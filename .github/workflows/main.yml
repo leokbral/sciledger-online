@@ -26,26 +26,31 @@ jobs:
         env:
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
           
-      - name: Install sshpass
-        run: sudo apt-get install sshpass -y
-          
       - name: Deploy to VM
         if: github.ref == 'refs/heads/main'
         env:
           HUNGRIA_PASSWORD: ${{ secrets.HUNGRIA_PASSWORD }}
           VM_PASSWORD: ${{ secrets.VM_PASSWORD }}
         run: |
-          # Create deployment script
-          echo '#!/bin/bash
-          ssh -p 4422 -o StrictHostKeyChecking=no sciledger@10.7.40.192 "
-            cd /var/www/sciledger &&
-            git pull origin main &&
-            npm ci &&
-            npm run build &&
-            pm2 restart sciledger || pm2 start npm --name sciledger -- run preview
-          "' > deploy.sh
+          # Create expect script for automated SSH login
+          cat > deploy.exp << 'EOL'
+          #!/usr/bin/expect -f
+          set timeout -1
+          spawn ssh -p 4422 leonardocabral@177.20.147.141
+          expect "password:"
+          send "$env(HUNGRIA_PASSWORD)\r"
+          expect "$ "
+          send "ssh -p 4422 sciledger@10.7.40.192\r"
+          expect "password:"
+          send "$env(VM_PASSWORD)\r"
+          expect "$ "
+          send "cd /var/www/sciledger && git pull origin main && npm ci && npm run build && pm2 restart sciledger || pm2 start npm --name sciledger -- run preview\r"
+          expect "$ "
+          send "exit\r"
+          expect "$ "
+          send "exit\r"
+          expect eof
+          EOL
           
-          chmod +x deploy.sh
-          
-          # Execute through Hungria
-          sshpass -p "$HUNGRIA_PASSWORD" ssh -p 4422 -o StrictHostKeyChecking=no leonardocabral@177.20.147.141 "bash -s" < deploy.sh
+          chmod +x deploy.exp
+          ./deploy.exp
