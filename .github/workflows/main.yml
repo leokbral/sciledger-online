@@ -35,14 +35,18 @@ jobs:
           HUNGRIA_PASSWORD: ${{ secrets.HUNGRIA_PASSWORD }}
           VM_PASSWORD: ${{ secrets.VM_PASSWORD }}
         run: |
-          # Create deployment script
+          # Create inner deployment script (to be executed on VM)
           echo '#!/bin/bash
           cd /var/www/sciledger && 
           git pull origin main && 
           npm ci && 
           npm run build && 
-          pm2 restart sciledger || pm2 start npm --name sciledger -- run preview' > deploy.sh
+          pm2 restart sciledger || pm2 start npm --name sciledger -- run preview' > deploy_vm.sh
+          
+          # Create outer deployment script (to be executed on Hungria)
+          echo '#!/bin/bash
+          echo $1 | ssh -p 4422 sciledger@10.7.40.192 "bash -s"' > deploy_hungria.sh
           
           # Execute deployment through SSH chain
           sshpass -p "$HUNGRIA_PASSWORD" ssh -o StrictHostKeyChecking=no -p 4422 leonardocabral@177.20.147.141 \
-            "sshpass -p '$VM_PASSWORD' ssh -o StrictHostKeyChecking=no -p 4422 sciledger@10.7.40.192 'bash -s'" < deploy.sh
+            "bash -s '$VM_PASSWORD'" < deploy_hungria.sh < deploy_vm.sh
