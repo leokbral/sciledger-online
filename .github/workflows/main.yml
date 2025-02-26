@@ -26,8 +26,10 @@ jobs:
         env:
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
           
-      - name: Install sshpass
-        run: sudo apt-get install sshpass -y
+      - name: Install required packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y sshpass expect
           
       - name: Deploy to VM
         if: github.ref == 'refs/heads/main'
@@ -35,18 +37,34 @@ jobs:
           HUNGRIA_PASSWORD: ${{ secrets.HUNGRIA_PASSWORD }}
           VM_PASSWORD: ${{ secrets.VM_PASSWORD }}
         run: |
-          # Create inner deployment script (to be executed on VM)
-          echo '#!/bin/bash
-          cd /var/www/sciledger && 
-          git pull origin main && 
-          npm ci && 
-          npm run build && 
-          pm2 restart sciledger || pm2 start npm --name sciledger -- run preview' > deploy_vm.sh
+          # Create expect script for VM connection
+          cat > vm_connect.exp << 'EOL'
+          #!/usr/bin/expect -f
+          set timeout -1
+          set vm_pass [lindex $argv 0]
           
-          # Create outer deployment script (to be executed on Hungria)
-          echo '#!/bin/bash
-          echo $1 | ssh -p 4422 sciledger@10.7.40.192 "bash -s"' > deploy_hungria.sh
+          # Connect to VM
+          send "ssh -p 4422 sciledger@10.7.40.192\r"
+          expect "password:"
+          send "$vm_pass\r"
+          expect "$ "
           
-          # Execute deployment through SSH chain
-          sshpass -p "$HUNGRIA_PASSWORD" ssh -o StrictHostKeyChecking=no -p 4422 leonardocabral@177.20.147.141 \
-            "bash -s '$VM_PASSWORD'" < deploy_hungria.sh < deploy_vm.sh
+          # Run deployment commands
+          send "cd /var/www/sciledger\r"
+          expect "$ "
+          send "git pull origin main\r"
+          expect "$ "
+          send "npm ci\r"
+          expect "$ "
+          send "npm run build\r"
+          expect "$ "
+          send "pm2 restart sciledger || pm2 start npm --name sciledger -- run preview\r"
+          expect "$ "
+          send "exit\r"
+          expect eof
+          EOL
+          
+          chmod +x vm_connect.exp
+          
+          # Connect to Hungria and run expect script
+          sshpass -p "$HUNGRIA_PASSWORD" ssh -o StrictHostKeyChecking=no -p 4422 leonardocabral@177.20.147.141 "expect -f -" < vm_connect.exp "$VM_PASSWORD"
