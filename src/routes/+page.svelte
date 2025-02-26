@@ -7,13 +7,17 @@
     export let data: { items: Item[] };
 </script>
 
-<h1>Items from MongoDB</h1>
-<h1>Testing GitHub Actions Workflow</h1>
-<ul>
-    {#each data.items as item}
-        <li>{item.name} (ID: {item._id})</li>
-    {/each}
-</ul>
+<div class="container mx-auto p-4">
+    <h1 class="text-2xl font-bold mb-4">MongoDB Items</h1>
+    <div class="grid gap-4">
+        {#each data.items as item}
+            <div class="card p-4">
+                <h3>{item.name}</h3>
+                <p class="text-sm opacity-70">ID: {item._id}</p>
+            </div>
+        {/each}
+    </div>
+</div>
 
 <!-- YOU CAN DELETE EVERYTHING IN THIS PAGE -->
 
