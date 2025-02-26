@@ -35,12 +35,19 @@ jobs:
           HUNGRIA_PASSWORD: ${{ secrets.HUNGRIA_PASSWORD }}
           VM_PASSWORD: ${{ secrets.VM_PASSWORD }}
         run: |
+          # Create SSH script for VM connection
+          echo '#!/bin/bash
+          sshpass -p "$1" ssh -p 4422 -o StrictHostKeyChecking=no sciledger@10.7.40.192 "
+            cd /var/www/sciledger &&
+            git pull origin main &&
+            npm ci &&
+            npm run build &&
+            pm2 restart sciledger || pm2 start npm --name sciledger -- start
+          "' > deploy_vm.sh
+          
+          # Make script executable
+          chmod +x deploy_vm.sh
+          
+          # Connect to Hungria and execute VM deployment
           sshpass -p "$HUNGRIA_PASSWORD" ssh -p 4422 -o StrictHostKeyChecking=no leonardocabral@177.20.147.141 "
-            sshpass -p '$VM_PASSWORD' ssh -p 4422 -o StrictHostKeyChecking=no sciledger@10.7.40.192 '
-              cd /var/www/app &&
-              git pull origin main &&
-              npm ci &&
-              npm run build &&
-              pm2 restart app || pm2 start npm --name app -- start
-            '
-          "
+            $(cat deploy_vm.sh)" "$VM_PASSWORD"
