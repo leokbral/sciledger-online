@@ -8,6 +8,7 @@
 </script>
 
 <h1>Items from MongoDB</h1>
+<h1>Testing GitHub Actions Workflow</h1>
 <ul>
     {#each data.items as item}
         <li>{item.name} (ID: {item._id})</li>
