@@ -45,4 +45,4 @@ jobs:
           
           # Execute deployment through SSH chain
           sshpass -p "$HUNGRIA_PASSWORD" ssh -o StrictHostKeyChecking=no -p 4422 leonardocabral@177.20.147.141 \
-            "ssh -o StrictHostKeyChecking=no -p 4422 sciledger@10.7.40.192 'bash -s'" < deploy.sh
+            "sshpass -p '$VM_PASSWORD' ssh -o StrictHostKeyChecking=no -p 4422 sciledger@10.7.40.192 'bash -s'" < deploy.sh
