@@ -1,39 +1,27 @@
-# name: CI/CD Pipeline
+name: CI/CD Pipeline
 
-# on:
-#   push:
-#     branches: [ main ]
-#   pull_request:
-#     branches: [ main ]
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
-# jobs:
-#   build-and-deploy:
-#     runs-on: ubuntu-latest
-#     steps:
-#       - uses: actions/checkout@v3
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
       
-#       - name: Setup Node.js
-#         uses: actions/setup-node@v3
-#         with:
-#           node-version: '18'
-#           cache: 'npm'
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
           
-#       - name: Install Dependencies
-#         run: npm ci
+      - name: Install Dependencies
+        run: npm ci
         
-#       - name: Build
-#         run: npm run build
-#         env:
-#           MONGODB_URI: ${{ secrets.MONGODB_URI }}
-          
-#       - name: Install sshpass
-#         run: sudo apt-get install -y sshpass
-          
-#       - name: Deploy to VM
-#         if: github.ref == 'refs/heads/main'
-#         env:
-#           HUNGRIA_PASSWORD: ${{ secrets.HUNGRIA_PASSWORD }}
-#           VM_PASSWORD: ${{ secrets.VM_PASSWORD }}
-#         run: |
-#           # Execute deployment script on Hungria
-#           sshpass -p "$HUNGRIA_PASSWORD" ssh -o StrictHostKeyChecking=no -p 4422 leonardocabral@177.20.147.141 "./deploy_sciledger.exp '$VM_PASSWORD'"
+      - name: Build
+        run: npm run build
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
