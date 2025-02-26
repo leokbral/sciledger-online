@@ -26,14 +26,8 @@ jobs:
         env:
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
           
-      - name: Install expect
-        run: sudo apt-get install -y expect
-          
-      - name: Configure SSH
-        run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -p 4422 177.20.147.141 >> ~/.ssh/known_hosts
-          ssh-keyscan -p 4422 10.7.40.192 >> ~/.ssh/known_hosts
+      - name: Install sshpass
+        run: sudo apt-get install sshpass -y
           
       - name: Deploy to VM
         if: github.ref == 'refs/heads/main'
@@ -41,25 +35,14 @@ jobs:
           HUNGRIA_PASSWORD: ${{ secrets.HUNGRIA_PASSWORD }}
           VM_PASSWORD: ${{ secrets.VM_PASSWORD }}
         run: |
-          # Create expect script for automated SSH login
-          cat > deploy.exp << 'EOL'
-          #!/usr/bin/expect -f
-          set timeout -1
-          spawn ssh -p 4422 leonardocabral@177.20.147.141
-          expect "password:"
-          send "$env(HUNGRIA_PASSWORD)\r"
-          expect "$ "
-          send "ssh -p 4422 sciledger@10.7.40.192\r"
-          expect "password:"
-          send "$env(VM_PASSWORD)\r"
-          expect "$ "
-          send "cd /var/www/sciledger && git pull origin main && npm ci && npm run build && pm2 restart sciledger || pm2 start npm --name sciledger -- run preview\r"
-          expect "$ "
-          send "exit\r"
-          expect "$ "
-          send "exit\r"
-          expect eof
-          EOL
+          # Create deployment script
+          echo '#!/bin/bash
+          cd /var/www/sciledger && 
+          git pull origin main && 
+          npm ci && 
+          npm run build && 
+          pm2 restart sciledger || pm2 start npm --name sciledger -- run preview' > deploy.sh
           
-          chmod +x deploy.exp
-          ./deploy.exp
+          # Execute deployment through SSH chain
+          sshpass -p "$HUNGRIA_PASSWORD" ssh -o StrictHostKeyChecking=no -p 4422 leonardocabral@177.20.147.141 \
+            "ssh -o StrictHostKeyChecking=no -p 4422 sciledger@10.7.40.192 'bash -s'" < deploy.sh
