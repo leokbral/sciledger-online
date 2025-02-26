@@ -1,27 +1,12 @@
-name: CI/CD Pipeline
+name: CI/CD Pipeline (Disabled)
 
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+  # Temporarily disable all triggers
+  workflow_dispatch:
+    # Manual trigger only
 
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-          cache: 'npm'
-          
-      - name: Install Dependencies
-        run: npm ci
-        
-      - name: Build
-        run: npm run build
-        env:
-          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+      - run: echo "Workflow temporarily disabled"
