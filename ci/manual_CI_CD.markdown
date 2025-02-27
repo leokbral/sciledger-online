@@ -329,3 +329,68 @@ Request for Admin:
    - Internal: 10.7.40.192:9305
    - Application: SciLedger web interface
 ```
+
+27. HTTPS Configuration
+```bash
+# 1. Verify SSL certificates
+ls -la /etc/nginx/certs/certificado.crt
+ls -la /etc/nginx/certs/server.key
+
+# 2. Update Nginx configuration
+sudo tee /etc/nginx/sites-available/sciledger << 'EOF'
+server {
+    listen 9305 ssl;
+    listen [::]:9305 ssl;
+    server_name scideep.imd.ufrn.br;
+
+    ssl_certificate /etc/nginx/certs/certificado.crt;
+    ssl_certificate_key /etc/nginx/certs/server.key;
+
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+EOF
+
+# 3. Test and restart Nginx
+sudo nginx -t
+sudo systemctl restart nginx
+```
+
+28. Test HTTPS Access
+```bash
+# Test local HTTPS access
+curl -k https://localhost:9305
+
+# Test from Hungria
+curl -k https://10.7.40.192:9305
+
+# Test from Windows (PowerShell)
+curl -k https://scideep.imd.ufrn.br:9305
+
+# Browser access
+https://scideep.imd.ufrn.br:9305
+```
+
+29. SSL Troubleshooting
+```bash
+# Check SSL certificate
+openssl x509 -in /etc/nginx/certs/certificado.crt -text -noout
+
+# Check Nginx SSL logs
+sudo tail -f /var/log/nginx/error.log
+
+# Verify SSL port is open
+sudo netstat -tulpn | grep :9305
+
+# Check SSL handshake
+openssl s_client -connect localhost:9305
+```
