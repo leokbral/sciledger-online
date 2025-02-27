@@ -46,8 +46,13 @@
   },
   "type": "module",
   "dependencies": {
+    "@faker-js/faker": "^8.4.1",
     "@floating-ui/dom": "1.6.13",
+    "@iconify/svelte": "^4.0.2",
+    "dotenv": "^16.4.5",
     "highlight.js": "11.11.1",
-    "mongodb": "^6.13.1"
+    "mongodb": "^6.13.1",
+    "mongoose": "^6.0.13",
+    "quill": "^2.0.3"
   }
 }
