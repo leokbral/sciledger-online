@@ -15,24 +15,32 @@ Host mongovm
     ProxyJump hungria
     LocalForward 27017 localhost:27017
 
-2. Create PowerShell Script
+2. Clean Up Existing MongoDB Processes
+
+# No terminal, executar como administrador
+taskkill /F /IM mongod.exe
+
+# Se o comando acima não funcionar, encontre o PID:
+netstat -ano | findstr "27017"
+taskkill /F /PID [PID_NUMBER]
+
+3. Create PowerShell Script
 
 # No terminal
-
 Write-Host "Establishing MongoDB Tunnel..." -ForegroundColor Green
 ssh mongovm -N
 
 ## Ele vai parecer que desligou, é normal. Deixe esse terminal aberto.
 
-3. Conectar Mongosh
+4. Conectar Mongosh
 
 # Em outro terminal, dentro da VM
-
 mongosh --port 27017 -u "adminUser" -p --authenticationDatabase "admin"
 
-4. Conectar Compass
+5. Conectar Compass
 
 # No Compass
 ## Use a string de conexão
+mongodb://adminUser:12345@localhost:27017/?authSource=admin&tls=false
 
-mongodb://adminUser:12345@localhost:27017/?authSource=admin
+Nota: Se houver problemas de conexão, sempre execute o passo 2 antes de tentar estabelecer o túnel SSH.
