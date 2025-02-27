@@ -1,0 +1,38 @@
+1. Create/Edit SSH Config File
+
+# Está em "C:\Users\leokb\.ssh"
+## Só precisa ser feito uma vez
+
+Host hungria
+    HostName 177.20.147.141
+    User leonardocabral
+    Port 4422
+    
+Host mongovm
+    HostName 10.7.40.192
+    User sciledger
+    Port 4422
+    ProxyJump hungria
+    LocalForward 27017 localhost:27017
+
+2. Create PowerShell Script
+
+# No terminal
+
+Write-Host "Establishing MongoDB Tunnel..." -ForegroundColor Green
+ssh mongovm -N
+
+## Ele vai parecer que desligou, é normal. Deixe esse terminal aberto.
+
+3. Conectar Mongosh
+
+# Em outro terminal, dentro da VM
+
+mongosh --port 27017 -u "adminUser" -p --authenticationDatabase "admin"
+
+4. Conectar Compass
+
+# No Compass
+## Use a string de conexão
+
+mongodb://adminUser:12345@localhost:27017/?authSource=admin
