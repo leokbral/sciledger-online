@@ -6,5 +6,12 @@ export default defineConfig({
 	plugins: [sveltekit(), purgeCss()],
 	server: {
 		allowedHosts: ['frontend_web'],
-	}
+	},
+	preview: {
+        allowedHosts: [
+            'localhost',
+            'scideep.imd.ufrn.br'
+        ]
+    }
+	
 });
