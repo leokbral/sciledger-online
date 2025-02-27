@@ -339,8 +339,8 @@ ls -la /etc/nginx/certs/server.key
 # 2. Update Nginx configuration
 sudo tee /etc/nginx/sites-available/sciledger << 'EOF'
 server {
-    listen 9305 ssl;
-    listen [::]:9305 ssl;
+    listen 443 ssl;
+    listen [::]:443 ssl;
     server_name scideep.imd.ufrn.br;
 
     ssl_certificate /etc/nginx/certs/certificado.crt;
@@ -368,16 +368,16 @@ sudo systemctl restart nginx
 28. Test HTTPS Access
 ```bash
 # Test local HTTPS access
-curl -k https://localhost:9305
+curl -k https://localhost
 
 # Test from Hungria
-curl -k https://10.7.40.192:9305
+curl -k https://10.7.40.192
 
 # Test from Windows (PowerShell)
-curl -k https://scideep.imd.ufrn.br:9305
+curl -k https://scideep.imd.ufrn.br
 
 # Browser access
-https://scideep.imd.ufrn.br:9305
+https://scideep.imd.ufrn.br
 ```
 
 29. SSL Troubleshooting
