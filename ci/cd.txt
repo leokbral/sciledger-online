@@ -1,0 +1,54 @@
+0. Nao ta funcionando entao fazer manualmente
+# Rodar isso ai logo quando entra na VM
+./sciledger_deploy.sh
+
+
+
+
+1. Create directory structure
+
+# Create application directory
+mkdir -p /var/www/sciledger
+cd /var/www/sciledger
+
+
+2. Clone repository
+
+# Clone your repository
+## Provavelmente vai pedir para usar ssh e talvez tenha que fazer um novo token como git clone https://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@github.com/leokbral/sciledger-online.git .
+git clone https://github.com/leokbral/sciledger-online.git .
+
+3. Install Node.js dependencies
+
+# Install project dependencies
+npm install
+
+# Install PM2 globally
+sudo npm install -g pm2
+
+4. Build and start application
+
+# Build the application
+npm run build
+
+# Start with PM2
+pm2 start npm --name "sciledger" -- start
+
+# Save PM2 process list
+pm2 save
+
+# Set PM2 to start on boot
+pm2 startup
+
+5. Verify installation
+
+# Check PM2 status
+pm2 status
+
+# View application logs
+pm2 logs sciledger
+
+6. After completing these steps, 
+    try accessing your application on port 3000 to verify it's running:
+
+curl http://localhost:3000
