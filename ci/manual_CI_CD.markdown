@@ -367,7 +367,7 @@ sudo systemctl restart nginx
 
 28. Test HTTPS Access
 ```bash
-# Test local HTTPS access
+# Test local HTTPS access dentro da VM
 curl -k https://localhost
 
 # Test from Hungria
