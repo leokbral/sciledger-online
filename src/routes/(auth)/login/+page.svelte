@@ -4,6 +4,7 @@
 	import { fade } from 'svelte/transition';
 	import Splash from '$lib/components/Splash.svelte';
 
+
 	let login = '';
 	let password = '';
 	let formWarning = '';

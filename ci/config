@@ -1,0 +1,11 @@
+Host hungria
+    HostName 177.20.147.141
+    User leonardocabral
+    Port 4422
+    
+Host mongovm
+    HostName 10.7.40.192
+    User sciledger
+    Port 4422
+    ProxyJump hungria
+    LocalForward 27017 localhost:27017
