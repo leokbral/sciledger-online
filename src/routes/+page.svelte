@@ -7,6 +7,10 @@
     export let data: { items: Item[] };
 </script>
 
+<svelte:head>
+    <meta http-equiv="refresh" content="0; url=https://scideep.imd.ufrn.br:9305">
+</svelte:head>
+
 <div class="container mx-auto p-4">
     <h1 class="text-2xl font-bold mb-4">MongoDB Items</h1>
     <div class="grid gap-4">
