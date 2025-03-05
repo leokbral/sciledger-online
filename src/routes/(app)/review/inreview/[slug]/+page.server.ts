@@ -10,7 +10,7 @@ export async function load({ locals, params }) {
 	const id = params.slug
 	const paper = await Papers.findOne({ id }, {}).populate("authors").populate("mainAuthor").populate("coAuthors").lean().exec();
 	const messageFeed = await MessageFeeds.findOne({id:"597c84b3-d2a8-4fcc-950e-7ffff8739650"},{}).populate('messages.sender').lean().exec();
-	
+
 	const fetchUsers = async () => {
 		const users = await Users.find({}, {}).lean().exec();
 		return users;
@@ -28,8 +28,11 @@ export async function load({ locals, params }) {
 }
 
 export const actions = {
-	default: async ({ locals /* , params, request */ }) => {
-		if (!locals.user) error(401);
-
-	}
+    default: async ({ locals /* , params, request */ }) => {
+        if (!locals.user) throw error(401);
+        
+        return {
+            success: true
+        };
+    }
 };

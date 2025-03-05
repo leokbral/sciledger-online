@@ -5,9 +5,9 @@
 	import type { Paper } from '$lib/types/Paper';
 	//import type { PaperPublishStoreData } from '$lib/types/PaperPublishStoreData';
 	import type { PageData } from './$types';
-	
 
 	export let data: PageData;
+	console.log("www0",data)
 
 	let paper = data.paper;
 	let currentUser = data.user;

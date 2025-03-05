@@ -6,14 +6,14 @@
 
 	export let paper: Paper;
 	export let user;
-	console.log('paper -- ', paper);
+	// console.log('paper -- ', paper);
 </script>
 
 <div class="flex flex-col gap-3">
 	<div class="flex gap-3 items-center">
 		<div>
 			<div class="flex gap-3 items-center">
-				<a href="/profile/{paper.mainAuthor.username}">
+				<a href="/profile/{paper.mainAuthor?.username}">
 					<div class="flex gap-3 items-center">
 						{#if paper.mainAuthor?.profilePictureUrl}
 							<Avatar
@@ -37,8 +37,8 @@
 							</div>
 						{/if}
 						<div class="flex flex-col justify-center">
-							<a class="text-primary-500" href="/profile/{paper.mainAuthor.username}">
-								{paper.mainAuthor.username}
+							<a class="text-primary-500" href="/profile/{paper.mainAuthor?.username}">
+								{paper.mainAuthor.username || "ERROR-404"}
 							</a>
 						</div>
 

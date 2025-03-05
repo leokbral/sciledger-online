@@ -1,12 +1,15 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import PaperPreview from '$lib/PaperList/PaperPreview.svelte';
+	
+	//AKIIIIIIIIIIIIIII
 	import ReviewChat from '$lib/components/review/ReviewChat.svelte';
+	// import { Types } from 'mongoose';
+	
 	import type { MessageFeed } from '$lib/types/MessageFeed';
 	import type { Paper } from '$lib/types/Paper';
 	import type { User } from '$lib/types/User';
 	import { faker } from '@faker-js/faker';
-	import { Types } from 'mongoose';
 	import { createEventDispatcher } from 'svelte';
 
 	const dispatch = createEventDispatcher();
@@ -105,18 +108,18 @@
 	// 	]
 	// };
 
-	console.log(messageFeed)
+	console.log('44444',messageFeed)
 	let currentMessage = '';
 
-	export let data = {
-		messageFeed,
-		currentMessage
-	};
+	// export let data = {
+	// 	messageFeed,
+	// 	currentMessage
+	// };
 
 	export let paper;
 	export let editable = false; // Nova propriedade
 
-	export let currentUser: User;
+	export let currentUser: User = user1;
 	// console.log('current', currentUser);
 	// console.log('Reviewers', paper.reviewers);
 
@@ -179,7 +182,7 @@
 					class="h-full w-1/2"
 				></iframe>
 				<section class="card w-1/2">
-					<ReviewChat on:saveDraft={hdlSaveDraft} on:submitReview {data} {currentUser}></ReviewChat>
+					<!-- <ReviewChat on:saveDraft={hdlSaveDraft} on:submitReview {data} {currentUser}></ReviewChat> -->
 				</section>
 			</div>
 		</div>

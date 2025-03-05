@@ -4,7 +4,7 @@
 	import { createEventDispatcher } from 'svelte';
 	import type { User } from '$lib/types/User';
 	import type { MessageFeed } from '$lib/types/MessageFeed';
-	import { Types } from 'mongoose';
+	// import { Types } from 'mongoose'; Isso deu erro!
 	import { page } from '$app/stores';
 	import { get } from 'svelte/store';
 
