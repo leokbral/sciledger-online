@@ -25,10 +25,10 @@
 	// Verifique se os dados do revisor estão definidos antes de usá-los
 	if (reviews?.length) {
 	  articlesPendingReview = reviews.filter((review: any) => review.status === 'pending').length;
-	  articlesInReview = reviews.filter((review: any) => review.status === 'in_review').length;
+	  articlesInReview = reviews.filter((review: any) => review.status === 'in review').length;
 	  articlesReviewed = reviews.filter((review: any) => review.status === 'reviewed').length;
-	  articlesNeedingCorrections = reviews.filter((review: any) => review.status === 'needs_corrections').length;
-	  articlesAwaitingFinalApproval = reviews.filter((review: any) => review.status === 'awaiting_approval').length;
+	  articlesNeedingCorrections = reviews.filter((review: any) => review.status === 'needs corrections').length;
+	  articlesAwaitingFinalApproval = reviews.filter((review: any) => review.status === 'awaiting approval').length;
 	}
   
 	if (user) {
@@ -74,7 +74,7 @@
 		<div class="text-xl font-bold mb-6">Your Activities</div>
 
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mb-6">
-			<!-- <div class="relative">
+			< !-- <div class="relative">
 				<p
 					class="text-ls font-semibold flex items-center gap-2 text-gray-700 hover:text-blue-600 hover:underline transition duration-300 ease-in-out cursor-pointer relative"
 				>

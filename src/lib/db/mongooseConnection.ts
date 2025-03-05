@@ -1,7 +1,11 @@
 
 import { config } from 'dotenv';
 config();
-const MONGO_URL = process.env.MONGO_URL;
+const MONGO_URL = process.env.MONGO_URL ||'';
+
+if (!MONGO_URL) {
+    throw new Error('MONGO_URL environment variable is not defined');
+}
 
 import mongoose from 'mongoose';
 
@@ -9,8 +13,7 @@ import mongoose from 'mongoose';
 export async function start_mongo() {
     if (mongoose.connection.readyState === 0) { // Verifica se já existe uma conexão ativa
         try {
-            await mongoose.connect(MONGO_URL, {
-            });
+            mongoose.connect(MONGO_URL, {});
             console.log('Conectado ao MongoDB via Mongoose');
         } catch (error) {
             console.error('Erro ao conectar ao MongoDB:', error);
