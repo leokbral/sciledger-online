@@ -302,6 +302,7 @@
 				<div class="font-normal mt-0">{contactInfo || 'No contact info'}</div>
 			</div>
 		</div>
+		
 
 		<!-- About Section -->
 		<div class="mt-6">

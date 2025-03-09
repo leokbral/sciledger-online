@@ -10,6 +10,7 @@
 	import AvailableReviewers from '$lib/AvailableReviewers.svelte';
 	import type { User } from '$lib/types/User';
 	import PapersImages from '$lib/components/PapersImages.svelte';
+	import Icon from '@iconify/svelte';
 
 	export let data: PageData;
 	let reviewers = data.users.filter((u: User) => u.roles.reviewer === true);
@@ -33,26 +34,6 @@
 		};
 	}
 
-	// async function handleSavePaper(event: { detail: { store: Paper } }) {
-	// 	console.log('Updated Paper Data:', event.detail.store);
-
-	// 	const updatedPaper = event.detail.store;
-	// 	console.log('Saving Updated Paper:', updatedPaper);
-
-	// 	try {
-	// 		const response = await post(`/publish/negotiation/${updatedPaper.id}`, updatedPaper); // Use id se for o campo correto
-
-	// 		if (response.paper) {
-	// 			// Redireciona para a página de detalhes do artigo editado
-	// 			goto(`/publish/`);
-	// 		} else {
-	// 			alert(`Issue! ${JSON.stringify(response)}`);
-	// 		}
-	// 	} catch (error) {
-	// 		console.log(error);
-	// 		alert('An error occurred. Please try again.');
-	// 	}
-	// }
 	async function handleSavePaper(event: MouseEvent) {
 		console.log('Saving Paper:', paper);
 
@@ -61,7 +42,9 @@
 		// Prepare the updated paper data
 		const updatedPaper = {
 			...paper,
-			selectedReviewers: selectedReviewers // Add selected reviewers
+			selectedReviewers: selectedReviewers,
+			peerReviewType: peer_review,
+			status: 'in review'
 		};
 
 		try {
@@ -69,15 +52,22 @@
 			const response = await post(`/publish/negotiation/${updatedPaper.id}`, updatedPaper);
 
 			if (response.paper) {
-				// Also update the price in paperspool
-				const poolResponse = await post(`/api/paperspool/${updatedPaper.id}/update-price`, {
-					price: updatedPaper.price
-				});
+				 // Update price in paperspool and assign reviewers
+				const [poolResponse, reviewAssignments] = await Promise.all([
+					post(`/api/paperspool/${updatedPaper.id}/update-price`, {
+						price: updatedPaper.price
+					}),
+					post(`/api/review/assign`, {
+						paperId: updatedPaper.id,
+						reviewerIds: selectedReviewers,
+						peerReviewType: peer_review
+					})
+				]);
 
-				if (poolResponse.success) {
+				if (poolResponse.success && reviewAssignments.success) {
 					goto(`/publish/`);
 				} else {
-					alert(`Failed to update price in papers pool: ${JSON.stringify(poolResponse)}`);
+					alert('Failed to update price or assign reviewers');
 				}
 			} else {
 				alert(`Issue: ${JSON.stringify(response)}`);
@@ -138,7 +128,7 @@
 			{/if}
 		</section>
 
-		<div class="p-4 border border-surface-300 rounded-lg">
+		<!-- <div class="p-4 border border-surface-300 rounded-lg">
 			<h5 class="text-lg font-semibold mb-2">Price</h5>
 			<label for="price" class="block mb-1">Price</label>
 			<input
@@ -148,6 +138,25 @@
 				bind:value={paper.price}
 				placeholder="Enter price"
 			/>
+		</div> -->
+
+		<p>Amount</p>
+		<div class="input-group input-group-divider grid-cols-[auto_1fr_auto]">
+			<div class="input-group-shim">
+				<Icon icon="material-symbols-light:attach-money-rounded" width="24" height="24" />
+			</div>
+
+			<input
+				type="number"
+				class="w-full p-2 border border-surface-300 rounded-lg"
+				bind:value={paper.price}
+				placeholder="Amount"
+			/>
+			<select>
+				<option>USD</option>
+				<!-- <option>CAD</option>
+				<option>EURO</option> -->
+			</select>
 		</div>
 
 		<!-- Peer Review Options -->
