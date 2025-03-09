@@ -9,6 +9,7 @@
 	import { page } from '$app/stores';
 	import AvailableReviewers from '$lib/AvailableReviewers.svelte';
 	import type { User } from '$lib/types/User';
+	import PapersImages from '$lib/components/PapersImages.svelte';
 
 	export let data: PageData;
 	let reviewers = data.users.filter((u: User) => u.roles.reviewer === true);
@@ -129,6 +130,14 @@
 				<PaperPreview {paper} user={$page.data.user} />
 			</div>
 		</div>
+
+		<!-- papers images section -->
+		<section>
+			{#if $page.url.pathname.includes('negotiation')}
+				<PapersImages />
+			{/if}
+		</section>
+
 		<div class="p-4 border border-surface-300 rounded-lg">
 			<h5 class="text-lg font-semibold mb-2">Price</h5>
 			<label for="price" class="block mb-1">Price</label>
@@ -140,6 +149,7 @@
 				placeholder="Enter price"
 			/>
 		</div>
+
 		<!-- Peer Review Options -->
 		<label for="peer_review" class="block mb-1">Peer Review Options</label>
 		<select

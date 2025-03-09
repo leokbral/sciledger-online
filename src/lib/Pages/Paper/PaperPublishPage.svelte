@@ -16,6 +16,7 @@
 	import { page } from '$app/stores';
 	import SERVER from '../config';
 	import RichTextEditor from '$lib/components/Text/RichTextEditor.svelte';
+	import PapersImages from '$lib/components/PapersImages.svelte';
 
 	let fileName = '';
 
@@ -209,7 +210,6 @@
 	function save() {
 		dispatch('savePaper', { store: $store });
 	}
-
 </script>
 
 <main class="grid p-5">
@@ -280,6 +280,14 @@
 					placeholder="Enter article keywords..."
 				/>
 			</section>
+
+			<!-- papers images section -->
+			<section>
+				{#if $page.url.pathname.includes('edit')}
+					<PapersImages />
+				{/if}
+			</section>
+
 			<!-- < !-- <label for="peer_review" class="block mb-1">Peer Review Options</label>
 			<select
 				id="peer_review"
