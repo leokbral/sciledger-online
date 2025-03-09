@@ -33,7 +33,12 @@
 		}
 	];
 
-	let papersPool = papers.filter((p: Paper) => p.status === 'under negotiation');
+	let papersPool = papers.filter(
+		(p: Paper) =>
+			p.status === 'under negotiation' &&
+			(p.reviewers.includes(data.user.id) || p.correspondingAuthor === data.user.id)
+	);
+	console.log(papersPool)
 	let inReview = papers.filter((p: Paper) => p.status === 'in review');
 	let correction = papers.filter((p: Paper) => p.status === 'needing corrections');
 	let reviewed = papers.filter((p: Paper) => p.status === 'published');

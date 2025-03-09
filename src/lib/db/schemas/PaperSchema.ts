@@ -31,7 +31,7 @@ export const PaperSchema: Schema = new Schema({
             reviewerResponses: [{
                 reviewerId: { type: String, ref: 'User' }, // UUID do revisor
                 counterProposal: { type: String }, // Proposta de contraproposta do revisor
-                responseStatus: { type: String, enum: ['accepted', 'declined', 'counter-proposal', 'pending'], default: 'pending' }, // Status geral da resposta do revisor
+                respon5seStatus: { type: String, enum: ['accepted', 'declined', 'counter-proposal', 'pending'], default: 'pending' }, // Status geral da resposta do revisor
                 reviewerComments: [{ type: String }] // Comentários do revisor
             }]
         }
