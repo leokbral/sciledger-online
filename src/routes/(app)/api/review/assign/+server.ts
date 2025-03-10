@@ -18,14 +18,14 @@ export const POST: RequestHandler = async ({ request }) => {
         }));
 
         // Insere na collection review_queue
-        await db.collection('reviewqueue').insertMany(reviewAssignments);
+        await db.collection('reviewqueues').insertMany(reviewAssignments);
 
         // Atualiza o status do paper
         await db.collection('papers').updateOne(
             { _id: paperId },
             { 
                 $set: { 
-                    status: 'in review',
+                    status: 'under negotiation', /*Aqui de fato muda o status do paper*/
                     reviewers: reviewerIds
                 }
             }

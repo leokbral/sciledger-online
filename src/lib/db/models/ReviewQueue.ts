@@ -1,12 +1,9 @@
+import type { ReviewQueue } from '$lib/types/ReviewQueue';
 import mongoose from 'mongoose';
+import { ReviewQueueSchema } from '../schemas/ReviewQueue';
 
-const ReviewQueueSchema = new mongoose.Schema({
-    paperId: { type: String, required: true },
-    assignedReviewers: [{ type: String, ref: 'User' }],
-    peerReviewType: { type: String, enum: ['open', 'selected'], required: true },
-    status: { type: String, enum: ['pending', 'accepted', 'rejected'], required: true },
-    assignedAt: { type: Date, default: Date.now }
-});
 
-const ReviewQueueModel = mongoose.model('reviewqueue', ReviewQueueSchema);
+export interface IReviewQueue extends ReviewQueue, mongoose.Document {}
+
+const ReviewQueueModel = mongoose.model<IReviewQueue>('ReviewQueue', ReviewQueueSchema);
 export default ReviewQueueModel;
