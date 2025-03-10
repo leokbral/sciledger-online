@@ -7,7 +7,7 @@ export const UserSchema: Schema = new Schema({
     firstName: { type: String, required: true, unique: false }, // Nome de usuário
     lastName: { type: String, required: true, unique: false }, // Nome de usuário
     country: { type: String, required: true, unique: false }, // Nome de usuário
-    dob: { type: String, required: true, unique: false }, // Nome de usuário
+    dob: { type: String, required: true, unique: false }, // Date of Birth
     username: { type: String, required: true, unique: true }, // Handle do usuário, único e obrigatório
     email: { type: String, required: true, unique: true }, // Email do usuário
     password: { type: String, required: true }, // Senha do usuário
