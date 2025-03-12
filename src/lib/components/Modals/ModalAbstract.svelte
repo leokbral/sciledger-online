@@ -1,10 +1,13 @@
 <script lang="ts">
-	import { getModalStore } from '@skeletonlabs/skeleton';
-	import ModalFullscreen from './ModalFullscreen.svelte';
+		import ModalFullscreen from './ModalFullscreen.svelte';
 	import type { SvelteComponent } from 'svelte';
 
 	
-	export let parent: SvelteComponent;
+	interface Props {
+		parent: SvelteComponent;
+	}
+
+	let { parent }: Props = $props();
 
 	const modalStore = getModalStore();
 

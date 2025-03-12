@@ -4,7 +4,11 @@
 
 	import type { PageData } from './$types';
 
-	export let data: PageData;
+	interface Props {
+		data: PageData;
+	}
+
+	let { data }: Props = $props();
 
 	let papers: Paper[] = data.papers;
 	let user = data.user;

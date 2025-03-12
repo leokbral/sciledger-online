@@ -12,15 +12,19 @@
 	import PapersImages from '$lib/components/PapersImages.svelte';
 	import Icon from '@iconify/svelte';
 
-	export let data: PageData;
+	interface Props {
+		data: PageData;
+	}
+
+	let { data }: Props = $props();
 	let reviewers = data.users.filter((u: User) => u.roles.reviewer === true);
 	// State for peer review option
-	let peer_review: string = '';
+	let peer_review: string = $state('');
 	// let reviewers: User;
 
 	// let user = data.user;
 
-	let paper: Paper | null = data.paper;
+	let paper: Paper | null = $state(data.paper);
 	//console.log("www",paper?.authors)
 	let userProfiles = data.users; // Ajuste conforme necessário
 
@@ -78,7 +82,7 @@
 		}
 	}
 
-	let selectedReviewers: string[] = [];
+	let selectedReviewers: string[] = $state([]);
 
 	// Define the toggle function
 	function toggleReviewerSelection(reviewerId: string) {
@@ -101,10 +105,10 @@
 <div class="grid grid-cols-[1fr_1fr_1fr] p-5">
 	<div></div>
 	<div class="flex justify-between gap-3">
-		<button class="bg-primary-500 text-white rounded-lg px-4 py-2" on:click={hdlSaveDraft}
+		<button class="bg-primary-500 text-white rounded-lg px-4 py-2" onclick={hdlSaveDraft}
 			>Save Draft</button
 		>
-		<button class="bg-primary-500 text-white rounded-lg px-4 py-2" on:click={handleSavePaper}
+		<button class="bg-primary-500 text-white rounded-lg px-4 py-2" onclick={handleSavePaper}
 			>Submit to Review</button
 		>
 	</div>

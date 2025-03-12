@@ -1,15 +1,17 @@
 <script lang="ts">
+	import { preventDefault } from 'svelte/legacy';
+
 	import { goto } from '$app/navigation';
 	import { post } from '$lib/utils';
 	import { fade } from 'svelte/transition';
 	import Splash from '$lib/components/Splash.svelte';
 
 
-	let login = '';
-	let password = '';
-	let formWarning = '';
+	let login = $state('');
+	let password = $state('');
+	let formWarning = $state('');
 	let processing = false;
-	let notInView: boolean = true;
+	let notInView: boolean = $state(true);
 
 	function hideSplash() {
 		notInView = !notInView;
@@ -35,7 +37,7 @@
 	<div
 		class="w-full flex justify-center md:max-w-xl md:bg-white md:rounded-3xl md:shadow-2xl md:shadow-surface-500/50"
 	>
-		<form class="flex flex-col w-4/5 md:w-full md:px-16 md:py-14" on:submit|preventDefault={submit}>
+		<form class="flex flex-col w-4/5 md:w-full md:px-16 md:py-14" onsubmit={preventDefault(submit)}>
 			<img
 				src="https://t4.ftcdn.net/jpg/05/44/04/47/360_F_544044746_Swth0lqH9CcTci8S5p2FS4Jqpcy6HWoI.jpg"
 				alt="Logo"

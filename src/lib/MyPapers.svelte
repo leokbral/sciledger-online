@@ -1,8 +1,12 @@
 <script lang="ts">
 	import type { Paper } from './types/Paper';
 
-	export let papersData: Paper[];
-	export let rota:string = '/articles'
+	interface Props {
+		papersData: Paper[];
+		rota?: string;
+	}
+
+	let { papersData, rota = '/articles' }: Props = $props();
 	// let user; // Selecionar o primeiro usuário na lista para demonstração
 </script>
 

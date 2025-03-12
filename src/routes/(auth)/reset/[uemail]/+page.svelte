@@ -1,17 +1,23 @@
 <script lang="ts">
+	import { preventDefault } from 'svelte/legacy';
+
 	import { goto } from '$app/navigation';
 	import { post } from '$lib/utils';
 	import { fade } from 'svelte/transition';
 	import '/src/app.postcss';
 	import type { PageData } from './$types';
 
-	export let data: PageData;
+	interface Props {
+		data: PageData;
+	}
+
+	let { data }: Props = $props();
 
 	let email = data.userEmail;
-	let verificationCode = '';
-	let password = '';
-	let newPassword = '';
-	let formWarning = '';
+	let verificationCode = $state('');
+	let password = $state('');
+	let newPassword = $state('');
+	let formWarning = $state('');
 	let processing = false;
 
 	async function submit(event: unknown) {
@@ -34,7 +40,7 @@
 </script>
 
 <div class="main-container">
-	<form class="main-form" on:submit|preventDefault={submit}>
+	<form class="main-form" onsubmit={preventDefault(submit)}>
 		<img
 			src="https://t4.ftcdn.net/jpg/05/44/04/47/360_F_544044746_Swth0lqH9CcTci8S5p2FS4Jqpcy6HWoI.jpg"
 			alt="Logo"

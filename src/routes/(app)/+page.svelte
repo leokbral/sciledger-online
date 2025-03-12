@@ -4,7 +4,11 @@
 	import { page_size } from '$lib/constants';
 	import type { PageData } from './$types';
 
-	export let data:PageData;
+	interface Props {
+		data: PageData;
+	}
+
+	let { data }: Props = $props();
 	//console.log('chamou page home', data.papers)
 
 	let papers = data.papers;
@@ -12,10 +16,10 @@
 	// let pages = Math.ceil(data.papers.papersCount / parseInt(page_size));
 	let tags: string[] = [];
 
-	$: p = +($page.url.searchParams.get('page') ?? '1');
-	$: tag = $page.url.searchParams.get('tag');
-	$: tab = $page.url.searchParams.get('tab') ?? 'all';
-	$: page_link_base = tag ? `tag=${tag}` : `tab=${tab}`;
+	let p = $derived(+($page.url.searchParams.get('page') ?? '1'));
+	let tag = $derived($page.url.searchParams.get('tag'));
+	let tab = $derived($page.url.searchParams.get('tab') ?? 'all');
+	let page_link_base = $derived(tag ? `tag=${tag}` : `tab=${tab}`);
 </script>
 
 <svelte:head>

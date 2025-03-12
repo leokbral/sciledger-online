@@ -1,9 +1,11 @@
 <script lang="ts">
-    let name = '';
-    let email = '';
-    let password = '';
-    let confirmPassword = '';
-    let handle = '';
+    import { preventDefault } from 'svelte/legacy';
+
+    let name = $state('');
+    let email = $state('');
+    let password = $state('');
+    let confirmPassword = $state('');
+    let handle = $state('');
 
     // Adiciona '@' ao handle apenas no envio dos dados
     function formatHandle(handle: string): string {
@@ -40,7 +42,7 @@
     }
 </script>
 
-<form on:submit|preventDefault={handleSubmit}>
+<form onsubmit={preventDefault(handleSubmit)}>
     <label for="name">Nome de Usuário:</label>
     <input id="name" type="text" bind:value={name} required />
 

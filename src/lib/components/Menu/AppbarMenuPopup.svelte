@@ -4,7 +4,11 @@
 	import MenuHighlights from './MenuHighlights.svelte';
 	// import MenuEmphasis from './MenuHighlights.svelte';
 
-	export let data: any;
+	interface Props {
+		data: any;
+	}
+
+	let { data }: Props = $props();
 
 	let lastStreakCheckpointDate: string = data.profile.lastStreakCheckpointDate;
 	let currentDate: string = getCurrentDate();
@@ -24,14 +28,14 @@
 	<div class="card w-72 shadow-xl">
 		<Profile {profile} />
 		<MenuHighlights {highlights} />
-		<div class="arrow bg-surface-800-100-token z-[50]" />
-		<section class="w-full text-surface-900-50-token card p-4 space-y-4">
+		<div class="arrow bg-surface-900-100 z-[50]"></div>
+		<section class="w-full text-surface-950-50 card p-4 space-y-4">
 			<p class="font-bold">Desafios</p>
 			<ul class="list">
 				{#each quests as quest}
 					<li>
 						<figure
-							class="avatar flex aspect-square font-semibold justify-center items-center overflow-hidden isolate bg-surface-400-500-token w-12 rounded-full"
+							class="avatar flex aspect-square font-semibold justify-center items-center overflow-hidden isolate bg-surface-500 w-12 rounded-full"
 							data-testid="avatar"
 						>
 							{quest}

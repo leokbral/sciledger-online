@@ -10,7 +10,7 @@
 		images: PaperImage[];
 	}
 
-	let elemPaperImages: HTMLDivElement;
+	let elemPaperImages: HTMLDivElement = $state();
 
 	const paperImagesData: PaperImagesData = {
 		images: [
@@ -65,8 +65,8 @@
 
 	<div class="grid grid-cols-[auto_1fr_auto] gap-4 items-center">
 		<!-- Button: Left -->
-		<button type="button" class="btn-icon variant-filled" on:click={multiColumnLeft}>
-			<i class="fa-solid fa-arrow-left" />
+		<button type="button" class="btn-icon preset-filled" onclick={multiColumnLeft}>
+			<i class="fa-solid fa-arrow-left"></i>
 		</button>
 
 		<div bind:this={elemPaperImages} class="snap-x snap-mandatory scroll-smooth flex gap-4 pb-4 overflow-x-auto">
@@ -85,8 +85,8 @@
 		</div>
 
 		<!-- Button-Right -->
-		<button type="button" class="btn-icon variant-filled" on:click={multiColumnRight}>
-			<i class="fa-solid fa-arrow-right" />
+		<button type="button" class="btn-icon preset-filled" onclick={multiColumnRight}>
+			<i class="fa-solid fa-arrow-right"></i>
 		</button>
 	</div>
 </section>

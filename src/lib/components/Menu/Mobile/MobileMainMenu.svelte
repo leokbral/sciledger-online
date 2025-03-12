@@ -1,22 +1,29 @@
 <script lang="ts">
+	import { createBubbler } from 'svelte/legacy';
+
+	const bubble = createBubbler();
 	import { onMount } from 'svelte';
 
 	import type { Menuitem } from '../types';
 	import MobileMenuItemCard from './MobileMenuItemCard.svelte';
 
-	let innerWidth: number;
+	let innerWidth: number = $state();
 	let w: number;
 
-	export let selected: number;
 
-	export let items: Menuitem[];
+	interface Props {
+		selected: number;
+		items: Menuitem[];
+	}
+
+	let { selected = $bindable(), items }: Props = $props();
 
 	let len = items.length;
 
 	let touchstartX = 0;
 	let touchendX = 0;
 
-	let menuContainer: HTMLDivElement;
+	let menuContainer: HTMLDivElement = $state();
 
 	const btnHdl = (i: number) => {
 		selected = i;
@@ -106,8 +113,8 @@
 
 <svelte:window bind:innerWidth />
 <div
-	on:touchstart={handleTouchStart}
-	on:touchend={handleTouchEnd}
+	ontouchstart={handleTouchStart}
+	ontouchend={handleTouchEnd}
 	class="w-screen h-[calc(100svh_-_80px)] bg-surface-900 p-0 grid grid-cols-[1fr] gap-4 items-center"
 >
 	<!-- Full Images -->
@@ -124,17 +131,17 @@
 		{#each items as item, i}
 			<div
 				id={`item-${i}`}
-				class="!bg-transparent w-10/12 snap-center shrink-0 rounded-container-token flex items-center"
+				class="!bg-transparent w-10/12 snap-center shrink-0 rounded-container flex items-center"
 				role="button"
 				tabindex="0"
-				on:click={() => btnHdl(i)}
-				on:keypress
+				onclick={() => btnHdl(i)}
+				onkeypress={bubble('keypress')}
 			>
 				<div class="flex flex-col justify-center items-center gap-4">
 					<div class="w-1/2">
 						<img
 							height="120"
-							class="snap-center rounded-container-token"
+							class="snap-center rounded-container"
 							src="/images/chibi-{i}.png"
 							alt={'tori'}
 							loading="lazy"

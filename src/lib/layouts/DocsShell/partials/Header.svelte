@@ -1,13 +1,15 @@
 <script lang="ts">
 	import type { DocsShellSettings } from '$lib/layouts/DocsShell/types';
-	import { CodeBlock } from '@skeletonlabs/skeleton';
-
 	// Props
-	export let pageData: DocsShellSettings;
+	interface Props {
+		pageData: DocsShellSettings;
+	}
+
+	let { pageData }: Props = $props();
 
 	// Classes
 	const cHeader = 'space-y-10';
-	const cChip = 'chip variant-soft hover:variant-filled';
+	const cChip = 'chip preset-tonal hover:preset-filled';
 
 	// Local
 	const githubBranch = 'master'; // IMPORTANT: for testing only, keep as 'master'
@@ -26,12 +28,12 @@
 	}
 
 	// Reactive
-	$: classesHeader = `${cHeader}`;
+	let classesHeader = $derived(`${cHeader}`);
 </script>
 
 <header class="doc-shell-header {classesHeader}">
 	<section class="space-y-4">
-		<span class="badge variant-soft translate-y-1">{@html pageData.feature}</span>
+		<span class="badge preset-tonal translate-y-1">{@html pageData.feature}</span>
 		<h1 class="h1">{pageData.name}</h1>
 		<p>{@html pageData.description}</p>
 	</section>

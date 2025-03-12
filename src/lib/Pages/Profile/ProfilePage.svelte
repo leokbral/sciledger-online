@@ -1,14 +1,18 @@
 <script lang="ts">
 	import AuthorDashboard from '$lib/AuthorDashboard.svelte';
 	import MyPapers from '$lib/MyPapers.svelte';
-	import { TabGroup, Tab } from '@skeletonlabs/skeleton';
+	import { Tab, Tabs } from '@skeletonlabs/skeleton-svelte';
 	import Icon from '@iconify/svelte';
 	import { userProfiles } from '../../../routes/(app)/UserProfile';
 
-	let tabSet: number = 0;
+	let tabSet: number = $state(0);
 	let user = userProfiles[0];
 
-	export let data;
+	interface Props {
+		data: any;
+	}
+
+	let { data }: Props = $props();
 
 	//console.log("data 13--> ", data)
 	let tabs = data.tabs;
@@ -16,7 +20,7 @@
 </script>
 
 <div class="container page p-4 m-auto">
-	<TabGroup justify="justify-center">
+	<Tabs justify="justify-center">
 		{#each tabs as tab, value}
 			<Tab bind:group={tabSet} name="tab{value}" {value}>
 				<div class="flex justify-center">
@@ -26,35 +30,37 @@
 			</Tab>
 		{/each}
 		<!-- Tab Panels --->
-		<svelte:fragment slot="panel">
-			<div class="grid gap-3 md:grid-cols-1">
-				{#if tabSet === 0}
-					<div class="card page max-w-[700px] p-4 m-auto">
-						<div class="text-surface-900">
-							<MyPapers papersData={tabsContent[0]}></MyPapers>
-						</div>
-					</div>
-				{:else if tabSet === 1}
-					<div class="card page max-w-[700px] p-4 m-auto">
-						<div class="text-surface-900">
-							{tabsContent[1]}
-						</div>
-					</div>
-				{:else if tabSet === 2}
-					<div class="card page max-w-[700px] p-4 m-auto">
-						<div class="text-surface-900">
-							{tabsContent[2]}
+		{#snippet panel()}
+			
+				<div class="grid gap-3 md:grid-cols-1">
+					{#if tabSet === 0}
+						<div class="card page max-w-[700px] p-4 m-auto">
 							<div class="text-surface-900">
-								<div class="mt-4">
-									<h2 class="text-xl font-semibold">Contact Information</h2>
-									<p class="mt-2"><strong>Email:</strong> {user.email}</p>
+								<MyPapers papersData={tabsContent[0]}></MyPapers>
+							</div>
+						</div>
+					{:else if tabSet === 1}
+						<div class="card page max-w-[700px] p-4 m-auto">
+							<div class="text-surface-900">
+								{tabsContent[1]}
+							</div>
+						</div>
+					{:else if tabSet === 2}
+						<div class="card page max-w-[700px] p-4 m-auto">
+							<div class="text-surface-900">
+								{tabsContent[2]}
+								<div class="text-surface-900">
+									<div class="mt-4">
+										<h2 class="text-xl font-semibold">Contact Information</h2>
+										<p class="mt-2"><strong>Email:</strong> {user.email}</p>
+									</div>
 								</div>
 							</div>
 						</div>
-					</div>
-				{/if}
-				<!-- {/each} -->
-			</div>
-		</svelte:fragment>
-	</TabGroup>
+					{/if}
+					<!-- {/each} -->
+				</div>
+			
+			{/snippet}
+	</Tabs>
 </div>

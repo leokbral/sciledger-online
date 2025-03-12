@@ -2,21 +2,25 @@
 	// Imports
 	import Icon from '@iconify/svelte';
 	import ProfilePage from '$lib/Pages/Profile/ProfilePage.svelte';
-	import { Avatar } from '@skeletonlabs/skeleton';
+	import { Avatar } from '@skeletonlabs/skeleton-svelte';
 	import type { KnowledgeArea } from '$lib/types/KnowledgeArea';
 	import { knowledgeAreas } from '../../KnowledgeAreas';
 	import type { Paper } from '$lib/types/Paper';
 	import { getInitials } from '$lib/utils/GetInitials';
 	import type { PageData } from './$types';
 
-	export let data: PageData;
+	interface Props {
+		data: PageData;
+	}
 
-	let user = data.user;
+	let { data }: Props = $props();
+
+	let user = $state(data.user);
 	let maxBioLength = 1000;
-	let isEditing = false;
-	let editedBio = user?.bio || '';
-	let editedPosition = user?.position || '';
-	let editedInstitution = user?.institution || '';
+	let isEditing = $state(false);
+	let editedBio = $state(user?.bio || '');
+	let editedPosition = $state(user?.position || '');
+	let editedInstitution = $state(user?.institution || '');
 	let profilePictureUrl = user?.profilePictureUrl || '';
 	let imageSize = 100;
 	let imagePositionX = 0;
@@ -116,16 +120,16 @@
 		<!-- Edit Button -->
 		<div class="mt-4 flex justify-end">
 			{#if isEditing}
-				<button class="bg-red-500 text-white p-2 rounded-full mr-2" on:click={toggleEdit}>
+				<button class="bg-red-500 text-white p-2 rounded-full mr-2" onclick={toggleEdit}>
 					Cancel
 				</button>
-				<button class="bg-green-500 text-white p-2 rounded-full" on:click={saveProfile}>
+				<button class="bg-green-500 text-white p-2 rounded-full" onclick={saveProfile}>
 					Save
 				</button>
 			{:else if user?.id === data.loggedUser.id}
 				<button
 					class="bg-blue-500 text-white p-2 rounded-full flex items-center"
-					on:click={toggleEdit}
+					onclick={toggleEdit}
 				>
 					Edit profile
 				</button>
@@ -154,7 +158,7 @@
 								id="profilePicture"
 								accept="image/*"
 								class="hidden"
-								on:change={handleProfilePictureChange}
+								onchange={handleProfilePictureChange}
 							/>
 						{/if}
 					</div>
@@ -181,7 +185,7 @@
 								id="profilePicture"
 								accept="image/*"
 								class="hidden"
-								on:change={handleProfilePictureChange}
+								onchange={handleProfilePictureChange}
 							/>
 						{/if}
 					</div>
@@ -206,7 +210,7 @@
 								id="profilePicture"
 								accept="image/*"
 								class="hidden"
-								on:change={handleProfilePictureChange}
+								onchange={handleProfilePictureChange}
 							/>
 						{/if}
 					</div>

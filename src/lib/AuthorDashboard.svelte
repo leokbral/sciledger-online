@@ -17,16 +17,20 @@
 	// let impactFactor = 4.2;
 	// let needingCorrections = 2;
 
-	export let user; // Certifique-se de que o user está sendo passado para o componente
-    export let publishedPapers; // Recebe os papers publicados passados do servidor
+	interface Props {
+		user: any;
+		publishedPapers: any;
+	}
+
+	let { user, publishedPapers }: Props = $props();
 
     console.log("Está sendo passado o user no AuthorDashboard", user);
     console.log("Papers publicados:", publishedPapers);
 
-    let totalCitations = 0;
-    let publishedArticles = 0;
-    let averageReviewTime = 0;
-    let highestScorePublication = { score: 0 };
+    let totalCitations = $state(0);
+    let publishedArticles = $state(0);
+    let averageReviewTime = $state(0);
+    let highestScorePublication = $state({ score: 0 });
 
     // Verifique se user e suas publicações estão definidos antes de usá-los
     if (user && publishedPapers) {

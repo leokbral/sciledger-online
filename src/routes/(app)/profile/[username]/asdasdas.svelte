@@ -2,23 +2,27 @@
 	// Imports
 	import Icon from '@iconify/svelte';
 	import ProfilePage from '$lib/Pages/Profile/ProfilePage.svelte';
-	import { Avatar } from '@skeletonlabs/skeleton';
+	import { Avatar } from '@skeletonlabs/skeleton-svelte';
 	//import { scientificArticles } from '../../ScientificArticles';
 	import type { KnowledgeArea } from '$lib/types/KnowledgeArea';
 	import { knowledgeAreas } from '../../KnowledgeAreas';
 	import type { Paper } from '$lib/types/Paper';
 
-	export let data;
+	interface Props {
+		data: any;
+	}
+
+	let { data }: Props = $props();
 
 	let user = data.user; //userProfiles[1];
 	let averageReview: number = 10;
 	let selectedReviewers: string[] = [];
 	let tabSet: number = 0;
 	let maxBioLength = 1000;
-	let isEditing = false;
-	let editedBio = user?.bio;
-	let editedTitle = user?.title;
-	let editedInstitution = user?.institution;
+	let isEditing = $state(false);
+	let editedBio = $state(user?.bio);
+	let editedTitle = $state(user?.title);
+	let editedInstitution = $state(user?.institution);
 	let profilePictureUrl = user?.profilePictureUrl;
 	let imageSize = 100;
 	let imagePositionX = 0;
@@ -100,16 +104,16 @@
 		<!-- Edit Button -->
 		<div class="mt-4 flex justify-end">
 			{#if isEditing}
-				<button class="bg-surface-500 text-white p-2 rounded-full mr-2" on:click={toggleEdit}>
+				<button class="bg-surface-500 text-white p-2 rounded-full mr-2" onclick={toggleEdit}>
 					Cancel
 				</button>
-				<button class="bg-primary-500 text-white p-2 rounded-full" on:click={saveProfile}>
+				<button class="bg-primary-500 text-white p-2 rounded-full" onclick={saveProfile}>
 					Save
 				</button>
 			{:else}
 				<button
 					class="bg-primary-500 text-white p-2 rounded-full flex items-center"
-					on:click={toggleEdit}
+					onclick={toggleEdit}
 				>
 					Edit profile
 				</button>

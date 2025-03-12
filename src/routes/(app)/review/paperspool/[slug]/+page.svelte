@@ -11,7 +11,11 @@
 	import type { User } from '$lib/types/User';
 	import Icon from '@iconify/svelte';
 
-	export let data: PageData;
+	interface Props {
+		data: PageData;
+	}
+
+	let { data }: Props = $props();
 	let reviewers = data.users.filter((u: User) => u.roles.reviewer === true);
 	// State for peer review option
 	let peer_review: string = '';
@@ -19,7 +23,7 @@
 
 	// let user = data.user;
 
-	let paper: Paper | null = data.paper;
+	let paper: Paper | null = $state(data.paper);
 	//console.log("www",paper?.authors)
 	let userProfiles = data.users; // Ajuste conforme necessário
 
@@ -78,7 +82,7 @@
 	<div class="flex justify-end items-center gap-3">
 		<button
 			class="bg-transparent text-primary-500 rounded-full p-2 border border-primary-500 hover:bg-primary-100 hover:text-primary-700 transition-all duration-300"
-			on:click={hdlSaveDraft}
+			onclick={hdlSaveDraft}
 		>
 			<Icon icon="fluent-mdl2:accept" class="size-6" />
 		</button>

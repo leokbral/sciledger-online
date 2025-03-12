@@ -1,12 +1,16 @@
 <script lang="ts">
 	import AuthorDashboard from '$lib/AuthorDashboard.svelte';
 	import MyPapers from '$lib/MyPapers.svelte';
-	import { TabGroup, Tab } from '@skeletonlabs/skeleton';
+	import { Tab, Tabs } from '@skeletonlabs/skeleton-svelte';
 	import Icon from '@iconify/svelte';
 
-	let tabSet: number = 0;
+	let tabSet: number = $state(0);
 
-	export let data;
+	interface Props {
+		data: any;
+	}
+
+	let { data }: Props = $props();
 	
 	let tabs = data.tabs;
 	let papers = data.papersData;
@@ -28,7 +32,7 @@
 	</div>
 	<div class="text-xl font-bold mb-6">Your Activities</div>
 
-	<TabGroup justify="justify-center">
+	<Tabs justify="justify-center">
 		{#each tabs as tab, value}
 			<Tab bind:group={tabSet} name="tab{value}" {value}>
 				<div class="flex justify-center">
@@ -38,28 +42,30 @@
 			</Tab>
 		{/each}
 		<!-- Tab Panels --->
-		<svelte:fragment slot="panel">
-			<div class="grid gap-3 md:grid-cols-[1fr_auto_1fr]">
-				<div class="">
-					<a
-						data-sveltekit-reload
-						href="/publish/new"
-						class="btn variant-filled-primary text-white"
-						data-sveltekit-preload-data="hover"
-					>
-						Submit a New Article
-					</a>
-				</div>
-				{#each papers as papersData, i}
-					{#if tabSet === i}
-						<div class="card page max-w-[700px] p-4 m-auto">
-							<div class="text-surface-900">
-								<MyPapers rota={tabs[i].rota} {papersData}></MyPapers>
+		{#snippet panel()}
+			
+				<div class="grid gap-3 md:grid-cols-[1fr_auto_1fr]">
+					<div class="">
+						<a
+							data-sveltekit-reload
+							href="/publish/new"
+							class="btn preset-filled-primary-500 text-white"
+							data-sveltekit-preload-data="hover"
+						>
+							Submit a New Article
+						</a>
+					</div>
+					{#each papers as papersData, i}
+						{#if tabSet === i}
+							<div class="card page max-w-[700px] p-4 m-auto">
+								<div class="text-surface-900">
+									<MyPapers rota={tabs[i].rota} {papersData}></MyPapers>
+								</div>
 							</div>
-						</div>
-					{/if}
-				{/each}
-			</div>
-		</svelte:fragment>
-	</TabGroup>
+						{/if}
+					{/each}
+				</div>
+			
+			{/snippet}
+	</Tabs>
 </div>

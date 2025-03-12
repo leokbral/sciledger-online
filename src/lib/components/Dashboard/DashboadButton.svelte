@@ -1,12 +1,20 @@
 <script lang="ts">
-	import type { ModalSettings /*, ModalComponent */ } from '@skeletonlabs/skeleton';
-	import { getModalStore } from '@skeletonlabs/skeleton';
-
+	import type { ModalSettings /*, ModalComponent */ } from '@skeletonlabs/skeleton-svelte';
 	const modalStore = getModalStore();
 
-	export let modalData: any;
-	export let component: string;
-	export let title: string;
+	interface Props {
+		modalData: any;
+		component: string;
+		title: string;
+		children?: import('svelte').Snippet;
+	}
+
+	let {
+		modalData,
+		component,
+		title,
+		children
+	}: Props = $props();
 
 	function modalComponentFullscreen(): void {
 		console.log("Chamou!")
@@ -21,4 +29,4 @@
 	}
 </script>
 
-<button class="chip h-full w-full p-0" on:click={modalComponentFullscreen}><slot /></button>
+<button class="chip h-full w-full p-0" onclick={modalComponentFullscreen}>{@render children?.()}</button>

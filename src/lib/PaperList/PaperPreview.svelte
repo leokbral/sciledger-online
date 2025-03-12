@@ -1,8 +1,9 @@
+<!-- @migration-task Error while migrating Svelte code: `<a>` is invalid inside `<a>` -->
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import type { Paper } from '$lib/types/Paper';
 	import { getInitials } from '$lib/utils/GetInitials';
-	import { Avatar, Ratings } from '@skeletonlabs/skeleton';
+	import { Avatar, Rating } from '@skeletonlabs/skeleton-svelte';
 
 	export let paper: Paper;
 	export let user;
@@ -119,7 +120,7 @@
 			<span class="text-xs">Read more...</span>
 			<div class="tag-list flex gap-1">
 				{#each paper.keywords as tag}
-					<span class="badge variant-ringed-primary text-primary-500"
+					<span class="badge preset-outlined-primary-500 text-primary-500"
 						><a href="/?tag={tag}">{tag}</a></span
 					>
 				{/each}
@@ -129,7 +130,7 @@
 </div>
 
 <div class="">
-	<Ratings value={3.5} max={5}>
+	<Rating value={3.5} max={5}>
 		<svelte:fragment slot="empty"
 			><svg
 				xmlns="http://www.w3.org/2000/svg"
@@ -172,6 +173,6 @@
 				/>
 			</svg></svelte:fragment
 		>
-	</Ratings>
+	</Rating>
 </div>
 <hr class="!border-t-1 mb-6 mt-1" />

@@ -2,9 +2,13 @@
 	import { createEventDispatcher } from 'svelte';
 	import type { Menuitem } from '../types';
 
-	export let videoSource: string;
-	export let items: Menuitem[];
-	let innerWidth: number;
+	interface Props {
+		videoSource: string;
+		items: Menuitem[];
+	}
+
+	let { videoSource, items }: Props = $props();
+	let innerWidth: number = $state();
 
 	const dispatch = createEventDispatcher();
 
@@ -55,8 +59,8 @@
 				
 			</span> -->
 			<button
-				on:click={() => hdlClick(item)}
-				class="w-56 px-8 py-3 m-1 text-xl chip rounded-lg variant-filled-primary font-Valorant hover:bg-primary-900"
+				onclick={() => hdlClick(item)}
+				class="w-56 px-8 py-3 m-1 text-xl chip rounded-lg preset-filled-primary-500 font-Valorant hover:bg-primary-900"
 			>
 				<span class:grayscale={item.notReady}>
 					{item.notReady ? item.name + ' 🔒' : item.name}</span

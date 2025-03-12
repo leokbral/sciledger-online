@@ -10,9 +10,13 @@
 	import AvailableReviewers from '$lib/AvailableReviewers.svelte';
 	import type { User } from '$lib/types/User';
 
-	export let data: PageData;
+	interface Props {
+		data: PageData;
+	}
+
+	let { data }: Props = $props();
 	// State for peer review option
-	let peer_review: string = '';
+	let peer_review: string = $state('');
 	let paper: Paper | null = data.paper;
 	let userProfiles = data.users;
 
@@ -45,7 +49,7 @@
 		}
 	}
 
-	let selectedReviewers: string[] = [];
+	let selectedReviewers: string[] = $state([]);
 
 	function toggleReviewerSelection(reviewerId: string) {
 		if (selectedReviewers.includes(reviewerId)) {

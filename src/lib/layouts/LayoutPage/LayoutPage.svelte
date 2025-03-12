@@ -1,7 +1,6 @@
+<!-- @migration-task Error while migrating Svelte code: $$props is used together with named props in a way that cannot be automatically migrated. -->
 <script lang="ts">
 	import { storeVercelProductionMode } from '$lib/stores/stores';
-	import { TableOfContents, tocCrawler } from '@skeletonlabs/skeleton';
-
 	// Props
 	export let sidebar = true;
 	export let tocKey: unknown = undefined;

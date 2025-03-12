@@ -1,11 +1,6 @@
 <script lang="ts">
 	import {
-		Autocomplete,
-		InputChip,
-		getToastStore,
-		FileDropzone,
-		type AutocompleteOption
-	} from '@skeletonlabs/skeleton';
+		type AutocompleteOption, TagsInput, FileUpload } from '@skeletonlabs/skeleton-svelte';
 	import type { Author } from '../../types/Author';
 	import type { User } from '$lib/types/User';
 	import { writable } from 'svelte/store';
@@ -13,20 +8,24 @@
 	import type { PaperPublishStoreData } from '$lib/types/PaperPublishStoreData';
 	import { createEventDispatcher } from 'svelte';
 	import { storeVercelProductionMode } from '$lib/stores/stores';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import SERVER from '../config';
 	import RichTextEditor from '$lib/components/Text/RichTextEditor.svelte';
 	import PapersImages from '$lib/components/PapersImages.svelte';
 
-	let fileName = '';
+	let fileName = $state('');
 
 	const dispatch = createEventDispatcher();
 
-	export let authorsOptions: any; //AutocompleteOption<string>[];
 	//console.log(authorsOptions);
-	export let author: User;
 
-	export let inicialValue: PaperPublishStoreData = {
+	interface Props {
+		authorsOptions: any;
+		author: User;
+		inicialValue?: PaperPublishStoreData;
+	}
+
+	let { authorsOptions = $bindable(), author, inicialValue = {
 		title: '',
 		authors: [],
 		mainAuthor: null,
@@ -48,7 +47,7 @@
 		score: 0,
 		submittedBy: author,
 		peer_review: 'open'
-	};
+	} }: Props = $props();
 
 	export const store = writable<PaperPublishStoreData>(inicialValue);
 	//console.log(inicialValue);
@@ -77,13 +76,13 @@
 	// let peer_review = 'open';
 
 	//let file: File | null = null;
-	let files: FileList;
+	let files: FileList = $state();
 
 	const toastStore = getToastStore();
 
-	let inputAuthor = '';
-	let inputAuthorList: string[] = inicialValue.authors.map((a) => a.username) || [];
-	let inputComponent: InputChip;
+	let inputAuthor = $state('');
+	let inputAuthorList: string[] = $state(inicialValue.authors.map((a) => a.username) || []);
+	let inputComponent: TagsInput = $state();
 	//console.log(inicialValue.authors)
 
 	authorsOptions = authorsOptions.map((a: User) => {
@@ -100,7 +99,7 @@
 	function onInvalidHandler(event: any): void {
 		toastStore.trigger({
 			message: `"${event.detail.input}" é um valor inválido. Por favor tente novamente!`,
-			background: 'variant-filled-error'
+			background: 'preset-filled-error-500'
 		});
 	}
 
@@ -216,10 +215,10 @@
 	<div class="grid grid-cols-[1fr_1fr_1fr]">
 		<div></div>
 		<div class="flex justify-between gap-3">
-			<button class="bg-primary-500 text-white rounded-lg px-4 py-2" on:click={hdlSaveDraft}
+			<button class="bg-primary-500 text-white rounded-lg px-4 py-2" onclick={hdlSaveDraft}
 				>Save Draft</button
 			>
-			<button class="bg-primary-500 text-white rounded-lg px-4 py-2" on:click={hdlSubmit}
+			<button class="bg-primary-500 text-white rounded-lg px-4 py-2" onclick={hdlSubmit}
 				>Submit Article</button
 			>
 		</div>
@@ -237,7 +236,7 @@
 				/>
 			</section>
 			<section id="skills" class="w-full flex flex-col gap-2">
-				<InputChip
+				<TagsInput
 					bind:this={inputComponent}
 					bind:input={inputAuthor}
 					bind:value={inputAuthorList}
@@ -274,7 +273,7 @@
 			</section>
 
 			<section class="mb-4 w-full">
-				<InputChip
+				<TagsInput
 					bind:value={$store.keywords}
 					name="chips"
 					placeholder="Enter article keywords..."
@@ -283,7 +282,7 @@
 
 			<!-- papers images section -->
 			<section>
-				{#if $page.url.pathname.includes('edit')}
+				{#if page.url.pathname.includes('edit')}
 					<PapersImages />
 				{/if}
 			</section>
@@ -316,19 +315,21 @@
 				<!-- <label for="file">PDF File:</label>
 				<input type="file" id="file" accept=".pdf" on:change={handleFileChange} /> -->
 				<div>
-					<FileDropzone name="files" bind:files on:change={onChangeHandler}>
-						<svelte:fragment slot="message">
-							{#if fileName}
-								<span class="font-bold text-surface-800-100-token">Selected file: {fileName}</span>
-							{:else}
-								<span class="font-bold text-surface-800-100-token">Select a pdf</span>
-							{/if}
-						</svelte:fragment>
-						<svelte:fragment slot="meta"
-							><span class="text-surface-800-100-token">Ou solte os arquivos aqui</span
-							></svelte:fragment
-						>
-					</FileDropzone>
+					<FileUpload name="files" bind:files on:change={onChangeHandler}>
+						{#snippet message()}
+											
+								{#if fileName}
+									<span class="font-bold text-surface-900-100">Selected file: {fileName}</span>
+								{:else}
+									<span class="font-bold text-surface-900-100">Select a pdf</span>
+								{/if}
+							
+											{/snippet}
+						{#snippet meta()}
+												<span class="text-surface-900-100">Ou solte os arquivos aqui</span
+								>
+											{/snippet}
+					</FileUpload>
 				</div>
 			</div>
 		</section>

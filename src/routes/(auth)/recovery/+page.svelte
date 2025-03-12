@@ -1,17 +1,21 @@
 <script lang="ts">
+	import { run, preventDefault } from 'svelte/legacy';
+
 	//import InputField from '$lib/InputField.svelte';
 	import { post } from '$lib/utils';
 	import { goto } from '$app/navigation';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import '/src/app.postcss';
-	let email = '';
-	let processing = false;
+	let email = $state('');
+	let processing = $state(false);
 	let modalToggle = true;
-	$: modalToggle;
+	run(() => {
+		modalToggle;
+	});
 
 	async function submit(event: unknown) {
 		processing = true;
-		const response = await post(`/recovery`, { email, host: $page.url.origin });
+		const response = await post(`/recovery`, { email, host: page.url.origin });
 		// TODO handle network errors
 		//errors = response.errors;
 
@@ -27,7 +31,7 @@
 	<div class="w-full flex justify-center md:max-w-xl md:bg-white md:rounded-3xl md:shadow-2xl md:shadow-surface-500/50"></div>
 	<form
 		class="flex flex-col items-center justify-between h-3/5 w-2/5 max-w-lg"
-		on:submit|preventDefault={submit}
+		onsubmit={preventDefault(submit)}
 	>
 		<!-- Imagem do Logo -->
 		<img
