@@ -5,7 +5,7 @@
 	import { post } from '$lib/utils';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import '/src/app.postcss';
+	import '/src/app.css';
 	let email = $state('');
 	let processing = $state(false);
 	let modalToggle = true;
@@ -52,7 +52,7 @@
 		<!-- Seção de Entrada -->
 		<div class="flex flex-col gap-5 w-full mb-4">
 			<input
-				class="bg-transparent rounded-xl border-washed-purple text-washed-purple font-medium text-lg p-2 w-full focus:outline-none focus:border-std-purple placeholder-yogurt"
+				class="bg-transparent rounded-xl border-washed-purple text-washed-purple font-medium text-lg p-2 w-full focus:outline-hidden focus:border-std-purple placeholder-yogurt"
 				type="email"
 				required
 				placeholder="Email"

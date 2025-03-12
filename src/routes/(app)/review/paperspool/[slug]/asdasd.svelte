@@ -65,7 +65,7 @@
 		<div class="row">
 			<div class="col-md-9">
 				<h4 class="h4 px-4 text-primary-500 font font-semibold">Published Articles</h4>
-				<hr class="mt-2 mb-4 !border-t-2" />
+				<hr class="mt-2 mb-4 border-t-2!" />
 				<PaperPreview {paper} user={$page.data.user} />
 			</div>
 		</div>

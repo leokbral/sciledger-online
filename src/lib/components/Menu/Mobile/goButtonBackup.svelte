@@ -10,7 +10,7 @@
 </script>
 
 <a id="blink" href="/{name}" class="relative top-[-70px] mb-[-80px] btn-icon preset-filled w-24">
-	<span class="font-Valorant text-2xl chip rounded-3xl !bg-transparent hover:bg-primary-800">
+	<span class="font-Valorant text-2xl chip rounded-3xl bg-transparent! hover:bg-primary-800">
 		Go!
 	</span>
 </a>

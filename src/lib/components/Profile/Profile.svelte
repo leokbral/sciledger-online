@@ -10,9 +10,9 @@
 	let alt: string = 'meta';
 </script>
 
-<div class="mt-[85 px] m-auto card !bg-white text-surface-800 card-hover overflow-hidden">
+<div class="mt-[85 px] m-auto card bg-white! text-surface-800 card-hover overflow-hidden">
 	<header>
-		<img {src} class="bg-black/50 w-full aspect-[21/9]" {alt} />
+		<img {src} class="bg-black/50 w-full aspect-21/9" {alt} />
 	</header>
 	<div class="p-4 space-y-4">
 		<h6 class="h6 capitalize" data-toc-ignore="">{belt}</h6>

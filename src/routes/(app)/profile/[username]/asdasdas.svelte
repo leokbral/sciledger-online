@@ -100,7 +100,7 @@
 
 <!-- Profile Section -->
 <section class="flex items-center justify-center min-h-screen">
-	<div class="p-6 mx-32 bg-surface-100-50-token rounded shadow-lg max-w-3xl w-full">
+	<div class="p-6 mx-32 bg-surface-100-50-token rounded-sm shadow-lg max-w-3xl w-full">
 		<!-- Edit Button -->
 		<div class="mt-4 flex justify-end">
 			{#if isEditing}
@@ -141,12 +141,12 @@ profilePictureUrl}
 						<input
 							type="text"
 							bind:value={editedTitle}
-							class="mt-2 p-2 text-surface-900 border rounded w-full"
+							class="mt-2 p-2 text-surface-900 border rounded-sm w-full"
 						/>
 						<input
 							type="text"
 							bind:value={editedInstitution}
-							class="mt-2 p-2 text-surface-900 border rounded w-full"
+							class="mt-2 p-2 text-surface-900 border rounded-sm w-full"
 						/>
 					{:else}
 						{user?.title} at {user?.institution}
@@ -216,7 +216,7 @@ profilePictureUrl}
 			<h2 class="text-xl font-semibold">About</h2>
 			{#if isEditing}
 				<textarea
-					class="mt-2 p-2 text-surface-900 border rounded w-full h-48"
+					class="mt-2 p-2 text-surface-900 border rounded-sm w-full h-48"
 					bind:value={editedBio}
 					maxlength={maxBioLength}
 				></textarea>

@@ -48,7 +48,7 @@
 	}
 
 	let modalData = user;
-	let classes = 'bg-gradient-to-b from-indigo-500 via-purple-500 to-pink-500 text-white';
+	let classes = 'bg-linear-to-b from-indigo-500 via-purple-500 to-pink-500 text-white';
 
 	function closeModal(event: MouseEvent & { currentTarget: EventTarget & HTMLButtonElement }) {
 		throw new Error('Function not implemented.');
@@ -70,7 +70,7 @@
 					<label for="min-price" class="block text-sm font-medium mb-1">Min Price:</label>
 					<input
 						type="number"
-						class="w-full h-8 p-2 border border-gray-300 rounded"
+						class="w-full h-8 p-2 border border-gray-300 rounded-sm"
 						bind:value={$minPrice}
 						placeholder="Min."
 						min="0"
@@ -82,7 +82,7 @@
 					<label for="max-price" class="block text-sm font-medium mb-1">Max Price:</label>
 					<input
 						type="number"
-						class="w-full h-8 p-2 border border-gray-300 rounded"
+						class="w-full h-8 p-2 border border-gray-300 rounded-sm"
 						bind:value={$maxPrice}
 						placeholder="Max."
 						min="0"
@@ -96,7 +96,7 @@
 				<label for="reviewers" class="text-sm font-medium whitespace-nowrap">Number of Reviewers:</label>
 				<input
 					type="number"
-					class="w-full h-8 p-2 border border-gray-300 rounded"
+					class="w-full h-8 p-2 border border-gray-300 rounded-sm"
 					bind:value={$numberOfReviewers}
 					min="3"
 				/>
@@ -104,7 +104,7 @@
 
 			<!-- Apply Filters Button -->
 			<button
-				class="w-full p-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+				class="w-full p-2 bg-blue-500 text-white rounded-sm hover:bg-blue-600"
 				onclick={applyFilters}
 			>
 				Apply Filters
@@ -112,7 +112,7 @@
 		</section>
 
 		<!-- Announced Articles Section -->
-		<section class="bg-white shadow-md rounded p-6 mb-8 w-full md:w-4/3">
+		<section class="bg-white shadow-md rounded-sm p-6 mb-8 w-full md:w-4/3">
 			<h3 class="text-xl font-bold mb-4">Announced Articles</h3>
 			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
 				{#each papers as paper, index}
@@ -121,7 +121,7 @@
 						href="{rota}/{paper.id}"
 						class="flex flex-col gap-2 hover:text-secondary-500"
 					>
-						<div class="bg-white shadow-md rounded overflow-hidden">
+						<div class="bg-white shadow-md rounded-sm overflow-hidden">
 							<header>
 								<img src={paper.paperPictures[0]} alt="Post" class="w-full h-48 object-cover" />
 							</header>

@@ -4,10 +4,11 @@
 	import ProfilePage from '$lib/Pages/Profile/ProfilePage.svelte';
 	import { Avatar } from '@skeletonlabs/skeleton-svelte';
 	import type { KnowledgeArea } from '$lib/types/KnowledgeArea';
-	import { knowledgeAreas } from '../../KnowledgeAreas';
+	import { knowledgeAreas, type SubArea } from '../../KnowledgeAreas';
 	import type { Paper } from '$lib/types/Paper';
 	import { getInitials } from '$lib/utils/GetInitials';
 	import type { PageData } from './$types';
+	import type { User } from '$lib/types/User';
 
 	interface Props {
 		data: PageData;
@@ -15,13 +16,54 @@
 
 	let { data }: Props = $props();
 
+	// Initialize state variables correctly
 	let user = $state(data.user);
-	let maxBioLength = 1000;
 	let isEditing = $state(false);
-	let editedBio = $state(user?.bio || '');
-	let editedPosition = $state(user?.position || '');
-	let editedInstitution = $state(user?.institution || '');
-	let profilePictureUrl = user?.profilePictureUrl || '';
+	let editedBio = $state('');
+	let editedPosition = $state('');
+	let editedInstitution = $state('');
+	let profilePictureUrl = $state('');
+	let publications = $state<Paper[]>([]);
+	let interestAreas = $state<string[]>([]);
+	let contactInfo = $state('');
+
+	let expertise = $state<string[]>([]); //user?.performanceReviews?.expertise || [];
+	// let areaToShow = $derived(() =>
+	// 	expertise.map((areaId) => knowledgeAreas.find((area) => area.id === areaId)).filter(Boolean)
+	// );
+	let areaToShow = $derived<SubArea[]>(
+		expertise
+			.map((areaId) => knowledgeAreas.find((area) => area.id === areaId))
+			.filter((area): area is SubArea => area !== undefined)
+	);
+
+	// expertise
+	// 	.map((areaId) => knowledgeAreas.find((area) => area.id === areaId))
+	// 	.filter(Boolean);
+
+	let userAdditionalInfo = $state({}); //user?.performanceReviews || {};
+
+	// Update edited values when user changes
+	$effect(() => {
+		editedBio = user?.bio || '';
+		editedPosition = user?.position || '';
+		editedInstitution = user?.institution || '';
+
+		if (user) {
+			publications = user.papers.filter((paper) => paper.status === 'published') || [];
+			interestAreas = user.performanceReviews?.expertise || [];
+			contactInfo = user.email || '';
+			profilePictureUrl = user.profilePictureUrl || '';
+			// expertise = user.performanceReviews?.expertise || [];
+			if (user?.performanceReviews?.expertise) {
+				expertise = user.performanceReviews.expertise;
+			}
+		}
+		// tabsContent = [publications, interestAreas, contactInfo];
+	});
+
+	let maxBioLength = 1000;
+
 	let imageSize = 100;
 	let imagePositionX = 0;
 	let imagePositionY = 0;
@@ -33,24 +75,16 @@
 		{ name: 'Contact Info', icon: 'material-symbols-light:contact-mail-outline' }
 	];
 
-	// let publications: Paper[] = user?.papers || [];
-	let publications: Paper[] = user?.papers.filter((paper) => paper.status === 'published') || [];
-	let interestAreas: string[] = user?.performanceReviews?.expertise || [];
-	let contactInfo = user?.email || '';
-
-	let tabsContent = [publications, interestAreas, contactInfo];
-
-	let tabsData = {
+	let tabsContent = $derived([publications, interestAreas, contactInfo]);
+	let tabsData = $derived({
 		tabs,
 		tabsContent
-	};
+	});
 
-	const expertise = user?.performanceReviews?.expertise || [];
-	const areaToShow = expertise
-		.map((areaId) => knowledgeAreas.find((area) => area.id === areaId))
-		.filter(Boolean);
-
-	const userAdditionalInfo = user?.performanceReviews || {};
+	// let tabsData = {
+	// 	tabs,
+	// 	tabsContent
+	// };
 
 	// Functions
 	async function toggleEdit() {
@@ -116,7 +150,7 @@
 
 <!-- Profile Section -->
 <section class="flex items-center justify-center min-h-screen bg-gray-100">
-	<div class="p-6 mx-32 bg-white rounded shadow-lg max-w-3xl w-full">
+	<div class="p-6 mx-32 bg-white rounded-sm shadow-lg max-w-3xl w-full">
 		<!-- Edit Button -->
 		<div class="mt-4 flex justify-end">
 			{#if isEditing}
@@ -141,7 +175,7 @@
 			<div class="relative w-36 h-36 mr-4">
 				{#if user?.profilePictureUrl}
 					<div class="relative group cursor-pointer w-32 h-32">
-						<Avatar src={user.profilePictureUrl} alt={user.firstName} width="w-32" />
+						<Avatar src={user.profilePictureUrl} name={user.firstName} size="w-32" />
 						{#if isEditing}
 							<label
 								for="profilePicture"
@@ -225,12 +259,12 @@
 						<input
 							type="text"
 							bind:value={editedPosition}
-							class="mt-2 p-2 text-gray-900 border rounded w-full"
+							class="mt-2 p-2 text-gray-900 border rounded-sm w-full"
 						/>
 						<input
 							type="text"
 							bind:value={editedInstitution}
-							class="mt-2 p-2 text-gray-900 border rounded w-full"
+							class="mt-2 p-2 text-gray-900 border rounded-sm w-full"
 						/>
 					{:else}
 						{user?.position || 'No position'} at {user?.institution || 'No institution'}
@@ -294,7 +328,7 @@
 				<div class="font-bold">Expertise:</div>
 				{#if areaToShow.length > 0}
 					<div class="font-normal mt-0">
-						{areaToShow.map((area) => area?.name).join(', ') || 'No expertise listed'}
+						{areaToShow.map((area: SubArea) => area?.name).join(', ') || 'No expertise listed'}
 					</div>
 				{:else}
 					<div class="font-normal">No expertise listed</div>
@@ -306,14 +340,13 @@
 				<div class="font-normal mt-0">{contactInfo || 'No contact info'}</div>
 			</div>
 		</div>
-		
 
 		<!-- About Section -->
 		<div class="mt-6">
 			<h2 class="text-xl font-semibold">About</h2>
 			{#if isEditing}
 				<textarea
-					class="mt-2 p-2 text-gray-900 border rounded w-full h-48"
+					class="mt-2 p-2 text-gray-900 border rounded-sm w-full h-48"
 					bind:value={editedBio}
 					maxlength={maxBioLength}
 				></textarea>

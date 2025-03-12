@@ -4,7 +4,7 @@
 	import { goto } from '$app/navigation';
 	import { post } from '$lib/utils';
 	import { fade } from 'svelte/transition';
-	import '/src/app.postcss';
+	import '/src/app.css';
 	import type { PageData } from './$types';
 
 	interface Props {

@@ -39,7 +39,7 @@
 			<source type="video/webm" src={videoSource} />
 		</video>
 	</div>
-	<div class="m-auto p-10 flex flex-col justify-center items-center lg:gap-3 z-[2] md:ml-2">
+	<div class="m-auto p-10 flex flex-col justify-center items-center lg:gap-3 z-2 md:ml-2">
 		{#each items as item, i}
 			<!-- <a href="/{item.name}"> -->
 

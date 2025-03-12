@@ -8,7 +8,7 @@
 
 	let { abstract }: Props = $props();
 
-	// let classes = 'bg-initial'; //'bg-gradient-to-b from-[#d14fc5_-344%] to-[#8121eb_181%] !gap-0';
+	// let classes = 'bg-initial'; //'bg-linear-to-b from-[#d14fc5_-344%] to-[#8121eb_181%] gap-0!';
 
 	let modalData = {
 		// classes,

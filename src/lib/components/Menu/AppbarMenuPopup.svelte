@@ -24,11 +24,11 @@
 	//const highlights = data.highlights;
 </script>
 
-<div data-popup="appbar-menu-popup" class="z-[50]">
+<div data-popup="appbar-menu-popup" class="z-50">
 	<div class="card w-72 shadow-xl">
 		<Profile {profile} />
 		<MenuHighlights {highlights} />
-		<div class="arrow bg-surface-900-100 z-[50]"></div>
+		<div class="arrow bg-surface-900-100 z-50"></div>
 		<section class="w-full text-surface-950-50 card p-4 space-y-4">
 			<p class="font-bold">Desafios</p>
 			<ul class="list">

@@ -1,10 +1,10 @@
 <script lang="ts">
 	import ReviewDashboard from '$lib/ReviewDashboard.svelte';
 	import MyPapers from '$lib/MyPapers.svelte';
-	import { Tab, Tabs } from '@skeletonlabs/skeleton-svelte';
+	import { Tabs } from '@skeletonlabs/skeleton-svelte';
 	import Icon from '@iconify/svelte';
 
-	let tabSet: number = $state(0);
+	let tabSet = $state('');
 
 	interface Props {
 		data: any;
@@ -21,7 +21,7 @@
 
 	console.log('Review tabs', tabs);
 	console.log('Review papers', papers);
-	console.log('Review data', reviews);  // Verificando as revisões
+	console.log('Review data', reviews); // Verificando as revisões
 </script>
 
 <div class="container page p-4 m-auto">
@@ -31,35 +31,35 @@
 	</div>
 	<div class="text-xl font-bold mb-6">Your Activities</div>
 
-	<Tabs justify="justify-center">
+	<Tabs value={tabSet} onValueChange={(e) => (tabSet = e.value)}>
+		{#snippet list()}
 		{#each tabs as tab, value}
-			<Tab bind:group={tabSet} name="tab{value}" {value}>
+			<Tabs.Control value="tab{value}">
 				<div class="flex justify-center">
 					<Icon icon={tab.icon} style="font-size: 2rem;" />
 				</div>
 				<span>{tab.name}</span>
-			</Tab>
+			</Tabs.Control>
 		{/each}
+		{/snippet}
 		<!-- Tab Panels --->
-		{#snippet panel()}
-			
-				<!-- <div class="grid gap-3 md:grid-cols-[1fr_auto_1fr]"> -->
-				<div class="grid gap-3 w-full">
-					{#each papers as papersData, i}
-						{#if tabSet === i}
-							<div class="card page p-4 m-auto">
-								{#if tabs[i].name === 'Papers Pool'}
-									{@render requested?.()}
-								{:else}
-									<div class="text-surface-900">
-										<MyPapers rota={tabs[i].rota} {papersData}></MyPapers>
-									</div>
-								{/if}
-							</div>
-						{/if}
-					{/each}
-				</div>
-			
-			{/snippet}
+		{#snippet content()}
+			<!-- <div class="grid gap-3 md:grid-cols-[1fr_auto_1fr]"> -->
+			<div class="grid gap-3 w-full">
+				{#each papers as papersData, i}
+					{#if tabSet === i.toString()}
+						<div class="card page p-4 m-auto">
+							{#if tabs[i].name === 'Papers Pool'}
+								{@render requested?.()}
+							{:else}
+								<div class="text-surface-900">
+									<MyPapers rota={tabs[i].rota} {papersData}></MyPapers>
+								</div>
+							{/if}
+						</div>
+					{/if}
+				{/each}
+			</div>
+		{/snippet}
 	</Tabs>
 </div>

@@ -1,7 +1,6 @@
 <script lang="ts">
-	import '../app.postcss';
-	import { AppBar } from '@skeletonlabs/skeleton-svelte';
-
+	import '../app.css';
+	
 	// Highlight JS
 	import hljs from 'highlight.js/lib/core';
 	import 'highlight.js/styles/github-dark.css';
@@ -14,18 +13,18 @@
 	hljs.registerLanguage('css', css);
 	hljs.registerLanguage('javascript', javascript);
 	hljs.registerLanguage('typescript', typescript);
-	storeHighlightJs.set(hljs);
+	//storeHighlightJs.set(hljs);
 
-	initializeStores();
+	//initializeStores();
 	
 	// Floating UI for Popups
-	import { computePosition, autoUpdate, flip, shift, offset, arrow } from '@floating-ui/dom';
+	// import { computePosition, autoUpdate, flip, shift, offset, arrow } from '@floating-ui/dom';
 	interface Props {
 		children?: import('svelte').Snippet;
 	}
 
 	let { children }: Props = $props();
-	storePopup.set({ computePosition, autoUpdate, flip, shift, offset, arrow });
+	//storePopup.set({ computePosition, autoUpdate, flip, shift, offset, arrow });
 </script>
 
 
