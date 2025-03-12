@@ -1,6 +1,14 @@
 <!DOCTYPE html>
-<html lang="en" class="dark" data-theme="sciLedger">
+<html lang="en"  data-theme="sciLedger">
 	<head>
+		<script>
+			// Check theme on page load or when changing themes
+			document.documentElement.classList.toggle(
+			  'dark',
+			  localStorage.theme === 'dark' ||
+				(!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)
+			);
+		  </script>
 		<meta charset="utf-8" >
 		<link rel="icon" href="%sveltekit.assets%/favicon.png" >
 		<meta name="viewport" content="width=device-width" >

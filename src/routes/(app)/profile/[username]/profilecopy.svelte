@@ -119,7 +119,7 @@
 <section>
 	<div class="p-6 mx-32 bg-surface-100-50-token min-h-screen">
 		<!-- container page max-w-[700px] p-4 m-auto -->
-		<div class="p-4 shadow rounded mb-6">
+		<div class="p-4 shadow-sm rounded-sm mb-6">
 			<!-- Edit Button -->
 			<div class="mt-4 flex justify-end">
 				{#if isEditing}
@@ -168,12 +168,12 @@
 							<input
 								type="text"
 								bind:value={editedTitle}
-								class="mt-2 p-2 text-surface-900 border rounded w-full"
+								class="mt-2 p-2 text-surface-900 border rounded-sm w-full"
 							/>
 							<input
 								type="text"
 								bind:value={editedInstitution}
-								class="mt-2 p-2 text-surface-900 border rounded w-full"
+								class="mt-2 p-2 text-surface-900 border rounded-sm w-full"
 							/>
 						{:else}
 							{user.title} at {user.institution}
@@ -199,7 +199,7 @@
 					<h2 class="text-xl font-semibold">About</h2>
 					{#if isEditing}
 						<textarea
-							class="mt-2 p-2 text-surface-900 border rounded w-full"
+							class="mt-2 p-2 text-surface-900 border rounded-sm w-full"
 							bind:value={editedBio}
 							maxlength={maxBioLength}
 						></textarea>

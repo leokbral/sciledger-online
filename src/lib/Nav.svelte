@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { Avatar, type PopupSettings } from '@skeletonlabs/skeleton-svelte';
+	import { Avatar,  } from '@skeletonlabs/skeleton-svelte';
+	// import { Avatar, type PopupSettings } from '@skeletonlabs/skeleton-svelte';
 	import { post } from './utils';
 	import { invalidateAll } from '$app/navigation';
 	import { userProfiles } from '../routes/(app)/UserProfile';
@@ -14,15 +15,15 @@
 	let { pathname, user }: Props = $props();
 	//console.log("nav 9 - ", user);
 
-	const popupFeatured: PopupSettings = {
-		// Represents the type of event that opens/closed the popup
-		event: 'click',
-		// Matches the data-popup value on your popup element
-		target: 'popupFeatured',
-		// Defines which side of your trigger the popup will appear
-		placement: 'bottom',
-		middleware: { offset: { mainAxis: 10, crossAxis: -100 } }
-	};
+	// const popupFeatured: PopupSettings = {
+	// 	// Represents the type of event that opens/closed the popup
+	// 	event: 'click',
+	// 	// Matches the data-popup value on your popup element
+	// 	target: 'popupFeatured',
+	// 	// Defines which side of your trigger the popup will appear
+	// 	placement: 'bottom',
+	// 	middleware: { offset: { mainAxis: 10, crossAxis: -100 } }
+	// };
 	async function logout() {
 		await post(`/logout`);
 		invalidateAll();
@@ -47,10 +48,11 @@
 
 {#if user}
 	<!-- <a href="/profile/@{user.username}"> -->
-	<button class="btn pl-12 !-ml-7" use:popup={popupFeatured}>
+	<!-- <button class="btn pl-12 -ml-7!" use:popup={popupFeatured}> -->
+		<button class="btn pl-12 -ml-7!" onclick={logout}>
 		<!-- <Avatar src={user.profilePictureUrl} alt={user.firstName} width="w-9" /> -->
 		{#if user.profilePictureUrl}
-			<Avatar src={user.profilePictureUrl} alt={user.firstName} width="w-9" />
+			<Avatar src={user.profilePictureUrl} name={user.firstName} size="w-9" />
 		{:else}
 			<div class="w-9 h-9 flex items-center justify-center bg-gray-300 text-white rounded-full">
 				<span class="text-xl font-bold">{getInitials(user.firstName, user.lastName)}</span>
@@ -58,12 +60,12 @@
 		{/if}
 	</button>
 	<!-- Div do tooltip -->
-	<div class="card p-4 w-72 shadow-xl preset-filled" data-popup="popupFeatured">
+	<!-- <div class="card p-4 w-72 shadow-xl preset-filled" data-popup="popupFeatured">
 		<div class="space-y-4 flex flex-col">
 			<div class="flex gap-2">
-				<!-- <Avatar src={user.profilePictureUrl} alt={user.firstName} width="w-14" /> -->
+				<!-- <Avatar src={user.profilePictureUrl} alt={user.firstName} width="w-14" /> -- >
 				{#if user.profilePictureUrl}
-					<Avatar src={user.profilePictureUrl} alt={user.firstName} width="w-9" />
+					<Avatar src={user.profilePictureUrl} name={user.firstName} size="w-9" />
 				{:else}
 					<div class="w-9 h-9 flex items-center justify-center bg-gray-300 text-white rounded-full">
 						<span class="text-xl font-bold">{getInitials(user.firstName, user.lastName)}</span>
@@ -104,7 +106,7 @@
 					</span>
 				</p>
 				<! -- <p class="text-ls">{notifications}</p> -- >
-			</div> -->
+			</div> -- >
 			<!-- <div class="relative">
 				<p
 					class="text-ls font-semibold flex items-center gap-2 text-gray-700 hover:text-blue-600 hover:underline transition duration-300 ease-in-out cursor-pointer"
@@ -129,7 +131,7 @@
 					</span>
 				</p>
 				<! -- <p class="text-ls">{messages}</p> -- >
-			</div> -->
+			</div> -- >
 			<a
 				data-sveltekit-reload
 				class="btn bg-primary-500 w-full"
@@ -143,7 +145,7 @@
 			<button class="btn preset-filled justify-start" onclick={logout}>Sign out</button>
 		</div>
 		<div class="arrow preset-filled"></div>
-	</div>
+	</div> -->
 	<!-- </a> -->
 {:else}
 	<a href="/login" class="nav-link" class:active={pathname === '/login'}> Sign in </a>

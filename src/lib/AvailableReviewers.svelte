@@ -21,7 +21,7 @@
 <section class="mt-4">
 	{#each reviewers as reviewer}
 		<div class="pt-0 bg-surface-100-50-token">
-			<div class="p-4 shadow rounded mb-6">
+			<div class="p-4 shadow-sm rounded-sm mb-6">
 				<!-- Seleção de Reviewer -->
 				<div class="flex justify-end items-center">
 					<input

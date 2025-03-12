@@ -55,7 +55,7 @@
 						required
 						placeholder="Email or Username"
 						bind:value={login}
-						class="bg-transparent rounded-xl border-b border-surface-500 text-black font-medium text-lg p-2 w-full focus:outline-none focus:border-primary-500 placeholder-gray-500"
+						class="bg-transparent rounded-xl border-b border-surface-500 text-black font-medium text-lg p-2 w-full focus:outline-hidden focus:border-primary-500 placeholder-gray-500"
 					/>
 				</fieldset>
 				<fieldset class="flex flex-col">
@@ -64,7 +64,7 @@
 						required
 						placeholder="Password"
 						bind:value={password}
-						class="bg-transparent rounded-xl border-b border-surface-500 text-black font-medium text-lg p-2 w-full focus:outline-none focus:border-primary-500 placeholder-gray-500"
+						class="bg-transparent rounded-xl border-b border-surface-500 text-black font-medium text-lg p-2 w-full focus:outline-hidden focus:border-primary-500 placeholder-gray-500"
 					/>
 				</fieldset>
 				{#if formWarning}
@@ -79,7 +79,7 @@
 			<div class="flex flex-col mt-12 w-full">
 				<button
 					type="submit"
-					class=" text-black font-bold py-2 px-4 rounded hover:bg-primary-500 self-end"
+					class=" text-black font-bold py-2 px-4 rounded-sm hover:bg-primary-500 self-end"
 				>
 					Start
 					<img

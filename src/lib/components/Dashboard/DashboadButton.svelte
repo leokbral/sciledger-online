@@ -22,7 +22,7 @@
 			type: 'component',
 			component /* : 'fullScreen' */,
 			title /* : 'Full screen Modal' */,
-			backdropClasses: '!p-0',
+			backdropClasses: 'p-0!',
 			meta: { modalData }
 		};
 		modalStore.trigger(modal);

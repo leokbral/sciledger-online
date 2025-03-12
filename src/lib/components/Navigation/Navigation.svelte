@@ -11,7 +11,7 @@
 </script>
 
 <nav class="m-auto list-nav p-4">
-	<ul class="m-auto p-10 flex flex-col justify-center items-center lg:gap-3 z-[2] md:ml-2">
+	<ul class="m-auto p-10 flex flex-col justify-center items-center lg:gap-3 z-2 md:ml-2">
 		{#each items as item, i}
 			<li>
 				<a

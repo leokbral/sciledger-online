@@ -28,10 +28,10 @@
 >
 	<div
 		bind:this={menuContainer}
-		class="!bg-transparent snap-x snap-mandatory scroll-smooth flex pb-6 overflow-x-auto"
+		class="bg-transparent! snap-x snap-mandatory scroll-smooth flex pb-6 overflow-x-auto"
 	>
 		{#each items as item, i}
-			<div id={`item-${i}`} class="!bg-transparent w-20 snap-start shrink-0">
+			<div id={`item-${i}`} class="bg-transparent! w-20 snap-start shrink-0">
 				<button
 					class:!preset-filled-primary-500={i === selected ? true : false}
 					type="button"

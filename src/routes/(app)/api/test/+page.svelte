@@ -50,9 +50,9 @@
 	}
 </script>
 
-<div class="m-auto card !bg-black text-surface-100 card-hover md:w-1/2">
+<div class="m-auto card bg-black! text-surface-100 card-hover md:w-1/2">
 	<header>
-		<!-- <img src={imageUrl || ''} class="bg-black/50 w-full aspect-[21/9]" alt="Post" /> -->
+		<!-- <img src={imageUrl || ''} class="bg-black/50 w-full aspect-21/9" alt="Post" /> -->
 		<div>
 			<FileUpload name="files" bind:files on:change={onChangeHandler}>
 				{#snippet message()}

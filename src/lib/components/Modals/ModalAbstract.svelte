@@ -16,7 +16,7 @@
 </script>
 
 <ModalFullscreen {parent} cCustom="gap-2">
-	<div class="{classes} w-8/12 h-2/6 md:p-2 flex flex-col md:flex-row mt-56 rounded">
+	<div class="{classes} w-8/12 h-2/6 md:p-2 flex flex-col md:flex-row mt-56 rounded-sm">
 		<!-- <div class="md:w-2/5 md:p-5"> -->
 			<!-- <RadarAtributes {data} classes="min-h-[240px] md:min-h-[50svh]" /> -->{data}
 		<!-- </div> -->

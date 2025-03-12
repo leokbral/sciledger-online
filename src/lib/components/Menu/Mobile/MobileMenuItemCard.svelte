@@ -11,7 +11,7 @@
 </script>
 
 <div
-	class="mt-[40px] card rounded-3xl py-5 bg-gradient-to-br from-primary-500 to-secondary-500 card-hover w-11/12 md:w-1/2 flex flex-col items-center"
+	class="mt-[40px] card rounded-3xl py-5 bg-linear-to-br from-primary-500 to-secondary-500 card-hover w-11/12 md:w-1/2 flex flex-col items-center"
 >
 	<span id="outerRing">
 		<a
@@ -19,7 +19,7 @@
 			href="/{name}"
 			class="relative top-[-70px] mb-[-80px] btn-icon preset-filled w-24"
 		>
-			<span class="font-Valorant text-2xl chip rounded-3xl !bg-transparent hover:bg-primary-800">
+			<span class="font-Valorant text-2xl chip rounded-3xl bg-transparent! hover:bg-primary-800">
 				Go!
 			</span>
 		</a>

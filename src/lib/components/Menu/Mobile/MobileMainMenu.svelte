@@ -126,12 +126,12 @@
 	</div>
 	<div
 		bind:this={menuContainer}
-		class="snap-x snap-mandatory scroll-smooth flex overflow-x-hidden z-[2] items-start"
+		class="snap-x snap-mandatory scroll-smooth flex overflow-x-hidden z-2 items-start"
 	>
 		{#each items as item, i}
 			<div
 				id={`item-${i}`}
-				class="!bg-transparent w-10/12 snap-center shrink-0 rounded-container flex items-center"
+				class="bg-transparent! w-10/12 snap-center shrink-0 rounded-container flex items-center"
 				role="button"
 				tabindex="0"
 				onclick={() => btnHdl(i)}

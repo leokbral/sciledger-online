@@ -10,7 +10,7 @@
 		images: PaperImage[];
 	}
 
-	let elemPaperImages: HTMLDivElement = $state();
+	let elemPaperImages = $state<HTMLDivElement | undefined>(undefined);
 
 	const paperImagesData: PaperImagesData = {
 		images: [
@@ -43,20 +43,26 @@
 
 	const multiColumnLeft = (): void => {
 		// elemPaperImages.scrollBy({ left: -300, behavior: 'smooth' });
-
-		let x = elemPaperImages.scrollWidth;
-		if (elemPaperImages.scrollLeft !== 0)
-			x = elemPaperImages.scrollLeft - elemPaperImages.clientWidth;
-		elemPaperImages.scroll(x, 0);
+		if (elemPaperImages) {
+			let x = elemPaperImages?.scrollWidth;
+			if (elemPaperImages?.scrollLeft !== 0)
+				x = elemPaperImages.scrollLeft - elemPaperImages.clientWidth;
+			elemPaperImages.scroll(x, 0);
+		}
 	};
 
 	const multiColumnRight = (): void => {
 		// elemPaperImages.scrollBy({ left: 300, behavior: 'smooth' });
 		let x = 0;
-		// -1 is used because different browsers use different methods to round scrollWidth pixels.
-		if (elemPaperImages.scrollLeft < elemPaperImages.scrollWidth - elemPaperImages.clientWidth - 1)
-			x = elemPaperImages.scrollLeft + elemPaperImages.clientWidth;
-		elemPaperImages.scroll(x, 0);
+		if (elemPaperImages) {
+			// -1 is used because different browsers use different methods to round scrollWidth pixels.
+			if (
+				elemPaperImages.scrollLeft <
+				elemPaperImages.scrollWidth - elemPaperImages.clientWidth - 1
+			)
+				x = elemPaperImages.scrollLeft + elemPaperImages.clientWidth;
+			elemPaperImages.scroll(x, 0);
+		}
 	};
 </script>
 
@@ -65,11 +71,19 @@
 
 	<div class="grid grid-cols-[auto_1fr_auto] gap-4 items-center">
 		<!-- Button: Left -->
-		<button type="button" class="btn-icon preset-filled" onclick={multiColumnLeft}>
+		<button
+			type="button"
+			class="btn-icon preset-filled"
+			onclick={multiColumnLeft}
+			aria-label="Scroll Left"
+		>
 			<i class="fa-solid fa-arrow-left"></i>
 		</button>
 
-		<div bind:this={elemPaperImages} class="snap-x snap-mandatory scroll-smooth flex gap-4 pb-4 overflow-x-auto">
+		<div
+			bind:this={elemPaperImages}
+			class="snap-x snap-mandatory scroll-smooth flex gap-4 pb-4 overflow-x-auto"
+		>
 			{#each paperImagesData.images as image (image.id)}
 				<div class="shrink-0 w-[300px] snap-start">
 					<img
@@ -85,7 +99,12 @@
 		</div>
 
 		<!-- Button-Right -->
-		<button type="button" class="btn-icon preset-filled" onclick={multiColumnRight}>
+		<button
+			type="button"
+			class="btn-icon preset-filled"
+			onclick={multiColumnRight}
+			aria-label="Scroll Right"
+		>
 			<i class="fa-solid fa-arrow-right"></i>
 		</button>
 	</div>

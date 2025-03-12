@@ -16,24 +16,24 @@ export const backgrounds: Record<string, string> = {
 	'preset-filled-warning-500': `variant-filled-warning`,
 	'preset-filled-error-500': `variant-filled-error`,
 	// Gradient
-	'primary-to-secondary': 'bg-gradient-to-br from-primary-500 to-secondary-500',
-	'secondary-to-tertiary': 'bg-gradient-to-br from-secondary-500 to-tertiary-500',
-	'tertiary-to-primary': 'bg-gradient-to-br from-tertiary-500 to-primary-500',
-	'secondary-to-primary': 'bg-gradient-to-br from-secondary-500 to-primary-500',
-	'tertiary-to-secondary': 'bg-gradient-to-br from-tertiary-500 to-secondary-500',
-	'primary-to-tertiary': 'bg-gradient-to-br from-primary-500 to-tertiary-500',
-	'success-to-warning': 'bg-gradient-to-br from-success-500 to-warning-500',
-	'warning-to-error': 'bg-gradient-to-br from-warning-500 to-error-500',
-	'error-to-success': 'bg-gradient-to-br from-error-500 to-success-500',
-	'warning-to-success': 'bg-gradient-to-br from-warning-500 to-success-500',
-	'error-to-warning': 'bg-gradient-to-br from-error-500 to-warning-500',
-	'success-to-error': 'bg-gradient-to-br from-success-500 to-error-500'
+	'primary-to-secondary': 'bg-linear-to-br from-primary-500 to-secondary-500',
+	'secondary-to-tertiary': 'bg-linear-to-br from-secondary-500 to-tertiary-500',
+	'tertiary-to-primary': 'bg-linear-to-br from-tertiary-500 to-primary-500',
+	'secondary-to-primary': 'bg-linear-to-br from-secondary-500 to-primary-500',
+	'tertiary-to-secondary': 'bg-linear-to-br from-tertiary-500 to-secondary-500',
+	'primary-to-tertiary': 'bg-linear-to-br from-primary-500 to-tertiary-500',
+	'success-to-warning': 'bg-linear-to-br from-success-500 to-warning-500',
+	'warning-to-error': 'bg-linear-to-br from-warning-500 to-error-500',
+	'error-to-success': 'bg-linear-to-br from-error-500 to-success-500',
+	'warning-to-success': 'bg-linear-to-br from-warning-500 to-success-500',
+	'error-to-warning': 'bg-linear-to-br from-error-500 to-warning-500',
+	'success-to-error': 'bg-linear-to-br from-success-500 to-error-500'
 };
 
 export const variants: { label: string; list: string[] }[] = [
 	{
 		label: 'Utility Classes',
-		list: ['bg-initial', '!bg-transparent']
+		list: ['bg-initial', 'bg-transparent!']
 	},
 	// filled
 	{
@@ -95,18 +95,18 @@ export const variants: { label: string; list: string[] }[] = [
 	{
 		label: 'Gradient Variants',
 		list: [
-			'bg-gradient-to-br from-primary-500 to-secondary-500',
-			'bg-gradient-to-br from-secondary-500 to-tertiary-500',
-			'bg-gradient-to-br from-tertiary-500 to-primary-500',
-			'bg-gradient-to-br from-secondary-500 to-primary-500',
-			'bg-gradient-to-br from-tertiary-500 to-secondary-500',
-			'bg-gradient-to-br from-primary-500 to-tertiary-500',
-			'bg-gradient-to-br from-success-500 to-warning-500',
-			'bg-gradient-to-br from-warning-500 to-error-500',
-			'bg-gradient-to-br from-error-500 to-success-500',
-			'bg-gradient-to-br from-warning-500 to-success-500',
-			'bg-gradient-to-br from-error-500 to-warning-500',
-			'bg-gradient-to-br from-success-500 to-error-500'
+			'bg-linear-to-br from-primary-500 to-secondary-500',
+			'bg-linear-to-br from-secondary-500 to-tertiary-500',
+			'bg-linear-to-br from-tertiary-500 to-primary-500',
+			'bg-linear-to-br from-secondary-500 to-primary-500',
+			'bg-linear-to-br from-tertiary-500 to-secondary-500',
+			'bg-linear-to-br from-primary-500 to-tertiary-500',
+			'bg-linear-to-br from-success-500 to-warning-500',
+			'bg-linear-to-br from-warning-500 to-error-500',
+			'bg-linear-to-br from-error-500 to-success-500',
+			'bg-linear-to-br from-warning-500 to-success-500',
+			'bg-linear-to-br from-error-500 to-warning-500',
+			'bg-linear-to-br from-success-500 to-error-500'
 		]
 	}
 ];

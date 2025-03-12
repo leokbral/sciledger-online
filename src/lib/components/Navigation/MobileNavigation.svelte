@@ -37,13 +37,13 @@
 
 <!-- <button on:click={scrollToNextTab}>Rolar para Próxima Tab</button> -->
 <div class="grid grid-cols-[1fr_auto]">
-	<Tabs class="grid grid-cols-[1] gap-0 items-center p-0">
+	<Tabs class="grid grid-cols-1 gap-0 items-center p-0">
 		<div bind:this={tabContainer} class="tab-container flex">
 			{#each items as item, i}
 				<Tabs.Control
 					href="./{item.name}"
 					selected={lastPathitem === item.name}
-					class="text-3xl tab-anchor !px-3.5"
+					class="text-3xl tab-anchor px-3.5!"
 					id={`tabAnchor-${i}`}
 				>
 					{item.icon}

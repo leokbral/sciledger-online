@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { preventDefault } from 'svelte/legacy';
 
-	import '/src/app.postcss';
+	import '/src/app.css';
 	import { goto } from '$app/navigation';
 	import { post } from '$lib/utils';
 	import { fade } from 'svelte/transition';

@@ -22,29 +22,17 @@
 	let page_link_base = $derived(tag ? `tag=${tag}` : `tab=${tab}`);
 </script>
 
-<svelte:head>
-	<title>Break Free from Nature</title>
-</svelte:head>
-
 <div class="">
 	<!-- {JSON.stringify(data.user)} -->
-	{#if !data.user}
-		<div class="banner w-screen bg-primary-900 p-8 text-white">
-			<div class="flex flex-col items-center gap-4">
-				<h1 class="h1">SciLedger</h1>
-				<p>Blockchain Based Open Science</p>
-				Consider rethinking your decision to invest substantial amounts
-			</div>
-		</div>
-	{/if}
+	
 
 	<div class="container page max-w-[700px] p-4 m-auto">
 		<div class="row">
 			<div class="col-md-9">
 				<h4 class="h4 px-4 text-primary-500 font font-semibold">Published Articles</h4>
-				<hr class="mt-2 mb-4 !border-t-2" />
+				<hr class="mt-2 mb-4 border-t-2!" />
 				<PaperList {papers} />
 			</div>
 		</div>
-	</div> 
+	</div>
 </div>

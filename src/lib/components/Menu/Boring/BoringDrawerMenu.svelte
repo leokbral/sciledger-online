@@ -14,7 +14,7 @@
 	}
 </script>
 
-<div class="z-[10] card !bg-transparent text-xl flex flex-col gap-5">
+<div class="z-10 card bg-transparent! text-xl flex flex-col gap-5">
 	<!-- <header class="card-header flex justify-end">
 		<button id="will-close" type="button" class="btn-icon">
 			<img

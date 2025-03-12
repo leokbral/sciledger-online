@@ -1,12 +1,14 @@
 <script lang="ts">
 	import AuthorDashboard from '$lib/AuthorDashboard.svelte';
 	import MyPapers from '$lib/MyPapers.svelte';
-	import { Tab, Tabs } from '@skeletonlabs/skeleton-svelte';
+	import { Tabs } from '@skeletonlabs/skeleton-svelte';
 	import Icon from '@iconify/svelte';
 	import { userProfiles } from '../../../routes/(app)/UserProfile';
 
-	let tabSet: number = $state(0);
+	let tabSet: string = $state('');
 	let user = userProfiles[0];
+
+	let group = $state('plane');
 
 	interface Props {
 		data: any;
@@ -20,47 +22,52 @@
 </script>
 
 <div class="container page p-4 m-auto">
-	<Tabs justify="justify-center">
-		{#each tabs as tab, value}
-			<Tab bind:group={tabSet} name="tab{value}" {value}>
-				<div class="flex justify-center">
-					<Icon icon={tab.icon} style="font-size: 2rem;" />
-				</div>
-				<span>{tab.name}</span>
-			</Tab>
-		{/each}
+	<Tabs value={group} onValueChange={(e) => (group = e.value)}>
+		{#snippet list()}
+			{#each tabs as tab, value}
+				<Tabs.Control value="tab{value}">
+					{#snippet lead()}
+						<div class="flex justify-center">
+							<Icon icon={tab.icon} style="font-size: 2rem;" />
+						</div>
+					{/snippet}
+					<span>{tab.name}</span>
+				</Tabs.Control>
+			{/each}
+		{/snippet}
 		<!-- Tab Panels --->
-		{#snippet panel()}
-			
-				<div class="grid gap-3 md:grid-cols-1">
-					{#if tabSet === 0}
-						<div class="card page max-w-[700px] p-4 m-auto">
-							<div class="text-surface-900">
-								<MyPapers papersData={tabsContent[0]}></MyPapers>
-							</div>
+		{#snippet content()}
+			<div class="grid gap-3 md:grid-cols-1">
+				<Tabs.Panel value={tabs[0].value}>
+					<div class="card page max-w-[700px] p-4 m-auto">
+						<div class="text-surface-900">
+							<MyPapers papersData={tabsContent[0]}></MyPapers>
 						</div>
-					{:else if tabSet === 1}
-						<div class="card page max-w-[700px] p-4 m-auto">
-							<div class="text-surface-900">
-								{tabsContent[1]}
-							</div>
+					</div>
+				</Tabs.Panel>
+				<Tabs.Panel value={tabs[1].value}>
+					<div class="card page max-w-[700px] p-4 m-auto">
+						<div class="text-surface-900">
+							{tabsContent[1]}
 						</div>
-					{:else if tabSet === 2}
-						<div class="card page max-w-[700px] p-4 m-auto">
+					</div>
+				</Tabs.Panel>
+				<Tabs.Panel value={tabs[2].value}>
+					<div class="card page max-w-[700px] p-4 m-auto">
+						<div class="text-surface-900">
+							{tabsContent[2]}
 							<div class="text-surface-900">
-								{tabsContent[2]}
-								<div class="text-surface-900">
-									<div class="mt-4">
-										<h2 class="text-xl font-semibold">Contact Information</h2>
-										<p class="mt-2"><strong>Email:</strong> {user.email}</p>
-									</div>
+								<div class="mt-4">
+									<h2 class="text-xl font-semibold">Contact Information</h2>
+									<p class="mt-2"><strong>Email:</strong> {user.email}</p>
 								</div>
 							</div>
 						</div>
-					{/if}
-					<!-- {/each} -->
-				</div>
-			
-			{/snippet}
+					</div>
+				</Tabs.Panel>
+				
+				<!-- {/each} -->
+			</div>
+		{/snippet}
 	</Tabs>
 </div>

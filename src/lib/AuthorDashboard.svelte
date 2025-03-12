@@ -426,41 +426,41 @@
 
 		<!-- <div class="text-2xl font-bold mb-4">Quick Actions</div>
 		<div class="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-			<button class="bg-primary-500 text-white p-4 rounded-full shadow hover:bg-primary-600"
+			<button class="bg-primary-500 text-white p-4 rounded-full shadow-sm hover:bg-primary-600"
 				>Submit a New Article</button
 			>
-			<button class="bg-primary-500 text-white p-4 rounded-full shadow hover:bg-primary-600"
+			<button class="bg-primary-500 text-white p-4 rounded-full shadow-sm hover:bg-primary-600"
 				>View All Notifications</button
 			>
-			<button class="bg-primary-500 text-white p-4 rounded-full shadow hover:bg-primary-600"
+			<button class="bg-primary-500 text-white p-4 rounded-full shadow-sm hover:bg-primary-600"
 				>Manage Followers</button
 			>
 		</div> -->
 
 		<div class="text-2xl font-bold mb-4 text-surface-900">Stats Overview</div>
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-			<div class="bg-white p-4 shadow rounded text-surface-900">
+			<div class="bg-white p-4 shadow-sm rounded-sm text-surface-900">
 				<p class="text-lg font-semibold">Total Publications</p>
 				<p class="text-2xl">{publishedArticles}</p>
 			</div>
-			<div class="bg-white p-4 shadow rounded text-surface-900">
+			<div class="bg-white p-4 shadow-sm rounded-sm text-surface-900">
 				<p class="text-lg font-semibold">Total Citations</p>
 				<p class="text-2xl">{totalCitations}</p>
 			</div>
-			<div class="bg-white p-4 shadow rounded text-surface-900">
+			<div class="bg-white p-4 shadow-sm rounded-sm text-surface-900">
 				<p class="text-lg font-semibold">Average Review Time (days)</p>
 				<p class="text-2xl">{averageReviewTime.toFixed()}</p>
 			</div>
-			<div class="bg-white p-4 shadow rounded text-surface-900">
+			<div class="bg-white p-4 shadow-sm rounded-sm text-surface-900">
 				<p class="text-lg font-semibold">Highest Score Publication</p>
-				<p class="text-2xl">{highestScorePublication.title || 'N/A'}</p>
+				<p class="text-2xl">{highestScorePublication.score || 'N/A'}</p>
 			</div>
 		</div>
-		<!-- <div class="bg-white p-4 shadow rounded text-surface-900">
+		<!-- <div class="bg-white p-4 shadow-sm rounded-sm text-surface-900">
 				<p class="text-lg font-semibold">Acceptance Rate (%)</p>
 				<p class="text-2xl">{acceptanceRate}</p>
 			</div>
-			<div class="bg-white p-4 shadow rounded text-surface-900">
+			<div class="bg-white p-4 shadow-sm rounded-sm text-surface-900">
 				<p class="text-lg font-semibold">Impact Factor</p>
 				<p class="text-2xl">{impactFactor}</p>
 			</div> -->
@@ -468,7 +468,7 @@
 </section>
 
 <!-- <section>
-	<div class="bg-white shadow-md rounded p-6 mb-8">
+	<div class="bg-white shadow-md rounded-sm p-6 mb-8">
 		<h3 class="text-xl font-bold mb-4">Your Research</h3>
 		<p class="text-gray-700 mb-4">
 			Keep track of the progress of your submitted articles and check the performance of your

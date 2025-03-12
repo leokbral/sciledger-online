@@ -17,11 +17,11 @@
 	</a>
 </div> -->
 
-<div class=" card bg-gradient-to-br from-primary-500 to-secondary-500 card-hover w-10/12 md:w-1/2">
+<div class=" card bg-linear-to-br from-primary-500 to-secondary-500 card-hover w-10/12 md:w-1/2">
 	<header class="card-header">
 		<!-- <img
 			src="https://images.unsplash.com/photo-1620562303747-ba21ca6f1530?ixid=M3w0Njc5ODF8MHwxfGFsbHx8fHx8fHx8fDE2ODc5NzY2MjR8&amp;ixlib=rb-4.0.3&amp;w=400&amp;h=175&amp;auto=format&amp;fit=crop"
-			class="bg-black/50 w-full aspect-[21/9]"
+			class="bg-black/50 w-full aspect-21/9"
 			alt="Post"
 		/> -->
 		<section class="text-white p-4 space-y-4">
