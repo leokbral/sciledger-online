@@ -1,7 +1,8 @@
+<!-- @migration-task Error while migrating Svelte code: $$props is used together with named props in a way that cannot be automatically migrated. -->
 <script lang="ts">
 	import { slide } from 'svelte/transition';
 	// Components
-	import { RadioGroup, RadioItem } from '@skeletonlabs/skeleton';
+	import { Segment } from '@skeletonlabs/skeleton-svelte';
 	// Settings
 	import { backgrounds } from './options';
 
@@ -26,14 +27,14 @@
 	export let regionSource = '';
 
 	// Classes
-	const cBase = 'shadow-2xl shadow-surface-500/10 dark:shadow-black/10 rounded-container-token overflow-hidden';
-	const cHeader = 'bg-surface-200-700-token p-4 flex justify-between items-center gap-4';
-	const cSwatches = 'variant-soft p-4 grid grid-cols-6 sm:grid-cols-12 gap-2';
+	const cBase = 'shadow-2xl shadow-surface-500/10 dark:shadow-black/10 rounded-container overflow-hidden';
+	const cHeader = 'bg-surface-200-800 p-4 flex justify-between items-center gap-4';
+	const cSwatches = 'preset-tonal p-4 grid grid-cols-6 sm:grid-cols-12 gap-2';
 	const cSwatchCell = 'ring-[1px] ring-surface-500/50 aspect-square rounded';
 	const cViewport = 'p-4 md:p-10 space-y-4';
 	const cContent = 'flex justify-center items-center mx-auto transition-[width] duration-200';
-	const cFooter = 'variant-soft p-4';
-	const cSource = 'bg-surface-100-800-token p-4 space-y-4';
+	const cFooter = 'preset-tonal p-4';
+	const cSource = 'bg-surface-100-900 p-4 space-y-4';
 
 	// Local
 	let tabView = 'preview';
@@ -67,20 +68,20 @@
 			<span class="text-2xl font-bold capitalize">{label}</span>
 		{:else}
 			<!-- View Toggle -->
-			<RadioGroup>
-				<RadioItem bind:group={tabView} name="view" value="preview" title="Preview"><i class="fa-solid fa-eye text-sm"></i></RadioItem>
-				<RadioItem bind:group={tabView} name="view" value="code" title="Code"><i class="fa-solid fa-code text-sm"></i></RadioItem>
-			</RadioGroup>
+			<Segment>
+				<Segment.Item bind:group={tabView} name="view" value="preview" title="Preview"><i class="fa-solid fa-eye text-sm"></i></Segment.Item>
+				<Segment.Item bind:group={tabView} name="view" value="code" title="Code"><i class="fa-solid fa-code text-sm"></i></Segment.Item>
+			</Segment>
 			<div class="flex justify-between gap-4">
 				<!-- Responsive Settings -->
 				{#if responsive}
-					<RadioGroup class="hidden md:flex">
-						<RadioItem bind:group={radioSize} name="size" value="mobile"><i class="fa-solid fa-mobile-screen text-sm"></i></RadioItem>
-						<RadioItem bind:group={radioSize} name="size" value="full"><i class="fa-solid fa-display text-sm"></i></RadioItem>
-					</RadioGroup>
+					<Segment class="hidden md:flex">
+						<Segment.Item bind:group={radioSize} name="size" value="mobile"><i class="fa-solid fa-mobile-screen text-sm"></i></Segment.Item>
+						<Segment.Item bind:group={radioSize} name="size" value="full"><i class="fa-solid fa-display text-sm"></i></Segment.Item>
+					</Segment>
 				{/if}
 				<!-- Toggle Swatches -->
-				<button class="btn-icon {swatches ? 'variant-filled' : 'variant-soft'}" on:click={toggleSwatches} title="Backgrounds">
+				<button class="btn-icon {swatches ? 'preset-filled' : 'preset-tonal'}" on:click={toggleSwatches} title="Backgrounds">
 					<i class="fa-solid fa-swatchbook text-sm"></i>
 				</button>
 			</div>

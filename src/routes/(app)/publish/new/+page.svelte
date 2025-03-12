@@ -5,7 +5,11 @@
 	//import { userProfiles } from '../../UserProfile';
 	//import Publisher from './Publisher.svelte';
 
-	export let data;
+	interface Props {
+		data: any;
+	}
+
+	let { data }: Props = $props();
 	let userProfiles = data.users;
 	//let articleComponent: PaperPublishPage;
 

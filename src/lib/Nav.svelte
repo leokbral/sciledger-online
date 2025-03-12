@@ -1,13 +1,17 @@
 <script lang="ts">
-	import { Avatar, popup, type PopupSettings } from '@skeletonlabs/skeleton';
+	import { Avatar, type PopupSettings } from '@skeletonlabs/skeleton-svelte';
 	import { post } from './utils';
 	import { invalidateAll } from '$app/navigation';
 	import { userProfiles } from '../routes/(app)/UserProfile';
 	import type { User } from './types/User';
 	import { getInitials } from './utils/GetInitials';
 
-	export let pathname: string;
-	export let user: User;
+	interface Props {
+		pathname: string;
+		user: User;
+	}
+
+	let { pathname, user }: Props = $props();
 	//console.log("nav 9 - ", user);
 
 	const popupFeatured: PopupSettings = {
@@ -54,7 +58,7 @@
 		{/if}
 	</button>
 	<!-- Div do tooltip -->
-	<div class="card p-4 w-72 shadow-xl variant-filled" data-popup="popupFeatured">
+	<div class="card p-4 w-72 shadow-xl preset-filled" data-popup="popupFeatured">
 		<div class="space-y-4 flex flex-col">
 			<div class="flex gap-2">
 				<!-- <Avatar src={user.profilePictureUrl} alt={user.firstName} width="w-14" /> -->
@@ -136,9 +140,9 @@
 				Profile
 			</a>
 			<a data-sveltekit-reload href="/profile/{user.username}">Profile</a>
-			<button class="btn variant-filled justify-start" on:click={logout}>Sign out</button>
+			<button class="btn preset-filled justify-start" onclick={logout}>Sign out</button>
 		</div>
-		<div class="arrow variant-filled"></div>
+		<div class="arrow preset-filled"></div>
 	</div>
 	<!-- </a> -->
 {:else}

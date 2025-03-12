@@ -1,18 +1,22 @@
 <script lang="ts">
-	export let papersData;
-	export let rota: string = '';
 
 	const papers: Paper[] = papersData.papersData[0];
 	console.log(papers);
-	export let user; // Selecionar o primeiro usuário na lista para demonstração
 
 	let tabSet: number = 0;
 
-	import { getModalStore, type ModalSettings } from '@skeletonlabs/skeleton';
+	import { type ModalSettings } from '@skeletonlabs/skeleton-svelte';
 	import Abstract from '$lib/components/hope/Abstract.svelte';
 	import PaperList from '$lib/PaperList/index.svelte';
 	import type { Paper } from '$lib/types/Paper';
 	import { writable } from 'svelte/store';
+	interface Props {
+		papersData: any;
+		rota?: string;
+		user: any;
+	}
+
+	let { papersData, rota = '', user }: Props = $props();
 	const modalStore = getModalStore();
 
 	// ------------------------FILTROS------------------------
@@ -101,7 +105,7 @@
 			<!-- Apply Filters Button -->
 			<button
 				class="w-full p-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-				on:click={applyFilters}
+				onclick={applyFilters}
 			>
 				Apply Filters
 			</button>

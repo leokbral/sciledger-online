@@ -1,6 +1,10 @@
 <script lang="ts">
-	export let i: number;
-	export let item: any = {};
+	interface Props {
+		i: number;
+		item?: any;
+	}
+
+	let { i, item = {} }: Props = $props();
 </script>
 
 <!-- <div class="card p-4 min-w-sm z-[10]" data-popup="boringMenu-{i}">
@@ -17,7 +21,7 @@
 </div> -->
 
 <div
-	class="z-[10] card bg-gradient-to-br variant-gradient-primary-secondary card-hover w-10/12 md:w-1/2"
+	class="z-[10] card bg-gradient-to-br from-primary-500 to-secondary-500 card-hover w-10/12 md:w-1/2"
 	data-popup="boringMenu-{i}"
 >
 	<header class="card-header flex justify-end">
@@ -45,12 +49,12 @@
 	</section>
 	<footer class="card-footer p-4 flex justify-center items-center space-x-4">
 		{#if item.notReady}
-			<span class="px-8 py-3 m-1 text-xl chip variant-filled-primary hover:bg-primary-800">
+			<span class="px-8 py-3 m-1 text-xl chip preset-filled-primary-500 hover:bg-primary-800">
 				Em breve...
 			</span>
 		{:else}
 			<a href="/{item.name}">
-				<span class="px-8 py-3 m-1 text-xl chip variant-filled-primary hover:bg-primary-800">
+				<span class="px-8 py-3 m-1 text-xl chip preset-filled-primary-500 hover:bg-primary-800">
 					Iniciar <!-- ▶️ -->
 					<img
 						src="https://raw.githubusercontent.com/AulaZero/icons/main/icons/play.svg"

@@ -4,22 +4,24 @@
 	// Sveld Mapper
 	import { sveldMapperProps } from '$lib/layouts/DocsShell/sveldMapper';
 	// Components
-	import { Table } from '@skeletonlabs/skeleton';
-
 	// Props
-	export let pageData: DocsShellSettings;
+	interface Props {
+		pageData: DocsShellSettings;
+	}
+
+	let { pageData }: Props = $props();
 
 	// Classes
 	const cBase = 'space-y-10';
 
 	// Reactive
-	$: classesBase = `${cBase}`;
+	let classesBase = $derived(`${cBase}`);
 </script>
 
 <div class="doc-shell-properties {classesBase}">
 	<!-- RestProps -->
 	{#if pageData.restProps}
-		<aside class="alert variant-ghost-warning">
+		<aside class="alert preset-tonal-warning border border-warning-500">
 			<!-- prettier-ignore -->
 			<div class="alert-message">
 				<p>This component implements <a class="anchor" href="https://svelte.dev/docs#template-syntax-attributes-and-props" target="_blank" rel="noreferrer">restProps</a>. This passes all extra attributes to the component's <code class="code">{pageData.restProps}</code> elements.</p>

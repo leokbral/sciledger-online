@@ -1,10 +1,12 @@
 <script lang="ts">
-	import { page } from '$app/stores';
+	import { run } from 'svelte/legacy';
+
+	import { page } from '$app/state';
 
 	// Docs
 	import LayoutPage from '$lib/layouts/LayoutPage/LayoutPage.svelte';
 	// Components
-	import { Tab, TabGroup } from '@skeletonlabs/skeleton';
+	import { Tab, Tabs } from '@skeletonlabs/skeleton-svelte';
 	// Types
 	import type { DocsShellSettings } from '$lib/layouts/DocsShell/types';
 	// Partials
@@ -22,8 +24,21 @@
 	import { browser } from '$app/environment';
 
 	// Props
-	export let settings: DocsShellSettings;
-	export let tabs = true;
+	interface Props {
+		settings: DocsShellSettings;
+		tabs?: boolean;
+		sandbox?: import('svelte').Snippet;
+		usage?: import('svelte').Snippet;
+		children?: import('svelte').Snippet;
+	}
+
+	let {
+		settings,
+		tabs = true,
+		sandbox,
+		usage,
+		children
+	}: Props = $props();
 
 	// Classes
 	const cBase = 'relative';
@@ -32,21 +47,21 @@
 
 	// Local
 	const defaultTab = 'usage';
-	let tabPanel = $page.url.searchParams.get('tab') || defaultTab;
+	let tabPanel = $state(page.url.searchParams.get('tab') || defaultTab);
 
 	// Page Data
 	const pageData: DocsShellSettings = {
 		// Define defaults first
 		...docShellDefaults,
 		// Local Overrides
-		...{ docsPath: $page.url.pathname },
+		...{ docsPath: page.url.pathname },
 		// Prop Settings Values
 		...settings
 	};
 
 	// Sveld Counts ---
 	// Conditional tab display based on Sveld reference counts
-	const sveldCounts = { props: 0, slots: 0, events: 0 };
+	const sveldCounts = $state({ props: 0, slots: 0, events: 0 });
 	if (pageData.components && pageData.components?.length > 0) {
 		pageData.components.forEach((comp) => {
 			sveldCounts.props += comp.sveld.props.length;
@@ -56,16 +71,18 @@
 	}
 
 	// Reactive
-	$: classesBase = `${cBase}`;
-	$: classesTabs = `${cTabs}`;
-	$: classesPanels = `${cPanels}`;
+	let classesBase = $derived(`${cBase}`);
+	let classesTabs = $derived(`${cTabs}`);
+	let classesPanels = $derived(`${cPanels}`);
 	// Handle tab URL param for deep linking
-	$: if (browser) {
-		const url = new URL($page.url);
-		url.searchParams.delete('tab');
-		if (tabPanel !== defaultTab) url.searchParams.set('tab', tabPanel);
-		goto(url, { replaceState: true });
-	}
+	run(() => {
+		if (browser) {
+			const url = new URL(page.url);
+			url.searchParams.delete('tab');
+			if (tabPanel !== defaultTab) url.searchParams.set('tab', tabPanel);
+			goto(url, { replaceState: true });
+		}
+	});
 </script>
 
 <LayoutPage class="doc-shell {classesBase}" tocKey={tabPanel}>
@@ -74,7 +91,7 @@
 
 	<!-- Tabs -->
 	{#if tabs}
-		<TabGroup class={classesTabs}>
+		<Tabs class={classesTabs}>
 			<Tab bind:group={tabPanel} name="panels" value="usage">Usage</Tab>
 			{#if sveldCounts.props > 0}<Tab bind:group={tabPanel} name="properties" value="properties">Props</Tab>{/if}
 			{#if pageData?.parameters?.length}<Tab bind:group={tabPanel} name="parameters" value="parameters">Params</Tab>{/if}
@@ -82,7 +99,7 @@
 			{#if pageData?.classes?.length}<Tab bind:group={tabPanel} name="classes" value="classes">Classes</Tab>{/if}
 			{#if sveldCounts.events > 0}<Tab bind:group={tabPanel} name="events" value="events">Events</Tab>{/if}
 			{#if pageData?.keyboard?.length}<Tab bind:group={tabPanel} name="keyboard" value="keyboard">Keyboard</Tab>{/if}
-		</TabGroup>
+		</Tabs>
 	{/if}
 
 	<!-- Panels -->
@@ -90,14 +107,14 @@
 		<!-- Panel: Usage -->
 		{#if tabPanel === 'usage'}
 			<!-- Slot: Sandbox -->
-			{#if $$slots.sandbox}
+			{#if sandbox}
 				<h2 class="sr-only">Demo</h2>
-				<slot name="sandbox" />
+				{@render sandbox?.()}
 			{/if}
 			<!-- Slot: Usage -->
-			<slot name="usage">(usage)</slot>
+			{#if usage}{@render usage()}{:else}(usage){/if}
 			<!-- Slot: Default -->
-			<slot />
+			{@render children?.()}
 		{/if}
 		<!-- Panel: properties -->
 		{#if tabPanel === 'properties'}<PanelProps {pageData} />{/if}

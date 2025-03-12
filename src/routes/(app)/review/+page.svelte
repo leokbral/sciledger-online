@@ -4,7 +4,11 @@
 	import type { Paper } from '$lib/types/Paper';
 	import type { PageData } from './$types';
 
-	export let data: PageData;
+	interface Props {
+		data: PageData;
+	}
+
+	let { data }: Props = $props();
 	// let papers = data.papers;
 	let papers: Paper[] = data.papers;
 	// console.log(data)
@@ -56,9 +60,11 @@
 
 <div class="container page p-4 m-auto">
 	<ReviewPage data={publishData}>
-		<div slot="requested" class="text-surface-900 w-full">
-			<PaperPool rota={'/review/paperspool'} papersData={publishData} {user}></PaperPool>
-		</div>
+		{#snippet requested()}
+				<div  class="text-surface-900 w-full">
+				<PaperPool rota={'/review/paperspool'} papersData={publishData} {user}></PaperPool>
+			</div>
+			{/snippet}
 	</ReviewPage>
 </div>
 <!-- <div class="container page p-4 m-auto">

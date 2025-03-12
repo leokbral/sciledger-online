@@ -1,13 +1,17 @@
 <script lang="ts">
-	import { TabGroup, TabAnchor } from '@skeletonlabs/skeleton';
+	import { Tabs } from '@skeletonlabs/skeleton-svelte';
 
-	export let data: any;
 	const items = data.items;
-	export let pathname: string;
+	interface Props {
+		data: any;
+		pathname: string;
+	}
 
-	let tabContainer: HTMLDivElement;
+	let { data, pathname }: Props = $props();
 
-	let isInEnd: boolean = false;
+	let tabContainer: HTMLDivElement = $state();
+
+	let isInEnd: boolean = $state(false);
 	const scrollToEnd = () => {
 		if (tabContainer) {
 			const lastTab = tabContainer.lastElementChild;
@@ -28,37 +32,37 @@
 		isInEnd = false;
 	};
 
-	$: lastPathitem = pathname.split('/').pop();
+	let lastPathitem = $derived(pathname.split('/').pop());
 </script>
 
 <!-- <button on:click={scrollToNextTab}>Rolar para Próxima Tab</button> -->
 <div class="grid grid-cols-[1fr_auto]">
-	<TabGroup class="grid grid-cols-[1] gap-0 items-center p-0">
+	<Tabs class="grid grid-cols-[1] gap-0 items-center p-0">
 		<div bind:this={tabContainer} class="tab-container flex">
 			{#each items as item, i}
-				<TabAnchor
+				<Tabs.Control
 					href="./{item.name}"
 					selected={lastPathitem === item.name}
 					class="text-3xl tab-anchor !px-3.5"
 					id={`tabAnchor-${i}`}
 				>
 					{item.icon}
-				</TabAnchor>
+				</Tabs.Control>
 			{/each}
 		</div>
-	</TabGroup>
+	</Tabs>
 	{#if isInEnd}
 		<button
 			type="button"
-			class="m-auto btn-icon variant-filled-white md:hidden"
-			on:click={scrollToStart}
+			class="m-auto btn-icon preset-filled-white-500 md:hidden"
+			onclick={scrollToStart}
 			><span class="flex pb-2 align-center justify-center text-4xl"> « </span>
 		</button>
 	{:else}
 		<button
 			type="button"
-			class="m-auto btn-icon variant-filled-white md:hidden"
-			on:click={scrollToEnd}
+			class="m-auto btn-icon preset-filled-white-500 md:hidden"
+			onclick={scrollToEnd}
 		>
 			<span class="flex pb-2 align-center justify-center text-4xl"> » </span>
 		</button>

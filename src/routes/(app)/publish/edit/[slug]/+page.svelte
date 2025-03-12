@@ -6,13 +6,17 @@
 	import type { PaperPublishStoreData } from '$lib/types/PaperPublishStoreData';
 	import type { PageData } from './$types';
 
-	export let data: PageData;
+	interface Props {
+		data: PageData;
+	}
+
+	let { data }: Props = $props();
 
 	let paper: Paper | null = data.paper;
 	//console.log("www",paper?.authors)
 	let userProfiles = data.users; // Ajuste conforme necessário
 
-	let inicialValue: PaperPublishStoreData;
+	let inicialValue: PaperPublishStoreData = $state();
 
 	if (paper) {
 		inicialValue = {

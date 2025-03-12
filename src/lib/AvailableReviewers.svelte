@@ -2,9 +2,13 @@
 	import type { User } from '$lib/types/User';
 	import Icon from '@iconify/svelte'; // Make sure to import Icon component if you're using icons
 
-	export let reviewers: User[] = [];
-	export let selectedReviewers: string[] = [];
-	export let toggleReviewerSelection: (reviewerId: string) => void;
+	interface Props {
+		reviewers?: User[];
+		selectedReviewers?: string[];
+		toggleReviewerSelection: (reviewerId: string) => void;
+	}
+
+	let { reviewers = [], selectedReviewers = [], toggleReviewerSelection }: Props = $props();
 	let imageSize = 100;
 	let imagePositionX = 0;
 	let imagePositionY = 0;
@@ -24,7 +28,7 @@
 						type="checkbox"
 						id={reviewer.id}
 						checked={selectedReviewers.includes(reviewer.id)}
-						on:change={() => toggleReviewerSelection(reviewer.id)}
+						onchange={() => toggleReviewerSelection(reviewer.id)}
 					/>
 					<label for={reviewer.id} class="ml-2"></label>
 				</div>

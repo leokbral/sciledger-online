@@ -10,13 +10,13 @@
 	let user = userProfiles[3];
 	let isEditing = false;
 	let editedBio = user.bio;
-	let editedTitle = user.title;
-	let editedInstitution = user.institution;
+	let editedTitle = $state(user.title);
+	let editedInstitution = $state(user.institution);
 	let profilePicture = user.profilePicture;
 	let imageSize = 100; // Tamanho inicial da imagem em pixels
 	let imagePositionX = 0;
 	let imagePositionY = 0;
-	let selectedReviewers: string[] = [];
+	let selectedReviewers: string[] = $state([]);
 	
 	let tabs = [
 		{
@@ -121,7 +121,7 @@
 						type="checkbox"
 						id={user.id}
 						checked={selectedReviewers.includes(user.id)}
-						on:change={() => toggleReviewerSelection(user.id)}
+						onchange={() => toggleReviewerSelection(user.id)}
 					/>
 					<!-- <label for={user.id} class="ml-2">Select for review</label> -->
 					<label for={user.id} class="ml-2"></label>

@@ -29,7 +29,7 @@ export async function load({ locals, params }) {
 
 export const actions = {
     default: async ({ locals /* , params, request */ }) => {
-        if (!locals.user) throw error(401);
+        if (!locals.user) error(401);
         
         return {
             success: true

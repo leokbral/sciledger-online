@@ -1,6 +1,10 @@
 <script lang="ts">
-	export let reviews: any[] = []; // Garantindo que seja um array vazio por padrão
-	export let user: any = {}; // Garantindo que seja um objeto vazio por padrão
+	interface Props {
+		reviews?: any[];
+		user?: any;
+	}
+
+	let { reviews = [], user = {} }: Props = $props();
   
 	let articlesPendingReview = 0;
 	let articlesInReview = 0;
@@ -13,13 +17,13 @@
 	let recentReviewedArticles = 0;
 	let commentsSent = 0;
 	let reviewsRequested = 0;
-	let avgReviewTime = 0;
+	let avgReviewTime = $state(0);
 	let totalReviewedArticles = 0;
 	let acceptanceRate = 0;
 	let articleImpact = 0;
 	let drafts = 0;
 	let upcomingDeadlines = 0;
-	let averageFeedback = 'N/A';
+	let averageFeedback = $state('N/A');
 	let value = 0; 
   
 	// Verifique se os dados do revisor estão definidos antes de usá-los

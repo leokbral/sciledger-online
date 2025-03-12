@@ -4,16 +4,18 @@
 	// Sveld Mapper
 	import { sveldMapperSlots } from '$lib/layouts/DocsShell/sveldMapper';
 	// Components
-	import { Table } from '@skeletonlabs/skeleton';
-
 	// Props
-	export let pageData: DocsShellSettings;
+	interface Props {
+		pageData: DocsShellSettings;
+	}
+
+	let { pageData }: Props = $props();
 
 	// Classes
 	const cBase = 'space-y-10';
 
 	// Reactive
-	$: classesBase = `${cBase}`;
+	let classesBase = $derived(`${cBase}`);
 </script>
 
 <div class="doc-shell-slots {classesBase}">

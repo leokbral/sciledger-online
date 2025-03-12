@@ -3,7 +3,11 @@
 	import CommentContainer from './CommentContainer.svelte';
 	//import TaskRegisterPage from '$lib/Pages/article/ArticlePublishPage.svelte';
 
-	export let data;
+	interface Props {
+		data: any;
+	}
+
+	let { data }: Props = $props();
 	let paper = data.paper;
 	let user = data.user;
 	//console.log('TO POR AKI O', data);
@@ -40,7 +44,7 @@
 
 		<hr />
 
-		<div class="article-actions" />
+		<div class="article-actions"></div>
 
 		<div class="row">
 			<CommentContainer comments={data.paper?.comments} {user} />

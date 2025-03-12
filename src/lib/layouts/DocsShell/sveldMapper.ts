@@ -1,6 +1,6 @@
 import type { Component } from './types';
 
-import type { TableSource } from '@skeletonlabs/skeleton';
+import type { TableSource } from '@skeletonlabs/skeleton-svelte';
 
 // Mapper: Props
 export function sveldMapperProps(component: Component): TableSource {

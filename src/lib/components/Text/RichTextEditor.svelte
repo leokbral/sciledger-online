@@ -2,8 +2,12 @@
   import { onMount } from 'svelte';
   import 'quill/dist/quill.snow.css';
   let editor: any;
-  export let content = '';
-  export let placeholder = 'Enter text...';
+  interface Props {
+    content?: string;
+    placeholder?: string;
+  }
+
+  let { content = $bindable(''), placeholder = 'Enter text...' }: Props = $props();
   onMount(async () => {
     const Quill = (await import('quill')).default;
 

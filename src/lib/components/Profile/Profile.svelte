@@ -1,5 +1,9 @@
 <script lang="ts">
-	export let profile;
+	interface Props {
+		profile: any;
+	}
+
+	let { profile }: Props = $props();
 	let name: string = profile.name;
 	let belt: string = profile.belt;
 	let src: string = profile.picture;
