@@ -1,11 +1,8 @@
 <script lang="ts">
 
-	const papers: Paper[] = papersData.papersData[0];
-	console.log(papers);
+	
 
-	let tabSet: number = 0;
-
-	import { type ModalSettings } from '@skeletonlabs/skeleton-svelte';
+	// import { type ModalSettings } from '@skeletonlabs/skeleton-svelte';
 	import Abstract from '$lib/components/hope/Abstract.svelte';
 	import PaperList from '$lib/PaperList/index.svelte';
 	import type { Paper } from '$lib/types/Paper';
@@ -17,7 +14,11 @@
 	}
 
 	let { papersData, rota = '', user }: Props = $props();
-	const modalStore = getModalStore();
+	// const modalStore = getModalStore();
+	const papers: Paper[] = papersData.papersData[0];
+	console.log(papers);
+
+	let tabSet: number = 0;
 
 	// ------------------------FILTROS------------------------
 	// Stores para os filtros
@@ -35,17 +36,17 @@
 		// Aqui você pode chamar uma API ou filtrar os dados localmente
 	};
 	// ------------------------FILTROS------------------------
-	const modal: ModalSettings = {
-		type: 'component',
-		title: 'Example Alert',
-		body: 'This is an example modal.',
-		image: '',
-		component: 'fullScreen'
-	};
-	function modalAbstract(abstract: string) {
-		modal.body = abstract;
-		modalStore.trigger(modal);
-	}
+	// const modal: ModalSettings = {
+	// 	type: 'component',
+	// 	title: 'Example Alert',
+	// 	body: 'This is an example modal.',
+	// 	image: '',
+	// 	component: 'fullScreen'
+	// };
+	// function modalAbstract(abstract: string) {
+	// 	modal.body = abstract;
+	// 	modalStore.trigger(modal);
+	// }
 
 	let modalData = user;
 	let classes = 'bg-linear-to-b from-indigo-500 via-purple-500 to-pink-500 text-white';

@@ -14,17 +14,17 @@
 
 	let { parent, cCustom = '', children }: Props = $props();
 
-	const modalStore = getModalStore();
+	// const modalStore = getModalStore();
 
 	// Notes: Use `w-screen h-screen` to fit the visible canvas size.
 	const cBase =
 		'bg-surface-100-900 w-screen h-[calc(100svh_-_32px)] gap-4 p-4 grid grid-rows-[auto_1fr] justify-center items-center';
 </script>
 
-{#if $modalStore[0]}
+<!-- {#if $modalStore[0]} -->
 	<div class="modal-example-fullscreen {cBase} {cCustom}">
 		<div class="w-[calc(100svw_-_64px)] flex justify-between">
-			<span class="px-2 text-3xl font-Nunito">{$modalStore[0].title}</span>
+			<span class="px-2 text-3xl font-Nunito"><!-- {$modalStore[0].title} -->title</span>
 			<button class="btn-icon btn-icon-md preset-tonal-primary border border-primary-500" onclick={parent.onClose}>
 				<span>
 					<img
@@ -46,7 +46,7 @@
 			{@render children?.()}
 		</div>
 	</div>
-{/if}
+<!-- {/if} -->
 
 <!-- <style>
 	* {

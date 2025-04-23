@@ -4,7 +4,7 @@
 	import { Tabs } from '@skeletonlabs/skeleton-svelte';
 	import Icon from '@iconify/svelte';
 
-	let tabSet = $state('');
+	let tabSet = $state('tab0'); //AKI muda qual tab está ativa primeiro
 
 	interface Props {
 		data: any;
@@ -58,8 +58,9 @@
 						Submit a New Article
 					</a>
 				</div>
+
 				{#each papers as papersData, i}
-					{#if tabSet === i.toString()}
+					{#if tabSet === 'tab' + i.toString()}
 						<div class="card page max-w-[700px] p-4 m-auto">
 							<div class="text-surface-900">
 								<MyPapers rota={tabs[i].rota} {papersData}></MyPapers>

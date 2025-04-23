@@ -27,6 +27,7 @@
     "@types/eslint": "^8.56.0",
     "@types/node": "22.13.5",
     "@types/pdfjs-dist": "^2.10.377",
+    "@types/sanitize-html": "^2.15.0",
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
     "autoprefixer": "10.4.20",
@@ -48,12 +49,16 @@
     "@faker-js/faker": "^8.4.1",
     "@floating-ui/dom": "1.6.13",
     "@iconify/svelte": "^4.0.2",
+    "@lucide/svelte": "^0.487.0",
     "@tailwindcss/vite": "^4.0.13",
     "dotenv": "^16.4.5",
     "highlight.js": "11.11.1",
+    "lucide-svelte": "^0.487.0",
+    "mammoth": "^1.9.0",
     "mongodb": "^6.13.1",
     "mongoose": "^6.0.13",
-    "quill": "^2.0.3"
+    "quill": "^2.0.3",
+    "sanitize-html": "^2.15.0"
   },
   "exports": {
     "./package.json": "./package.json",

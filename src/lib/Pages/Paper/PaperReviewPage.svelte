@@ -107,7 +107,7 @@
 	// 	]
 	// };
 
-	console.log('44444',messageFeed)
+	// console.log('44444',messageFeed)
 	let currentMessage = '';
 
 	// export let data = {

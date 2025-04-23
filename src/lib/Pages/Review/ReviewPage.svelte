@@ -47,7 +47,7 @@
 			<!-- <div class="grid gap-3 md:grid-cols-[1fr_auto_1fr]"> -->
 			<div class="grid gap-3 w-full">
 				{#each papers as papersData, i}
-					{#if tabSet === i.toString()}
+					{#if tabSet === 'tab'+i.toString()}
 						<div class="card page p-4 m-auto">
 							{#if tabs[i].name === 'Papers Pool'}
 								{@render requested?.()}
