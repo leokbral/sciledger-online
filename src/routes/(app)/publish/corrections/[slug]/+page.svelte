@@ -69,9 +69,16 @@
 	}
 </script>
 
-<PaperReviewPage
+<!-- <PaperReviewPage
 	on:savePaper={handleSavePaper}
 	on:submitReview={hdlSubmitPublish}
+	{paper}
+	{currentUser}
+	{messageFeed}
+/> -->
+
+<PaperReviewPage
+	
 	{paper}
 	{currentUser}
 	{messageFeed}
