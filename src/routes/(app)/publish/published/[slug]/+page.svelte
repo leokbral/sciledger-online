@@ -91,9 +91,9 @@
                 <!-- Imagem Principal -->
                 {#if paper.paperPictures && paper.paperPictures.length > 0}
                     <img
-                        src={paper.paperPictures[0]}
+                    src={`/api/images/${paper.paperPictures[0]}`}
                         alt="Imagem do artigo"
-                        class="w-full h-48 object-cover rounded-sm mb-4"
+                        class="w-full h-full object-cover rounded-sm mb-4"
                     />
                 {:else}
                     <!-- Placeholder caso não haja imagem -->

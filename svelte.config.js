@@ -6,8 +6,11 @@ const config = {
 	//extensions: ['.svelte'],
 	// Consult https://kit.svelte.dev/docs/integrations#preprocessors
 	// for more information about preprocessors
+	// compilerOptions: {
+	// 	runes: true
+	// },
 	preprocess: [vitePreprocess()],
-	
+
 	vitePlugin: {
 		inspector: true,
 	},
