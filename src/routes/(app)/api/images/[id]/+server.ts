@@ -1,34 +1,37 @@
 import type { RequestHandler } from '@sveltejs/kit';
 import { GridFSBucket } from 'mongodb';
-import { fsFiles } from '$lib/db/fs';
 import { db } from '$lib/db/mongo';
 
 const bucket = new GridFSBucket(db);
 
 export const GET: RequestHandler = async ({ params }) => {
-    const { id } = params;
-    if (!id) {
-        return new Response('ID da IMAGEM não fornecido', { status: 400 });
-    }
-
     try {
-        const file = await fsFiles.findOne({ 'metadata.id': id });
+        const filesCursor = bucket.find({ 'metadata.id': params.id });
+        const files = await filesCursor.toArray();
 
-        if (!file) {
-            return new Response('Arquivo não encontrado', { status: 404 });
+        if (!files.length) {
+            return new Response('Image not found', { status: 404 });
         }
 
+        const file = files[0];
         const downloadStream = bucket.openDownloadStream(file._id);
 
-        // Usando o ReadableStream como corpo da resposta
-        return new Response(downloadStream as unknown as ReadableStream, {
+        // Collect the file data
+        const chunks: Uint8Array[] = [];
+        for await (const chunk of downloadStream) {
+            chunks.push(chunk);
+        }
+
+        const fileData = Buffer.concat(chunks);
+
+        return new Response(fileData, {
             headers: {
-                'Content-Type': file.contentType,
-                'Content-Disposition': `inline; filename="${file.filename}"`,
-            },
+                'Content-Type': file.contentType || 'application/octet-stream',
+                'Cache-Control': 'public, max-age=31536000'
+            }
         });
     } catch (error) {
-        console.error('Erro ao recuperar o arquivo:', error);
-        return new Response('Erro ao recuperar o arquivo', { status: 500 });
+        console.error('Error fetching image:', error);
+        return new Response('Error fetching image', { status: 500 });
     }
 };

@@ -109,11 +109,17 @@
 		{/if}
 	</div>
 
-	<img
+	<!-- <img
 		src={paper.paperPictures ? paper.paperPictures[0] : ''}
 		alt="Post"
 		class="w-full h-48 object-cover rounded-sm"
+	/> -->
+	<img
+		src={paper.paperPictures?.[0] ? `/api/images/${paper.paperPictures[0]}` : ''}
+		alt="Post"
+		class="w-full h-48 object-cover rounded-sm"
 	/>
+
 	<h4 class="h4 font-bold">{paper.title}</h4>
 	<p>{paper.abstract}</p>
 	<div class="flex justify-between my-3">

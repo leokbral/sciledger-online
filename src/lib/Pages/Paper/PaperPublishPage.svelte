@@ -73,7 +73,6 @@
 	// 	inputAuthor = '';
 	// }
 
-
 	const onInputValueChange = (e: any) => {
 		// ={(e) => (inputAuthorList = e.value)}
 		console.log('chamou', e);

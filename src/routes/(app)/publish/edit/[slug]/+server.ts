@@ -1,57 +1,78 @@
 import type { RequestHandler } from './$types';
 import { json } from '@sveltejs/kit';
-//import * as crypto from 'crypto';
-//import Users from '$lib/db/models/User';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import Papers from '$lib/db/models/Paper';
 import '$lib/db/models/User';
 import type { User } from '$lib/types/User';
 
 export const POST: RequestHandler = async ({ request }) => {
-
     await start_mongo();
 
     try {
-        const { id, mainAuthor, correspondingAuthor, title, abstract, keywords, pdfUrl, submittedBy, price, coAuthors, status, authors, peer_review } =
-            await request.json();
+        const data = await request.json();
+        
+        // Log incoming data for debugging
+        console.log('Received data:', data);
 
-        // console.log(mainAuthor, correspondingAuthor, title, abstract, keywords, pdfUrl, submittedBy)
-        // Verifica se todas as informações necessárias foram enviadas
-        if (!mainAuthor || !correspondingAuthor || !title || !abstract || !keywords || !pdfUrl || !submittedBy) {
-            /* console.log(firstName, lastName, country, dob, email, password, confirmPassword) */
-            return json({ error: 'Todos os campos são obrigatórios.' }, { status: 400 });
+        // Validate that id exists
+        if (!data.id) {
+            return json({ error: 'Paper ID is required.' }, { status: 400 });
         }
 
-        const _coAuthors = coAuthors.map((a: User) => a.id)
-        const _authors = authors.map((a: User) => a.id)
+        // Validate required fields
+        const requiredFields = ['mainAuthor', 'correspondingAuthor', 'title', 'abstract', 'keywords', 'pdfUrl', 'submittedBy'];
+        const missingFields = requiredFields.filter(field => !data[field]);
+        
+        if (missingFields.length > 0) {
+            return json({ 
+                error: `Missing required fields: ${missingFields.join(', ')}` 
+            }, { status: 400 });
+        }
+
+        // Safely handle arrays with optional chaining
+        const _coAuthors = data.coAuthors?.map((a: User) => a.id) || [];
+        const _authors = data.authors?.map((a: User) => a.id) || [];
+
+        const updateData = {
+            mainAuthor: data.mainAuthor?.id,
+            authors: _authors,
+            correspondingAuthor: data.correspondingAuthor,
+            coAuthors: _coAuthors,
+            status: 'under negotiation',
+            title: data.title,
+            abstract: data.abstract,
+            keywords: data.keywords,
+            pdfUrl: data.pdfUrl,
+            submittedBy: data.submittedBy,
+            price: data.price || 0,
+            peer_review: data.peer_review,
+            updatedAt: new Date().toISOString()
+        };
+
+        // Log update data for debugging
+        console.log('Update data:', updateData);
 
         const paper = await Papers.findByIdAndUpdate(
-            id,
-            {
-                mainAuthor: mainAuthor.id,
-                authors: _authors,
-                correspondingAuthor: correspondingAuthor,
-                coAuthors: _coAuthors,
-                status: status,
-                title: title,
-                abstract: abstract,
-                keywords: keywords,
-                pdfUrl: pdfUrl,
-                submittedBy: submittedBy,
-                price: price,
-                peer_review,
-                updatedAt: new Date().toISOString(),
-            },
-            { new: true, runValidators: true } // Retorna o documento atualizado e aplica validação
+            data.id,
+            updateData,
+            { 
+                new: true, 
+                runValidators: true,
+                upsert: false // Ensure we don't create a new document
+            }
         ).lean().exec();
 
         if (!paper) {
-            throw new Error('Paper not found');
+            return json({ error: 'Paper not found' }, { status: 404 });
         }
-        return json({ paper }, { status: 201 });
+
+        return json({ paper }, { status: 200 });
         
     } catch (error) {
-        console.error('Erro ao registrar usuário:', error);
-        return json({ error: 'Erro interno do servidor.' }, { status: 500 });
+        console.error('Error updating paper:', error);
+        return json({ 
+            error: 'Internal server error', 
+            details: error instanceof Error ? error.message : 'Unknown error'
+        }, { status: 500 });
     }
 };

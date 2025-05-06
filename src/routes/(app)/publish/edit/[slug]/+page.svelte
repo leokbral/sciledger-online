@@ -29,17 +29,37 @@
 	// 	};
 	// }
 
-	async function savePaper( store: any ) {
-		console.log('Updated Paper Data:', store);
+	async function savePaper(store: any) {
+		// Check required fields
+		const requiredFields = {
+			title: 'Title',
+			abstract: 'Abstract',
+			mainAuthor: 'Main Author',
+			correspondingAuthor: 'Corresponding Author',
+			keywords: 'Keywords',
+			pdfUrl: 'PDF URL'
+		};
 
-		const updatedPaper = store;
+		const missingFields = Object.entries(requiredFields)
+			.filter(([key]) => !store[key])
+			.map(([, label]) => label);
+
+		if (missingFields.length > 0) {
+			alert(`Please fill in all required fields: ${missingFields.join(', ')}`);
+			return;
+		}
+
+		const updatedPaper = {
+			...store,
+			status: 'under_negotiation'
+		};
+
 		console.log('Saving Updated Paper:', updatedPaper);
 
 		try {
-			const response = await post(`/publish/edit/${updatedPaper.id}`, updatedPaper); // Use id se for o campo correto
+			const response = await post(`/publish/edit/${updatedPaper.id}`, updatedPaper);
 			console.log(response);
 			if (response.paper) {
-				// Redireciona para a página de detalhes do artigo editado
 				goto(`/publish/`);
 			} else {
 				alert(`Issue! ${JSON.stringify(response)}`);
