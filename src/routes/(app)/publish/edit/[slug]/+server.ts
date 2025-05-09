@@ -36,9 +36,11 @@ export const POST: RequestHandler = async ({ request }) => {
         const updateData = {
             mainAuthor: data.mainAuthor?.id,
             authors: _authors,
+            paperPictures: data.paperPictures,
             correspondingAuthor: data.correspondingAuthor,
             coAuthors: _coAuthors,
-            status: 'under negotiation',
+            status: data.status,//'draft', //'under negotiation'
+            content: data.content,
             title: data.title,
             abstract: data.abstract,
             keywords: data.keywords,

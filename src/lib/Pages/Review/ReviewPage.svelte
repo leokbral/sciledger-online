@@ -4,7 +4,7 @@
 	import { Tabs } from '@skeletonlabs/skeleton-svelte';
 	import Icon from '@iconify/svelte';
 
-	let tabSet = $state('');
+	let tabSet = $state('tab0');
 
 	interface Props {
 		data: any;

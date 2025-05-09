@@ -62,11 +62,11 @@
 	<!-- Sections -->
 	<div class="flex flex-col md:flex-row gap-8 mt-4">
 		<!-- Filter Section -->
-		<section class="bg-gray-100 rounded-lg shadow-md p-4 mb-8 w-full md:w-1/5">
+		<!-- <section class="bg-gray-100 rounded-lg shadow-md p-4 mb-8 w-full md:w-1/5">
 			<h2 class="text-lg font-semibold mb-4">Filters</h2>
 
 			<div class="mb-4 flex space-x-4">
-				<!-- Min Price -->
+				<!-- Min Price -- >
 				<div class="flex-1">
 					<label for="min-price" class="block text-sm font-medium mb-1">Min Price:</label>
 					<input
@@ -78,7 +78,7 @@
 					/>
 				</div>
 
-				<!-- Max Price -->
+				<!-- Max Price -- >
 				<div class="flex-1">
 					<label for="max-price" class="block text-sm font-medium mb-1">Max Price:</label>
 					<input
@@ -91,9 +91,9 @@
 				</div>
 			</div>
 
-			<!-- Number of Reviewers -->
+			<!-- Number of Reviewers -- >
 			<div class="mb-4 flex items-center space-x-2">
-				<!-- <label for="reviewers" class="block text-sm font-medium mb-1">Number of Reviewers:</label> -->
+				<!-- <label for="reviewers" class="block text-sm font-medium mb-1">Number of Reviewers:</label> -- >
 				<label for="reviewers" class="text-sm font-medium whitespace-nowrap">Number of Reviewers:</label>
 				<input
 					type="number"
@@ -103,14 +103,14 @@
 				/>
 			</div>
 
-			<!-- Apply Filters Button -->
+			<!-- Apply Filters Button -- >
 			<button
 				class="w-full p-2 bg-blue-500 text-white rounded-sm hover:bg-blue-600"
 				onclick={applyFilters}
 			>
 				Apply Filters
 			</button>
-		</section>
+		</section> -->
 
 		<!-- Announced Articles Section -->
 		<section class="bg-white shadow-md rounded-sm p-6 mb-8 w-full md:w-4/3">

@@ -49,15 +49,16 @@
 			return;
 		}
 
-		const updatedPaper = {
-			...store,
-			status: 'under_negotiation'
-		};
+		// const updatedPaper = {
+		// 	...store,
+		// 	status: 'under negotiation'
+		// };
 
-		console.log('Saving Updated Paper:', updatedPaper);
+		// console.log('Saving Updated Paper:', updatedPaper);
 
 		try {
-			const response = await post(`/publish/edit/${updatedPaper.id}`, updatedPaper);
+			// const response = await post(`/publish/edit/${updatedPaper.id}`, updatedPaper);
+			const response = await post(`/publish/edit/${store.id}`, store);
 			console.log(response);
 			if (response.paper) {
 				goto(`/publish/`);
