@@ -12,32 +12,37 @@ export const POST: RequestHandler = async ({ request }) => {
     await start_mongo(); // Não necessário mais
 
     try {
-        const { mainAuthor, correspondingAuthor, title, abstract, keywords, pdfUrl, submittedBy, price, coAuthors, status } =
+        const { paperPictures, content, mainAuthor, correspondingAuthor, title, abstract, keywords, pdfUrl, submittedBy, price, coAuthors, status, authors } =
             await request.json();
         console.log("chamou server")
         console.log(mainAuthor, correspondingAuthor, title, abstract, keywords, pdfUrl, submittedBy)
         // Verifica se todas as informações necessárias foram enviadas
         if (!mainAuthor || !correspondingAuthor || !title || !abstract || !keywords || !pdfUrl || !submittedBy) {
             /* console.log(firstName, lastName, country, dob, email, password, confirmPassword) */
-            return json({ error: 'Todos os campos são obrigatórios.' }, { status: 400 });
+            return json({ error: `Todos os campos são obrigatórios. ${mainAuthor}, ${correspondingAuthor}, ${title}, ${abstract}, ${keywords}, ${pdfUrl}, ${submittedBy}` }, { status: 400 });
         }
 
         const _coAuthors = coAuthors.map((a: User) => a.id)
+        const _authors = authors?.map((a: User) => a.id) || [];
         console.log("coAu", _coAuthors, coAuthors)
         const id = crypto.randomUUID()
-        // Cria um novo usuário
+        // Cria um novo paper
         const newPaper = new Papers({
             _id: id,
             id: id,
             mainAuthor: mainAuthor.id,
+           
             correspondingAuthor: correspondingAuthor.id,
             coAuthors: _coAuthors,
+            authors: _authors,
             status,
-            title, abstract, keywords, pdfUrl, submittedBy: submittedBy.id, price,
+            content,
+            paperPictures, title, abstract, keywords, pdfUrl, submittedBy: submittedBy.id, price,
             createdAt: new Date(),
             updatedAt: new Date()
         });
 
+        console.log("newPaper", newPaper)
         // Salva o usuário no banco de dados
         await newPaper.save();
 

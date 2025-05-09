@@ -191,12 +191,12 @@
 <div class="grid grid-cols-[1fr_1fr_1fr] p-5">
 	<div></div>
 	<div class="flex justify-between gap-3">
-		<button class="bg-primary-500 text-white rounded-lg px-4 py-2" onclick={hdlSaveDraft}>
+		<!-- <button class="bg-primary-500 text-white rounded-lg px-4 py-2" onclick={hdlSaveDraft}>
 			Save Draft
 		</button>
 		<button class="bg-primary-500 text-white rounded-lg px-4 py-2" onclick={handleSavePaper}>
 			Submit to Review
-		</button>
+		</button> -->
 	</div>
 	<div></div>
 </div>
@@ -208,7 +208,7 @@
 		<PaperPreview {paper} user={$page.data.user} />
 
 		<!-- Price -->
-		<p>Amount</p>
+		<!-- <p>Amount</p>
 		<div class="input-group input-group-divider grid-cols-[auto_1fr_auto]">
 			<div class="input-group-shim">
 				<Icon icon="material-symbols-light:attach-money-rounded" width="24" height="24" />
@@ -220,10 +220,10 @@
 				placeholder="Amount"
 			/>
 			<select><option>USD</option></select>
-		</div>
+		</div> -->
 
 		<!-- Image Upload Section -->
-		<div class="mt-4">
+		<!-- <div class="mt-4">
 			<h5 class="text-lg font-semibold mb-2">Paper Images</h5>
 			<div class="grid grid-cols-2 gap-4">
 				<div class="border-2 border-dashed border-surface-300 rounded-lg p-4">
@@ -277,10 +277,10 @@
 					</div>
 				{/if}
 			</div>
-		</div>
+		</div> -->
 
 		<!-- Peer Review Options -->
-		<label for="peer_review" class="block mb-1">Peer Review Options</label>
+		<!-- <label for="peer_review" class="block mb-1">Peer Review Options</label>
 		<select
 			id="peer_review"
 			name="peer_review"
@@ -290,7 +290,7 @@
 			<option value="" disabled selected>Select peer review option</option>
 			<option value="open">Open</option>
 			<option value="selected">Selected</option>
-		</select>
+		</select> -->
 
 		{#if peer_review === 'selected'}
 			<AvailableReviewers {reviewers} {selectedReviewers} {toggleReviewerSelection} />

@@ -1,11 +1,12 @@
 <script lang="ts">
-	import { Avatar,  } from '@skeletonlabs/skeleton-svelte';
+	import { Avatar } from '@skeletonlabs/skeleton-svelte';
 	// import { Avatar, type PopupSettings } from '@skeletonlabs/skeleton-svelte';
 	import { post } from './utils';
 	import { invalidateAll } from '$app/navigation';
 	import { userProfiles } from '../routes/(app)/UserProfile';
 	import type { User } from './types/User';
 	import { getInitials } from './utils/GetInitials';
+	import { Popover } from '@skeletonlabs/skeleton-svelte';
 
 	interface Props {
 		pathname: string;
@@ -13,6 +14,13 @@
 	}
 
 	let { pathname, user }: Props = $props();
+
+	let openState = $state(false);
+
+	function popoverClose() {
+		openState = false;
+	}
+
 	//console.log("nav 9 - ", user);
 
 	// const popupFeatured: PopupSettings = {
@@ -49,8 +57,69 @@
 {#if user}
 	<!-- <a href="/profile/@{user.username}"> -->
 	<!-- <button class="btn pl-12 -ml-7!" use:popup={popupFeatured}> -->
-		<button class="btn pl-12 -ml-7!" onclick={logout}>
-		<!-- <Avatar src={user.profilePictureUrl} alt={user.firstName} width="w-9" /> -->
+	<Popover
+		open={openState}
+		onOpenChange={(e) => (openState = e.open)}
+		positioning={{ placement: 'top' }}
+		triggerBase=""
+		contentBase="card bg-surface-950-50 space-y-4 card p-4 w-72 shadow-xl text-surface-50-950"
+		arrow
+		arrowBackground="!bg-surface-950 dark:!bg-surface-50"
+	>
+		{#snippet trigger()}
+			{#if user.profilePictureUrl}
+				<Avatar src={user.profilePictureUrl} name={user.firstName} size="w-9" />
+			{:else}
+				<div class="w-9 h-9 flex items-center justify-center bg-gray-300 text-white rounded-full">
+					<span class="text-xl font-bold">{getInitials(user.firstName, user.lastName)}</span>
+				</div>
+			{/if}{/snippet}
+		{#snippet content()}
+			<div class="space-y-4 flex flex-col">
+				<div class="flex gap-2">
+					{#if user.profilePictureUrl}
+						<Avatar src={user.profilePictureUrl} name={user.firstName} size="w-9" />
+					{:else}
+						<div
+							class="w-9 h-9 flex items-center justify-center bg-gray-300 text-white rounded-full"
+						>
+							<span class="text-xl font-bold">{getInitials(user.firstName, user.lastName)}</span>
+						</div>
+					{/if}
+
+					<div>
+						<p class="font-bold">{`${user.firstName} ${user.lastName}`}</p>
+						<p class="opacity-50">{user.username}</p>
+					</div>
+				</div>
+				<p>{user.position} at {user.institution}</p>
+				<div class="flex gap-4">
+					<small
+						><strong>{user?.following.length || 0}</strong>
+						<span class="opacity-50">Following</span></small
+					>
+					<small
+						><strong>{user?.followers.length || 0}</strong>
+						<span class="opacity-50">Followers</span></small
+					>
+				</div>
+				
+				<a
+					data-sveltekit-reload
+					class="btn bg-primary-500 w-full text-white"
+					href={`/profile/${user.username}`}
+					target=""
+					rel="noreferrer"
+				>
+					Profile
+				</a>
+				<!-- <a data-sveltekit-reload href="/profile/{user.username}" class="btn preset-primary-500">Profile</a> -->
+				<button class="btn preset-filled justify-start" onclick={logout}>Sign out</button>
+			</div>
+		{/snippet}
+	</Popover>
+	<!-- <button class="btn pl-12 -ml-7!" onclick={logout}>
+		<! -- <Avatar src={user.profilePictureUrl} alt={user.firstName} width="w-9" /> -- >
 		{#if user.profilePictureUrl}
 			<Avatar src={user.profilePictureUrl} name={user.firstName} size="w-9" />
 		{:else}
@@ -58,7 +127,8 @@
 				<span class="text-xl font-bold">{getInitials(user.firstName, user.lastName)}</span>
 			</div>
 		{/if}
-	</button>
+	</button> -->
+
 	<!-- Div do tooltip -->
 	<!-- <div class="card p-4 w-72 shadow-xl preset-filled" data-popup="popupFeatured">
 		<div class="space-y-4 flex flex-col">
