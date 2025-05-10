@@ -30,6 +30,7 @@ export type User = {
     followers: User[]; // IDs dos seguidores
     following: User[]; // IDs dos usuários seguidos
     papers: Paper[]; // IDs das publicações do usuário
+    hubs?: string[]; // IDs dos hubs associados ao usuário
     createdAt: Date; // Data de criação
     updatedAt: Date; // Data de atualização
 };

@@ -31,6 +31,7 @@ export const UserSchema: Schema = new Schema({
     followers: [{ type: String, ref: 'User' }], // IDs dos seguidores
     following: [{ type: String, ref: 'User' }], // IDs dos usuários seguidos
     papers: [{ type: String, ref: 'Paper' }], // IDs das publicações do usuário
+    hubs: [{ type: String, ref: 'Hub', default: [] }], // IDs dos hubs do usuário
     createdAt: { type: String, default: () => new Date().toISOString() },
     updatedAt: { type: String, default: () => new Date().toISOString() }
 });
