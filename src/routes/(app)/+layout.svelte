@@ -63,6 +63,13 @@
 							active="bg-transparent border-b-2 border-primary-500 rounded-none"
 							width='w-24'
 						></Navigation.Tile>
+						<Navigation.Tile
+							label="Hub"
+							href="/hub"
+							selected={page.url.pathname === '/hub'}
+							active="bg-transparent border-b-2 border-primary-500 rounded-none"
+							width='w-24'
+						></Navigation.Tile>
 					</Navigation.Bar>
 				{/if}
 				<span class="z-10!">
