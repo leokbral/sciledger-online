@@ -34,4 +34,6 @@ export type Paper = {
     createdAt: Date;
     updatedAt: Date;
     submittedBy: User; // Campo adicionado para quem submeteu o paper
+    hubId?: string | null;
+    isLinkedToHub?: boolean
 }

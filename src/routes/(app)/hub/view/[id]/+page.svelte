@@ -1,0 +1,387 @@
+<script lang="ts">
+	import { Modal } from '@skeletonlabs/skeleton-svelte';
+	import Icon from '@iconify/svelte';
+
+	let { data } = $props();
+	const hub = data.hub;
+	const papers = data.papers;
+	
+	// Enhanced debug logging
+	// console.log('Current Hub ID:', hub._id);
+	// console.log('Papers before filtering:', papers?.length);
+	
+	// Filter papers to only show ones that belong to this hub
+	const filteredPapers = papers?.filter(paper => {
+		// console.log(`Paper ${paper._id} hubId:`, paper.hubId);
+		return paper.hubId === hub._id;
+	});
+	
+	// console.log('Papers after filtering:', filteredPapers?.length);
+
+	let openCalendarModal = $state(false);
+	let openAcknowledgementModal = $state(false);
+
+	function closeAllModals() {
+		openCalendarModal = false;
+		openAcknowledgementModal = false;
+	}
+</script>
+
+<!-- Banner -->
+<!-- <div class="w-full h-80 rounded-2xl overflow-hidden relative">
+	{#if hub.bannerUrl}
+		<img src={`/api/images/${hub.bannerUrl}`} alt="Banner" class="w-full h-full object-cover" />
+	{:else}
+		<div class="w-full h-full bg-gray-200 flex items-center justify-center text-gray-500">Sem banner</div>
+	{/if}
+</div> -->
+
+<!-- Card -->
+<div class="w-full h-80 rounded-2xl overflow-hidden relative">
+	{#if hub.cardUrl}
+		<img src={`/api/images/${hub.cardUrl}`} alt="Card" class="w-full h-full object-cover" />
+	{:else}
+		<div class="w-full h-full bg-gray-200 flex items-center justify-center text-gray-500">
+			Sem Card
+		</div>
+	{/if}
+</div>
+
+<!-- Cabeçalho com logo -->
+<div class="bg-white shadow-md rounded-xl p-6 flex flex-col md:flex-row gap-6">
+	<img
+		src={hub.logoUrl ? `/api/images/${hub.logoUrl}` : '/placeholder-logo.jpg'}
+		alt="Logo"
+		class="w-28 h-28 object-contain rounded-full"
+	/>
+	<div class="flex-1 flex flex-col justify-between min-h-full">
+    <!-- Top section with title and guidelines -->
+    <div class="flex justify-between items-start">
+        <div class="space-y-2">
+            <h1 class="text-2xl font-semibold text-gray-900">
+                {hub.title} <span class="text-sm text-gray-500 font-normal">{hub.type}</span>
+            </h1>
+
+            <!-- Localização -->
+            {#if hub.location}
+                <div class="flex items-center gap-2 text-gray-600 text-sm mt-2">
+                    <Icon icon="material-symbols-light:location-on-outline" width="24" height="24" />
+                    <span>{hub.location}</span>
+                </div>
+            {/if}
+
+            <!-- ISSN -->
+            {#if hub.issn}
+                <div class="flex items-center gap-2 text-gray-600 text-sm mt-2">
+                    <span>ISSN: {hub.issn}</span>
+                </div>
+            {/if}
+        </div>
+
+        <!-- Guidelines moved to right -->
+        {#if hub.guidelinesUrl}
+            <a 
+                href={hub.guidelinesUrl} 
+                target="_blank" 
+                class="flex items-center gap-2 text-blue-600 hover:text-blue-700"
+            >
+                <Icon icon="mdi:file-document-outline" width="24" height="24" />
+                <span class="underline">Diretrizes</span>
+            </a>
+        {/if}
+    </div>
+
+    <!-- Description -->
+    {#if hub.description}
+        <p class="text-gray-700 mt-4">{hub.description}</p>
+    {/if}
+
+    <!-- Rest of the content -->
+		<!-- Datas -->
+		<div class="flex justify-end gap-4 mt-6">
+			{#if hub.dates}
+				<Modal
+					open={openCalendarModal}
+					onOpenChange={(e) => (openCalendarModal = e.open)}
+					triggerBase="btn preset-tonal"
+					contentBase="card bg-surface-100-900 p-4 space-y-4 shadow-xl max-w-screen-sm"
+					backdropClasses="backdrop-blur-sm"
+				>
+					{#snippet trigger()}
+						<h2 class="text-gray-800 flex items-center gap-2">
+							<Icon icon="mdi:calendar-outline" width="24" height="24" />Calendar
+						</h2>
+					{/snippet}
+					{#snippet content()}
+						<header class="flex justify-between">
+							<h2 class="h2">Calendar</h2>
+						</header>
+						<article class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-gray-800">
+							<div class="flex items-start gap-2">
+								<Icon icon="mdi:calendar-start" width="20" />
+								<div>
+									<p class="font-semibold">Início da submissão</p>
+									<p>{new Date(hub.dates.submissionStart).toLocaleDateString()}</p>
+								</div>
+							</div>
+							<div class="flex items-start gap-2">
+								<Icon icon="mdi:calendar-end" width="20" />
+								<div>
+									<p class="font-semibold">Fim da submissão</p>
+									<p>{new Date(hub.dates.submissionEnd).toLocaleDateString()}</p>
+								</div>
+							</div>
+							<div class="flex items-start gap-2">
+								<Icon icon="mdi:calendar-start" width="20" />
+								<div>
+									<p class="font-semibold">Início do evento</p>
+									<p>{new Date(hub.dates.eventStart).toLocaleDateString()}</p>
+								</div>
+							</div>
+							<div class="flex items-start gap-2">
+								<Icon icon="mdi:calendar-end" width="20" />
+								<div>
+									<p class="font-semibold">Fim do evento</p>
+									<p>{new Date(hub.dates.eventEnd).toLocaleDateString()}</p>
+								</div>
+							</div>
+						</article>
+					{/snippet}
+				</Modal>
+			{/if}
+
+			<!-- Ações -->
+			{#if hub.acknowledgement}
+				<Modal
+					open={openAcknowledgementModal}
+					onOpenChange={(e) => (openAcknowledgementModal = e.open)}
+					triggerBase="btn preset-tonal"
+					contentBase="card bg-surface-100-900 p-4 space-y-4 shadow-xl max-w-screen-sm"
+					backdropClasses="backdrop-blur-sm"
+				>
+					{#snippet trigger()}Acknowledgement{/snippet}
+					{#snippet content()}
+						<article>
+							<div class="prose prose-sm text-gray-800 max-w-none">{@html hub.acknowledgement}</div>
+						</article>
+					{/snippet}
+				</Modal>
+			{/if}
+		</div>
+
+		<!-- Social Media Icons -->
+		{#if hub.socialMedia}
+			<div class="flex flex-wrap gap-3">
+				{#if hub.socialMedia.website}
+					<a
+						href={hub.socialMedia.website}
+						target="_blank"
+						class="text-gray-600 hover:text-blue-600"
+					>
+						<Icon icon="mdi:web" width="24" height="24" />
+					</a>
+				{/if}
+				{#if hub.socialMedia.twitter}
+					<a
+						href={`https://twitter.com/${hub.socialMedia.twitter}`}
+						target="_blank"
+						class="text-gray-600 hover:text-blue-600"
+					>
+						<Icon icon="mdi:twitter" width="24" height="24" />
+					</a>
+				{/if}
+				{#if hub.socialMedia.facebook}
+					<a
+						href={`https://facebook.com/${hub.socialMedia.facebook}`}
+						target="_blank"
+						class="text-gray-600 hover:text-blue-600"
+					>
+						<Icon icon="mdi:facebook" width="24" height="24" />
+					</a>
+				{/if}
+				{#if hub.socialMedia.instagram}
+					<a
+						href={`https://instagram.com/${hub.socialMedia.instagram}`}
+						target="_blank"
+						class="text-gray-600 hover:text-pink-600"
+					>
+						<Icon icon="mdi:instagram" width="24" height="24" />
+					</a>
+				{/if}
+				{#if hub.socialMedia.linkedin}
+					<a
+						href={`https://linkedin.com/in/${hub.socialMedia.linkedin}`}
+						target="_blank"
+						class="text-gray-600 hover:text-blue-700"
+					>
+						<Icon icon="mdi:linkedin" width="24" height="24" />
+					</a>
+				{/if}
+				{#if hub.socialMedia.youtube}
+					<a
+						href={`https://youtube.com/${hub.socialMedia.youtube}`}
+						target="_blank"
+						class="text-gray-600 hover:text-red-600"
+					>
+						<Icon icon="mdi:youtube" width="24" height="24" />
+					</a>
+				{/if}
+				{#if hub.socialMedia.tiktok}
+					<a
+						href={`https://tiktok.com/@${hub.socialMedia.tiktok}`}
+						target="_blank"
+						class="text-gray-600 hover:text-black"
+					>
+					<Icon icon="simple-icons:tiktok" width="24" height="24" />
+
+					</a>
+				{/if}
+				{#if hub.socialMedia.github}
+					<a
+						href={`https://github.com/${hub.socialMedia.github}`}
+						target="_blank"
+						class="text-gray-600 hover:text-gray-900"
+					>
+						<Icon icon="mdi:github" width="24" height="24" />
+					</a>
+				{/if}
+				{#if hub.socialMedia.discord}
+					<a
+						href={hub.socialMedia.discord}
+						target="_blank"
+						class="text-gray-600 hover:text-indigo-600"
+					>
+						<Icon icon="mdi:discord" width="24" height="24" />
+					</a>
+				{/if}
+				{#if hub.socialMedia.telegram}
+					<a
+						href={`https://t.me/${hub.socialMedia.telegram}`}
+						target="_blank"
+						class="text-gray-600 hover:text-blue-500"
+					>
+						<Icon icon="mdi:telegram" width="24" height="24" />
+					</a>
+				{/if}
+				{#if hub.socialMedia.whatsapp}
+					<a
+						href={`https://wa.me/${hub.socialMedia.whatsapp}`}
+						target="_blank"
+						class="text-gray-600 hover:text-green-600"
+					>
+						<Icon icon="mdi:whatsapp" width="24" height="24" />
+					</a>
+				{/if}
+				{#if hub.socialMedia.wechat}
+					<a
+						href="#"
+						class="text-gray-600 hover:text-green-500"
+						title={`WeChat ID: ${hub.socialMedia.wechat}`}
+					>
+						<Icon icon="mdi:wechat" width="24" height="24" />
+					</a>
+				{/if}
+			</div>
+		{/if}
+	</div>
+</div>
+
+<!-- Papers Section -->
+<div class="mt-6 bg-white shadow-md rounded-xl p-6">
+    <h2 class="text-xl font-semibold text-gray-800 mb-4">Artigos Submetidos</h2>
+    
+    {#if filteredPapers && filteredPapers.length > 0}
+        <div class="space-y-4">
+            {#each filteredPapers as paper}
+                <div class="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h3 class="text-lg font-medium text-gray-900">{paper.title}</h3>
+                            <p class="text-sm text-gray-600 mt-1">
+                                Submetido por: {paper.submittedBy?.firstName || 'Usuário Anônimo'}
+                            </p>
+                            {#if paper.abstract}
+                                <p class="text-gray-700 mt-2 line-clamp-2">{@html paper.abstract}</p>
+                            {/if}
+                            {#if paper.keywords?.length}
+                                <div class="flex gap-2 mt-2 flex-wrap">
+                                    {#each paper.keywords as keyword}
+                                        <span class="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">
+                                            {keyword}
+                                        </span>
+                                    {/each}
+                                </div>
+                            {/if}
+                        </div>
+                        <div class="flex items-center gap-2">
+                            {#if paper.pdfId}
+                                <a 
+                                    href={`/api/papers/${paper._id}/download`} 
+                                    class="btn btn-sm variant-filled"
+                                    target="_blank"
+                                >
+                                    <Icon icon="mdi:file-pdf-box" width="20" height="20" />
+                                    PDF
+                                </a>
+                            {/if}
+                        </div>
+                    </div>
+                </div>
+            {/each}
+        </div>
+    {:else}
+        <p class="text-gray-600 text-center py-8">Nenhum artigo submetido ainda.</p>
+    {/if}
+</div>
+
+<!-- Informações Gerais -->
+<!-- <div class="mt-6 bg-white shadow rounded-xl p-4 space-y-2">
+	<h2 class="text-xl font-semibold text-gray-800">Informações Gerais</h2>
+	<p><strong>Status:</strong> {hub.status}</p>
+	<p><strong>Criado por:</strong> {hub.createdBy}</p>
+</div> -->
+
+<!-- Revisão e Visibilidade -->
+<!-- <div class="mt-6 bg-white shadow rounded-xl p-4 space-y-2">
+	<h2 class="text-xl font-semibold text-gray-800">Revisão</h2>
+	<p><strong>Revisão por:</strong> {hub.peerReview}</p>
+	<p><strong>Convite para autores:</strong> {hub.authorInvite}</p>
+	<p><strong>Visibilidade da identidade:</strong> {hub.identityVisibility}</p>
+	<p><strong>Visibilidade da revisão:</strong> {hub.reviewVisibility}</p>
+</div> -->
+
+<!-- Licenças e Diretrizes -->
+<!-- <div class="mt-6 bg-white shadow rounded-xl p-4 space-y-2">
+	<h2 class="text-xl font-semibold text-gray-800">Publicação</h2> -->
+	
+	<!-- {#if hub.acknowledgement}
+		<div class="mt-6 bg-white shadow rounded-xl p-4">
+			<h2 class="text-xl font-semibold text-gray-800 mb-2">Agradecimentos e Regras</h2>
+			<div class="prose prose-sm text-gray-800 max-w-none">{@html hub.acknowledgement}</div>
+		</div>
+	{/if} -->
+
+	<!-- {#if hub.licenses && hub.licenses.length > 0}
+		<p><strong>Licenças:</strong> {hub.licenses.join(', ')}</p>
+	{:else}
+		<p><strong>Licenças:</strong> Nenhuma</p>
+	{/if}
+	{#if hub.extensions}
+		<p><strong>Extensões:</strong> {hub.extensions}</p>
+	{/if}
+</div>
+ -->
+
+<!-- Outros Campos -->
+<!-- {#if hub.tracks || hub.calendar}
+	<div class="mt-6 bg-white shadow rounded-xl p-4 space-y-2">
+		<h2 class="text-xl font-semibold text-gray-800">Outros</h2>
+		{#if hub.tracks}
+			<p><strong>Trilhas:</strong> {hub.tracks}</p>
+		{/if}
+		{#if hub.calendar}
+			<p><strong>Calendário:</strong> {hub.calendar}</p>
+		{/if}
+		<p><strong>Mostrar calendário:</strong> {hub.showCalendar ? 'Sim' : 'Não'}</p>
+	</div>
+{/if} -->

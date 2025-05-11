@@ -1,24 +1,49 @@
-import { HubSchema } from '$lib/db/schemas/HubSchema';
-import { model, Document } from 'mongoose';
-
-export interface IHub extends Document {
+export type Hub = {
     _id: string;
     id: string;
-    title: string;
-    description: string;
     createdBy: string;
-    startDate: string;
-    endDate: string;
-    submissionStartDate: string;
-    submissionEndDate: string;
-    reviewers: string[];
-    submittedPapers: string[];
-    location?: string;
-    tags?: string[];
-    status: 'draft' | 'open' | 'in_review' | 'closed';
+    title: string;
+    type: 'Conference' | 'Journal' | 'Working Group';
+    description: string;
+    location: string;
+    issn?: string;
+    guidelinesUrl?: string;
+    acknowledgement?: string;
+    licenses: string[];
+    extensions?: string;
+    logoUrl?: string;
+    bannerUrl?: string;
+    cardUrl?: string;
+    peerReview: 'Everyone' | 'Only Reviewers';
+    authorInvite: 'Yes' | 'No';
+    identityVisibility: 'Everyone' | 'Reviewers Only' | 'Hidden';
+    reviewVisibility: 'Everyone' | 'Authors Only' | 'Hidden';
+    socialMedia?: {
+        twitter?: string;
+        facebook?: string;
+        website?: string;
+        instagram?: string;
+        linkedin?: string;
+        youtube?: string;
+        tiktok?: string;
+        github?: string;
+        discord?: string;
+        telegram?: string;
+        whatsapp?: string;
+        wechat?: string;
+    };
+    tracks?: string;
+    calendar?: string;
+    showCalendar: boolean;
+    dates: {
+        submissionStart: { type: Date },
+        submissionEnd: { type: Date },
+        eventStart: { type: Date },
+        eventEnd: { type: Date }
+    },
+    reviewers?: string[];
+    submittedPapers?: string[];
+    status: 'open' | 'closed';
     createdAt: string;
     updatedAt: string;
 }
-
-const Hub = model<IHub>('Hub', HubSchema);
-export default Hub;

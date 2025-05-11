@@ -1,109 +1,88 @@
-<script>
-	import { onMount } from 'svelte';
+<script lang="ts">
+    import { onMount } from 'svelte';
+    // import type { Hub } from '$lib/types';
 
-	/**
-	 * @type {string | any[]}
-	 */
-	let hubs = [];
+    let hubs: any[] = []; // Replace 'any' with the actual type of your hub data
+    let loading = true;
+    let error: string | null = null;
 
-	onMount(async () => {
-		// TODO: Replace with actual API call to fetch hubs
-		hubs = [
-			{ id: 1, name: 'Research Lab Hub', description: 'Main research laboratory hub' },
-			{ id: 2, name: 'Chemistry Department', description: 'Chemistry research and experiments' }
-		];
-	});
-
-	function createNewHub() {
-		// TODO: Implement navigation to hub creation page or open modal
-		console.log('Create new hub clicked');
-	}
+    onMount(async () => {
+        try {
+            const response = await fetch('/hub');
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+            hubs = data.hubs;
+        } catch (e) {
+            error = e instanceof Error ? e.message : 'Failed to load hubs';
+            console.error('Error loading hubs:', e);
+        } finally {
+            loading = false;
+        }
+    });
 </script>
 
 <div class="p-8">
-	<div class="flex justify-between items-center mb-8">
-		<h1 class="text-2xl font-bold">Research Hubs</h1>
-		<a
-			href="/hub/new"
-			class="btn preset-filled-primary-500 text-white transition-colors duration-200"
-			data-sveltekit-preload-data="hover"
-			onclick={createNewHub}
-		>
-			Create New Hub
-		</a>
-	</div>
+    <div class="flex justify-between items-center mb-8">
+        <h1 class="text-2xl font-bold">Research Hubs</h1>
+        <a
+            href="/hub/new"
+            class="btn preset-filled-primary-500 text-white transition-colors duration-200"
+            data-sveltekit-preload-data="hover"
+        >
+            Create New Hub
+        </a>
+    </div>
 
-	<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
-		{#if hubs.length === 0}
-			<p class="text-gray-600">No hubs found. Create your first hub!</p>
-		{:else}
-			{#each hubs as hub}
-				<a 
-					href="/hub/{hub.id}/view" 
-					class="block relative w-full h-54 rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-200"
-					data-sveltekit-preload-data="hover"
-				>
-					<!-- Banner de fundo estático ou baseado no hub -->
-					<img
-						src="/placeholder-banner.jpg"
-						alt="Hub Banner"
-						class="absolute w-full h-full object-cover"
-					/>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-8">
+        {#if loading}
+            <p class="text-gray-600">Loading hubs...</p>
+        {:else if error}
+            <p class="text-red-600">Error: {error}</p>
+        {:else if hubs.length === 0}
+            <p class="text-gray-600">No hubs found. Create your first hub!</p>
+        {:else}
+            {#each hubs as hub}
+                <a 
+                    href="/hub/view/{hub.id}" 
+                    class="block relative w-full h-80 rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-200 transform hover:scale-[1.02]"
+                    data-sveltekit-preload-data="hover"
+                >
+                    <!-- Card image -->
+                    <img
+                        src={hub.cardUrl ? `/api/images/${hub.cardUrl}` : '/placeholder-card.jpg'}
+                        alt={`${hub.title} Card`}
+                        class="absolute w-full h-full object-cover"
+                    />
 
-					<!-- Overlay escuro -->
-					<div class="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>
+                    <!-- Gradient overlay -->
+                    <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent"></div>
 
-					<!-- Conteúdo sobreposto -->
-					<div class="absolute inset-0 p-4 flex flex-col justify-between text-white">
-						<!-- Views e Members simulados -->
-						<div class="flex items-center gap-4 text-sm">
-							<div class="flex items-center gap-1">
-								<svg
-									xmlns="http://www.w3.org/2000/svg"
-									class="w-4 h-4"
-									fill="none"
-									viewBox="0 0 24 24"
-									stroke="currentColor"
-									><path
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										stroke-width="2"
-										d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-									/><path
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										stroke-width="2"
-										d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-									/></svg
-								>
-								<span>29.2k</span>
-							</div>
-							<div class="flex items-center gap-1">
-								<svg
-									xmlns="http://www.w3.org/2000/svg"
-									class="w-4 h-4"
-									fill="none"
-									viewBox="0 0 24 24"
-									stroke="currentColor"
-									><path
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										stroke-width="2"
-										d="M17 20h5v-2a4 4 0 00-5-4M9 20H4v-2a4 4 0 015-4m3-4a4 4 0 100-8 4 4 0 000 8zm6 4a4 4 0 10-8 0 4 4 0 008 0z"
-									/></svg
-								>
-								<span>788</span>
-							</div>
-						</div>
+                    <!-- Content -->
+                    <div class="absolute inset-0 p-6 flex flex-col justify-between text-white">
+                        <!-- Title at the top -->
+                        <div>
+                            <h2 class="text-2xl font-bold leading-tight mb-4">{hub.title}</h2>
+                            
+                            <!-- Logo and Type in the same line -->
+                            <div class="flex items-center gap-4">
+                                {#if hub.logoUrl}
+                                    <img
+                                        src={`/api/images/${hub.logoUrl}`}
+                                        alt={`${hub.title} Logo`}
+                                        class="w-16 h-16 rounded-full border-2 border-white shadow-lg object-cover"
+                                    />
+                                {/if}
+                                <span class="text-lg text-white/90">{hub.type}</span>
+                            </div>
+                        </div>
 
-						<!-- Nome e descrição -->
-						<div>
-							<h2 class="text-lg font-bold leading-tight">{hub.name}</h2>
-							<p class="text-sm text-white/80">{hub.description}</p>
-						</div>
-					</div>
-					</a>
-			{/each}
-		{/if}
-	</div>
+                        <!-- Description at the bottom -->
+                        <p class="text-sm text-white/80 line-clamp-2">{hub.description}</p>
+                    </div>
+                </a>
+            {/each}
+        {/if}
+    </div>
 </div>

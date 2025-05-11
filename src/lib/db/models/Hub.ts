@@ -1,24 +1,10 @@
-import { model, Document } from 'mongoose';
-import { HubSchema } from '../schemas/HubSchema';
+import mongoose from "mongoose";
+import { HubSchema } from "../schemas/HubSchema";
+import type { Hub } from "$lib/types/Hub";
 
-export interface IHub extends Document {
-    _id: string;
-    id: string;
-    title: string;
-    description: string;
-    createdBy: string;
-    startDate: string;
-    endDate: string;
-    submissionStartDate: string;
-    submissionEndDate: string;
-    reviewers: string[];
-    submittedPapers: string[];
-    location?: string;
-    tags?: string[];
-    status: 'draft' | 'open' | 'in_review' | 'closed';
-    createdAt: string;
-    updatedAt: string;
+export interface IHub extends Hub, Document {
+    pdfId: ObjectId | undefined;
 }
 
-const Hub = model<IHub>('Hub', HubSchema);
-export default Hub;
+const Hubs = mongoose.model<IHub>('Hub', HubSchema);
+export default Hubs;

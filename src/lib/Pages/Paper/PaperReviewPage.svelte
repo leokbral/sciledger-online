@@ -11,6 +11,7 @@
 	import type { User } from '$lib/types/User';
 	import { faker } from '@faker-js/faker';
 	import { createEventDispatcher } from 'svelte';
+	import ReviewForms from '../Review/ReviewForms.svelte';
 
 	const dispatch = createEventDispatcher();
 
@@ -197,3 +198,11 @@
 		</div>
 	</fieldset>
 </main>
+<!-- <ReviewForms
+	
+	{editable}
+	{currentUser}
+	on:saveDraft={hdlSaveDraft}
+	on:submitReview={hdlSubmitReview}
+></ReviewForms> -->
+<ReviewForms paperTitle={paper.title} />
