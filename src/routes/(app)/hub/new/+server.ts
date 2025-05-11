@@ -10,31 +10,49 @@ export const POST: RequestHandler = async ({ request }) => {
 
     try {
         const {
+            status,
             title,
+            type,
             description,
-            createdBy,
-            startDate,
-            endDate,
-            submissionStartDate,
-            submissionEndDate,
-            reviewers,
             location,
-            tags
+            issn,
+            guidelinesUrl,
+            acknowledgement,
+            licenses,
+            extensions,
+            logoUrl,
+            bannerUrl,
+            cardUrl,
+            peerReview,
+            authorInvite,
+            identityVisibility,
+            reviewVisibility,
+            socialMedia,  // Add this line
+            tracks,
+            calendar,
+            showCalendar,
+            dates,
+            createdBy
         } = await request.json();
 
         // Validação de campos obrigatórios
-        if (
-            !title ||
-            !description ||
-            !createdBy?.id ||
-            !startDate ||
-            !endDate ||
-            !submissionStartDate ||
-            !submissionEndDate
-        ) {
+        const requiredFields = {
+            title,
+            type,
+            description,
+            'createdBy.id': createdBy?.id
+        };
+
+        const missingFields = Object.entries(requiredFields)
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            .filter(([_, value]) => !value)
+            .map(([field]) => field);
+
+        if (missingFields.length > 0) {
             return json(
                 {
-                    error: 'Todos os campos obrigatórios devem ser preenchidos.'
+                    error: `Missing required fields: ${missingFields.join(', ')}`,
+                    providedData: requiredFields
                 },
                 { status: 400 }
             );
@@ -43,7 +61,7 @@ export const POST: RequestHandler = async ({ request }) => {
         // Verifica se o usuário existe
         const user = await Users.findById(createdBy.id);
         if (!user) {
-            return json({ error: 'Usuário criador não encontrado.' }, { status: 404 });
+            return json({ error: 'User not found' }, { status: 404 });
         }
 
         const id = crypto.randomUUID();
@@ -53,17 +71,49 @@ export const POST: RequestHandler = async ({ request }) => {
             _id: id,
             id,
             title,
+            type,
             description,
+            location,
+            issn,
+            guidelinesUrl,
+            acknowledgement,
+            licenses: licenses || [],
+            extensions,
+            logoUrl,
+            bannerUrl,
+            cardUrl,
+            peerReview,
+            authorInvite,
+            identityVisibility,
+            reviewVisibility,
+            socialMedia: {
+                twitter: socialMedia?.twitter || '',
+                facebook: socialMedia?.facebook || '',
+                website: socialMedia?.website || '',
+                instagram: socialMedia?.instagram || '',
+                linkedin: socialMedia?.linkedin || '',
+                youtube: socialMedia?.youtube || '',
+                tiktok: socialMedia?.tiktok || '',
+                github: socialMedia?.github || '',
+                discord: socialMedia?.discord || '',
+                telegram: socialMedia?.telegram || '',
+                whatsapp: socialMedia?.whatsapp || '',
+                wechat: socialMedia?.wechat || '',
+                weibo: socialMedia?.weibo || '',
+                pinterest: socialMedia?.pinterest || ''
+            },
+            tracks,
+            calendar,
+            showCalendar: showCalendar || false,
+            // Fix the date fields to match exactly with what's being sent
+            dates: {
+                submissionStart: dates.submissionStart,
+                submissionEnd: dates.submissionEnd,
+                eventStart: dates.eventStart,
+                eventEnd: dates.eventEnd
+            },
             createdBy: createdBy.id,
-            startDate,
-            endDate,
-            submissionStartDate,
-            submissionEndDate,
-            reviewers: reviewers?.map((r: { id: string }) => r.id) || [],
-            location: location || 'online',
-            tags: tags || [],
-            submittedPapers: [],
-            status: 'draft',
+            status: status,
             createdAt: new Date(),
             updatedAt: new Date()
         });
@@ -77,7 +127,10 @@ export const POST: RequestHandler = async ({ request }) => {
 
         return json({ hub: { id: newHub.id } }, { status: 201 });
     } catch (error) {
-        console.error('Erro ao criar hub:', error);
-        return json({ error: 'Erro interno do servidor.' }, { status: 500 });
+        console.error('Error creating hub:', error);
+        return json({ 
+            error: 'Internal server error',
+            details: error instanceof Error ? error.message : 'Unknown error'
+        }, { status: 500 });
     }
 };

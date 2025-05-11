@@ -71,8 +71,8 @@
 </script>
 
 <PaperReviewPage
-	on:savePaper={handleSavePaper}
-	on:submitReview={hdlSubmitReview}
+	onsavePaper={handleSavePaper}
+	onsubmitReview={hdlSubmitReview}
 	{paper}
 	{currentUser}
 	{messageFeed}

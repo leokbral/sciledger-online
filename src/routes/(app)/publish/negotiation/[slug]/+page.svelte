@@ -10,6 +10,7 @@
 	import PapersImages from '$lib/components/PapersImages.svelte';
 	import Icon from '@iconify/svelte';
 	import { FileUpload } from '@skeletonlabs/skeleton-svelte';
+	import type { Hub } from '$lib/types/Hub';
 
 	interface Props {
 		data: PageData;
@@ -27,7 +28,11 @@
 	}
 
 	let imageItems: ImageItem[] = $state([]);
+	let isLinkedToHub: boolean = $state(false);
 	let selectedReviewers: string[] = $state([]);
+	let availableHubs: Hub[] = $state([]);
+	let isLoadingHubs: boolean = $state(false);
+	let selectedHub: string | null = $state(null);
 
 	$effect(() => {
 		if (paper?.paperPictures) {
@@ -185,6 +190,56 @@
 			alert('Failed to delete image');
 		}
 	}
+
+	async function loadHubs() {
+		isLoadingHubs = true;
+		try {
+			// Change from '/hubs' to the current route which has the GET handler
+			const response = await fetch(`/publish/negotiation/${paper?.id}`);
+			const data = await response.json();
+
+			if (data.success) {
+				availableHubs = data.hubs
+					.filter((hub: { status: string }) => hub.status === 'open')
+					.sort((a: { title: string }, b: { title: string }) => a.title.localeCompare(b.title));
+			} else {
+				console.error('Failed to load hubs:', data.message);
+			}
+		} catch (error) {
+			console.error('Error loading hubs:', error);
+		} finally {
+			isLoadingHubs = false;
+		}
+	}
+	$effect(() => {
+		if (isLinkedToHub) {
+			loadHubs();
+		}
+	});
+
+	async function confirmHubSelection() {
+		try {
+			if (!paper || !selectedHub) return;
+
+			const updatedPaper = {
+				...paper,
+				hubId: selectedHub,
+				isLinkedToHub: true
+			};
+
+			const response = await post(`/publish/negotiation/${paper.id}`, updatedPaper);
+
+			if (response.paper) {
+				alert('Hub linked successfully!');
+				paper = response.paper;
+			} else {
+				alert('Failed to link hub.');
+			}
+		} catch (error) {
+			console.error('Error confirming hub selection:', error);
+			alert('An error occurred while linking the hub.');
+		}
+	}
 </script>
 
 <!-- UI HTML -->
@@ -206,6 +261,98 @@
 		<h4 class="h4 px-4 text-primary-500 font font-semibold">Under Negotiation</h4>
 		<hr class="mt-2 mb-4 border-t-2!" />
 		<PaperPreview {paper} user={$page.data.user} />
+
+		<!-- Hub Selection Section -->
+		<div class="mt-6 space-y-4">
+			<div class="flex items-center gap-2">
+				<label class="relative inline-flex items-center cursor-pointer">
+					<input type="checkbox" bind:checked={isLinkedToHub} class="sr-only peer" />
+					<div
+						class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"
+					></div>
+					<span class="ml-3 text-sm font-medium text-gray-900">Link to Hub/Event</span>
+				</label>
+			</div>
+
+			{#if isLinkedToHub}
+				<div class="space-y-4">
+					<h5 class="text-lg font-semibold">Available Hubs</h5>
+
+					{#if isLoadingHubs}
+						<div class="flex items-center justify-center p-4">
+							<div
+								class="animate-spin h-8 w-8 border-4 border-primary-500 border-t-transparent rounded-full"
+							></div>
+						</div>
+					{:else if availableHubs.length === 0}
+						<p class="text-gray-500 p-4">No available hubs found</p>
+					{:else}
+						<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+							{#each availableHubs as hub}
+								<button
+									class="relative w-full h-48 rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-200 transform hover:scale-[1.02] {selectedHub ===
+									hub.id
+										? 'ring-2 ring-primary-500'
+										: ''}"
+									onclick={() => (selectedHub = hub.id)}
+								>
+									<!-- Card image -->
+									<img
+										src={hub.cardUrl ? `/api/images/${hub.cardUrl}` : '/placeholder-card.jpg'}
+										alt={`${hub.title} Card`}
+										class="absolute w-full h-full object-cover"
+									/>
+
+									<!-- Gradient overlay -->
+									<div
+										class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent"
+									></div>
+
+									<!-- Content -->
+									<div class="absolute inset-0 p-4 flex flex-col justify-between text-white">
+										<div>
+											<h3 class="text-xl font-bold mb-2">{hub.title}</h3>
+											<div class="flex items-center gap-2">
+												{#if hub.logoUrl}
+													<img
+														src={`/api/images/${hub.logoUrl}`}
+														alt={`${hub.title} Logo`}
+														class="w-8 h-8 rounded-full border-2 border-white shadow-lg object-cover"
+													/>
+												{/if}
+												<span class="text-sm text-white/90">{hub.type}</span>
+											</div>
+										</div>
+
+										{#if hub.description}
+											<p class="text-sm text-white/80 line-clamp-2">{hub.description}</p>
+										{/if}
+
+										{#if selectedHub === hub.id}
+											<div
+												class="absolute top-2 right-2 bg-primary-500 text-white px-2 py-1 rounded-full text-sm"
+											>
+												Selected
+											</div>
+										{/if}
+									</div>
+								</button>
+							{/each}
+						</div>
+					{/if}
+				</div>
+			{/if}
+			{#if selectedHub}
+				<div class="flex justify-end mt-4">
+					<button
+						class="bg-primary-500 text-white px-4 py-2 rounded-lg hover:bg-primary-600"
+						onclick={confirmHubSelection}
+					>
+						Confirm Selection
+					</button>
+				</div>
+			{/if}
+		</div>
 
 		<!-- Price -->
 		<!-- <p>Amount</p>
