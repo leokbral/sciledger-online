@@ -20,15 +20,15 @@
 					{#if paper.mainAuthor?.profilePictureUrl}
 						<Avatar
 							src={paper.mainAuthor.profilePictureUrl}
-							name={paper.mainAuthor.username}
+							name={`${paper.mainAuthor.firstName} ${paper.mainAuthor.lastName}`}
 							size="w-9"
 						/>
 					{:else if paper.mainAuthor?.firstName && paper.mainAuthor?.lastName}
 						<div
 							class="w-9 h-9 flex items-center justify-center bg-gray-300 text-white rounded-full"
 						>
-							<span class="text-2xl font-bold"
-								>{getInitials(paper.mainAuthor.firstName, paper.mainAuthor.lastName)}</span
+							<span class="text-xs font-bold text-gray-600">
+								{getInitials(paper.mainAuthor.firstName, paper.mainAuthor.lastName)}</span
 							>
 						</div>
 					{:else}
@@ -38,22 +38,30 @@
 							<span class="text-sm font-bold">N/A</span>
 						</div>
 					{/if}
-					<div class="flex flex-col justify-center">
-						<a class="text-primary-500" href="/profile/{paper.mainAuthor?.username}">
-							{paper.mainAuthor.username || 'ERROR-404'}
+					<div class="flex items-center">
+						<a
+							class="text-primary-500 whitespace-nowrap"
+							href="/profile/{paper.mainAuthor?.username}"
+						>
+							{paper.mainAuthor.firstName}
+							{paper.mainAuthor.lastName}
 						</a>
 					</div>
 
 					<!-- Coautores -->
 					{#each paper.coAuthors as ca}
-						<a href="/profile/{ca.username}">
+						<div class="flex items-center gap-2">
 							{#if ca.profilePictureUrl}
-								<Avatar src={ca.profilePictureUrl} name={ca.username} size="w-9" />
+								<Avatar
+									src={ca.profilePictureUrl}
+									name={`${ca.firstName} ${ca.lastName}`}
+									size="w-9"
+								/>
 							{:else if ca.firstName && ca.lastName}
 								<div
 									class="w-9 h-9 flex items-center justify-center bg-gray-300 text-white rounded-full"
 								>
-									<span class="text-2xl font-bold">
+									<span class="text-xs font-bold text-gray-600">
 										{getInitials(ca.firstName, ca.lastName)}
 									</span>
 								</div>
@@ -64,11 +72,12 @@
 									<span class="text-sm font-bold">N/A</span>
 								</div>
 							{/if}
-						</a>
-						<div class="flex flex-col justify-center">
-							<a class="text-primary-500" href="/profile/{ca.username}">
-								{ca.username}
-							</a>
+							<div class="flex items-center">
+								<a class="text-primary-500 whitespace-nowrap" href="/profile/{ca.username}">
+									{ca.firstName}
+									{ca.lastName}
+								</a>
+							</div>
 						</div>
 					{/each}
 				</div>

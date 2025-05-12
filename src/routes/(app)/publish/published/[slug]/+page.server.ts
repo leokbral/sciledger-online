@@ -1,32 +1,42 @@
 import Papers from '$lib/db/models/Paper';
 import Users from '$lib/db/models/User';
 import { error, redirect } from '@sveltejs/kit';
-//import * as api from '$lib/api.js';
+import { start_mongo } from '$lib/db/mongooseConnection';
 
 export async function load({ locals, params }) {
-	if (!locals.user) redirect(302, `/login`);
+    if (!locals.user) redirect(302, `/login`);
 
-	const paper = await Papers.findOne({ id: params.slug }, {}).populate("authors").populate("mainAuthor").populate("coAuthors").lean().exec();
+    await start_mongo();
 
-	const fetchUsers = async () => {
-		const users = await Users.find({},{}).lean().exec();
-		return users;
-	};
+    const paper = await Papers.findOne({ id: params.slug })
+        .populate("authors")
+        .populate("mainAuthor")
+        .populate("coAuthors")
+        // Only populate hub if hubId exists and isLinkedToHub is true
+        .populate({
+            path: 'hubId',
+            match: { isLinkedToHub: true }
+        })
+        .lean()
+        .exec();
 
-	// const fetchUsersReviewers = async () => {
-	// 	 const reviewers = await Users.find({ 'roles.reviewer': true }, { _id: 0 }).lean().exec();
-	// 	 return reviewers;
-	// };
+    if (!paper) {
+        throw error(404, 'Paper not found');
+    }
 
-	return {
-		paper, users: await fetchUsers()/* , reviewers: await fetchUsersReviewers() */ // Get only reviewers };
+    const fetchUsers = async () => {
+        const users = await Users.find({}, {}).lean().exec();
+        return users;
+    };
 
-	}
+    return {
+        paper,
+        users: await fetchUsers()
+    };
 }
 
 export const actions = {
-	default: async ({ locals /* , params, request */ }) => {
-		if (!locals.user) error(401);
-
-	}
+    default: async ({ locals }) => {
+        if (!locals.user) error(401);
+    }
 };

@@ -27,38 +27,23 @@ export async function load({ params, locals }) {
     };
 
     const fetchPapers = async () => {
-        let papers;
-        const isCoAuthor = await Papers.exists({
-            coAuthors: locals.user.id
-        });
-
-        if (isCoAuthor) {
-            papers = await Papers.find({
-                coAuthors: locals.user.id,
-                status: 'published'
-            })
-                .populate("mainAuthor")
-                .populate("coAuthors")
-                .lean()
-                .exec();
-        } else {
-            papers = await Papers.find({
-                $or: [
-                    { mainAuthor: locals.user.id },
-                    { correspondingAuthor: locals.user.id }
-                ]
-            })
-                .populate("mainAuthor")
-                .populate("coAuthors")
-                .lean()
-                .exec();
-        }
+        const papers = await Papers.find({
+            $or: [
+                { coAuthors: locals.user.id },  // User is contributing author
+                { mainAuthor: locals.user.id },  // O usuário como autor principal
+                { correspondingAuthor: locals.user.id },  // O usuário como autor correspondente
+            ]
+        })
+            .populate("mainAuthor")
+            .populate("coAuthors")
+            .populate("submittedBy")  // Added submittedBy population
+            .lean()
+            .exec();
 
         return papers;
     };
 
     try {
-        console.log('Fetching data...');
         return {
             hub: await fetchHub(),
             users: await fetchUsers(),

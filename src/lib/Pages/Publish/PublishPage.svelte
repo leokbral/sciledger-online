@@ -21,10 +21,10 @@
 
 	let user = data.user;
 
-	console.log('Publish tabs', tabs);
+	// console.log('Publish tabs', tabs);
 	console.log('Publish papers', papers);
-	console.log('Publish user', user);
-	console.log('Publish paper', publishedPapers);
+	// console.log('Publish user', user);
+	// console.log('Publish paper', publishedPapers);
 </script>
 
 <div class="container page p-4 m-auto">
@@ -58,7 +58,6 @@
 						Submit a New Article
 					</a>
 				</div>
-
 				{#each papers as papersData, i}
 					{#if tabSet === 'tab' + i.toString()}
 						<div class="card page max-w-[700px] p-4 m-auto">
