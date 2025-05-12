@@ -1,22 +1,24 @@
 <script lang="ts">
 	import { Modal } from '@skeletonlabs/skeleton-svelte';
 	import Icon from '@iconify/svelte';
+	import { Avatar } from '@skeletonlabs/skeleton-svelte';
+	import { getInitials } from '$lib/utils/GetInitials';
 
 	let { data } = $props();
 	const hub = data.hub;
 	const papers = data.papers;
-	
+
 	// Enhanced debug logging
 	// console.log('Current Hub ID:', hub._id);
 	// console.log('Papers before filtering:', papers?.length);
-	
+
 	// Filter papers to only show ones that belong to this hub
-	const filteredPapers = papers?.filter(paper => {
+	const filteredPapers = papers?.filter((paper) => {
 		// console.log(`Paper ${paper._id} hubId:`, paper.hubId);
 		return paper.hubId === hub._id;
 	});
-	
-	// console.log('Papers after filtering:', filteredPapers?.length);
+
+	console.log('Papers after filtering:', filteredPapers);
 
 	let openCalendarModal = $state(false);
 	let openAcknowledgementModal = $state(false);
@@ -55,48 +57,48 @@
 		class="w-28 h-28 object-contain rounded-full"
 	/>
 	<div class="flex-1 flex flex-col justify-between min-h-full">
-    <!-- Top section with title and guidelines -->
-    <div class="flex justify-between items-start">
-        <div class="space-y-2">
-            <h1 class="text-2xl font-semibold text-gray-900">
-                {hub.title} <span class="text-sm text-gray-500 font-normal">{hub.type}</span>
-            </h1>
+		<!-- Top section with title and guidelines -->
+		<div class="flex justify-between items-start">
+			<div class="space-y-2">
+				<h1 class="text-2xl font-semibold text-gray-900">
+					{hub.title} <span class="text-sm text-gray-500 font-normal">{hub.type}</span>
+				</h1>
 
-            <!-- Localização -->
-            {#if hub.location}
-                <div class="flex items-center gap-2 text-gray-600 text-sm mt-2">
-                    <Icon icon="material-symbols-light:location-on-outline" width="24" height="24" />
-                    <span>{hub.location}</span>
-                </div>
-            {/if}
+				<!-- Localização -->
+				{#if hub.location}
+					<div class="flex items-center gap-2 text-gray-600 text-sm mt-2">
+						<Icon icon="material-symbols-light:location-on-outline" width="24" height="24" />
+						<span>{hub.location}</span>
+					</div>
+				{/if}
 
-            <!-- ISSN -->
-            {#if hub.issn}
-                <div class="flex items-center gap-2 text-gray-600 text-sm mt-2">
-                    <span>ISSN: {hub.issn}</span>
-                </div>
-            {/if}
-        </div>
+				<!-- ISSN -->
+				{#if hub.issn}
+					<div class="flex items-center gap-2 text-gray-600 text-sm mt-2">
+						<span>ISSN: {hub.issn}</span>
+					</div>
+				{/if}
+			</div>
 
-        <!-- Guidelines moved to right -->
-        {#if hub.guidelinesUrl}
-            <a 
-                href={hub.guidelinesUrl} 
-                target="_blank" 
-                class="flex items-center gap-2 text-blue-600 hover:text-blue-700"
-            >
-                <Icon icon="mdi:file-document-outline" width="24" height="24" />
-                <span class="underline">Diretrizes</span>
-            </a>
-        {/if}
-    </div>
+			<!-- Guidelines moved to right -->
+			{#if hub.guidelinesUrl}
+				<a
+					href={hub.guidelinesUrl}
+					target="_blank"
+					class="flex items-center gap-2 text-blue-600 hover:text-blue-700"
+				>
+					<Icon icon="mdi:file-document-outline" width="24" height="24" />
+					<span class="underline">Diretrizes</span>
+				</a>
+			{/if}
+		</div>
 
-    <!-- Description -->
-    {#if hub.description}
-        <p class="text-gray-700 mt-4">{hub.description}</p>
-    {/if}
+		<!-- Description -->
+		{#if hub.description}
+			<p class="text-gray-700 mt-4">{hub.description}</p>
+		{/if}
 
-    <!-- Rest of the content -->
+		<!-- Rest of the content -->
 		<!-- Datas -->
 		<div class="flex justify-end gap-4 mt-6">
 			{#if hub.dates}
@@ -232,8 +234,7 @@
 						target="_blank"
 						class="text-gray-600 hover:text-black"
 					>
-					<Icon icon="simple-icons:tiktok" width="24" height="24" />
-
+						<Icon icon="simple-icons:tiktok" width="24" height="24" />
 					</a>
 				{/if}
 				{#if hub.socialMedia.github}
@@ -287,52 +288,150 @@
 </div>
 
 <!-- Papers Section -->
-<div class="mt-6 bg-white shadow-md rounded-xl p-6">
-    <h2 class="text-xl font-semibold text-gray-800 mb-4">Artigos Submetidos</h2>
-    
-    {#if filteredPapers && filteredPapers.length > 0}
-        <div class="space-y-4">
-            {#each filteredPapers as paper}
-                <div class="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
-                    <div class="flex justify-between items-start">
-                        <div>
-                            <h3 class="text-lg font-medium text-gray-900">{paper.title}</h3>
-                            <p class="text-sm text-gray-600 mt-1">
-                                Submetido por: {paper.submittedBy?.firstName || 'Usuário Anônimo'}
-                            </p>
-                            {#if paper.abstract}
-                                <p class="text-gray-700 mt-2 line-clamp-2">{@html paper.abstract}</p>
-                            {/if}
-                            {#if paper.keywords?.length}
-                                <div class="flex gap-2 mt-2 flex-wrap">
-                                    {#each paper.keywords as keyword}
-                                        <span class="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">
-                                            {keyword}
-                                        </span>
-                                    {/each}
-                                </div>
-                            {/if}
-                        </div>
-                        <div class="flex items-center gap-2">
-                            {#if paper.pdfId}
-                                <a 
-                                    href={`/api/papers/${paper._id}/download`} 
-                                    class="btn btn-sm variant-filled"
-                                    target="_blank"
-                                >
-                                    <Icon icon="mdi:file-pdf-box" width="20" height="20" />
-                                    PDF
-                                </a>
-                            {/if}
-                        </div>
-                    </div>
-                </div>
-            {/each}
-        </div>
-    {:else}
-        <p class="text-gray-600 text-center py-8">Nenhum artigo submetido ainda.</p>
-    {/if}
-</div>
+<section>
+	<div class="mt-6 bg-white shadow-md rounded-xl p-6">
+		<h2 class="text-xl font-semibold text-gray-800 mb-4">Artigos Submetidos</h2>
+
+		{#if filteredPapers && filteredPapers.length > 0}
+			<div class="space-y-4">
+				{#each filteredPapers as paper}
+					<div class="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
+						<div class="flex justify-between items-start">
+							<div>
+								<h2 class="text-s font-semibold text-gray-800">
+									{hub.type ? hub.type.toUpperCase() : ''} PAPER
+								</h2>
+								<a
+									href={`/hub/view/${hub._id}`}
+									class="text-xs text-blue-600 hover:text-blue-600 hover:underline"
+								>
+									{hub.title}
+								</a>
+								<h3 class="text-lg font-medium text-gray-900 mt-4">
+									<a
+										href={`/publish/published/${paper._id}`}
+										class="hover:text-primary-600 transition-colors"
+									>
+										{paper.title}
+									</a>
+								</h3>
+								<div class="text-sm text-gray-600 mt-1 flex items-center">
+									<span class="mr-2">
+										{new Date(paper.createdAt).toLocaleDateString()} |
+									</span>
+									<div class="flex items-center gap-2">
+										<!-- Main Author -->
+										{#if paper.mainAuthor}
+											<div class="flex items-center gap-1">
+												{#if paper.mainAuthor.profilePicture}
+													<Avatar
+														src={paper.mainAuthor.profilePicture}
+														name={paper.mainAuthor.firstName}
+														size="w-6"
+													/>
+												{:else}
+													<div
+														class="w-6 h-6 rounded-full bg-gray-300 flex items-center justify-center"
+													>
+														<span class="text-xs font-bold text-gray-600">
+															{getInitials(paper.mainAuthor.firstName, paper.mainAuthor.lastName)}
+														</span>
+													</div>
+												{/if}
+												<a
+													href={`/profile/${paper.mainAuthor.username}`}
+													class="text-blue-600 hover:text-blue-800 hover:underline"
+												>
+													{paper.mainAuthor.firstName + ' ' + paper.mainAuthor.lastName}
+												</a>
+											</div>
+										{/if}
+
+										<!-- Co-authors -->
+										{#if paper.coAuthors && paper.coAuthors.length > 0}
+											<!-- <span class="mx-1">,</span> -->
+											<div class="flex items-center gap-1">
+												{#each paper.coAuthors as coAuthor, i}
+													<div class="flex items-center gap-1">
+														{#if coAuthor.profilePicture}
+															<Avatar
+																src={coAuthor.profilePicture}
+																name={coAuthor.firstName}
+																size="w-6"
+															/>
+														{:else}
+															<div
+																class="w-6 h-6 rounded-full bg-gray-300 flex items-center justify-center"
+															>
+																<span class="text-xs font-bold text-gray-600">
+																	{getInitials(coAuthor.firstName, coAuthor.lastName)}
+																</span>
+															</div>
+														{/if}
+														<a
+															href={`/profile/${coAuthor.username}`}
+															class="text-blue-600 hover:text-blue-800 hover:underline"
+														>
+															{coAuthor.firstName + ' ' + coAuthor.lastName}
+														</a>
+														{#if i < paper.coAuthors.length - 1}
+															<span class="mx-1">,</span>
+														{/if}
+													</div>
+												{/each}
+											</div>
+										{/if}
+									</div>
+								</div>
+
+								{#if paper.abstract}
+									<p class="text-gray-700 mt-6 line-clamp-2">{@html paper.abstract}</p>
+								{/if}
+							</div>
+						</div>
+						<!-- Bottom section with keywords and actions -->
+						<div class="flex justify-between items-end mt-4">
+							<div>
+								{#if paper.keywords?.length}
+									<div class="flex gap-2 mt-2 flex-wrap">
+										{#each paper.keywords as keyword}
+											<span class="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">
+												{keyword}
+											</span>
+										{/each}
+									</div>
+								{/if}
+							</div>
+
+							<!-- Action buttons -->
+							<div class="flex items-center gap-2">
+								{#if paper.pdfId}
+									<a
+										href={`/api/papers/${paper._id}/download`}
+										class="btn btn-sm variant-filled"
+										target="_blank"
+									>
+										<Icon icon="mdi:file-pdf-box" width="20" height="20" />
+										PDF
+									</a>
+								{/if}
+									<a 
+										href={`/publish/published/${paper._id}`} 
+										class="btn btn-sm bg-primary-100-700 text-primary-700-100 hover:bg-primary-200-600 hover:text-primary-800-50 transition-colors duration-200 flex items-center gap-1"
+									>
+										Read More
+										<Icon icon="mdi:arrow-right" width="20" height="20" />
+									</a>
+							</div>
+						</div>
+					</div>
+				{/each}
+			</div>
+		{:else}
+			<p class="text-gray-600 text-center py-8">Nenhum artigo submetido ainda.</p>
+		{/if}
+	</div>
+</section>
 
 <!-- Informações Gerais -->
 <!-- <div class="mt-6 bg-white shadow rounded-xl p-4 space-y-2">
@@ -353,15 +452,15 @@
 <!-- Licenças e Diretrizes -->
 <!-- <div class="mt-6 bg-white shadow rounded-xl p-4 space-y-2">
 	<h2 class="text-xl font-semibold text-gray-800">Publicação</h2> -->
-	
-	<!-- {#if hub.acknowledgement}
+
+<!-- {#if hub.acknowledgement}
 		<div class="mt-6 bg-white shadow rounded-xl p-4">
 			<h2 class="text-xl font-semibold text-gray-800 mb-2">Agradecimentos e Regras</h2>
 			<div class="prose prose-sm text-gray-800 max-w-none">{@html hub.acknowledgement}</div>
 		</div>
 	{/if} -->
 
-	<!-- {#if hub.licenses && hub.licenses.length > 0}
+<!-- {#if hub.licenses && hub.licenses.length > 0}
 		<p><strong>Licenças:</strong> {hub.licenses.join(', ')}</p>
 	{:else}
 		<p><strong>Licenças:</strong> Nenhuma</p>
