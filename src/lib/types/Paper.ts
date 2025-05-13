@@ -20,17 +20,26 @@ export type Paper = {
     price: number;
     score: number;
     authors: User[],
-	peer_review: string,
-   /*  peer_review: {
-        reviewType: 'open' | 'selected'; // Tipo de revisão: 'open' para qualquer revisor, 'selected' para revisores específicos
-        assignedReviewers: User[]; // Lista de revisores específicos se 'selected'
-        reviewerResponses: {
-            reviewerId: User; // UUID do revisor
-            counterProposal?: string; // Proposta de contraproposta do revisor (opcional)
-            responseStatus: 'accepted' | 'declined' | 'counter-proposal' | 'pending'; // Status geral da resposta do revisor
-            reviewerComments: string[]; // Comentários do revisor
-        }[];
-    }; */
+    peer_review?: {
+        reviewType: 'open' | 'selected';
+        assignedReviewers: User[];
+        responses: Array<{
+            reviewerId: User;
+            status: 'pending' | 'accepted' | 'declined';
+            responseDate?: Date;
+        }>;
+    };
+
+    /*  peer_review: {
+         reviewType: 'open' | 'selected'; // Tipo de revisão: 'open' para qualquer revisor, 'selected' para revisores específicos
+         assignedReviewers: User[]; // Lista de revisores específicos se 'selected'
+         reviewerResponses: {
+             reviewerId: User; // UUID do revisor
+             counterProposal?: string; // Proposta de contraproposta do revisor (opcional)
+             responseStatus: 'accepted' | 'declined' | 'counter-proposal' | 'pending'; // Status geral da resposta do revisor
+             reviewerComments: string[]; // Comentários do revisor
+         }[];
+     }; */
     createdAt: Date;
     updatedAt: Date;
     submittedBy: User; // Campo adicionado para quem submeteu o paper

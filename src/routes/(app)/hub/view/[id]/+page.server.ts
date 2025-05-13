@@ -6,7 +6,7 @@ import Hubs from '$lib/db/models/Hub';
 
 export async function load({ params, locals }) {
     if (!locals.user) redirect(302, `/login`);
-    
+
     await start_mongo();
 
     const fetchHub = async () => {
@@ -28,20 +28,29 @@ export async function load({ params, locals }) {
 
     const fetchPapers = async () => {
         const papers = await Papers.find({
+            hubId: params.id, // <-- Apenas artigos do hub atual
             $or: [
-                { coAuthors: locals.user.id },  // User is contributing author
-                { mainAuthor: locals.user.id },  // O usuário como autor principal
-                { correspondingAuthor: locals.user.id },  // O usuário como autor correspondente
+                { status: 'published' }, // visível para todos
+                {
+                    status: { $ne: 'published' }, // status != published
+                    $or: [ // visível para usuários envolvidos
+                        { mainAuthor: locals.user.id },
+                        { correspondingAuthor: locals.user.id },
+                        { coAuthors: locals.user.id },
+                        { submittedBy: locals.user.id }
+                    ]
+                }
             ]
         })
-            .populate("mainAuthor")
-            .populate("coAuthors")
-            .populate("submittedBy")  // Added submittedBy population
-            .lean()
-            .exec();
-
+        .populate("mainAuthor")
+        .populate("coAuthors")
+        .populate("submittedBy")
+        .lean()
+        .exec();
+    
         return papers;
     };
+    
 
     try {
         return {
