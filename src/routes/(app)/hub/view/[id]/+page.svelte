@@ -12,10 +12,21 @@
 	// console.log('Current Hub ID:', hub._id);
 	// console.log('Papers before filtering:', papers?.length);
 
-	// Filter papers to only show ones that belong to this hub
-	const filteredPapers = papers?.filter((paper) => {
-		// console.log(`Paper ${paper._id} hubId:`, paper.hubId);
-		return paper.hubId === hub._id;
+	// Filter papers to only show ones that belong to this hub and are published
+	// const filteredPapers = papers?.filter((paper) => {
+	// 	return paper.hubId === hub._id && paper.status === 'published';
+	// });
+	const userId = data.user._id;
+
+	const filteredPapers = data.papers?.filter((paper) => {
+		if (paper.status === 'published') return true;
+
+		const isMainAuthor = paper.mainAuthor?._id === userId;
+		const isCoAuthor = paper.coAuthors?.some((ca) => ca._id === userId);
+		const isCorresponding = paper.correspondingAuthor?._id === userId;
+		const isSubmittedBy = paper.submittedBy?._id === userId;
+
+		return isMainAuthor || isCoAuthor || isCorresponding || isSubmittedBy;
 	});
 
 	console.log('Papers after filtering:', filteredPapers);
@@ -27,6 +38,16 @@
 		openCalendarModal = false;
 		openAcknowledgementModal = false;
 	}
+
+	const isUserInvolved = (paper) => {
+		const userId = data.user._id;
+		return (
+			paper.mainAuthor?._id === userId ||
+			paper.coAuthors?.some((c) => c._id === userId) ||
+			paper.correspondingAuthor?._id === userId ||
+			paper.submittedBy?._id === userId
+		);
+	};
 </script>
 
 <!-- Banner -->
@@ -115,36 +136,63 @@
 						</h2>
 					{/snippet}
 					{#snippet content()}
-						<header class="flex justify-between">
-							<h2 class="h2">Calendar</h2>
+						<header class="flex justify-between border-b pb-4 mb-6">
+							<h2 class="text-2xl font-semibold text-gray-800">Important Dates</h2>
 						</header>
-						<article class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-gray-800">
-							<div class="flex items-start gap-2">
-								<Icon icon="mdi:calendar-start" width="20" />
+						<article class="flex flex-col gap-6 text-gray-800 px-2">
+							<div class="flex items-center gap-4 border-l-4 border-primary-500 pl-4">
+								<Icon icon="mdi:calendar-start" class="text-primary-500" width="24" height="24" />
 								<div>
-									<p class="font-semibold">Início da submissão</p>
-									<p>{new Date(hub.dates.submissionStart).toLocaleDateString()}</p>
+									<p class="text-lg font-medium">Submission Start Date</p>
+									<p class="text-gray-600">
+										{new Date(hub.dates.submissionStart).toLocaleDateString('en-US', {
+											month: 'long',
+											day: 'numeric',
+											year: 'numeric'
+										})}
+									</p>
 								</div>
 							</div>
-							<div class="flex items-start gap-2">
-								<Icon icon="mdi:calendar-end" width="20" />
+
+							<div class="flex items-center gap-4 border-l-4 border-yellow-500 pl-4">
+								<Icon icon="mdi:calendar-end" class="text-yellow-500" width="24" height="24" />
 								<div>
-									<p class="font-semibold">Fim da submissão</p>
-									<p>{new Date(hub.dates.submissionEnd).toLocaleDateString()}</p>
+									<p class="text-lg font-medium">Submission Deadline</p>
+									<p class="text-gray-600">
+										{new Date(hub.dates.submissionEnd).toLocaleDateString('en-US', {
+											month: 'long',
+											day: 'numeric',
+											year: 'numeric'
+										})}
+									</p>
 								</div>
 							</div>
-							<div class="flex items-start gap-2">
-								<Icon icon="mdi:calendar-start" width="20" />
+
+							<div class="flex items-center gap-4 border-l-4 border-green-500 pl-4">
+								<Icon icon="mdi:calendar-start" class="text-green-500" width="24" height="24" />
 								<div>
-									<p class="font-semibold">Início do evento</p>
-									<p>{new Date(hub.dates.eventStart).toLocaleDateString()}</p>
+									<p class="text-lg font-medium">Event Start Date</p>
+									<p class="text-gray-600">
+										{new Date(hub.dates.eventStart).toLocaleDateString('en-US', {
+											month: 'long',
+											day: 'numeric',
+											year: 'numeric'
+										})}
+									</p>
 								</div>
 							</div>
-							<div class="flex items-start gap-2">
-								<Icon icon="mdi:calendar-end" width="20" />
+
+							<div class="flex items-center gap-4 border-l-4 border-red-500 pl-4">
+								<Icon icon="mdi:calendar-end" class="text-red-500" width="24" height="24" />
 								<div>
-									<p class="font-semibold">Fim do evento</p>
-									<p>{new Date(hub.dates.eventEnd).toLocaleDateString()}</p>
+									<p class="text-lg font-medium">Event End Date</p>
+									<p class="text-gray-600">
+										{new Date(hub.dates.eventEnd).toLocaleDateString('en-US', {
+											month: 'long',
+											day: 'numeric',
+											year: 'numeric'
+										})}
+									</p>
 								</div>
 							</div>
 						</article>
@@ -295,7 +343,19 @@
 		{#if filteredPapers && filteredPapers.length > 0}
 			<div class="space-y-4">
 				{#each filteredPapers as paper}
-					<div class="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
+					<div
+						class="border rounded-lg p-4 transition-colors"
+						class:bg-yellow-50={paper.status !== 'published' && isUserInvolved(paper)}
+						class:border-yellow-300={paper.status !== 'published' && isUserInvolved(paper)}
+					>
+						{#if paper.status !== 'published' && isUserInvolved(paper)}
+							<div
+								class="mb-3 p-2 bg-yellow-100 border border-yellow-300 rounded text-yellow-800 text-sm font-medium"
+							>
+								 This article has <strong>not been published</strong> yet and is visible only to you
+								and the authors involved.
+							</div>
+						{/if}
 						<div class="flex justify-between items-start">
 							<div>
 								<h2 class="text-s font-semibold text-gray-800">
@@ -415,13 +475,13 @@
 										PDF
 									</a>
 								{/if}
-									<a 
-										href={`/publish/published/${paper._id}`} 
-										class="btn btn-sm bg-primary-100-700 text-primary-700-100 hover:bg-primary-200-600 hover:text-primary-800-50 transition-colors duration-200 flex items-center gap-1"
-									>
-										Read More
-										<Icon icon="mdi:arrow-right" width="20" height="20" />
-									</a>
+								<a
+									href={`/publish/published/${paper._id}`}
+									class="btn btn-sm bg-primary-100-700 text-primary-700-100 hover:bg-primary-200-600 hover:text-primary-800-50 transition-colors duration-200 flex items-center gap-1"
+								>
+									Read More
+									<Icon icon="mdi:arrow-right" width="20" height="20" />
+								</a>
 							</div>
 						</div>
 					</div>

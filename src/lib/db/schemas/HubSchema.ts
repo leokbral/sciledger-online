@@ -54,6 +54,13 @@ export const HubSchema: Schema = new Schema({
 	createdBy: { type: String, required: true, ref: 'User' },
 	reviewers: [{ type: String, ref: 'User' }],
 	submittedPapers: [{ type: String, ref: 'Paper' }],
+	assignedReviews: [{
+		paperId: { type: String, ref: 'Paper' },
+		reviewerId: { type: String, ref: 'User' },
+		status: { type: String, enum: ['assigned', 'in_review', 'completed'], default: 'assigned' },
+		assignedAt: { type: Date, default: Date.now }
+	  }],
+	  
 
 	status: {
 		type: String,

@@ -22,7 +22,18 @@ export const PaperSchema: Schema = new Schema({
     price: { type: Number, required: true }, // Campo para o preço da publicação
     score: { type: Number, default: 0, min: 0, max: 5 }, // Campo para a pontuação da publicação, com um valor padrão de 0 e limite de 0 a 5
     authors: [{ type: String, ref: 'User' }],
-    peer_review: { type: String },
+    peer_review: {
+        type: {
+            reviewType: { type: String, enum: ['open', 'selected'], required: true },
+            assignedReviewers: [{ type: String, ref: 'User' }],
+            responses: [{
+                reviewerId: { type: String, ref: 'User' },
+                status: { type: String, enum: ['pending', 'accepted', 'declined'], default: 'pending' },
+                responseDate: { type: Date }
+            }]
+        }
+    },
+
     // peer_review: [{ type: String, ref: 'Review' }], // Agora este campo faz referência ao ReviewSchema
     /* peer_review: {
         type: {

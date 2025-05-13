@@ -43,6 +43,12 @@ export type Hub = {
     },
     reviewers?: string[];
     submittedPapers?: string[];
+    assignedReviews: Array<{
+        paperId: string;
+        reviewerId: string;
+        status: 'assigned' | 'in_review' | 'completed';
+        assignedAt: Date;
+    }>;
     status: 'open' | 'closed';
     createdAt: string;
     updatedAt: string;

@@ -1,7 +1,6 @@
 import type { Paper } from "./Paper";
 
 export type User = {
-	[x: string]: any;
 	id: string; // ID único gerado para o usuário
     //name: string; // Nome do usuário
     firstName: string; 
