@@ -1,6 +1,7 @@
 import type { Paper } from "./Paper";
 
 export type User = {
+	_id: string; // ID interno do MongoDB
 	id: string; // ID único gerado para o usuário
     //name: string; // Nome do usuário
     firstName: string; 

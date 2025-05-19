@@ -44,11 +44,18 @@
 			{#if paper.hubId && paper.isLinkedToHub}
 				<div class="flex flex-col gap-1 mb-2">
 					<span class="text-xs font-medium text-primary-700 bg-primary-100 px-2 py-1 rounded w-fit">
-						{paper.hubId?.type.toUpperCase() + ' ' + 'PAPER' || 'Hub'}
+						{typeof paper.hubId === 'object' && paper.hubId !== null && 'type' in paper.hubId
+							? paper.hubId.type.toUpperCase() + ' PAPER'
+							: 'Hub'}
 					</span>
 					<span class="text-xs text-gray-600 ml-2">
-						<a href={`/hub/view/${paper.hubId?._id}`} class="text-primary-500 hover:text-primary-700">
-							{paper.hubId?.title || 'Unknown Hub'}
+						<a
+							href={`/hub/view/${typeof paper.hubId === 'object' && paper.hubId !== null && '_id' in paper.hubId ? paper.hubId._id : paper.hubId}`}
+							class="text-primary-500 hover:text-primary-700"
+						>
+							{typeof paper.hubId === 'object' && paper.hubId !== null && 'title' in paper.hubId
+								? paper.hubId.title
+								: 'Unknown Hub'}
 						</a>
 					</span>
 				</div>
@@ -73,8 +80,12 @@
 					/>
 				{/if}
 				<div class="flex items-center">
-					<a class="text-primary-500 whitespace-nowrap" href="/profile/{paper.mainAuthor?.username}">
-						{paper.mainAuthor.firstName} {paper.mainAuthor.lastName}
+					<a
+						class="text-primary-500 whitespace-nowrap"
+						href="/profile/{paper.mainAuthor?.username}"
+					>
+						{paper.mainAuthor.firstName}
+						{paper.mainAuthor.lastName}
 					</a>
 				</div>
 
@@ -82,10 +93,10 @@
 				{#each paper.coAuthors as ca}
 					<div class="flex items-center gap-2">
 						{#if ca.profilePictureUrl}
-							<Avatar 
-								src={ca.profilePictureUrl} 
-								name={`${ca.firstName} ${ca.lastName}`} 
-								size="w-9" 
+							<Avatar
+								src={ca.profilePictureUrl}
+								name={`${ca.firstName} ${ca.lastName}`}
+								size="w-9"
 							/>
 						{:else}
 							<Avatar
@@ -96,7 +107,8 @@
 						{/if}
 						<div class="flex items-center">
 							<a class="text-primary-500 whitespace-nowrap" href="/profile/{ca.username}">
-								{ca.firstName} {ca.lastName}
+								{ca.firstName}
+								{ca.lastName}
 							</a>
 						</div>
 					</div>

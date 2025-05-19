@@ -10,7 +10,25 @@
 
 	let { data }: Props = $props();
 	// let papers = data.papers;
-	let papers: Paper[] = data.papers;
+	// let papers: Paper[] = data.papers; //VERIFICAR ISSO!!!!
+
+	let papers: Paper[] = data.papers.map((p: any) => ({
+		...p,
+		coAuthors:
+			p.coAuthors?.map((u: any) => ({
+				id: u.id ?? u._id?.toString(),
+				firstName: u.firstName,
+				lastName: u.lastName,
+				country: u.country,
+				email: u.email,
+				affiliation: u.affiliation,
+				orcid: u.orcid,
+				role: u.role,
+				// add other User fields as needed
+				...u
+			})) ?? []
+	}));
+
 	// console.log(data)
 	let reviews = data.reviews;
 
@@ -37,21 +55,58 @@
 		}
 	];
 
-	let papersPool = papers.filter(
-		(p: Paper) =>
-			p.status === 'under negotiation' &&
-			(p.reviewers.includes(data.user.id) || p.correspondingAuthor === data.user.id)
-	);
-	console.log(papersPool)
+	// let papersPool = papers.filter(
+	// 	(p: Paper) =>
+	// 		p.status === 'under negotiation' &&
+	// 		(p.reviewers.includes(data.user.id) || p.correspondingAuthor === data.user.id)
+	// );
+	// let papersPool = papers.filter(
+	// 		(p: Paper) => p.status === 'under negotiation'
+	// 	);
+
+	let user = data.user; //userProfiles[0];
+	let reviewerInvitations = data.reviewerInvitations;
+
+	let papersPool = papers
+		.filter((p: Paper) => {
+			const userId = user.id?.toString();
+			const isReviewerRole = user.roles?.reviewer === true; // ← checa se o usuário é revisor mesmo
+
+			if (!isReviewerRole) return false; // ← se não é revisor, não pode ver nenhum artigo
+
+			const correspondingAuthorId = p.correspondingAuthor?.toString();
+			const mainAuthorId = (
+				typeof p.mainAuthor === 'object' ? (p.mainAuthor.id ?? p.mainAuthor._id) : p.mainAuthor
+			)?.toString();
+			const isAuthor = correspondingAuthorId === userId;
+			const isMainAuthor = mainAuthorId === userId;
+			const isCoAuthor = p.coAuthors?.some((author) => author.id?.toString() === userId);
+
+			const isHubReviewer = typeof p.hubId === 'object' && p.hubId?.reviewers?.includes(userId);
+			const isPaperInHub = !!p.hubId;
+
+			const isUnderNegotiation = p.status === 'under negotiation';
+			const isInvolved = isAuthor || isCoAuthor || isMainAuthor;
+
+			const canSeeWithoutHub = !isPaperInHub && isUnderNegotiation && !isInvolved;
+			const canSeeWithHub = isPaperInHub && isUnderNegotiation && isHubReviewer && !isInvolved;
+
+			return canSeeWithoutHub || canSeeWithHub;
+		})
+		.map((paper) => ({
+			...paper,
+			isHubPaper: typeof paper.hubId === 'object' && paper.hubId?.reviewers?.includes(user.id)
+		}));
+
+	console.log(papersPool);
 	let inReview = papers.filter((p: Paper) => p.status === 'in review');
 	let correction = papers.filter((p: Paper) => p.status === 'needing corrections');
 	let reviewed = papers.filter((p: Paper) => p.status === 'published');
 
-	let user = data.user; //userProfiles[0];
-
 	let papersData = [papersPool, inReview, correction, reviewed];
 	let publishData = {
 		tabs,
+		reviewerInvitations,
 		papersData,
 		reviews,
 		user
@@ -61,10 +116,10 @@
 <div class="container page p-4 m-auto">
 	<ReviewPage data={publishData}>
 		{#snippet requested()}
-				<div  class="text-surface-900 w-full">
+			<div class="text-surface-900 w-full">
 				<PaperPool rota={'/review/paperspool'} papersData={publishData} {user}></PaperPool>
 			</div>
-			{/snippet}
+		{/snippet}
 	</ReviewPage>
 </div>
 <!-- <div class="container page p-4 m-auto">

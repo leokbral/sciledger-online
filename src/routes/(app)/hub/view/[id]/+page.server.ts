@@ -27,13 +27,32 @@ export async function load({ params, locals }) {
     };
 
     const fetchPapers = async () => {
-        const papers = await Papers.find({
-            hubId: params.id, // <-- Apenas artigos do hub atual
+        // First, get the hub to check if user is creator or reviewer
+        const hub = await Hubs.findById(params.id).lean();
+        if (!hub) {
+            throw error(404, 'Hub not found');
+        }
+        const isCreator = hub.createdBy.toString() === locals.user.id;
+        const isReviewer = hub.reviewers?.includes(locals.user.id);
+
+        // If user is creator or reviewer, show all papers
+        if (isCreator || isReviewer) {
+            return await Papers.find({ hubId: params.id })
+                .populate("mainAuthor")
+                .populate("coAuthors")
+                .populate("submittedBy")
+                .lean()
+                .exec();
+        }
+
+        // Otherwise, show only published papers or papers where user is involved
+        return await Papers.find({
+            hubId: params.id,
             $or: [
-                { status: 'published' }, // visível para todos
+                { status: 'published' },
                 {
-                    status: { $ne: 'published' }, // status != published
-                    $or: [ // visível para usuários envolvidos
+                    status: { $ne: 'published' },
+                    $or: [
                         { mainAuthor: locals.user.id },
                         { correspondingAuthor: locals.user.id },
                         { coAuthors: locals.user.id },
@@ -47,13 +66,12 @@ export async function load({ params, locals }) {
         .populate("submittedBy")
         .lean()
         .exec();
-    
-        return papers;
     };
     
 
     try {
         return {
+            // user: locals.user,
             hub: await fetchHub(),
             users: await fetchUsers(),
             papers: await fetchPapers()
