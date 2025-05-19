@@ -1,37 +1,28 @@
 <script lang="ts">
-	import { Avatar } from '@skeletonlabs/skeleton-svelte';
-	// import { Avatar, type PopupSettings } from '@skeletonlabs/skeleton-svelte';
+	import { Avatar, Popover } from '@skeletonlabs/skeleton-svelte';
 	import { post } from './utils';
 	import { invalidateAll } from '$app/navigation';
-	import { userProfiles } from '../routes/(app)/UserProfile';
 	import type { User } from './types/User';
 	import { getInitials } from './utils/GetInitials';
-	import { Popover } from '@skeletonlabs/skeleton-svelte';
+	import ReviewerInvitations from './components/ReviewerInvitations/ReviewerInvitations.svelte';
 
 	interface Props {
 		pathname: string;
 		user: User;
+		reviewerInvitations: ReviewerInvitations;
 	}
 
-	let { pathname, user }: Props = $props();
+	let { pathname, user, reviewerInvitations }: Props = $props();
 
-	let openState = $state(false);
+	let openState = $state(false); // popover do avatar
+	let showNotifications = $state(false); // popover das notificações
 
-	function popoverClose() {
-		openState = false;
-	}
+	let notifications = [
+		{ id: 1, message: 'You have a new follower!' },
+		{ id: 2, message: 'Your post was liked!' },
+		{ id: 3, message: 'New comment on your photo.' }
+	];
 
-	//console.log("nav 9 - ", user);
-
-	// const popupFeatured: PopupSettings = {
-	// 	// Represents the type of event that opens/closed the popup
-	// 	event: 'click',
-	// 	// Matches the data-popup value on your popup element
-	// 	target: 'popupFeatured',
-	// 	// Defines which side of your trigger the popup will appear
-	// 	placement: 'bottom',
-	// 	middleware: { offset: { mainAxis: 10, crossAxis: -100 } }
-	// };
 	async function logout() {
 		await post(`/logout`);
 		invalidateAll();
@@ -41,99 +32,72 @@
 		return str.replace(/\s+/g, '');
 	}
 
-	// // Função para obter as iniciais do primeiro e do último nome
-	// function getInitials(firstName: string, lastName: string): string {
-	// 	const firstInitial = firstName.charAt(0).toUpperCase();
-	// 	const lastInitial = lastName.charAt(0).toUpperCase();
-	// 	return `${firstInitial}${lastInitial}`;
-	// }
-
-	// Função para retornar a contagem de elementos ou 0 se o valor não for um array
 	function getCount(value: string[] | undefined): number {
 		return Array.isArray(value) ? value.length : 0;
 	}
 </script>
 
 {#if user}
-	<!-- <a href="/profile/@{user.username}"> -->
-	<!-- <button class="btn pl-12 -ml-7!" use:popup={popupFeatured}> -->
-	<Popover
-		open={openState}
-		onOpenChange={(e) => (openState = e.open)}
-		positioning={{ placement: 'top' }}
-		triggerBase=""
-		contentBase="card bg-surface-950-50 space-y-4 card p-4 w-72 shadow-xl text-surface-50-950"
-		arrow
-		arrowBackground="!bg-surface-950 dark:!bg-surface-50"
-	>
-		{#snippet trigger()}
-			{#if user.profilePictureUrl}
-				<Avatar src={user.profilePictureUrl} name={user.firstName} size="w-9" />
-			{:else}
-				<div class="w-9 h-9 flex items-center justify-center bg-gray-300 text-white rounded-full">
-					<span class="text-xl font-bold">{getInitials(user.firstName, user.lastName)}</span>
-				</div>
-			{/if}{/snippet}
-		{#snippet content()}
-			<div class="space-y-4 flex flex-col">
-				<div class="flex gap-2">
-					{#if user.profilePictureUrl}
-						<Avatar src={user.profilePictureUrl} name={user.firstName} size="w-9" />
-					{:else}
-						<div
-							class="w-9 h-9 flex items-center justify-center bg-gray-300 text-white rounded-full"
-						>
-							<span class="text-xl font-bold">{getInitials(user.firstName, user.lastName)}</span>
-						</div>
-					{/if}
-
-					<div>
-						<p class="font-bold">{`${user.firstName} ${user.lastName}`}</p>
-						<p class="opacity-50">{user.username}</p>
-					</div>
-				</div>
-				<p>{user.position} at {user.institution}</p>
-				<div class="flex gap-4">
-					<small
-						><strong>{user?.following.length || 0}</strong>
-						<span class="opacity-50">Following</span></small
-					>
-					<small
-						><strong>{user?.followers.length || 0}</strong>
-						<span class="opacity-50">Followers</span></small
-					>
-				</div>
-				
-				<a
-					data-sveltekit-reload
-					class="btn bg-primary-500 w-full text-white"
-					href={`/profile/${user.username}`}
-					target=""
-					rel="noreferrer"
+	<div class="flex items-center gap-4">
+		<!-- Botão de Notificações -->
+		<Popover
+			open={showNotifications}
+			onOpenChange={(e) => (showNotifications = e.open)}
+			positioning={{ placement: 'bottom-end' }}
+			triggerBase="relative"
+			contentBase="card bg-surface-950-50 card p-4 w-72 shadow-xl text-surface-50-950"
+			arrow
+			arrowBackground="!bg-surface-950 dark:!bg-surface-50"
+		>
+			{#snippet trigger()}
+				<button
+					class="relative w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
+					aria-label="Open notifications"
 				>
-					Profile
-				</a>
-				<!-- <a data-sveltekit-reload href="/profile/{user.username}" class="btn preset-primary-500">Profile</a> -->
-				<button class="btn preset-filled justify-start" onclick={logout}>Sign out</button>
-			</div>
-		{/snippet}
-	</Popover>
-	<!-- <button class="btn pl-12 -ml-7!" onclick={logout}>
-		<! -- <Avatar src={user.profilePictureUrl} alt={user.firstName} width="w-9" /> -- >
-		{#if user.profilePictureUrl}
-			<Avatar src={user.profilePictureUrl} name={user.firstName} size="w-9" />
-		{:else}
-			<div class="w-9 h-9 flex items-center justify-center bg-gray-300 text-white rounded-full">
-				<span class="text-xl font-bold">{getInitials(user.firstName, user.lastName)}</span>
-			</div>
-		{/if}
-	</button> -->
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="w-6 h-6 text-gray-600 dark:text-gray-300"
+						viewBox="0 0 24 24"
+						fill="currentColor"
+					>
+						<path
+							d="M12 24c1.104 0 2-.896 2-2h-4a2 2 0 0 0 2 2Zm6-6v-5c0-3.075-1.725-5.64-4.5-6.32V6a1.5 1.5 0 0 0-3 0v.68C7.725 7.36 6 9.925 6 13v5l-2 2v1h16v-1l-2-2Z"
+						/>
+					</svg>
+				</button>
+			{/snippet}
 
-	<!-- Div do tooltip -->
-	<!-- <div class="card p-4 w-72 shadow-xl preset-filled" data-popup="popupFeatured">
-		<div class="space-y-4 flex flex-col">
-			<div class="flex gap-2">
-				<!-- <Avatar src={user.profilePictureUrl} alt={user.firstName} width="w-14" /> -- >
+			{#snippet content()}
+				<h4 class="font-bold mb-2">Notifications</h4>
+				{#if notifications.length > 0}
+					<ul class="space-y-2">
+						{#each notifications as note}
+							<li class="text-sm bg-gray-100 dark:bg-gray-800 p-2 rounded">
+								<ReviewerInvitations {reviewerInvitations} />
+							</li>
+						{/each}
+					</ul>
+				{:else}
+					<p class="text-sm text-gray-400">No notifications</p>
+				{/if}
+
+				<!-- Passando o componente de convites aqui -->
+				<!-- <h3 class="font-bold text-lg mb-2">Reviewer Invitations</h3>
+				<ReviewerInvitations {reviewerInvitations} /> -->
+			{/snippet}
+		</Popover>
+
+		<!-- Popover do Avatar do Usuário -->
+		<Popover
+			open={openState}
+			onOpenChange={(e) => (openState = e.open)}
+			positioning={{ placement: 'top-end' }}
+			triggerBase=""
+			contentBase="card bg-surface-950-50 space-y-4 card p-4 w-72 shadow-xl text-surface-50-950"
+			arrow
+			arrowBackground="!bg-surface-950 dark:!bg-surface-50"
+		>
+			{#snippet trigger()}
 				{#if user.profilePictureUrl}
 					<Avatar src={user.profilePictureUrl} name={user.firstName} size="w-9" />
 				{:else}
@@ -141,83 +105,52 @@
 						<span class="text-xl font-bold">{getInitials(user.firstName, user.lastName)}</span>
 					</div>
 				{/if}
+			{/snippet}
 
-				<div>
-					<p class="font-bold">{`${user.firstName} ${user.lastName}`}</p>
-					<p class="opacity-50">{user.username}</p>
+			{#snippet content()}
+				<div class="space-y-4 flex flex-col">
+					<div class="flex gap-2">
+						{#if user.profilePictureUrl}
+							<Avatar src={user.profilePictureUrl} name={user.firstName} size="w-9" />
+						{:else}
+							<div
+								class="w-9 h-9 flex items-center justify-center bg-gray-300 text-white rounded-full"
+							>
+								<span class="text-xl font-bold">{getInitials(user.firstName, user.lastName)}</span>
+							</div>
+						{/if}
+						<div>
+							<p class="font-bold">{`${user.firstName} ${user.lastName}`}</p>
+							<p class="opacity-50">{user.username}</p>
+						</div>
+					</div>
+					<p>{user.position} at {user.institution}</p>
+					<div class="flex gap-4">
+						<small
+							><strong>{user?.following.length || 0}</strong>
+							<span class="opacity-50">Following</span></small
+						>
+						<small
+							><strong>{user?.followers.length || 0}</strong>
+							<span class="opacity-50">Followers</span></small
+						>
+					</div>
+
+					<a
+						data-sveltekit-reload
+						class="btn bg-primary-500 w-full text-white"
+						href={`/profile/${user.username}`}
+						target=""
+						rel="noreferrer"
+					>
+						Profile
+					</a>
+					<button class="btn preset-filled justify-start" onclick={logout}>Sign out</button>
 				</div>
-			</div>
-			<p>{user.position} at {user.institution}</p>
-			<div class="flex gap-4">
-				<small><strong>{user?.following.length || 0}</strong> <span class="opacity-50">Following</span></small>
-				<small><strong>{user?.followers.length || 0}</strong> <span class="opacity-50">Followers</span></small>
-			</div>
-			<!-- <div class="relative">
-				<p
-					class="text-ls font-semibold flex items-center gap-2 text-gray-700 hover:text-blue-600 hover:underline transition duration-300 ease-in-out cursor-pointer"
-				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						width="2.5em"
-						height="2.5em"
-						viewBox="0 0 24 24"
-						{...$$props}
-					>
-						<path
-							fill="currentColor"
-							d="M5 18.77v-1h1.616V9.845q0-1.96 1.24-3.447T11 4.546V4q0-.417.291-.708q.291-.292.707-.292t.709.292T13 4v.546q1.904.365 3.144 1.853t1.24 3.447v7.923H19v1zm6.997 2.615q-.668 0-1.14-.475t-.472-1.14h3.23q0 .67-.475 1.142q-.476.472-1.143.472M7.616 17.77h8.769V9.846q0-1.823-1.281-3.104T12 5.462t-3.104 1.28t-1.28 3.104z"
-						/>
-					</svg>
-					Notifications
-					<span
-						class="absolute top-0 left-1/4 -translate-x-8 -translate-y-1 bg-primary-500 text-white text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full"
-					>
-						<! -- {notifications} -- >1
-					</span>
-				</p>
-				<! -- <p class="text-ls">{notifications}</p> -- >
-			</div> -- >
-			<!-- <div class="relative">
-				<p
-					class="text-ls font-semibold flex items-center gap-2 text-gray-700 hover:text-blue-600 hover:underline transition duration-300 ease-in-out cursor-pointer"
-				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						width="2.5em"
-						height="2.5em"
-						viewBox="0 0 24 24"
-						{...$$props}
-					>
-						<g fill="none" stroke="currentColor">
-							<rect width="16" height="12" x="4" y="6" rx="2" />
-							<path d="m4 9l7.106 3.553a2 2 0 0 0 1.788 0L20 9" />
-						</g>
-					</svg>
-					Messages
-					<span
-						class="absolute top-0 left-1/4 -translate-x-8 -translate-y-1 bg-primary-500 text-white text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full"
-					>
-						<! -- {messages} -- >2
-					</span>
-				</p>
-				<! -- <p class="text-ls">{messages}</p> -- >
-			</div> -- >
-			<a
-				data-sveltekit-reload
-				class="btn bg-primary-500 w-full"
-				href={`/profile/${user.username}`}
-				target=""
-				rel="noreferrer"
-			>
-				Profile
-			</a>
-			<a data-sveltekit-reload href="/profile/{user.username}">Profile</a>
-			<button class="btn preset-filled justify-start" onclick={logout}>Sign out</button>
-		</div>
-		<div class="arrow preset-filled"></div>
-	</div> -->
-	<!-- </a> -->
+			{/snippet}
+		</Popover>
+	</div>
 {:else}
-	<a href="/login" class="nav-link" class:active={pathname === '/login'}> Sign in </a>
-	<a href="/register" class="nav-link" class:active={pathname === '/register'}> Sign up </a>
+	<a href="/login" class="nav-link" class:active={pathname === '/login'}>Sign in</a>
+	<a href="/register" class="nav-link" class:active={pathname === '/register'}>Sign up</a>
 {/if}

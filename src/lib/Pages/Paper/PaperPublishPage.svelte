@@ -52,7 +52,12 @@
 			price: 0,
 			score: 0,
 			submittedBy: author,
-			peer_review: 'open'
+			peer_review: {
+				reviewType: 'open',
+				assignedReviewers: [],
+				responses: []
+			},
+			_id: ''
 		},
 		savePaper
 	}: Props = $props();

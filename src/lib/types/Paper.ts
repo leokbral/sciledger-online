@@ -1,6 +1,8 @@
+import type { Hub } from "./Hub";
 import type { User } from "./User";
 
 export type Paper = {
+    _id: string; // ID interno do MongoDB
     id: string; // ID único gerado para o paper
     mainAuthor: User; // Autor principal como UUID
     correspondingAuthor: User; // Autor correspondente como UUID
@@ -43,6 +45,6 @@ export type Paper = {
     createdAt: Date;
     updatedAt: Date;
     submittedBy: User; // Campo adicionado para quem submeteu o paper
-    hubId?: string | null;
+    hubId?: string | Hub| null;
     isLinkedToHub?: boolean
 }

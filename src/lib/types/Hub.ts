@@ -1,7 +1,9 @@
+import type { User } from './User';
+
 export type Hub = {
     _id: string;
     id: string;
-    createdBy: string;
+    createdBy: User;
     title: string;
     type: 'Conference' | 'Journal' | 'Working Group';
     description: string;

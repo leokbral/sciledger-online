@@ -3,7 +3,9 @@
 	import { AppBar, Navigation, Tabs } from '@skeletonlabs/skeleton-svelte';
 	import Nav from '$lib/Nav.svelte';
 	import type { PageData } from './$types';
-
+	import { Toaster } from '@skeletonlabs/skeleton-svelte';
+	import { toaster } from '$lib/toaster-svelte';
+	
 	interface Props {
 		data: PageData;
 		children?: import('svelte').Snippet;
@@ -136,6 +138,7 @@
 	<!-- Footer -->
 	<footer class="bg-blue-500 p-4">(footer)</footer>
 </div>
+<Toaster {toaster} />
 
 <!-- <AppShell>
 	{#snippet header()}

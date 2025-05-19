@@ -50,7 +50,7 @@
 		editedInstitution = user?.institution || '';
 
 		if (user) {
-			publications = user.papers.filter((paper) => paper.status === 'published') || [];
+			publications = user.papers.filter((paper: { status: string; }) => paper.status === 'published') || [];
 			interestAreas = user.performanceReviews?.expertise || [];
 			contactInfo = user.email || '';
 			profilePictureUrl = user.profilePictureUrl || '';

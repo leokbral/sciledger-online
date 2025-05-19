@@ -130,7 +130,7 @@
 	/>
 
 	<h4 class="h4 font-bold">{paper.title}</h4>
-	<p>{paper.abstract}</p>
+	<p>{@html paper.abstract}</p>
 	<div class="flex justify-between my-3">
 		<span class="text-xs"
 			><a data-sveltekit-reload href="/articles/{paper.id}" class="flex flex-col gap-2"

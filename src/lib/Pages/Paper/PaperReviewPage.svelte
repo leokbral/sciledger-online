@@ -128,7 +128,7 @@
 		messageFeed,
 		paper,
 		editable = false,
-		currentUser = user1
+		// currentUser = user1
 	}: Props = $props();
 	// console.log('current', currentUser);
 	// console.log('Reviewers', paper.reviewers);
@@ -205,4 +205,8 @@
 	on:saveDraft={hdlSaveDraft}
 	on:submitReview={hdlSubmitReview}
 ></ReviewForms> -->
-<ReviewForms paperTitle={paper.title} />
+<!-- <ReviewForms paperTitle={paper.title} /> -->
+
+{#if page.url.pathname.startsWith('/review/inreview/')}
+    <ReviewForms paperTitle={paper.title} />
+{/if}
