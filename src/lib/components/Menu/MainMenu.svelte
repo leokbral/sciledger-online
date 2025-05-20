@@ -3,10 +3,14 @@
 	import MobileMainMenu from './Mobile/MobileMainMenu.svelte';
 	import type { Menuitem } from './types';
 
-	export let items: Menuitem[];
-	export let selected: number;
+	interface Props {
+		items: Menuitem[];
+		selected: number;
+	}
 
-	let innerWidth: number;
+	let { items, selected }: Props = $props();
+
+	let innerWidth: number = $state();
 </script>
 
 <svelte:window bind:innerWidth />

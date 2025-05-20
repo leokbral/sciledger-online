@@ -12,7 +12,7 @@ export const messageFeedSchema: Schema = new Schema({
         message: { type: String, required: true }, // Conteúdo da mensagem
         isRead: { type: Boolean, default: false }, // Indica se a mensagem foi lida
         timestamp: { type: String, default: () => new Date().toLocaleString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true }) }, // Timestamp formatado
-        color: { type: String, default: 'variant-soft-primary' } // Cor da mensagem (exemplo de valor padrão)
+        color: { type: String, default: 'preset-tonal-primary' } // Cor da mensagem (exemplo de valor padrão)
         // color: { type: String, required: true }
     }]
 });

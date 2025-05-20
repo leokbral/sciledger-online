@@ -5,14 +5,18 @@
 	//import { userProfiles } from '../../UserProfile';
 	//import Publisher from './Publisher.svelte';
 
-	export let data;
+	interface Props {
+		data: any;
+	}
+
+	let { data }: Props = $props();
 	let userProfiles = data.users;
 	//let articleComponent: PaperPublishPage;
 
-	async function hdlSavePaper(event: { detail: { store: any } }) {
-		console.log(event.detail.store);
+	async function savePaper( store: any) {
+		console.log(store);
 
-		const paper = event.detail.store;
+		const paper = store;
 		console.log(paper)
 		try {
 			const response = await post(`/publish/new`, paper);
@@ -29,6 +33,7 @@
 		}
 	}
 </script>
+
 
 <!-- <Publisher
 	article={{
@@ -50,7 +55,6 @@
 	errors={''}
 /> -->
 
-<PaperPublishPage on:savePaper={hdlSavePaper} author={data.user} authorsOptions={userProfiles} />
 <!-- <PaperPublishPage
 	article={{
 		title: '',
@@ -77,3 +81,7 @@
 	bind:this={articleComponent}
 	authorsOptions={userProfiles}
 /> -->
+
+
+<PaperPublishPage  author={data.user} authorsOptions={userProfiles} {savePaper}/>
+<!-- <PaperPublishPage on:savePaper={hdlSavePaper} author={data.user} authorsOptions={userProfiles} /> -->

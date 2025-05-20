@@ -1,9 +1,9 @@
 <script>
 	import { enhance } from '$app/forms';
 
-	export let paper;
 	//console.log('EH NOIX AQUI', article);
-	export let user;
+	/** @type {{paper: any, user: any}} */
+	let { paper, user } = $props();
 </script>
 
 <div class="article-meta">
@@ -23,12 +23,12 @@
 	{#if paper.mainAuthor.name === user?.name}
 		<span>
 			<a href="/editor/{paper.slug}" class="btn btn-outline-secondary btn-sm">
-				<i class="ion-edit" /> Edit Article
+				<i class="ion-edit"></i> Edit Article
 			</a>
 
 			<form use:enhance method="POST" action="?/deleteArticle">
 				<button class="btn btn-outline-danger btn-sm">
-					<i class="ion-trash-a" /> Delete Article
+					<i class="ion-trash-a"></i> Delete Article
 				</button>
 			</form>
 		</span>

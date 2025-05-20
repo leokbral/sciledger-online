@@ -6,33 +6,61 @@
 	import type { PaperPublishStoreData } from '$lib/types/PaperPublishStoreData';
 	import type { PageData } from './$types';
 
-	export let data: PageData;
+	interface Props {
+		data: PageData;
+	}
+
+	let { data }: Props = $props();
 
 	let paper: Paper | null = data.paper;
 	//console.log("www",paper?.authors)
 	let userProfiles = data.users; // Ajuste conforme necessário
 
-	let inicialValue: PaperPublishStoreData;
+	let inicialValue: PaperPublishStoreData = $state({
+		...paper,
+		// authors: [paper.mainAuthor, ...paper.coAuthors],
+		mainAuthor: paper?.mainAuthor
+	} as PaperPublishStoreData);
+	// if (paper) {
+	// 	inicialValue = {
+	// 		...paper,
+	// 		// authors: [paper.mainAuthor, ...paper.coAuthors],
+	// 		mainAuthor: paper.mainAuthor
+	// 	};
+	// }
 
-	if (paper) {
-		inicialValue = {
-			...paper,
-			// authors: [paper.mainAuthor, ...paper.coAuthors],
-			mainAuthor: paper.mainAuthor
+	async function savePaper(store: any) {
+		// Check required fields
+		const requiredFields = {
+			title: 'Title',
+			abstract: 'Abstract',
+			mainAuthor: 'Main Author',
+			correspondingAuthor: 'Corresponding Author',
+			keywords: 'Keywords',
+			pdfUrl: 'PDF URL'
 		};
-	}
 
-	async function handleSavePaper(event: { detail: { store: Paper } }) {
-		console.log('Updated Paper Data:', event.detail.store);
+		const missingFields = Object.entries(requiredFields)
+			.filter(([key]) => !store[key])
+			.map(([, label]) => label);
 
-		const updatedPaper = event.detail.store;
-		console.log('Saving Updated Paper:', updatedPaper);
+		if (missingFields.length > 0) {
+			alert(`Please fill in all required fields: ${missingFields.join(', ')}`);
+			return;
+		}
+
+		// const updatedPaper = {
+		// 	...store,
+		// 	status: 'under negotiation'
+		// };
+
+		// console.log('Saving Updated Paper:', updatedPaper);
 
 		try {
-			const response = await post(`/publish/edit/${updatedPaper.id}`, updatedPaper); // Use id se for o campo correto
-			console.log(response)
+			// const response = await post(`/publish/edit/${updatedPaper.id}`, updatedPaper);
+			const response = await post(`/publish/edit/${store.id}`, store);
+			console.log(response);
 			if (response.paper) {
-				// Redireciona para a página de detalhes do artigo editado
 				goto(`/publish/`);
 			} else {
 				alert(`Issue! ${JSON.stringify(response)}`);
@@ -44,8 +72,14 @@
 	}
 </script>
 
-<PaperPublishPage
+<!-- <PaperPublishPage
 	on:savePaper={handleSavePaper}
+	{inicialValue}
+	author={data.user}
+	authorsOptions={userProfiles}
+/> -->
+<PaperPublishPage
+	{savePaper}
 	{inicialValue}
 	author={data.user}
 	authorsOptions={userProfiles}

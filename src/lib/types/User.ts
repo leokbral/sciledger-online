@@ -1,6 +1,7 @@
 import type { Paper } from "./Paper";
 
 export type User = {
+	_id: string; // ID interno do MongoDB
 	id: string; // ID único gerado para o usuário
     //name: string; // Nome do usuário
     firstName: string; 
@@ -30,6 +31,7 @@ export type User = {
     followers: User[]; // IDs dos seguidores
     following: User[]; // IDs dos usuários seguidos
     papers: Paper[]; // IDs das publicações do usuário
+    hubs?: string[]; // IDs dos hubs associados ao usuário
     createdAt: Date; // Data de criação
     updatedAt: Date; // Data de atualização
 };

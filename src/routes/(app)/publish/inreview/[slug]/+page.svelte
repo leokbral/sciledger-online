@@ -9,9 +9,13 @@
 	import { page } from '$app/stores';
 	import AvailableReviewers from '$lib/AvailableReviewers.svelte';
 	import type { User } from '$lib/types/User';
-	import { ProgressBar } from '@skeletonlabs/skeleton';
+	import { Progress } from '@skeletonlabs/skeleton-svelte';
 
-	export let data: PageData;
+	interface Props {
+		data: PageData;
+	}
+
+	let { data }: Props = $props();
 	let reviewers = data.users.filter((u: User) => u.roles.reviewer === true);
 	// State for peer review option
 	let peer_review: string = '';
@@ -76,10 +80,10 @@
 <div class="grid grid-cols-[1fr_1fr_1fr] p-5">
 	<div></div>
 	<div class="flex justify-between gap-3">
-		<button class="bg-primary-500 text-white rounded-lg px-4 py-2" on:click={hdlSaveDraft}
+		<button class="bg-primary-500 text-white rounded-lg px-4 py-2" onclick={hdlSaveDraft}
 			>Save Draft</button
 		>
-		<button class="bg-primary-500 text-white rounded-lg px-4 py-2" on:click={hdlSubmit}
+		<button class="bg-primary-500 text-white rounded-lg px-4 py-2" onclick={hdlSubmit}
 			>Submit to Review</button
 		>
 	</div>
@@ -89,13 +93,13 @@
 {#if paper}
 	<div class="container page max-w-[700px] p-4 m-auto">
 		<div>PROGRESS BAR TIME
-			<ProgressBar value={60} max={100} class="my-8" />
+			<Progress value={60} max={100} class="my-8" />
 		</div>
 
 		<div class="row">
 			<div class="col-md-9">
 				<h4 class="h4 px-4 text-primary-500 font font-semibold">In Review</h4>
-				<hr class="mt-2 mb-4 !border-t-2" />
+				<hr class="mt-2 mb-4 border-t-2!" />
 				<PaperPreview {paper} user={$page.data.user} />
 			</div>
 		</div>

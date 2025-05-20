@@ -1,11 +1,15 @@
 <script lang="ts">
-	import { FileDropzone } from '@skeletonlabs/skeleton';
+	import { FileUpload } from '@skeletonlabs/skeleton-svelte';
 	import type { PageData } from './$types';
 
-	export let data: PageData;
+	interface Props {
+		data: PageData;
+	}
+
+	let { data }: Props = $props();
 	const pdfs = data.pdfs;
 
-	let files: FileList;
+	let files: FileList = $state();
 
 	async function onChangeHandler(event: any): Promise<void> {
 		const file = event.target?.files[0];
@@ -45,25 +49,25 @@
 	}
 </script>
 
-<div class="m-auto card !bg-black text-surface-100 card-hover md:w-1/2">
+<div class="m-auto card bg-black! text-surface-100 card-hover md:w-1/2">
 	<header>
-		<!-- <img src={imageUrl || ''} class="bg-black/50 w-full aspect-[21/9]" alt="Post" /> -->
+		<!-- <img src={imageUrl || ''} class="bg-black/50 w-full aspect-21/9" alt="Post" /> -->
 		<div>
-			<FileDropzone name="files" bind:files on:change={onChangeHandler}>
-				<svelte:fragment slot="message"
-					><span class="font-bold text-surface-800-100-token">Selecione um pdf</span
-					></svelte:fragment
-				>
-				<svelte:fragment slot="meta"
-					><span class="text-surface-800-100-token">Ou solte os arquivos aqui</span
-					></svelte:fragment
-				>
-			</FileDropzone>
+			<FileUpload name="files" bind:files on:change={onChangeHandler}>
+				{#snippet message()}
+								<span class="font-bold text-surface-900-100">Selecione um pdf</span
+						>
+							{/snippet}
+				{#snippet meta()}
+								<span class="text-surface-900-100">Ou solte os arquivos aqui</span
+						>
+							{/snippet}
+			</FileUpload>
 		</div>
 	</header>
 </div>
 
-<button class="btn variant-filled-primary" on:click={uploadFile}>Upload</button>
+<button class="btn preset-filled-primary-500" onclick={uploadFile}>Upload</button>
 
 <div>
 	<h1 class="h1">OS PDFS</h1>

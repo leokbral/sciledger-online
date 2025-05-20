@@ -1,5 +1,5 @@
 <script>
-	import '/src/app.postcss';
+	import '/src/app.css';
 </script>
 
 <div class="main-container">

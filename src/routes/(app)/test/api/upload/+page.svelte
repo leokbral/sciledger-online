@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { FileDropzone } from '@skeletonlabs/skeleton';
+	import { FileUpload } from '@skeletonlabs/skeleton-svelte';
 
 	let file: File | null = null;
-	let files: FileList;
+	let files: FileList = $state();
 
 	const handleFileChange = (event: Event) => {
 		const target = event.target as HTMLInputElement;
@@ -41,8 +41,8 @@
 	};
 </script>
 
-<input type="file" accept=".pdf" on:change={handleFileChange} />
+<input type="file" accept=".pdf" onchange={handleFileChange} />
 
 
-<FileDropzone name="files" bind:files on:change={onChangeHandler}>Upload</FileDropzone>
-<button class="btn variant-filled-primary" on:click={uploadFile}>Upload</button>
+<FileUpload name="files" bind:files on:change={onChangeHandler}>Upload</FileUpload>
+<button class="btn preset-filled-primary-500" onclick={uploadFile}>Upload</button>

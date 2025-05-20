@@ -10,7 +10,8 @@ export async function load({ locals }) {
 
     const fetchUsers = async () => {
         const users = await Users.find({}, { _id: 0 }).lean().exec();
-        return users;
+        console.log('users');
+		return users;
     };
 
     return {

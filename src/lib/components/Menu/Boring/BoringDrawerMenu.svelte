@@ -1,7 +1,11 @@
 <script lang="ts">
 	import { createEventDispatcher } from 'svelte';
 
-	export let item: any = {};
+	interface Props {
+		item?: any;
+	}
+
+	let { item = {} }: Props = $props();
 
 	const dispatch = createEventDispatcher();
 
@@ -10,7 +14,7 @@
 	}
 </script>
 
-<div class="z-[10] card !bg-transparent text-xl flex flex-col gap-5">
+<div class="z-10 card bg-transparent! text-xl flex flex-col gap-5">
 	<!-- <header class="card-header flex justify-end">
 		<button id="will-close" type="button" class="btn-icon">
 			<img
@@ -33,16 +37,16 @@
 	<footer class="card-footer p-4 flex justify-center items-center space-x-4">
 		{#if item.notReady}
 			<button
-				on:click={hdlSelected}
-				class="px-8 py-3 m-1 text-xl chip variant-filled-primary hover:bg-primary-800"
+				onclick={hdlSelected}
+				class="px-8 py-3 m-1 text-xl chip preset-filled-primary-500 hover:bg-primary-800"
 			>
 				Em breve...
 			</button>
 		{:else}
 			<a href="/{item.name}">
 				<button
-					on:click={hdlSelected}
-					class="px-8 py-3 m-1 text-xl chip variant-filled-primary hover:bg-primary-800"
+					onclick={hdlSelected}
+					class="px-8 py-3 m-1 text-xl chip preset-filled-primary-500 hover:bg-primary-800"
 				>
 					Iniciar
 					<img

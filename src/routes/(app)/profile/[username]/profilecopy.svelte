@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { TabGroup, Tab, TabAnchor } from '@skeletonlabs/skeleton';
+	import { Tab, Tabs } from '@skeletonlabs/skeleton-svelte';
 	import MyPapers from '$lib/MyPapers.svelte';
 	import AuthorDashboard from '$lib/AuthorDashboard.svelte';
 	import ReviewerDashboard from '$lib/ReviewDashboard.svelte';
@@ -9,12 +9,12 @@
 
 	let tabSet: number = 0;
 	let maxBioLength = 1000;
-	let user = userProfiles[0];
-	let isEditing = false;
-	let editedBio = user.bio;
-	let editedTitle = user.title;
-	let editedInstitution = user.institution;
-	let profilePicture = user.profilePicture;
+	let user = $state(userProfiles[0]);
+	let isEditing = $state(false);
+	let editedBio = $state(user.bio);
+	let editedTitle = $state(user.title);
+	let editedInstitution = $state(user.institution);
+	let profilePicture = $state(user.profilePicture);
 	let imageSize = 100; // Tamanho inicial da imagem em pixels
 	let imagePositionX = 0;
 	let imagePositionY = 0;
@@ -119,20 +119,20 @@
 <section>
 	<div class="p-6 mx-32 bg-surface-100-50-token min-h-screen">
 		<!-- container page max-w-[700px] p-4 m-auto -->
-		<div class="p-4 shadow rounded mb-6">
+		<div class="p-4 shadow-sm rounded-sm mb-6">
 			<!-- Edit Button -->
 			<div class="mt-4 flex justify-end">
 				{#if isEditing}
-					<button class="bg-surface-500 text-white p-2 rounded-full mr-2" on:click={toggleEdit}>
+					<button class="bg-surface-500 text-white p-2 rounded-full mr-2" onclick={toggleEdit}>
 						Cancel
 					</button>
-					<button class="bg-primary-500 text-white p-2 rounded-full" on:click={saveProfile}>
+					<button class="bg-primary-500 text-white p-2 rounded-full" onclick={saveProfile}>
 						Save
 					</button>
 				{:else}
 					<button
 						class="bg-primary-500 text-white p-2 rounded-full flex items-center"
-						on:click={toggleEdit}
+						onclick={toggleEdit}
 					>
 						Edit profile
 						<!-- <Icon icon="material-symbols-light:edit-outline" class="ml-2" /> -->
@@ -168,12 +168,12 @@
 							<input
 								type="text"
 								bind:value={editedTitle}
-								class="mt-2 p-2 text-surface-900 border rounded w-full"
+								class="mt-2 p-2 text-surface-900 border rounded-sm w-full"
 							/>
 							<input
 								type="text"
 								bind:value={editedInstitution}
-								class="mt-2 p-2 text-surface-900 border rounded w-full"
+								class="mt-2 p-2 text-surface-900 border rounded-sm w-full"
 							/>
 						{:else}
 							{user.title} at {user.institution}
@@ -199,7 +199,7 @@
 					<h2 class="text-xl font-semibold">About</h2>
 					{#if isEditing}
 						<textarea
-							class="mt-2 p-2 text-surface-900 border rounded w-full"
+							class="mt-2 p-2 text-surface-900 border rounded-sm w-full"
 							bind:value={editedBio}
 							maxlength={maxBioLength}
 						></textarea>

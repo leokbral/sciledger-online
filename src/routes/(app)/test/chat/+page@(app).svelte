@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { faker } from '@faker-js/faker';
 	import { onMount } from 'svelte';
-	import { Avatar } from '@skeletonlabs/skeleton';
+	import { Avatar } from '@skeletonlabs/skeleton-svelte';
 
 	// Types
 
@@ -15,11 +15,11 @@
 		color: string;
 	}
 
-	let elemChat: HTMLElement;
+	let elemChat: HTMLElement = $state();
 	const lorem = faker.lorem.paragraph();
 
 	// Messages
-	let messageFeed: MessageFeed[] = [
+	let messageFeed: MessageFeed[] = $state([
 		{
 			id: 0,
 			host: true,
@@ -27,7 +27,7 @@
 			name: 'Jane',
 			timestamp: 'Yesterday @ 2:30pm',
 			message: lorem,
-			color: 'variant-soft-primary'
+			color: 'preset-tonal-primary'
 		},
 		{
 			id: 1,
@@ -36,7 +36,7 @@
 			name: 'Michael',
 			timestamp: 'Yesterday @ 2:45pm',
 			message: lorem,
-			color: 'variant-soft-primary'
+			color: 'preset-tonal-primary'
 		},
 		{
 			id: 2,
@@ -45,7 +45,7 @@
 			name: 'Jane',
 			timestamp: 'Yesterday @ 2:50pm',
 			message: lorem,
-			color: 'variant-soft-primary'
+			color: 'preset-tonal-primary'
 		},
 		{
 			id: 3,
@@ -54,11 +54,11 @@
 			name: 'Michael',
 			timestamp: 'Yesterday @ 2:52pm',
 			message: lorem,
-			color: 'variant-soft-primary'
+			color: 'preset-tonal-primary'
 		}
-	];
+	]);
 	let currentMessage = '';
-	let tempMessage = '';
+	let tempMessage = $state('');
 
 	// For some reason, eslint thinks ScrollBehavior is undefined...
 	// eslint-disable-next-line no-undef
@@ -78,7 +78,7 @@
 			name: 'Jane',
 			timestamp: `Today @ ${getCurrentTimestamp()}`,
 			message: currentMessage,
-			color: 'variant-soft-primary'
+			color: 'preset-tonal-primary'
 		};
 		// Update the message feed
 		messageFeed = [...messageFeed, newMessage];
@@ -110,7 +110,7 @@
 					{#if bubble.host === true}
 						<div class="grid grid-cols-[auto_1fr] gap-2">
 							<Avatar src="https://i.pravatar.cc/?img={bubble.avatar}" width="w-12" />
-							<div class="card p-4 variant-soft rounded-tl-none space-y-2">
+							<div class="card p-4 preset-tonal rounded-tl-none space-y-2">
 								<header class="flex justify-between items-center">
 									<p class="font-bold">{bubble.name}</p>
 									<small class="opacity-50">{bubble.timestamp}</small>

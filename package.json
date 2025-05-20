@@ -17,32 +17,31 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.28.1",
-    "@skeletonlabs/skeleton": "2.11.0",
-    "@skeletonlabs/tw-plugin": "0.4.1",
+    "@skeletonlabs/skeleton": "^3.1.3",
+    "@skeletonlabs/skeleton-svelte": "^1.2.1",
     "@sveltejs/adapter-auto": "^3.0.0",
-    "@sveltejs/kit": "^2.0.0",
-    "@sveltejs/vite-plugin-svelte": "^3.0.0",
+    "@sveltejs/kit": "^2.12.0",
+    "@sveltejs/vite-plugin-svelte": "^4.0.0",
     "@tailwindcss/forms": "^0.5.10",
     "@tailwindcss/typography": "^0.5.16",
     "@types/eslint": "^8.56.0",
     "@types/node": "22.13.5",
-    "@types/pdfjs-dist": "^2.10.378",
+    "@types/pdfjs-dist": "^2.10.377",
+    "@types/sanitize-html": "^2.15.0",
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
     "autoprefixer": "10.4.20",
     "eslint": "^8.56.0",
     "eslint-config-prettier": "^9.1.0",
-    "eslint-plugin-svelte": "^2.35.1",
-    "postcss": "8.5.3",
+    "eslint-plugin-svelte": "^2.45.1",
     "prettier": "^3.1.1",
-    "prettier-plugin-svelte": "^3.1.2",
-    "svelte": "^4.2.7",
-    "svelte-check": "^3.6.0",
-    "tailwindcss": "^3.4.17",
+    "prettier-plugin-svelte": "^3.2.6",
+    "svelte": "^5.0.0",
+    "svelte-check": "^4.0.0",
+    "tailwindcss": "^4.0.0",
     "tslib": "^2.4.1",
-    "typescript": "^5.0.0",
-    "vite": "^5.0.3",
-    "vite-plugin-tailwind-purgecss": "0.3.5",
+    "typescript": "^5.5.0",
+    "vite": "^5.4.4",
     "vitest": "^1.2.0"
   },
   "type": "module",
@@ -50,10 +49,752 @@
     "@faker-js/faker": "^8.4.1",
     "@floating-ui/dom": "1.6.13",
     "@iconify/svelte": "^4.0.2",
+    "@lucide/svelte": "^0.487.0",
+    "@tailwindcss/vite": "^4.0.13",
     "dotenv": "^16.4.5",
     "highlight.js": "11.11.1",
+    "lucide-svelte": "^0.487.0",
+    "mammoth": "^1.9.0",
     "mongodb": "^6.13.1",
     "mongoose": "^6.0.13",
-    "quill": "^2.0.3"
+    "quill": "^2.0.3",
+    "sanitize-html": "^2.15.0"
+  },
+  "exports": {
+    "./package.json": "./package.json",
+    "./api": {
+      "types": "./package/api/index.d.ts",
+      "svelte": "./package/api/index.js",
+      "default": "./package/api/index.js"
+    },
+    "./AuthorDashboard.svelte": {
+      "types": "./package/AuthorDashboard.svelte.d.ts",
+      "svelte": "./package/AuthorDashboard.svelte",
+      "default": "./package/AuthorDashboard.svelte"
+    },
+    "./AvailableReviewers.svelte": {
+      "types": "./package/AvailableReviewers.svelte.d.ts",
+      "svelte": "./package/AvailableReviewers.svelte",
+      "default": "./package/AvailableReviewers.svelte"
+    },
+    "./components/coisasparaorganizar/userprofile": {
+      "types": "./package/components/coisasparaorganizar/userprofile.d.ts",
+      "default": "./package/components/coisasparaorganizar/userprofile.js"
+    },
+    "./components/Dashboard/DashboadButton.svelte": {
+      "types": "./package/components/Dashboard/DashboadButton.svelte.d.ts",
+      "svelte": "./package/components/Dashboard/DashboadButton.svelte",
+      "default": "./package/components/Dashboard/DashboadButton.svelte"
+    },
+    "./components/Dashboard/DashboardItem.svelte": {
+      "types": "./package/components/Dashboard/DashboardItem.svelte.d.ts",
+      "svelte": "./package/components/Dashboard/DashboardItem.svelte",
+      "default": "./package/components/Dashboard/DashboardItem.svelte"
+    },
+    "./components/DocsPreview/DocsPreview.svelte": {
+      "types": "./package/components/DocsPreview/DocsPreview.svelte.d.ts",
+      "svelte": "./package/components/DocsPreview/DocsPreview.svelte",
+      "default": "./package/components/DocsPreview/DocsPreview.svelte"
+    },
+    "./components/DocsPreview/options": {
+      "types": "./package/components/DocsPreview/options.d.ts",
+      "default": "./package/components/DocsPreview/options.js"
+    },
+    "./components/FeedbackCard.svelte": {
+      "types": "./package/components/FeedbackCard.svelte.d.ts",
+      "svelte": "./package/components/FeedbackCard.svelte",
+      "default": "./package/components/FeedbackCard.svelte"
+    },
+    "./components/hope/Abstract.svelte": {
+      "types": "./package/components/hope/Abstract.svelte.d.ts",
+      "svelte": "./package/components/hope/Abstract.svelte",
+      "default": "./package/components/hope/Abstract.svelte"
+    },
+    "./components/Menu/AppbarMenuPopup.svelte": {
+      "types": "./package/components/Menu/AppbarMenuPopup.svelte.d.ts",
+      "svelte": "./package/components/Menu/AppbarMenuPopup.svelte",
+      "default": "./package/components/Menu/AppbarMenuPopup.svelte"
+    },
+    "./components/Menu/Boring/BoringDrawerMenu.svelte": {
+      "types": "./package/components/Menu/Boring/BoringDrawerMenu.svelte.d.ts",
+      "svelte": "./package/components/Menu/Boring/BoringDrawerMenu.svelte",
+      "default": "./package/components/Menu/Boring/BoringDrawerMenu.svelte"
+    },
+    "./components/Menu/Boring/BoringMainMenu.svelte": {
+      "types": "./package/components/Menu/Boring/BoringMainMenu.svelte.d.ts",
+      "svelte": "./package/components/Menu/Boring/BoringMainMenu.svelte",
+      "default": "./package/components/Menu/Boring/BoringMainMenu.svelte"
+    },
+    "./components/Menu/Boring/BoringMenuPopUp.svelte": {
+      "types": "./package/components/Menu/Boring/BoringMenuPopUp.svelte.d.ts",
+      "svelte": "./package/components/Menu/Boring/BoringMenuPopUp.svelte",
+      "default": "./package/components/Menu/Boring/BoringMenuPopUp.svelte"
+    },
+    "./components/Menu/Desktop/DesktopMainMenu.svelte": {
+      "types": "./package/components/Menu/Desktop/DesktopMainMenu.svelte.d.ts",
+      "svelte": "./package/components/Menu/Desktop/DesktopMainMenu.svelte",
+      "default": "./package/components/Menu/Desktop/DesktopMainMenu.svelte"
+    },
+    "./components/Menu/MainMenu.svelte": {
+      "types": "./package/components/Menu/MainMenu.svelte.d.ts",
+      "svelte": "./package/components/Menu/MainMenu.svelte",
+      "default": "./package/components/Menu/MainMenu.svelte"
+    },
+    "./components/Menu/MenuHighlights.svelte": {
+      "types": "./package/components/Menu/MenuHighlights.svelte.d.ts",
+      "svelte": "./package/components/Menu/MenuHighlights.svelte",
+      "default": "./package/components/Menu/MenuHighlights.svelte"
+    },
+    "./components/Menu/MenuItemCard.svelte": {
+      "types": "./package/components/Menu/MenuItemCard.svelte.d.ts",
+      "svelte": "./package/components/Menu/MenuItemCard.svelte",
+      "default": "./package/components/Menu/MenuItemCard.svelte"
+    },
+    "./components/Menu/MenuPopupButton.svelte": {
+      "types": "./package/components/Menu/MenuPopupButton.svelte.d.ts",
+      "svelte": "./package/components/Menu/MenuPopupButton.svelte",
+      "default": "./package/components/Menu/MenuPopupButton.svelte"
+    },
+    "./components/Menu/Mobile/goButtonBackup.svelte": {
+      "types": "./package/components/Menu/Mobile/goButtonBackup.svelte.d.ts",
+      "svelte": "./package/components/Menu/Mobile/goButtonBackup.svelte",
+      "default": "./package/components/Menu/Mobile/goButtonBackup.svelte"
+    },
+    "./components/Menu/Mobile/MobileMainMenu.svelte": {
+      "types": "./package/components/Menu/Mobile/MobileMainMenu.svelte.d.ts",
+      "svelte": "./package/components/Menu/Mobile/MobileMainMenu.svelte",
+      "default": "./package/components/Menu/Mobile/MobileMainMenu.svelte"
+    },
+    "./components/Menu/Mobile/MobileMenuItemCard.svelte": {
+      "types": "./package/components/Menu/Mobile/MobileMenuItemCard.svelte.d.ts",
+      "svelte": "./package/components/Menu/Mobile/MobileMenuItemCard.svelte",
+      "default": "./package/components/Menu/Mobile/MobileMenuItemCard.svelte"
+    },
+    "./components/Menu/Mobile/MobileMenuScrollContainer.svelte": {
+      "types": "./package/components/Menu/Mobile/MobileMenuScrollContainer.svelte.d.ts",
+      "svelte": "./package/components/Menu/Mobile/MobileMenuScrollContainer.svelte",
+      "default": "./package/components/Menu/Mobile/MobileMenuScrollContainer.svelte"
+    },
+    "./components/Menu/types": {
+      "types": "./package/components/Menu/types.d.ts",
+      "default": "./package/components/Menu/types.js"
+    },
+    "./components/Modals/ModalAbstract.svelte": {
+      "types": "./package/components/Modals/ModalAbstract.svelte.d.ts",
+      "svelte": "./package/components/Modals/ModalAbstract.svelte",
+      "default": "./package/components/Modals/ModalAbstract.svelte"
+    },
+    "./components/Modals/ModalFullscreen.svelte": {
+      "types": "./package/components/Modals/ModalFullscreen.svelte.d.ts",
+      "svelte": "./package/components/Modals/ModalFullscreen.svelte",
+      "default": "./package/components/Modals/ModalFullscreen.svelte"
+    },
+    "./components/Navigation/MobileNavigation.svelte": {
+      "types": "./package/components/Navigation/MobileNavigation.svelte.d.ts",
+      "svelte": "./package/components/Navigation/MobileNavigation.svelte",
+      "default": "./package/components/Navigation/MobileNavigation.svelte"
+    },
+    "./components/Navigation/Navigation.svelte": {
+      "types": "./package/components/Navigation/Navigation.svelte.d.ts",
+      "svelte": "./package/components/Navigation/Navigation.svelte",
+      "default": "./package/components/Navigation/Navigation.svelte"
+    },
+    "./components/PapersImages.svelte": {
+      "types": "./package/components/PapersImages.svelte.d.ts",
+      "svelte": "./package/components/PapersImages.svelte",
+      "default": "./package/components/PapersImages.svelte"
+    },
+    "./components/Profile/Profile.svelte": {
+      "types": "./package/components/Profile/Profile.svelte.d.ts",
+      "svelte": "./package/components/Profile/Profile.svelte",
+      "default": "./package/components/Profile/Profile.svelte"
+    },
+    "./components/review/ReviewChat.svelte": {
+      "types": "./package/components/review/ReviewChat.svelte.d.ts",
+      "svelte": "./package/components/review/ReviewChat.svelte",
+      "default": "./package/components/review/ReviewChat.svelte"
+    },
+    "./components/SpinInput.svelte": {
+      "types": "./package/components/SpinInput.svelte.d.ts",
+      "svelte": "./package/components/SpinInput.svelte",
+      "default": "./package/components/SpinInput.svelte"
+    },
+    "./components/Splash.svelte": {
+      "types": "./package/components/Splash.svelte.d.ts",
+      "svelte": "./package/components/Splash.svelte",
+      "default": "./package/components/Splash.svelte"
+    },
+    "./components/Text/RichTextEditor.svelte": {
+      "types": "./package/components/Text/RichTextEditor.svelte.d.ts",
+      "svelte": "./package/components/Text/RichTextEditor.svelte",
+      "default": "./package/components/Text/RichTextEditor.svelte"
+    },
+    "./constants": {
+      "types": "./package/constants.d.ts",
+      "default": "./package/constants.js"
+    },
+    "./db/fs": {
+      "types": "./package/db/fs.d.ts",
+      "default": "./package/db/fs.js"
+    },
+    "./db/mncs": {
+      "types": "./package/db/mncs.d.ts",
+      "default": "./package/db/mncs.js"
+    },
+    "./db/models/Comment": {
+      "types": "./package/db/models/Comment.d.ts",
+      "default": "./package/db/models/Comment.js"
+    },
+    "./db/models/Connection": {
+      "types": "./package/db/models/Connection.d.ts",
+      "default": "./package/db/models/Connection.js"
+    },
+    "./db/models/Like": {
+      "types": "./package/db/models/Like.d.ts",
+      "default": "./package/db/models/Like.js"
+    },
+    "./db/models/MessageFeed": {
+      "types": "./package/db/models/MessageFeed.d.ts",
+      "default": "./package/db/models/MessageFeed.js"
+    },
+    "./db/models/Notification": {
+      "types": "./package/db/models/Notification.d.ts",
+      "default": "./package/db/models/Notification.js"
+    },
+    "./db/models/Paper": {
+      "types": "./package/db/models/Paper.d.ts",
+      "default": "./package/db/models/Paper.js"
+    },
+    "./db/models/Review": {
+      "types": "./package/db/models/Review.d.ts",
+      "default": "./package/db/models/Review.js"
+    },
+    "./db/models/ReviewQueue": {
+      "types": "./package/db/models/ReviewQueue.d.ts",
+      "default": "./package/db/models/ReviewQueue.js"
+    },
+    "./db/models/Tag": {
+      "types": "./package/db/models/Tag.d.ts",
+      "default": "./package/db/models/Tag.js"
+    },
+    "./db/models/User": {
+      "types": "./package/db/models/User.d.ts",
+      "default": "./package/db/models/User.js"
+    },
+    "./db/mongo": {
+      "types": "./package/db/mongo.d.ts",
+      "default": "./package/db/mongo.js"
+    },
+    "./db/mongooseConnection": {
+      "types": "./package/db/mongooseConnection.d.ts",
+      "default": "./package/db/mongooseConnection.js"
+    },
+    "./db/pdfs": {
+      "types": "./package/db/pdfs.d.ts",
+      "default": "./package/db/pdfs.js"
+    },
+    "./db/schemas/MessageFeedSchema": {
+      "types": "./package/db/schemas/MessageFeedSchema.d.ts",
+      "default": "./package/db/schemas/MessageFeedSchema.js"
+    },
+    "./db/schemas/PaperSchema": {
+      "types": "./package/db/schemas/PaperSchema.d.ts",
+      "default": "./package/db/schemas/PaperSchema.js"
+    },
+    "./db/schemas/ReviewQueue": {
+      "types": "./package/db/schemas/ReviewQueue.d.ts",
+      "default": "./package/db/schemas/ReviewQueue.js"
+    },
+    "./db/schemas/ReviewSchema": {
+      "types": "./package/db/schemas/ReviewSchema.d.ts",
+      "default": "./package/db/schemas/ReviewSchema.js"
+    },
+    "./db/schemas/tempschema/PaperSchema": {
+      "types": "./package/db/schemas/tempschema/PaperSchema.d.ts",
+      "default": "./package/db/schemas/tempschema/PaperSchema.js"
+    },
+    "./db/schemas/tempschema/ReviewSchema": {
+      "types": "./package/db/schemas/tempschema/ReviewSchema.d.ts",
+      "default": "./package/db/schemas/tempschema/ReviewSchema.js"
+    },
+    "./db/schemas/UserSchema": {
+      "types": "./package/db/schemas/UserSchema.d.ts",
+      "default": "./package/db/schemas/UserSchema.js"
+    },
+    ".": {
+      "types": "./package/index.d.ts",
+      "svelte": "./package/index.js",
+      "default": "./package/index.js"
+    },
+    "./layouts/DocsShell/defaults": {
+      "types": "./package/layouts/DocsShell/defaults.d.ts",
+      "default": "./package/layouts/DocsShell/defaults.js"
+    },
+    "./layouts/DocsShell/DocsShell.svelte": {
+      "types": "./package/layouts/DocsShell/DocsShell.svelte.d.ts",
+      "svelte": "./package/layouts/DocsShell/DocsShell.svelte",
+      "default": "./package/layouts/DocsShell/DocsShell.svelte"
+    },
+    "./layouts/DocsShell/partials/Header.svelte": {
+      "types": "./package/layouts/DocsShell/partials/Header.svelte.d.ts",
+      "svelte": "./package/layouts/DocsShell/partials/Header.svelte",
+      "default": "./package/layouts/DocsShell/partials/Header.svelte"
+    },
+    "./layouts/DocsShell/partials/PanelClasses.svelte": {
+      "types": "./package/layouts/DocsShell/partials/PanelClasses.svelte.d.ts",
+      "svelte": "./package/layouts/DocsShell/partials/PanelClasses.svelte",
+      "default": "./package/layouts/DocsShell/partials/PanelClasses.svelte"
+    },
+    "./layouts/DocsShell/partials/PanelEvents.svelte": {
+      "types": "./package/layouts/DocsShell/partials/PanelEvents.svelte.d.ts",
+      "svelte": "./package/layouts/DocsShell/partials/PanelEvents.svelte",
+      "default": "./package/layouts/DocsShell/partials/PanelEvents.svelte"
+    },
+    "./layouts/DocsShell/partials/PanelKeyboard.svelte": {
+      "types": "./package/layouts/DocsShell/partials/PanelKeyboard.svelte.d.ts",
+      "svelte": "./package/layouts/DocsShell/partials/PanelKeyboard.svelte",
+      "default": "./package/layouts/DocsShell/partials/PanelKeyboard.svelte"
+    },
+    "./layouts/DocsShell/partials/PanelParams.svelte": {
+      "types": "./package/layouts/DocsShell/partials/PanelParams.svelte.d.ts",
+      "svelte": "./package/layouts/DocsShell/partials/PanelParams.svelte",
+      "default": "./package/layouts/DocsShell/partials/PanelParams.svelte"
+    },
+    "./layouts/DocsShell/partials/PanelProps.svelte": {
+      "types": "./package/layouts/DocsShell/partials/PanelProps.svelte.d.ts",
+      "svelte": "./package/layouts/DocsShell/partials/PanelProps.svelte",
+      "default": "./package/layouts/DocsShell/partials/PanelProps.svelte"
+    },
+    "./layouts/DocsShell/partials/PanelSlots.svelte": {
+      "types": "./package/layouts/DocsShell/partials/PanelSlots.svelte.d.ts",
+      "svelte": "./package/layouts/DocsShell/partials/PanelSlots.svelte",
+      "default": "./package/layouts/DocsShell/partials/PanelSlots.svelte"
+    },
+    "./layouts/DocsShell/sveldMapper": {
+      "types": "./package/layouts/DocsShell/sveldMapper.d.ts",
+      "default": "./package/layouts/DocsShell/sveldMapper.js"
+    },
+    "./layouts/DocsShell/types": {
+      "types": "./package/layouts/DocsShell/types.d.ts",
+      "default": "./package/layouts/DocsShell/types.js"
+    },
+    "./layouts/LayoutPage/LayoutPage.svelte": {
+      "types": "./package/layouts/LayoutPage/LayoutPage.svelte.d.ts",
+      "svelte": "./package/layouts/LayoutPage/LayoutPage.svelte",
+      "default": "./package/layouts/LayoutPage/LayoutPage.svelte"
+    },
+    "./ListErrors.svelte": {
+      "types": "./package/ListErrors.svelte.d.ts",
+      "svelte": "./package/ListErrors.svelte",
+      "default": "./package/ListErrors.svelte"
+    },
+    "./MyPapers.svelte": {
+      "types": "./package/MyPapers.svelte.d.ts",
+      "svelte": "./package/MyPapers.svelte",
+      "default": "./package/MyPapers.svelte"
+    },
+    "./Nav.svelte": {
+      "types": "./package/Nav.svelte.d.ts",
+      "svelte": "./package/Nav.svelte",
+      "default": "./package/Nav.svelte"
+    },
+    "./Pages/config": {
+      "types": "./package/Pages/config.d.ts",
+      "default": "./package/Pages/config.js"
+    },
+    "./Pages/Paper/PaperPool.svelte": {
+      "types": "./package/Pages/Paper/PaperPool.svelte.d.ts",
+      "svelte": "./package/Pages/Paper/PaperPool.svelte",
+      "default": "./package/Pages/Paper/PaperPool.svelte"
+    },
+    "./Pages/Paper/PaperPublishPage.svelte": {
+      "types": "./package/Pages/Paper/PaperPublishPage.svelte.d.ts",
+      "svelte": "./package/Pages/Paper/PaperPublishPage.svelte",
+      "default": "./package/Pages/Paper/PaperPublishPage.svelte"
+    },
+    "./Pages/Paper/PaperReviewPage.svelte": {
+      "types": "./package/Pages/Paper/PaperReviewPage.svelte.d.ts",
+      "svelte": "./package/Pages/Paper/PaperReviewPage.svelte",
+      "default": "./package/Pages/Paper/PaperReviewPage.svelte"
+    },
+    "./Pages/Profile/ProfilePage.svelte": {
+      "types": "./package/Pages/Profile/ProfilePage.svelte.d.ts",
+      "svelte": "./package/Pages/Profile/ProfilePage.svelte",
+      "default": "./package/Pages/Profile/ProfilePage.svelte"
+    },
+    "./Pages/Publish/PublishPage.svelte": {
+      "types": "./package/Pages/Publish/PublishPage.svelte.d.ts",
+      "svelte": "./package/Pages/Publish/PublishPage.svelte",
+      "default": "./package/Pages/Publish/PublishPage.svelte"
+    },
+    "./Pages/Review/ReviewPage.svelte": {
+      "types": "./package/Pages/Review/ReviewPage.svelte.d.ts",
+      "svelte": "./package/Pages/Review/ReviewPage.svelte",
+      "default": "./package/Pages/Review/ReviewPage.svelte"
+    },
+    "./PaperList/index.svelte": {
+      "types": "./package/PaperList/index.svelte.d.ts",
+      "svelte": "./package/PaperList/index.svelte",
+      "default": "./package/PaperList/index.svelte"
+    },
+    "./PaperList/PaperPreview.svelte": {
+      "types": "./package/PaperList/PaperPreview.svelte.d.ts",
+      "svelte": "./package/PaperList/PaperPreview.svelte",
+      "default": "./package/PaperList/PaperPreview.svelte"
+    },
+    "./ReviewDashboard.svelte": {
+      "types": "./package/ReviewDashboard.svelte.d.ts",
+      "svelte": "./package/ReviewDashboard.svelte",
+      "default": "./package/ReviewDashboard.svelte"
+    },
+    "./stores/stores": {
+      "types": "./package/stores/stores.d.ts",
+      "default": "./package/stores/stores.js"
+    },
+    "./types/Author": {
+      "types": "./package/types/Author.d.ts",
+      "default": "./package/types/Author.js"
+    },
+    "./types/KnowledgeArea": {
+      "types": "./package/types/KnowledgeArea.d.ts",
+      "default": "./package/types/KnowledgeArea.js"
+    },
+    "./types/MessageFeed": {
+      "types": "./package/types/MessageFeed.d.ts",
+      "default": "./package/types/MessageFeed.js"
+    },
+    "./types/Paper": {
+      "types": "./package/types/Paper.d.ts",
+      "default": "./package/types/Paper.js"
+    },
+    "./types/PaperPublishStoreData": {
+      "types": "./package/types/PaperPublishStoreData.d.ts",
+      "default": "./package/types/PaperPublishStoreData.js"
+    },
+    "./types/RefreshToken": {
+      "types": "./package/types/RefreshToken.d.ts",
+      "default": "./package/types/RefreshToken.js"
+    },
+    "./types/Review": {
+      "types": "./package/types/Review.d.ts",
+      "default": "./package/types/Review.js"
+    },
+    "./types/ReviewQueue": {
+      "types": "./package/types/ReviewQueue.d.ts",
+      "default": "./package/types/ReviewQueue.js"
+    },
+    "./types/Token": {
+      "types": "./package/types/Token.d.ts",
+      "default": "./package/types/Token.js"
+    },
+    "./types/User": {
+      "types": "./package/types/User.d.ts",
+      "default": "./package/types/User.js"
+    },
+    "./utils/GetInitials": {
+      "types": "./package/utils/GetInitials.d.ts",
+      "default": "./package/utils/GetInitials.js"
+    },
+    "./utils": {
+      "types": "./package/utils/index.d.ts",
+      "svelte": "./package/utils/index.js",
+      "default": "./package/utils/index.js"
+    }
+  },
+  "files": [
+    "package"
+  ],
+  "svelte": "./package/index.js",
+  "typesVersions": {
+    ">4.0": {
+      "api": [
+        "./package/api/index.d.ts"
+      ],
+      "AuthorDashboard.svelte": [
+        "./package/AuthorDashboard.svelte.d.ts"
+      ],
+      "AvailableReviewers.svelte": [
+        "./package/AvailableReviewers.svelte.d.ts"
+      ],
+      "components/coisasparaorganizar/userprofile": [
+        "./package/components/coisasparaorganizar/userprofile.d.ts"
+      ],
+      "components/Dashboard/DashboadButton.svelte": [
+        "./package/components/Dashboard/DashboadButton.svelte.d.ts"
+      ],
+      "components/Dashboard/DashboardItem.svelte": [
+        "./package/components/Dashboard/DashboardItem.svelte.d.ts"
+      ],
+      "components/DocsPreview/DocsPreview.svelte": [
+        "./package/components/DocsPreview/DocsPreview.svelte.d.ts"
+      ],
+      "components/DocsPreview/options": [
+        "./package/components/DocsPreview/options.d.ts"
+      ],
+      "components/FeedbackCard.svelte": [
+        "./package/components/FeedbackCard.svelte.d.ts"
+      ],
+      "components/hope/Abstract.svelte": [
+        "./package/components/hope/Abstract.svelte.d.ts"
+      ],
+      "components/Menu/AppbarMenuPopup.svelte": [
+        "./package/components/Menu/AppbarMenuPopup.svelte.d.ts"
+      ],
+      "components/Menu/Boring/BoringDrawerMenu.svelte": [
+        "./package/components/Menu/Boring/BoringDrawerMenu.svelte.d.ts"
+      ],
+      "components/Menu/Boring/BoringMainMenu.svelte": [
+        "./package/components/Menu/Boring/BoringMainMenu.svelte.d.ts"
+      ],
+      "components/Menu/Boring/BoringMenuPopUp.svelte": [
+        "./package/components/Menu/Boring/BoringMenuPopUp.svelte.d.ts"
+      ],
+      "components/Menu/Desktop/DesktopMainMenu.svelte": [
+        "./package/components/Menu/Desktop/DesktopMainMenu.svelte.d.ts"
+      ],
+      "components/Menu/MainMenu.svelte": [
+        "./package/components/Menu/MainMenu.svelte.d.ts"
+      ],
+      "components/Menu/MenuHighlights.svelte": [
+        "./package/components/Menu/MenuHighlights.svelte.d.ts"
+      ],
+      "components/Menu/MenuItemCard.svelte": [
+        "./package/components/Menu/MenuItemCard.svelte.d.ts"
+      ],
+      "components/Menu/MenuPopupButton.svelte": [
+        "./package/components/Menu/MenuPopupButton.svelte.d.ts"
+      ],
+      "components/Menu/Mobile/goButtonBackup.svelte": [
+        "./package/components/Menu/Mobile/goButtonBackup.svelte.d.ts"
+      ],
+      "components/Menu/Mobile/MobileMainMenu.svelte": [
+        "./package/components/Menu/Mobile/MobileMainMenu.svelte.d.ts"
+      ],
+      "components/Menu/Mobile/MobileMenuItemCard.svelte": [
+        "./package/components/Menu/Mobile/MobileMenuItemCard.svelte.d.ts"
+      ],
+      "components/Menu/Mobile/MobileMenuScrollContainer.svelte": [
+        "./package/components/Menu/Mobile/MobileMenuScrollContainer.svelte.d.ts"
+      ],
+      "components/Menu/types": [
+        "./package/components/Menu/types.d.ts"
+      ],
+      "components/Modals/ModalAbstract.svelte": [
+        "./package/components/Modals/ModalAbstract.svelte.d.ts"
+      ],
+      "components/Modals/ModalFullscreen.svelte": [
+        "./package/components/Modals/ModalFullscreen.svelte.d.ts"
+      ],
+      "components/Navigation/MobileNavigation.svelte": [
+        "./package/components/Navigation/MobileNavigation.svelte.d.ts"
+      ],
+      "components/Navigation/Navigation.svelte": [
+        "./package/components/Navigation/Navigation.svelte.d.ts"
+      ],
+      "components/PapersImages.svelte": [
+        "./package/components/PapersImages.svelte.d.ts"
+      ],
+      "components/Profile/Profile.svelte": [
+        "./package/components/Profile/Profile.svelte.d.ts"
+      ],
+      "components/review/ReviewChat.svelte": [
+        "./package/components/review/ReviewChat.svelte.d.ts"
+      ],
+      "components/SpinInput.svelte": [
+        "./package/components/SpinInput.svelte.d.ts"
+      ],
+      "components/Splash.svelte": [
+        "./package/components/Splash.svelte.d.ts"
+      ],
+      "components/Text/RichTextEditor.svelte": [
+        "./package/components/Text/RichTextEditor.svelte.d.ts"
+      ],
+      "constants": [
+        "./package/constants.d.ts"
+      ],
+      "db/fs": [
+        "./package/db/fs.d.ts"
+      ],
+      "db/mncs": [
+        "./package/db/mncs.d.ts"
+      ],
+      "db/models/Comment": [
+        "./package/db/models/Comment.d.ts"
+      ],
+      "db/models/Connection": [
+        "./package/db/models/Connection.d.ts"
+      ],
+      "db/models/Like": [
+        "./package/db/models/Like.d.ts"
+      ],
+      "db/models/MessageFeed": [
+        "./package/db/models/MessageFeed.d.ts"
+      ],
+      "db/models/Notification": [
+        "./package/db/models/Notification.d.ts"
+      ],
+      "db/models/Paper": [
+        "./package/db/models/Paper.d.ts"
+      ],
+      "db/models/Review": [
+        "./package/db/models/Review.d.ts"
+      ],
+      "db/models/ReviewQueue": [
+        "./package/db/models/ReviewQueue.d.ts"
+      ],
+      "db/models/Tag": [
+        "./package/db/models/Tag.d.ts"
+      ],
+      "db/models/User": [
+        "./package/db/models/User.d.ts"
+      ],
+      "db/mongo": [
+        "./package/db/mongo.d.ts"
+      ],
+      "db/mongooseConnection": [
+        "./package/db/mongooseConnection.d.ts"
+      ],
+      "db/pdfs": [
+        "./package/db/pdfs.d.ts"
+      ],
+      "db/schemas/MessageFeedSchema": [
+        "./package/db/schemas/MessageFeedSchema.d.ts"
+      ],
+      "db/schemas/PaperSchema": [
+        "./package/db/schemas/PaperSchema.d.ts"
+      ],
+      "db/schemas/ReviewQueue": [
+        "./package/db/schemas/ReviewQueue.d.ts"
+      ],
+      "db/schemas/ReviewSchema": [
+        "./package/db/schemas/ReviewSchema.d.ts"
+      ],
+      "db/schemas/tempschema/PaperSchema": [
+        "./package/db/schemas/tempschema/PaperSchema.d.ts"
+      ],
+      "db/schemas/tempschema/ReviewSchema": [
+        "./package/db/schemas/tempschema/ReviewSchema.d.ts"
+      ],
+      "db/schemas/UserSchema": [
+        "./package/db/schemas/UserSchema.d.ts"
+      ],
+      "index.d.ts": [
+        "./package/index.d.ts"
+      ],
+      "layouts/DocsShell/defaults": [
+        "./package/layouts/DocsShell/defaults.d.ts"
+      ],
+      "layouts/DocsShell/DocsShell.svelte": [
+        "./package/layouts/DocsShell/DocsShell.svelte.d.ts"
+      ],
+      "layouts/DocsShell/partials/Header.svelte": [
+        "./package/layouts/DocsShell/partials/Header.svelte.d.ts"
+      ],
+      "layouts/DocsShell/partials/PanelClasses.svelte": [
+        "./package/layouts/DocsShell/partials/PanelClasses.svelte.d.ts"
+      ],
+      "layouts/DocsShell/partials/PanelEvents.svelte": [
+        "./package/layouts/DocsShell/partials/PanelEvents.svelte.d.ts"
+      ],
+      "layouts/DocsShell/partials/PanelKeyboard.svelte": [
+        "./package/layouts/DocsShell/partials/PanelKeyboard.svelte.d.ts"
+      ],
+      "layouts/DocsShell/partials/PanelParams.svelte": [
+        "./package/layouts/DocsShell/partials/PanelParams.svelte.d.ts"
+      ],
+      "layouts/DocsShell/partials/PanelProps.svelte": [
+        "./package/layouts/DocsShell/partials/PanelProps.svelte.d.ts"
+      ],
+      "layouts/DocsShell/partials/PanelSlots.svelte": [
+        "./package/layouts/DocsShell/partials/PanelSlots.svelte.d.ts"
+      ],
+      "layouts/DocsShell/sveldMapper": [
+        "./package/layouts/DocsShell/sveldMapper.d.ts"
+      ],
+      "layouts/DocsShell/types": [
+        "./package/layouts/DocsShell/types.d.ts"
+      ],
+      "layouts/LayoutPage/LayoutPage.svelte": [
+        "./package/layouts/LayoutPage/LayoutPage.svelte.d.ts"
+      ],
+      "ListErrors.svelte": [
+        "./package/ListErrors.svelte.d.ts"
+      ],
+      "MyPapers.svelte": [
+        "./package/MyPapers.svelte.d.ts"
+      ],
+      "Nav.svelte": [
+        "./package/Nav.svelte.d.ts"
+      ],
+      "Pages/config": [
+        "./package/Pages/config.d.ts"
+      ],
+      "Pages/Paper/PaperPool.svelte": [
+        "./package/Pages/Paper/PaperPool.svelte.d.ts"
+      ],
+      "Pages/Paper/PaperPublishPage.svelte": [
+        "./package/Pages/Paper/PaperPublishPage.svelte.d.ts"
+      ],
+      "Pages/Paper/PaperReviewPage.svelte": [
+        "./package/Pages/Paper/PaperReviewPage.svelte.d.ts"
+      ],
+      "Pages/Profile/ProfilePage.svelte": [
+        "./package/Pages/Profile/ProfilePage.svelte.d.ts"
+      ],
+      "Pages/Publish/PublishPage.svelte": [
+        "./package/Pages/Publish/PublishPage.svelte.d.ts"
+      ],
+      "Pages/Review/ReviewPage.svelte": [
+        "./package/Pages/Review/ReviewPage.svelte.d.ts"
+      ],
+      "PaperList/index.svelte": [
+        "./package/PaperList/index.svelte.d.ts"
+      ],
+      "PaperList/PaperPreview.svelte": [
+        "./package/PaperList/PaperPreview.svelte.d.ts"
+      ],
+      "ReviewDashboard.svelte": [
+        "./package/ReviewDashboard.svelte.d.ts"
+      ],
+      "stores/stores": [
+        "./package/stores/stores.d.ts"
+      ],
+      "types/Author": [
+        "./package/types/Author.d.ts"
+      ],
+      "types/KnowledgeArea": [
+        "./package/types/KnowledgeArea.d.ts"
+      ],
+      "types/MessageFeed": [
+        "./package/types/MessageFeed.d.ts"
+      ],
+      "types/Paper": [
+        "./package/types/Paper.d.ts"
+      ],
+      "types/PaperPublishStoreData": [
+        "./package/types/PaperPublishStoreData.d.ts"
+      ],
+      "types/RefreshToken": [
+        "./package/types/RefreshToken.d.ts"
+      ],
+      "types/Review": [
+        "./package/types/Review.d.ts"
+      ],
+      "types/ReviewQueue": [
+        "./package/types/ReviewQueue.d.ts"
+      ],
+      "types/Token": [
+        "./package/types/Token.d.ts"
+      ],
+      "types/User": [
+        "./package/types/User.d.ts"
+      ],
+      "utils/GetInitials": [
+        "./package/utils/GetInitials.d.ts"
+      ],
+      "utils": [
+        "./package/utils/index.d.ts"
+      ]
+    }
   }
 }

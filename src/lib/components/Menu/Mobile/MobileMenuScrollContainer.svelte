@@ -13,10 +13,14 @@
 		});
 	};
 
-	export let selected: number;
 
-	export let menuContainer: HTMLDivElement;
-	export let items: Menuitem[];
+	interface Props {
+		selected: number;
+		menuContainer: HTMLDivElement;
+		items: Menuitem[];
+	}
+
+	let { selected = $bindable(), menuContainer = $bindable(), items }: Props = $props();
 </script>
 
 <div
@@ -24,15 +28,15 @@
 >
 	<div
 		bind:this={menuContainer}
-		class="!bg-transparent snap-x snap-mandatory scroll-smooth flex pb-6 overflow-x-auto"
+		class="bg-transparent! snap-x snap-mandatory scroll-smooth flex pb-6 overflow-x-auto"
 	>
 		{#each items as item, i}
-			<div id={`item-${i}`} class="!bg-transparent w-20 snap-start shrink-0">
+			<div id={`item-${i}`} class="bg-transparent! w-20 snap-start shrink-0">
 				<button
-					class:!variant-filled-primary={i === selected ? true : false}
+					class:!preset-filled-primary-500={i === selected ? true : false}
 					type="button"
-					class="btn-icon btn-icon-xl bg-surface-100 text-4xl"
-					on:click={() => btnHdl(i)}>{item.icon}</button
+					class="btn-icon btn-icon-lg bg-surface-100 text-4xl"
+					onclick={() => btnHdl(i)}>{item.icon}</button
 				>
 			</div>
 		{/each}

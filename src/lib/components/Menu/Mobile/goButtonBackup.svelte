@@ -1,12 +1,16 @@
 <script lang="ts">
 	import type { Menuitem } from '../types';
-	export let item: Menuitem;
+	interface Props {
+		item: Menuitem;
+	}
+
+	let { item }: Props = $props();
 	let description = item.description;
 	let name = item.name;
 </script>
 
-<a id="blink" href="/{name}" class="relative top-[-70px] mb-[-80px] btn-icon variant-filled w-24">
-	<span class="font-Valorant text-2xl chip rounded-3xl !bg-transparent hover:bg-primary-800">
+<a id="blink" href="/{name}" class="relative top-[-70px] mb-[-80px] btn-icon preset-filled w-24">
+	<span class="font-Valorant text-2xl chip rounded-3xl bg-transparent! hover:bg-primary-800">
 		Go!
 	</span>
 </a>

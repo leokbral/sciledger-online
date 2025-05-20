@@ -1,17 +1,19 @@
 <script lang="ts">
-	import { FileDropzone } from '@skeletonlabs/skeleton';
+	import { preventDefault } from 'svelte/legacy';
+
+	import { FileUpload } from '@skeletonlabs/skeleton-svelte';
 
 	let file: File | null = null;
-	let files: FileList;
+	let files: FileList = $state();
 
 	// Campos do formulário
-	let title = '';
-	let abstract = '';
-	let keywords = '';
-	let mainAuthor = '';
-	let correspondingAuthor = '';
-	let coAuthors = '';
-	let tags = '';
+	let title = $state('');
+	let abstract = $state('');
+	let keywords = $state('');
+	let mainAuthor = $state('');
+	let correspondingAuthor = $state('');
+	let coAuthors = $state('');
+	let tags = $state('');
 
 	const handleFileChange = (event: Event) => {
 		const target = event.target as HTMLInputElement;
@@ -56,7 +58,7 @@
 </script>
 
 <!-- Formulário de envio -->
-<form on:submit|preventDefault={uploadFile}>
+<form onsubmit={preventDefault(uploadFile)}>
 	<div>
 		<label for="title">Title:</label>
 		<input type="text" id="title" bind:value={title} required />
@@ -94,10 +96,10 @@
 
 	<div>
 		<label for="file">PDF File:</label>
-		<input type="file" id="file" accept=".pdf" on:change={handleFileChange} />
+		<input type="file" id="file" accept=".pdf" onchange={handleFileChange} />
 	</div>
 
-	<FileDropzone name="files" bind:files on:change={onChangeHandler}>Upload</FileDropzone>
+	<FileUpload name="files" bind:files on:change={onChangeHandler}>Upload</FileUpload>
 
-	<button type="submit" class="btn variant-filled-primary">Submit Article</button>
+	<button type="submit" class="btn preset-filled-primary-500">Submit Article</button>
 </form>

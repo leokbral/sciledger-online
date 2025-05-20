@@ -6,7 +6,11 @@
 	//import type { PaperPublishStoreData } from '$lib/types/PaperPublishStoreData';
 	import type { PageData } from './$types';
 
-	export let data: PageData;
+	interface Props {
+		data: PageData;
+	}
+
+	let { data }: Props = $props();
 
 	let paper = data.paper;
 	let currentUser = data.user;
@@ -65,9 +69,16 @@
 	}
 </script>
 
-<PaperReviewPage
+<!-- <PaperReviewPage
 	on:savePaper={handleSavePaper}
 	on:submitReview={hdlSubmitPublish}
+	{paper}
+	{currentUser}
+	{messageFeed}
+/> -->
+
+<PaperReviewPage
+	
 	{paper}
 	{currentUser}
 	{messageFeed}

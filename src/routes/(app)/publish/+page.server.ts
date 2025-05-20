@@ -44,37 +44,42 @@ export async function load({ locals }) {
 
     // Função para buscar os artigos
     const fetchPapers = async () => {
-        let papers;
-
-        // Verificando se o usuário é coautor ou autor principal/correspondente
-        const isCoAuthor = await Papers.exists({
-            coAuthors: locals.user.id // Checando se o usuário está na lista de coautores
-        });
-
-        if (isCoAuthor) {
-            // Coautor - traz apenas os artigos publicados em que o usuário é coautor
-            papers = await Papers.find({
-                coAuthors: locals.user.id, // O usuário como coautor
-                status: 'published' // Filtro para artigos publicados
-            })
-                .populate("mainAuthor")
-                .populate("coAuthors") // Populando os coautores
-                .lean()
-                .exec();
-        } else {
-            // Se o usuário não for coautor (assumindo que é autor principal ou correspondente), busca todos os artigos
-            papers = await Papers.find({
-                $or: [
-                    { mainAuthor: locals.user.id },  // O usuário como autor principal
-                    { correspondingAuthor: locals.user.id },  // O usuário como autor correspondente
-                    // { coAuthors: locals.user.id }  // O usuário como coautor
-                ]
-            })
-                .populate("mainAuthor")
-                .populate("coAuthors")  // Populando os coautores
-                .lean()
-                .exec();
-        }
+        /*         
+                let papers;
+        
+                // Verificando se o usuário é coautor ou autor principal/correspondente
+                const isCoAuthor = await Papers.exists({
+                    coAuthors: locals.user.id // Checando se o usuário está na lista de coautores
+                });
+                console.log("NEW ORLEANS", isCoAuthor)
+                if (isCoAuthor) {
+                    // Coautor - traz apenas os artigos publicados em que o usuário é coautor
+                    papers = await Papers.find({
+                        coAuthors: locals.user.id, // O usuário como coautor
+                        status: 'published' // Filtro para artigos publicados
+                    })
+                        .populate("mainAuthor")
+                        .populate("coAuthors") // Populando os coautores
+                        .lean()
+                        .exec();
+                } else {
+                    console.log("LOL - ERRO DOIDO")
+                    // Se o usuário não for coautor (assumindo que é autor principal ou correspondente), busca todos os artigos
+                    
+                }
+         */
+        const papers = await Papers.find({
+            $or: [
+                { coAuthors: locals.user.id },  // User is contributing author
+                { mainAuthor: locals.user.id },  // O usuário como autor principal
+                { correspondingAuthor: locals.user.id },  // O usuário como autor correspondente
+                // { coAuthors: locals.user.id }  // O usuário como coautor
+            ]
+        })
+            .populate("mainAuthor")
+            .populate("coAuthors")  // Populando os coautores
+            .lean()
+            .exec();
 
         return papers;
     };

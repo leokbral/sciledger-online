@@ -10,9 +10,13 @@
 	import AvailableReviewers from '$lib/AvailableReviewers.svelte';
 	import type { User } from '$lib/types/User';
 
-	export let data: PageData;
+	interface Props {
+		data: PageData;
+	}
+
+	let { data }: Props = $props();
 	// State for peer review option
-	let peer_review: string = '';
+	let peer_review: string = $state('');
 	let paper: Paper | null = data.paper;
 	let userProfiles = data.users;
 
@@ -45,7 +49,7 @@
 		}
 	}
 
-	let selectedReviewers: string[] = [];
+	let selectedReviewers: string[] = $state([]);
 
 	function toggleReviewerSelection(reviewerId: string) {
 		if (selectedReviewers.includes(reviewerId)) {
@@ -61,7 +65,7 @@
 		<div class="row">
 			<div class="col-md-9">
 				<h4 class="h4 px-4 text-primary-500 font font-semibold">Published Articles</h4>
-				<hr class="mt-2 mb-4 !border-t-2" />
+				<hr class="mt-2 mb-4 border-t-2!" />
 				<PaperPreview {paper} user={$page.data.user} />
 			</div>
 		</div>
