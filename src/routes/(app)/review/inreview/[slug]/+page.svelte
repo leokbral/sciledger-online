@@ -6,7 +6,11 @@
 	//import type { PaperPublishStoreData } from '$lib/types/PaperPublishStoreData';
 	import type { PageData } from './$types';
 
-	export let data: PageData;
+	interface Props {
+		data: PageData;
+	}
+
+	let { data }: Props = $props();
 	console.log("www0",data)
 
 	let paper = data.paper;
@@ -67,8 +71,8 @@
 </script>
 
 <PaperReviewPage
-	on:savePaper={handleSavePaper}
-	on:submitReview={hdlSubmitReview}
+	onsavePaper={handleSavePaper}
+	onsubmitReview={hdlSubmitReview}
 	{paper}
 	{currentUser}
 	{messageFeed}

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import PaperPreview from '$lib/PaperList/PaperPreview.svelte';
 	
 	//AKIIIIIIIIIIIIIII
@@ -11,6 +11,7 @@
 	import type { User } from '$lib/types/User';
 	import { faker } from '@faker-js/faker';
 	import { createEventDispatcher } from 'svelte';
+	import ReviewForms from '../Review/ReviewForms.svelte';
 
 	const dispatch = createEventDispatcher();
 
@@ -94,7 +95,6 @@
 		papers: []
 	};
 	const lorem = faker.lorem.paragraph();
-	export let messageFeed// = {
 	// 	id: '597c84b3-d2a8-4fcc-950e-7ffff8739650',
 	// 	messages: [
 	// 		{
@@ -108,7 +108,7 @@
 	// 	]
 	// };
 
-	console.log('44444',messageFeed)
+	// console.log('44444',messageFeed)
 	let currentMessage = '';
 
 	// export let data = {
@@ -116,10 +116,20 @@
 	// 	currentMessage
 	// };
 
-	export let paper;
-	export let editable = false; // Nova propriedade
 
-	export let currentUser: User = user1;
+	interface Props {
+		messageFeed: any;
+		paper: any;
+		editable?: boolean;
+		currentUser?: User;
+	}
+
+	let {
+		messageFeed,
+		paper,
+		editable = false,
+		// currentUser = user1
+	}: Props = $props();
 	// console.log('current', currentUser);
 	// console.log('Reviewers', paper.reviewers);
 
@@ -154,15 +164,15 @@
 		<section id="article-body" class="flex flex-col items-center max-w-[700px] m-auto">
 			{#if editable}
 				<div class="flex justify-end gap-3 mb-4">
-					<button class="bg-primary-500 text-white rounded-lg px-4 py-2" on:click={hdlSaveDraft}
+					<button class="bg-primary-500 text-white rounded-lg px-4 py-2" onclick={hdlSaveDraft}
 						>Save Draft</button
 					>
-					<button class="bg-primary-500 text-white rounded-lg px-4 py-2" on:click={hdlSubmitReview}
+					<button class="bg-primary-500 text-white rounded-lg px-4 py-2" onclick={hdlSubmitReview}
 						>Submit Article</button
 					>
 				</div>
 			{/if}
-			<PaperPreview {paper} user={$page.data.user} />
+			<PaperPreview {paper} user={page.data.user} />
 		</section>
 
 		<hr class="my-4" />
@@ -188,3 +198,15 @@
 		</div>
 	</fieldset>
 </main>
+<!-- <ReviewForms
+	
+	{editable}
+	{currentUser}
+	on:saveDraft={hdlSaveDraft}
+	on:submitReview={hdlSubmitReview}
+></ReviewForms> -->
+<!-- <ReviewForms paperTitle={paper.title} /> -->
+
+{#if page.url.pathname.startsWith('/review/inreview/')}
+    <ReviewForms paperTitle={paper.title} />
+{/if}

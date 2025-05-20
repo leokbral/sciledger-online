@@ -1,11 +1,9 @@
 <script lang="ts">
-	import '../app.postcss';
-	import { AppShell, AppBar, LightSwitch, autoModeWatcher, initializeStores } from '@skeletonlabs/skeleton';
-
+	import '../app.css';
+	
 	// Highlight JS
 	import hljs from 'highlight.js/lib/core';
 	import 'highlight.js/styles/github-dark.css';
-	import { storeHighlightJs } from '@skeletonlabs/skeleton';
 	import xml from 'highlight.js/lib/languages/xml'; // for HTML
 	import css from 'highlight.js/lib/languages/css';
 	import javascript from 'highlight.js/lib/languages/javascript';
@@ -15,15 +13,19 @@
 	hljs.registerLanguage('css', css);
 	hljs.registerLanguage('javascript', javascript);
 	hljs.registerLanguage('typescript', typescript);
-	storeHighlightJs.set(hljs);
+	//storeHighlightJs.set(hljs);
 
-	initializeStores();
+	//initializeStores();
 	
 	// Floating UI for Popups
-	import { computePosition, autoUpdate, flip, shift, offset, arrow } from '@floating-ui/dom';
-	import { storePopup } from '@skeletonlabs/skeleton';
-	storePopup.set({ computePosition, autoUpdate, flip, shift, offset, arrow });
+	// import { computePosition, autoUpdate, flip, shift, offset, arrow } from '@floating-ui/dom';
+	interface Props {
+		children?: import('svelte').Snippet;
+	}
+
+	let { children }: Props = $props();
+	//storePopup.set({ computePosition, autoUpdate, flip, shift, offset, arrow });
 </script>
 
 
-<slot />
+{@render children?.()}

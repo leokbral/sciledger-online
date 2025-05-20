@@ -11,7 +11,11 @@
 	import type { User } from '$lib/types/User';
 	import Icon from '@iconify/svelte';
 
-	export let data: PageData;
+	interface Props {
+		data: PageData;
+	}
+
+	let { data }: Props = $props();
 	let reviewers = data.users.filter((u: User) => u.roles.reviewer === true);
 	// State for peer review option
 	let peer_review: string = '';
@@ -19,7 +23,7 @@
 
 	// let user = data.user;
 
-	let paper: Paper | null = data.paper;
+	let paper: Paper | null = $state(data.paper);
 	//console.log("www",paper?.authors)
 	let userProfiles = data.users; // Ajuste conforme necessário
 
@@ -73,55 +77,33 @@
 	}
 </script>
 
-<div class="grid grid-cols-[1fr_1fr_1fr] p-5">
-	<div></div>
-	<div class="flex justify-end items-center gap-3">
-		<button
-			class="bg-transparent text-primary-500 rounded-full p-2 border border-primary-500 hover:bg-primary-100 hover:text-primary-700 transition-all duration-300"
-			on:click={hdlSaveDraft}
-		>
-			<Icon icon="fluent-mdl2:accept" class="size-6" />
-		</button>
-	</div>
-	<div></div>
-</div>
-
-<!-- <div class="grid grid-cols-[1fr_1fr_1fr] p-5">
-	<div></div>
-	<div class="flex justify-between gap-3">
-		<Icon icon="fluent-mdl2:accept" class="text-primary-500 size-8" />
-		<button class="bg-primary-500 text-white rounded-lg px-4 py-2" on:click={hdlSaveDraft}
-			>Save Draft</button
-		>
-		<button class="bg-primary-500 text-white rounded-lg px-4 py-2" on:click={hdlSubmit}
-			>Submit to Review</button
-		>
-	</div>
-	<div></div>
-</div> -->
-
 {#if paper}
-	<div class="container page max-w-[700px] p-4 m-auto">
-		<div class="row">
-			<div class="col-md-9">
-				<h4 class="h4 px-4 text-primary-500 font font-semibold">Não sei o que vou colocar aqui</h4>
-				<hr class="mt-2 mb-4 !border-t-2" />
-				<PaperPreview {paper} user={$page.data.user} />
-			</div>
-		</div>
-		<div class="p-4 border border-surface-300 rounded-lg">
-			<h5 class="text-lg font-semibold mb-2">Price</h5>
-			<label for="price" class="block mb-1">Price</label>
-			<input
-				id="price"
-				type="text"
-				class="w-full p-2 border border-surface-300 rounded-lg"
-				bind:value={paper.price}
-				placeholder="Enter price"
-			/>
+    <div class="container page max-w-[900px] p-4 m-auto">
+        <div class="mb-6">
+            <h2 class="text-2xl font-bold text-primary-500 mb-2">Review Request</h2>
+            <p class="text-surface-600">Please review the paper details below and decide if you would like to accept this review assignment.</p>
+            <hr class="mt-4 mb-6 border-t-2 border-surface-200" />
+        </div>
 
-			<h5 class="text-lg font-semibold mb-2">Pages</h5>
-			<label for="price" class="block mb-1">Pages</label>
-		</div>
-	</div>
+        <div class="card p-6 bg-surface-100 rounded-lg shadow-sm mb-6">
+            <PaperPreview {paper} user={$page.data.user} />
+        </div>
+
+        <div class="flex justify-center gap-4 mt-8">
+            <button
+                class="btn variant-filled-error px-8 py-3 rounded-lg flex items-center gap-2"
+                onclick={() => goto('/review/')}
+            >
+                <Icon icon="fluent-mdl2:cancel" class="size-5" />
+                Decline Review
+            </button>
+            <button
+                class="btn variant-filled-success px-8 py-3 rounded-lg flex items-center gap-2"
+                onclick={hdlSaveDraft}
+            >
+                <Icon icon="fluent-mdl2:accept" class="size-5" />
+                Accept Review
+            </button>
+        </div>
+    </div>
 {/if}

@@ -10,13 +10,13 @@
 	let user = userProfiles[3];
 	let isEditing = false;
 	let editedBio = user.bio;
-	let editedTitle = user.title;
-	let editedInstitution = user.institution;
+	let editedTitle = $state(user.title);
+	let editedInstitution = $state(user.institution);
 	let profilePicture = user.profilePicture;
 	let imageSize = 100; // Tamanho inicial da imagem em pixels
 	let imagePositionX = 0;
 	let imagePositionY = 0;
-	let selectedReviewers: string[] = [];
+	let selectedReviewers: string[] = $state([]);
 	
 	let tabs = [
 		{
@@ -114,14 +114,14 @@
 	{#each userProfiles as user}
 		<div class="pt-0 mx-32 bg-surface-100-50-token">
 			<!-- container page max-w-[700px] p-4 m-auto -->
-			<div class="p-4 shadow rounded mb-6">
+			<div class="p-4 shadow-sm rounded-sm mb-6">
 				<!-- Seleção de Reviewer -->
 				<div class="flex justify-end items-center">
 					<input
 						type="checkbox"
 						id={user.id}
 						checked={selectedReviewers.includes(user.id)}
-						on:change={() => toggleReviewerSelection(user.id)}
+						onchange={() => toggleReviewerSelection(user.id)}
 					/>
 					<!-- <label for={user.id} class="ml-2">Select for review</label> -->
 					<label for={user.id} class="ml-2"></label>
@@ -149,12 +149,12 @@
 								<input
 									type="text"
 									bind:value={editedTitle}
-									class="mt-2 p-2 text-surface-900 border rounded w-full"
+									class="mt-2 p-2 text-surface-900 border rounded-sm w-full"
 								/>
 								<input
 									type="text"
 									bind:value={editedInstitution}
-									class="mt-2 p-2 text-surface-900 border rounded w-full"
+									class="mt-2 p-2 text-surface-900 border rounded-sm w-full"
 								/>
 							{:else}
 								{user.title} at {user.institution}

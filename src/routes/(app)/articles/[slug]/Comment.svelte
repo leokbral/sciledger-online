@@ -1,8 +1,8 @@
 <script>
 	import { enhance } from '$app/forms';
 
-	export let comment;
-	export let user;
+	/** @type {{comment: any, user: any}} */
+	let { comment, user } = $props();
 </script>
 
 <div class="card">
@@ -23,7 +23,7 @@
 
 		{#if user && comment.author.firstName === user.firstName}
 			<form use:enhance method="POST" action="?/deleteComment&id={comment.id}" class="mod-options">
-				<button class="ion-trash-a" aria-label="Delete comment" />
+				<button class="ion-trash-a" aria-label="Delete comment"></button>
 			</form>
 		{/if}
 	</div>

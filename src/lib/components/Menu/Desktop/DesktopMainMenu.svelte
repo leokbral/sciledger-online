@@ -2,11 +2,16 @@
 	import MenuItemCard from '../MenuItemCard.svelte';
 	import type { Menuitem } from '../types';
 
-	export let selected: number;
 
-	export let items: Menuitem[];
+	interface Props {
+		selected: number;
+		items: Menuitem[];
+		children?: import('svelte').Snippet;
+	}
 
-	let menuContainer: HTMLDivElement;
+	let { selected = $bindable(), items, children }: Props = $props();
+
+	let menuContainer: HTMLDivElement = $state();
 
 	const btnHdl = (i: number) => {
 		selected = i;
@@ -23,10 +28,10 @@
 			{#each items as item, i}
 				<div id={`item-${i}`} class="items-center flex flex-col">
 					<button
-						class:variant-filled-primary={i === selected ? true : false}
+						class:preset-filled-primary-500={i === selected ? true : false}
 						type="button"
-						class="btn btn-xl variant-filled"
-						on:click={() => btnHdl(i)}>{item.icon} {item.name}</button
+						class="btn btn-lg preset-filled"
+						onclick={() => btnHdl(i)}>{item.icon} {item.name}</button
 					>
 				</div>
 			{/each}
@@ -49,6 +54,6 @@ background-repeat: no-repeat; background-position: center center;"
 			alt="AulaZero Logo"
 			src="https://raw.githubusercontent.com/AulaZero/icons/main/icons/azr-bg-transparent.svg"
 		/> -->
-		<slot />
+		{@render children?.()}
 	</div>
 </div>

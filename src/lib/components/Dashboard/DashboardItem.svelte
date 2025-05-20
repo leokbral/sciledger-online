@@ -1,19 +1,33 @@
 <script lang="ts">
-	export let classes: string = ''; //'bg-gradient-to-r from-pink-500 to-yellow-500 text-white';
+	interface Props {
+		classes?: string;
+		tittle?: import('svelte').Snippet;
+		message?: import('svelte').Snippet;
+		description?: import('svelte').Snippet;
+		generic?: import('svelte').Snippet;
+	}
+
+	let {
+		classes = '',
+		tittle,
+		message,
+		description,
+		generic
+	}: Props = $props();
 </script>
 
 <div
 	class=" flex flex-col items-start w-full h-full overflow-hidden p-4 rounded-2xl gap-2 {classes}"
 >
 	<span class="stat-title font-semibold uppercase whitespace-normal leading-3 text-sm">
-		<slot name="tittle" />
+		{@render tittle?.()}
 	</span>
 	<span class="text-4xl font-bold whitespace-nowrap overflow-hidden">
-		<slot name="message" />
+		{@render message?.()}
 	</span>
 	<span class="text-xs font-normal leading-normal">
-		<slot name="description" />
+		{@render description?.()}
 	</span>
 
-	<slot name="generic" />
+	{@render generic?.()}
 </div>

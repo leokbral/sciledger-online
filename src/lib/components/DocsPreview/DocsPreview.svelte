@@ -1,63 +1,74 @@
+<!-- @migration-task Error while migrating Svelte code: $$props is used together with named props in a way that cannot be automatically migrated. -->
 <script lang="ts">
-	import { slide } from 'svelte/transition';
-	// Components
-	import { RadioGroup, RadioItem } from '@skeletonlabs/skeleton';
-	// Settings
-	import { backgrounds } from './options';
+    import { slide } from 'svelte/transition';
+    import { Segment } from '@skeletonlabs/skeleton-svelte';
+    import { backgrounds } from './options';
 
-	// Props
-	/** Provide a label to replace the preview/code buttons. */
-	export let label = '';
-	/** Enable the mobile responsive settings */
-	export let responsive = false;
-	/** Force and append a custom color value. */
-	export let background = 'primary-to-secondary';
+    // Initialize props with defaults using $props()
+    let {
+        label = '',
+        responsive = false,
+        background = 'primary-to-secondary',
+        regionHeader = '',
+        regionViewport = '',
+        regionPreview = '',
+        regionFooter = '',
+        regionSource = '',
+        className = ''
+    } = $props<{
+        label?: string;
+        responsive?: boolean;
+        background?: string;
+        regionHeader?: string;
+        regionViewport?: string;
+        regionPreview?: string;
+        regionFooter?: string;
+        regionSource?: string;
+        className?: string;
+    }>();
 
-	// Props (regions)
-	/** Provide arbitrary classes to the header region. */
-	export let regionHeader = '';
-	/** Provide arbitrary classes to the preview viewport. */
-	export let regionViewport = '';
-	/** Provide arbitrary classes to the content region. */
-	export let regionPreview = '';
-	/** Provide arbitrary classes to the footer region. */
-	export let regionFooter = '';
-	/** Provide arbitrary classes to the source code region. */
-	export let regionSource = '';
+    // Add render props for slots
+    // const slots = $props<{
+    //     lead?: () => any;
+    //     preview?: () => any;
+    //     trail?: () => any;
+    //     footer?: () => any;
+    //     source?: () => any;
+    // }>();
 
-	// Classes
-	const cBase = 'shadow-2xl shadow-surface-500/10 dark:shadow-black/10 rounded-container-token overflow-hidden';
-	const cHeader = 'bg-surface-200-700-token p-4 flex justify-between items-center gap-4';
-	const cSwatches = 'variant-soft p-4 grid grid-cols-6 sm:grid-cols-12 gap-2';
-	const cSwatchCell = 'ring-[1px] ring-surface-500/50 aspect-square rounded';
-	const cViewport = 'p-4 md:p-10 space-y-4';
-	const cContent = 'flex justify-center items-center mx-auto transition-[width] duration-200';
-	const cFooter = 'variant-soft p-4';
-	const cSource = 'bg-surface-100-800-token p-4 space-y-4';
+    // Local state
+    let tabView = $state<string | null>('preview');
+    let radioSize = $state<string | null>('full');
+    let swatches = $state<boolean>(false);
 
-	// Local
-	let tabView = 'preview';
-	let radioSize = 'full';
-	let swatches = false;
+    // Classes
+    let cBase = 'shadow-2xl shadow-surface-500/10 dark:shadow-black/10 rounded-container overflow-hidden';
+    let cHeader = 'bg-surface-200-800 p-4 flex justify-between items-center gap-4';
+    let cSwatches = 'preset-tonal p-4 grid grid-cols-6 sm:grid-cols-12 gap-2';
+    let cSwatchCell = 'ring-[1px] ring-surface-500/50 aspect-square rounded-sm';
+    let cViewport = 'p-4 md:p-10 space-y-4';
+    let cContent = 'flex justify-center items-center mx-auto transition-[width] duration-200';
+    let cFooter = 'preset-tonal p-4';
+    let cSource = 'bg-surface-100-900 p-4 space-y-4';
 
-	function toggleSwatches(): void {
-		swatches = !swatches;
-	}
+    // Functions
+    function toggleSwatches(): void {
+        swatches = !swatches;
+    }
 
-	function swatchHandler(key: string): void {
-		background = key;
-	}
+    function swatchHandler(key: string): void {
+        background = key;
+    }
 
-	// State
-	$: resizableWidth = radioSize === 'mobile' ? 'w-[320px]' : 'w-full';
-	// Reactive
-	$: classesBase = `${cBase} ${$$props.class ?? ''}`;
-	$: classesHeader = `${cHeader} ${regionHeader}`;
-	$: classesSwatches = `${cSwatches}`;
-	$: classesViewport = `${cViewport} ${backgrounds[background]} ${regionViewport}`;
-	$: classesPreview = `${cContent} ${resizableWidth} ${regionPreview}`;
-	$: classesFooter = `${cFooter} ${regionFooter}`;
-	$: classesSource = `${cSource} ${regionSource}`;
+    // Convert reactive statements to derived values
+    let resizableWidth = $derived(radioSize === 'mobile' ? 'w-[320px]' : 'w-full');
+    let classesBase = $derived(`${cBase} ${className}`);
+    let classesHeader = $derived(`${cHeader} ${regionHeader}`);
+    let classesSwatches = $derived(`${cSwatches}`);
+    let classesViewport = $derived(`${cViewport} ${backgrounds[background]} ${regionViewport}`);
+    let classesPreview = $derived(`${cContent} ${resizableWidth} ${regionPreview}`);
+    let classesFooter = $derived(`${cFooter} ${regionFooter}`);
+    let classesSource = $derived(`${cSource} ${regionSource}`);
 </script>
 
 <div class="previewer {classesBase}">
@@ -67,20 +78,30 @@
 			<span class="text-2xl font-bold capitalize">{label}</span>
 		{:else}
 			<!-- View Toggle -->
-			<RadioGroup>
-				<RadioItem bind:group={tabView} name="view" value="preview" title="Preview"><i class="fa-solid fa-eye text-sm"></i></RadioItem>
-				<RadioItem bind:group={tabView} name="view" value="code" title="Code"><i class="fa-solid fa-code text-sm"></i></RadioItem>
-			</RadioGroup>
+			<Segment name="view" value={tabView} onValueChange={(e) => (tabView = e.value)}>
+				<Segment.Item value="preview"><i class="fa-solid fa-eye text-sm"></i></Segment.Item>
+				<Segment.Item value="code"><i class="fa-solid fa-code text-sm"></i></Segment.Item>
+			</Segment>
 			<div class="flex justify-between gap-4">
 				<!-- Responsive Settings -->
 				{#if responsive}
-					<RadioGroup class="hidden md:flex">
-						<RadioItem bind:group={radioSize} name="size" value="mobile"><i class="fa-solid fa-mobile-screen text-sm"></i></RadioItem>
-						<RadioItem bind:group={radioSize} name="size" value="full"><i class="fa-solid fa-display text-sm"></i></RadioItem>
-					</RadioGroup>
+					<!-- <Segment class="hidden md:flex"> -->
+						<Segment name="radioSize" value={radioSize} onValueChange={(e) => (radioSize = e.value)}>
+						<Segment.Item value="mobile"
+							><i class="fa-solid fa-mobile-screen text-sm"></i></Segment.Item
+						>
+						<Segment.Item value="full"
+							><i class="fa-solid fa-display text-sm"></i></Segment.Item
+						>
+					</Segment>
 				{/if}
 				<!-- Toggle Swatches -->
-				<button class="btn-icon {swatches ? 'variant-filled' : 'variant-soft'}" on:click={toggleSwatches} title="Backgrounds">
+				<button
+					class="btn-icon {swatches ? 'preset-filled' : 'preset-tonal'}"
+					onclick={toggleSwatches}
+					title="Backgrounds"
+					aria-label="Backgrounds"
+				>
 					<i class="fa-solid fa-swatchbook text-sm"></i>
 				</button>
 			</div>
@@ -92,26 +113,42 @@
 			<div class="previewer-swatches {classesSwatches}" transition:slide={{ duration: 200 }}>
 				{#each Object.entries(backgrounds) as [k, v], i}
 					<!-- prettier-ignore -->
-					<button type="button" class="{cSwatchCell} {v}" on:click={() => { swatchHandler(k) }} title={k}>
+					<button type="button" class="{cSwatchCell} {v}" onclick={() => { swatchHandler(k) }} title={k}>
 						{#if i === 0}<i class="fa-regular fa-circle-xmark text-xl"></i>{/if}
 					</button>
 				{/each}
 			</div>
 		{/if}
 		<!-- Viewport -->
-		<div class="previewer-viewport {classesViewport}">
-			<!-- Slot: Lead -->
-			{#if $$slots.lead}<div class="previewer-lead"><slot name="lead" /></div>{/if}
-			<!-- Slot: Preview -->
-			<div class="previewer-preview {classesPreview}"><slot name="preview">(preview)</slot></div>
-			<!-- Slot: Trail -->
-			{#if $$slots.trail}<div class="previewer-trail"><slot name="trail" /></div>{/if}
-		</div>
-		{#if $$slots.footer}<footer class="previewer-footer {classesFooter}"><slot name="footer" /></footer>{/if}
+		<!-- <div class="previewer-viewport {classesViewport}">
+			 <! -- Render: Lead -- >
+            {#if slots.lead}
+                <div class="previewer-lead">
+                    {@render slots.lead()}
+                </div>
+            {/if}
+            <! -- Render: Preview -- >
+            <div class="previewer-preview {classesPreview}">
+                {@render slots.preview?.() }
+            </div>
+            <! -- Render: Trail -- >
+            {#if slots.trail}
+                <div class="previewer-trail">
+                    {@render slots.trail()}
+                </div>
+            {/if}
+		</div> -->
+		AGORA?????????
+		<!-- {#if slots.footer}
+            <footer class="previewer-footer {classesFooter}">
+                {@render slots.footer()}
+            </footer>
+        {/if} -->
 	{:else if tabView === 'code'}
 		<!-- Source -->
-		<div class="previewer-source {classesSource}">
-			<slot name="source">(source)</slot>
-		</div>
+		<!-- <div class="previewer-source {classesSource}">
+			{@render slots.source?.()}
+		</div> -->
+		Sera???????
 	{/if}
 </div>

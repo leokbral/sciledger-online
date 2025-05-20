@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { Avatar } from '@skeletonlabs/skeleton';
+	import { Avatar } from '@skeletonlabs/skeleton-svelte';
 	import { createEventDispatcher } from 'svelte';
 	import type { User } from '$lib/types/User';
 	import type { MessageFeed } from '$lib/types/MessageFeed';
@@ -21,7 +21,7 @@
 	// 	color: string;
 	// }
 
-	let submitButtonText = '';
+	let submitButtonText = $state('');
 
 	onMount(() => {
 		const currentPath = get(page).url.pathname;
@@ -33,19 +33,23 @@
 		}
 	});
 
-	let elemChat: HTMLElement;
+	let elemChat: HTMLElement = $state();
 
-	export let data: any;
-	export let currentUser: User;
+	interface Props {
+		data: any;
+		currentUser: User;
+	}
+
+	let { data, currentUser }: Props = $props();
 
 	// Initialize messageFeed with default values if data.messageFeed is null
-	let messageFeed: MessageFeed = data?.messageFeed ?? {
+	let messageFeed: MessageFeed = $state(data?.messageFeed ?? {
 		messages: [],
 		currentMessage: ''
-	};
+	});
 	
 	// Initialize currentMessage with a default empty string
-	let currentMessage: string = messageFeed?.currentMessage ?? '';
+	let currentMessage: string = $state(messageFeed?.currentMessage ?? '');
 
 	function scrollChatBottom(behavior?: ScrollBehavior): void {
 		elemChat.scrollTo({ top: elemChat.scrollHeight, behavior });
@@ -63,7 +67,7 @@
 			isRead: true,
 			timestamp: `Today @ ${getCurrentTimestamp()}`,
 			message: currentMessage,
-			color: 'variant-soft-primary'
+			color: 'preset-tonal-primary'
 		};
 		// Update the message feed
 		messageFeed.messages = [...messageFeed.messages, newMessage];
@@ -97,7 +101,7 @@
 				{#if bubble.sender.id === currentUser.id}
 					<div class="grid grid-cols-[auto_1fr] gap-2">
 						<Avatar src={bubble.sender.profilePictureUrl} width="w-12" />
-						<div class="card p-4 variant-soft rounded-tl-none space-y-2">
+						<div class="card p-4 preset-tonal rounded-tl-none space-y-2">
 							<header class="flex justify-between items-center">
 								<p class="font-bold">{bubble.sender.username}</p>
 								<small class="opacity-50">{bubble.timestamp}</small>
@@ -107,7 +111,7 @@
 					</div>
 				{:else}
 					<div class="grid grid-cols-[1fr_auto] gap-2">
-						<div class="card p-4 rounded-tr-none space-y-2 variant-soft-primary">
+						<div class="card p-4 rounded-tr-none space-y-2 preset-tonal-primary">
 							<header class="flex justify-between items-center">
 								<p class="font-bold">{bubble.sender.username}</p>
 								<small class="opacity-50">{bubble.timestamp}</small>
@@ -132,10 +136,10 @@
 		></textarea>
 	</section>
 	<div class="flex justify-around gap-3">
-		<button class="bg-primary-500 text-white rounded-lg px-4 py-2" on:click={hdlSaveDraft}
+		<button class="bg-primary-500 text-white rounded-lg px-4 py-2" onclick={hdlSaveDraft}
 			>Save Draft</button
 		>
-		<button class="bg-primary-500 text-white rounded-lg px-4 py-2" on:click={hdlSubmit}
+		<button class="bg-primary-500 text-white rounded-lg px-4 py-2" onclick={hdlSubmit}
 			>{submitButtonText}</button
 		>
 	</div>

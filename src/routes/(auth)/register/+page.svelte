@@ -1,20 +1,22 @@
 <script lang="ts">
-	import '/src/app.postcss';
+	import { preventDefault } from 'svelte/legacy';
+
+	import '/src/app.css';
 	import { goto } from '$app/navigation';
 	import { post } from '$lib/utils';
 	import { fade } from 'svelte/transition';
 
-	let firstName = '';
-	let lastName = '';
-	let username = '';
-	let country = '';
-	let dob = '';
-	let email = '';
-	let password = '';
-	let confirmPassword = '';
-	let processing = false;
+	let firstName = $state('');
+	let lastName = $state('');
+	let username = $state('');
+	let country = $state('');
+	let dob = $state('');
+	let email = $state('');
+	let password = $state('');
+	let confirmPassword = $state('');
+	let processing = $state(false);
 	let isAdmin = false;
-	let formWarning = '';
+	let formWarning = $state('');
 
 	async function submit(event: Event) {
 		//event.preventDefault();
@@ -63,7 +65,7 @@
 
 <div class="flex items-center justify-center min-h-screen bg-surface-100">
 	<div class="w-full max-w-lg p-6 bg-white rounded-xl md:shadow-2xl md:shadow-surface-500/50">
-		<form on:submit|preventDefault={submit} class="space-y-6">
+		<form onsubmit={preventDefault(submit)} class="space-y-6">
 			<img
 				src="https://t4.ftcdn.net/jpg/05/44/04/47/360_F_544044746_Swth0lqH9CcTci8S5p2FS4Jqpcy6HWoI.jpg"
 				alt="Logo"

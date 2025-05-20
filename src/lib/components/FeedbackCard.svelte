@@ -1,20 +1,18 @@
 <script>
-	/**
-	 * What type to use
-	 */
-	export let type = 'alternative';
+	
 
-	/**
-	 * Feedback value
-	 */
-	export let value = '';
+	
 
-	/**
-	 * Is visible?
-	 */
-	export let display = true;
+	
 
-	export let answerKey = true;
+	/** @type {{type?: string, value?: string, display?: boolean, answerKey?: boolean, children?: import('svelte').Snippet}} */
+	let {
+		type = 'alternative',
+		value = $bindable(''),
+		display = true,
+		answerKey = true,
+		children
+	} = $props();
 
 	/**
 	 * Don't mess up!
@@ -35,7 +33,7 @@
 		style="display:{display ? 'initial' : 'none'};"
 		placeholder="Justificativa..."
 	>
-		<slot />
+		{@render children?.()}
 	</div>
 {:else if type === 'essay'}
 	<div
@@ -45,7 +43,7 @@
 		style="display:{display ? 'initial' : 'none'};"
 		placeholder={answerKey ? 'Chave de Resposta...' : 'Feedback'}
 	>
-		<slot />
+		{@render children?.()}
 	</div>
 {/if}
 

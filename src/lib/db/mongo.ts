@@ -4,7 +4,7 @@ config();
 const MONGO_URL = process.env.MONGO_URL;
 
 
-const client = new MongoClient(MONGO_URL)
+const client = new MongoClient(MONGO_URL as string)
 
 console.log(MONGO_URL)
 

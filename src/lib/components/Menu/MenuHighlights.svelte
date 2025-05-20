@@ -1,8 +1,12 @@
 <script lang="ts">
-	export let highlights: { icon: string; value: number; isInactive?: boolean }[];
+	interface Props {
+		highlights: { icon: string; value: number; isInactive?: boolean }[];
+	}
+
+	let { highlights }: Props = $props();
 </script>
 
-<div class="flex text-surface-900-50-token">
+<div class="flex text-surface-950-50">
 	{#each highlights as highlight}
 		<div
 			class="chip"

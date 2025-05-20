@@ -1,9 +1,17 @@
 import { Schema } from "mongoose";
 
 export const ReviewQueueSchema: Schema = new Schema({
-    paperId: { type: String, required: true },
-    assignedReviewers: [{ type: String, ref: 'User' }],
-    peerReviewType: { type: String, enum: ['open', 'selected'], required: true },
-    status: { type: String, enum: ['pending', 'accepted', 'rejected'], required: true },
-    assignedAt: { type: Date, default: Date.now }
-}, { collection: 'reviewqueue' });
+    _id: { type: String, required: true },
+    id: { type: String, default: () => crypto.randomUUID(), unique: true },
+    paperId: { type: String, required: true }, // ID do paper
+    reviewer: { type: Schema.Types.ObjectId, ref: 'User', required: true }, // Um único revisor
+    peerReviewType: { type: String, enum: ['open', 'selected'], required: true }, // Tipo de revisão
+    hubId: { type: String, required: false }, // ID do hub (opcional)
+    isLinkedToHub: { type: Boolean, required: true }, // Se está vinculado a um hub
+    status: { type: String, enum: ['pending', 'accepted', 'declined'], required: true }, // Status
+    assignedAt: { type: Date, required: true, default: Date.now }, // Quando foi designado
+    respondedAt: { type: Date, required: false }, // Quando respondeu
+    createdAt: { type: Date, default: Date.now }, // Data de criação
+    updatedAt: { type: Date, default: Date.now }, // Data de atualização
+},
+    { collection: 'reviewqueue' });

@@ -12,7 +12,7 @@ export const POST: RequestHandler = async ({ request }) => {
     await start_mongo();
 
     try {
-        const { id, mainAuthor, correspondingAuthor, title, abstract, keywords, pdfUrl, submittedBy, price, coAuthors, status, authors, peer_review, selectedReviewers  } =
+        const { id, mainAuthor, correspondingAuthor, title, abstract, keywords, pdfUrl, submittedBy, price, coAuthors, status, authors, peer_review, selectedReviewers, paperPictures, hubId, hub  } =
             await request.json();
 
         // console.log(mainAuthor, correspondingAuthor, title, abstract, keywords, pdfUrl, submittedBy)
@@ -41,10 +41,13 @@ export const POST: RequestHandler = async ({ request }) => {
                 price: price,
                 peer_review,
                 selectedReviewers,
+                paperPictures,
+                hubId: hubId, // Add this line
+                hub: hub, // Add this line
                 updatedAt: new Date().toISOString(),
             },
             { new: true, runValidators: true } // Retorna o documento atualizado e aplica validação
-        ).lean().exec();
+        ).populate('hub').lean().exec(); // Add populate to get hub details
 
         if (!paper) {
             throw new Error('Paper not found');
