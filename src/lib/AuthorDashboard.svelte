@@ -1,4 +1,6 @@
 <script lang="ts">
+	import Icon from '@iconify/svelte';
+
 	// let publishedArticles = 10;
 	// let articlesInReview = 3;
 	// let notifications = 2;
@@ -24,46 +26,54 @@
 
 	let { user, publishedPapers }: Props = $props();
 
-    console.log("Está sendo passado o user no AuthorDashboard", user);
-    console.log("Papers publicados:", publishedPapers);
+	console.log('Está sendo passado o user no AuthorDashboard', user);
+	console.log('Papers publicados:', publishedPapers);
 
-    let totalCitations = $state(0);
-    let publishedArticles = $state(0);
-    let averageReviewTime = $state(0);
-    let highestScorePublication = $state({ score: 0 });
+	let totalCitations = $state(0);
+	let publishedArticles = $state(0);
+	let averageReviewTime = $state(0);
+	let highestScorePublication = $state({ score: 0 });
 
-    // Verifique se user e suas publicações estão definidos antes de usá-los
-    if (user && publishedPapers) {
-        // Calcular o total de citações
-        totalCitations = publishedPapers.reduce((sum: number, paper: { citations: any[] }) => sum + (paper.citations.length || 0), 0);
+	// Verifique se user e suas publicações estão definidos antes de usá-los
+	if (user && publishedPapers) {
+		// Calcular o total de citações
+		totalCitations = publishedPapers.reduce(
+			(sum: number, paper: { citations: any[] }) => sum + (paper.citations.length || 0),
+			0
+		);
 
-        // Calcular o número de artigos publicados
-        publishedArticles = publishedPapers.length;
+		// Calcular o número de artigos publicados
+		publishedArticles = publishedPapers.length;
 
-        // Calcular o tempo médio de revisão (em dias)
-        if (publishedPapers.length) {
-            averageReviewTime = publishedPapers.reduce(
-                (sum: number, paper: { reviewDate: string | number | Date; createdAt: string | number | Date }) =>
-                    sum + (new Date(paper.reviewDate).getTime() - new Date(paper.createdAt).getTime()),
-                0
-            ) / publishedPapers.length / (1000 * 3600 * 24);
-        }
+		// Calcular o tempo médio de revisão (em dias)
+		if (publishedPapers.length) {
+			averageReviewTime =
+				publishedPapers.reduce(
+					(
+						sum: number,
+						paper: { reviewDate: string | number | Date; createdAt: string | number | Date }
+					) => sum + (new Date(paper.reviewDate).getTime() - new Date(paper.createdAt).getTime()),
+					0
+				) /
+				publishedPapers.length /
+				(1000 * 3600 * 24);
+		}
 
-        // Obter a publicação com a maior pontuação
-        highestScorePublication = publishedPapers.reduce(
-            (max: { score: number }, paper: { score: number }) => (paper.score > max.score ? paper : max),
-            { score: 0 }
-        );
-    }
+		// Obter a publicação com a maior pontuação
+		highestScorePublication = publishedPapers.reduce(
+			(max: { score: number }, paper: { score: number }) => (paper.score > max.score ? paper : max),
+			{ score: 0 }
+		);
+	}
 </script>
 
-<section>
-	<div class="p-6 bg-surface-100 mb-4 text-surface-900">
-		<!-- <div class="text-xl font-bold mb-6">Your Activities</div> -->
+<section class="max-w-7xl mx-auto">
+	<!-- <div class="p-6 bg-surface-100 mb-4 text-surface-900"> -->
+	<!-- <div class="text-xl font-bold mb-6">Your Activities</div> -->
 
-		<!-- <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mb-6"> -->
-		<!-- <button> -->
-		<!-- <div class="relative">
+	<!-- <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mb-6"> -->
+	<!-- <button> -->
+	<!-- <div class="relative">
 				<p
 					class="text-ls font-semibold flex items-center gap-2 text-gray-700 hover:text-blue-600 hover:underline transition duration-300 ease-in-out cursor-pointer"
 				>
@@ -113,7 +123,7 @@
 				</p>
 				<! -- <p class="text-ls">{messages}</p> -- >
 			</div> -->
-		<!-- <div class="relative">
+	<!-- <div class="relative">
 				<p
 					class="text-ls font-semibold flex items-center gap-2 text-gray-700 hover:text-blue-600 hover:underline transition duration-300 ease-in-out cursor-pointer"
 				>
@@ -139,7 +149,7 @@
 				<! -- <p class="text-ls">{articlesInReview}</p> -- >
 			</div> -->
 
-		<!-- <div class="relative">
+	<!-- <div class="relative">
 				<p
 					class="text-ls font-semibold flex items-center gap-2 text-gray-700 hover:text-blue-600 hover:underline transition duration-300 ease-in-out cursor-pointer"
 				>
@@ -192,7 +202,7 @@
 				</p>
 			</div> -->
 
-		<!-- <div class="relative">
+	<!-- <div class="relative">
 				<p
 					class="text-ls font-semibold flex items-center gap-2 text-gray-700 hover:text-blue-600 hover:underline transition duration-300 ease-in-out cursor-pointer"
 				>
@@ -325,18 +335,18 @@
 				</p>
 				<! -- <p class="text-ls">{readyForProofreading}</p> -- >
 			</div> -->
-		<!-- </button> -->
-		<!-- <button> -->
+	<!-- </button> -->
+	<!-- <button> -->
 
-		<!-- </button> -->
-		<!-- <button> -->
+	<!-- </button> -->
+	<!-- <button> -->
 
-		<!-- </button> -->
-		<!-- <button> -->
+	<!-- </button> -->
+	<!-- <button> -->
 
-		<!-- </button> -->
-		<!-- <button> -->
-		<!-- <div class="relative">
+	<!-- </button> -->
+	<!-- <button> -->
+	<!-- <div class="relative">
 				<p
 					class="text-ls font-semibold flex items-center gap-2 text-gray-700 hover:text-blue-600 hover:underline transition duration-300 ease-in-out cursor-pointer"
 				>
@@ -361,15 +371,15 @@
 				</p>
 				<! -- <p class="text-ls">{pendingApproval}</p> -- >
 			</div> -->
-		<!-- </button> -->
-		<!-- <button> -->
+	<!-- </button> -->
+	<!-- <button> -->
 
-		<!-- </button> -->
-		<!-- <button> -->
+	<!-- </button> -->
+	<!-- <button> -->
 
-		<!-- </button> -->
-		<!-- <button> -->
-		<!-- <div class="relative">
+	<!-- </button> -->
+	<!-- <button> -->
+	<!-- <div class="relative">
 				<p
 					class="text-ls font-semibold flex items-center gap-2 text-gray-700 hover:text-blue-600 hover:underline transition duration-300 ease-in-out cursor-pointer"
 				>
@@ -421,10 +431,10 @@
 				</p>
 				<! -- <p class="text-ls">{profileViews}</p> -- >
 			</div> -->
-		<!-- </button> -->
-		<!-- </div> -->
+	<!-- </button> -->
+	<!-- </div> -->
 
-		<!-- <div class="text-2xl font-bold mb-4">Quick Actions</div>
+	<!-- <div class="text-2xl font-bold mb-4">Quick Actions</div>
 		<div class="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
 			<button class="bg-primary-500 text-white p-4 rounded-full shadow-sm hover:bg-primary-600"
 				>Submit a New Article</button
@@ -437,23 +447,74 @@
 			>
 		</div> -->
 
-		<div class="text-2xl font-bold mb-4 text-surface-900">Stats Overview</div>
-		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-			<div class="bg-white p-4 shadow-sm rounded-sm text-surface-900">
-				<p class="text-lg font-semibold">Total Publications</p>
-				<p class="text-2xl">{publishedArticles}</p>
+	<div class="bg-surface-50/50 rounded-lg p-8 backdrop-blur-sm">
+		<div class="mb-12">
+			<h2 class="text-3xl font-light text-surface-900 mb-2">Stats Overview</h2>
+			<div class="h-1 w-20 bg-primary-500 rounded-full"></div>
+		</div>
+
+		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+			<!-- Publications Card -->
+			<div
+				class="bg-white p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300 border border-surface-200/50"
+			>
+				<div class="flex flex-col gap-2">
+					<span class="text-sm font-medium text-surface-600">Total Publications</span>
+					<div class="flex items-end justify-between">
+						<span class="text-3xl font-light text-surface-900">{publishedArticles}</span>
+						<Icon
+							icon="material-symbols-light:article-outline"
+							class="text-blue-500"
+							width="24"
+							height="24"
+						/>
+					</div>
+				</div>
 			</div>
-			<div class="bg-white p-4 shadow-sm rounded-sm text-surface-900">
-				<p class="text-lg font-semibold">Total Citations</p>
-				<p class="text-2xl">{totalCitations}</p>
+
+			<!-- Citations Card -->
+			<div
+				class="bg-white p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300 border border-surface-200/50"
+			>
+				<div class="flex flex-col gap-2">
+					<span class="text-sm font-medium text-surface-600">Total Citations</span>
+					<div class="flex items-end justify-between">
+						<span class="text-3xl font-light text-surface-900">{totalCitations}</span>
+						<Icon icon="material-icon-theme:citation" width="24" height="24" />
+					</div>
+				</div>
 			</div>
-			<div class="bg-white p-4 shadow-sm rounded-sm text-surface-900">
-				<p class="text-lg font-semibold">Average Review Time (days)</p>
-				<p class="text-2xl">{averageReviewTime.toFixed()}</p>
+
+			<!-- Review Time Card -->
+			<div
+				class="bg-white p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300 border border-surface-200/50"
+			>
+				<div class="flex flex-col gap-2">
+					<span class="text-sm font-medium text-surface-600">Avg. Review Time</span>
+					<div class="flex items-end justify-between">
+						<div class="flex items-baseline gap-1">
+							<span class="text-3xl font-light text-surface-900">{averageReviewTime.toFixed()}</span
+							>
+							<span class="text-sm text-surface-600">days</span>
+						</div>
+						<Icon icon="mdi-light:clock" class="text-blue-500" width="24" height="24" />
+					</div>
+				</div>
 			</div>
-			<div class="bg-white p-4 shadow-sm rounded-sm text-surface-900">
-				<p class="text-lg font-semibold">Highest Score Publication</p>
-				<p class="text-2xl">{highestScorePublication.score || 'N/A'}</p>
+
+			<!-- Highest Score Card -->
+			<div
+				class="bg-white p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300 border border-surface-200/50"
+			>
+				<div class="flex flex-col gap-2">
+					<span class="text-sm font-medium text-surface-600">Highest Score</span>
+					<div class="flex items-end justify-between">
+						<span class="text-3xl font-light text-surface-900"
+							>{highestScorePublication.score || 'N/A'}</span
+						>
+						<Icon icon="material-symbols:star-rounded" class="text-blue-500" width="24" height="24" />
+					</div>
+				</div>
 			</div>
 		</div>
 		<!-- <div class="bg-white p-4 shadow-sm rounded-sm text-surface-900">

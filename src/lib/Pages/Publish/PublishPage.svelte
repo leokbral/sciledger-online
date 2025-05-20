@@ -36,14 +36,16 @@
 
 	<Tabs value={tabSet} onValueChange={(e) => (tabSet = e.value)}>
 		{#snippet list()}
-			{#each tabs as tab, value}
-				<Tabs.Control value="tab{value}">
-					<div class="flex justify-center">
-						<Icon icon={tab.icon} style="font-size: 2rem;" />
-					</div>
-					<span>{tab.name}</span>
-				</Tabs.Control>
-			{/each}
+			<div class="flex justify-center w-full">
+				{#each tabs as tab, value}
+					<Tabs.Control value="tab{value}">
+						<div class="flex justify-center">
+							<Icon icon={tab.icon} style="font-size: 2rem;" />
+						</div>
+						<span>{tab.name}</span>
+					</Tabs.Control>
+				{/each}
+			</div>
 		{/snippet}
 		<!-- Tab Panels --->
 		{#snippet content()}

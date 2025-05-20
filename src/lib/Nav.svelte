@@ -9,10 +9,10 @@
 	interface Props {
 		pathname: string;
 		user: User;
-		reviewerInvitations: ReviewerInvitations;
+		// reviewerInvitations: ReviewerInvitations;
 	}
 
-	let { pathname, user, reviewerInvitations }: Props = $props();
+	let { pathname, user/* , reviewerInvitations */ }: Props = $props();
 
 	let openState = $state(false); // popover do avatar
 	let showNotifications = $state(false); // popover das notificações
@@ -40,7 +40,7 @@
 {#if user}
 	<div class="flex items-center gap-4">
 		<!-- Botão de Notificações -->
-		<Popover
+		<!-- <Popover
 			open={showNotifications}
 			onOpenChange={(e) => (showNotifications = e.open)}
 			positioning={{ placement: 'bottom-end' }}
@@ -81,11 +81,11 @@
 					<p class="text-sm text-gray-400">No notifications</p>
 				{/if}
 
-				<!-- Passando o componente de convites aqui -->
-				<!-- <h3 class="font-bold text-lg mb-2">Reviewer Invitations</h3>
-				<ReviewerInvitations {reviewerInvitations} /> -->
+				<! -- Passando o componente de convites aqui - ->
+				<! -- <h3 class="font-bold text-lg mb-2">Reviewer Invitations</h3>
+				<ReviewerInvitations {reviewerInvitations} /> - ->
 			{/snippet}
-		</Popover>
+		</Popover> -->
 
 		<!-- Popover do Avatar do Usuário -->
 		<Popover
