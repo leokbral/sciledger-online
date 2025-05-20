@@ -38,6 +38,16 @@ pm2 start npm --name "sciledger" -- run preview -- --host --port 3000
 pm2 save
 ```
 
+2.5. Git Authentication Setup
+```bash
+# Set up Git credentials
+cd /var/www/sciledger
+git remote set-url origin https://YOUR_GITHUB_TOKEN@github.com/leokbral/sciledger-online.git
+
+# Verify remote URL is set correctly
+git remote -v
+```
+
 3. Verify Deployment
 ```bash
 # Check PM2 status
@@ -394,3 +404,33 @@ sudo netstat -tulpn | grep :9305
 # Check SSL handshake
 openssl s_client -connect localhost:9305
 ```
+
+### Working HTTPS Configuration
+
+1. SSL Setup Status ✓
+```bash
+# Certificate Details
+- Valid until: Sep 13 16:11:04 2025 GMT
+- Domain: *.imd.ufrn.br
+- Issuer: GlobalSign RSA OV SSL CA 2018
+
+# Active Ports
+- HTTP: 9305
+- HTTPS: 443
+
+# Working Access Points
+curl http://localhost:9305           # Local HTTP ✓
+curl -k https://localhost           # Local HTTPS ✓
+curl http://10.7.40.192:9305       # Internal HTTP ✓
+curl -k https://10.7.40.192        # Internal HTTPS ✓
+```
+
+2. Current Infrastructure
+```text
+Client -> HTTPS -> Hungria (177.20.147.141) -> HTTP -> VM (10.7.40.192:9305) -> App (localhost:3000)
+```
+
+3. Next Steps
+- Request port 443 forwarding on Hungria
+- Update DNS records
+- Implement automatic HTTP to HTTPS redirect
