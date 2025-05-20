@@ -30,10 +30,10 @@ export async function POST({ params, request, fetch }) {
                 throw new Error('Failed to add reviewer to hub');
             }
 
-            // Delete the invitation after successful acceptance
+        }
+            
             await Invitation.findByIdAndDelete(inviteId);
             console.log('Invitation deleted:', inviteId);
-        }
 
         return json({ success: true });
     } catch (error) {

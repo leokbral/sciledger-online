@@ -37,21 +37,23 @@
 
 	<Tabs value={tabSet} onValueChange={(e) => (tabSet = e.value)}>
 		{#snippet list()}
-		{#each tabs as tab, value}
-			<Tabs.Control value="tab{value}">
-				<div class="flex justify-center">
-					<Icon icon={tab.icon} style="font-size: 2rem;" />
-				</div>
-				<span>{tab.name}</span>
-			</Tabs.Control>
-		{/each}
+			<div class="flex justify-center w-full">
+				{#each tabs as tab, value}
+					<Tabs.Control value="tab{value}">
+						<div class="flex justify-center">
+							<Icon icon={tab.icon} style="font-size: 2rem;" />
+						</div>
+						<span>{tab.name}</span>
+					</Tabs.Control>
+				{/each}
+			</div>
 		{/snippet}
 		<!-- Tab Panels --->
 		{#snippet content()}
 			<!-- <div class="grid gap-3 md:grid-cols-[1fr_auto_1fr]"> -->
 			<div class="grid gap-3 w-full">
 				{#each papers as papersData, i}
-					{#if tabSet === 'tab'+i.toString()}
+					{#if tabSet === 'tab' + i.toString()}
 						<div class="card page p-4 m-auto">
 							{#if tabs[i].name === 'Papers Pool'}
 								{@render requested?.()}

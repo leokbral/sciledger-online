@@ -1,11 +1,13 @@
 <script lang="ts">
+	import Icon from '@iconify/svelte';
+
 	interface Props {
 		reviews?: any[];
 		user?: any;
 	}
 
 	let { reviews = [], user = {} }: Props = $props();
-  
+
 	let articlesPendingReview = 0;
 	let articlesInReview = 0;
 	let articlesReviewed = 0;
@@ -24,54 +26,61 @@
 	let drafts = 0;
 	let upcomingDeadlines = 0;
 	let averageFeedback = $state('N/A');
-	let value = 0; 
-  
+	let value = 0;
+
 	// Verifique se os dados do revisor estão definidos antes de usá-los
 	if (reviews?.length) {
-	  articlesPendingReview = reviews.filter((review: any) => review.status === 'pending').length;
-	  articlesInReview = reviews.filter((review: any) => review.status === 'in review').length;
-	  articlesReviewed = reviews.filter((review: any) => review.status === 'reviewed').length;
-	  articlesNeedingCorrections = reviews.filter((review: any) => review.status === 'needs corrections').length;
-	  articlesAwaitingFinalApproval = reviews.filter((review: any) => review.status === 'awaiting approval').length;
+		articlesPendingReview = reviews.filter((review: any) => review.status === 'pending').length;
+		articlesInReview = reviews.filter((review: any) => review.status === 'in review').length;
+		articlesReviewed = reviews.filter((review: any) => review.status === 'reviewed').length;
+		articlesNeedingCorrections = reviews.filter(
+			(review: any) => review.status === 'needs corrections'
+		).length;
+		articlesAwaitingFinalApproval = reviews.filter(
+			(review: any) => review.status === 'awaiting approval'
+		).length;
 	}
-  
-	if (user) {
-	  notifications = user.notifications?.length || 0;
-	  underNegotiation = user.underNegotiation?.length || 0;
-	  messages = user.messages?.length || 0;
-	  commentsSent = user.commentsSent?.length || 0;
-	  reviewsRequested = user.reviewsRequested?.length || 0;
-  
-	  // Calcular o tempo médio de revisão, caso exista o campo 'reviewDate'
-	  if (reviews?.length) {
-		avgReviewTime = reviews.reduce(
-		  (sum: number, review: { reviewDate: string | number | Date; createdAt: string | number | Date }) =>
-			sum + (new Date(review.reviewDate).getTime() - new Date(review.createdAt).getTime()),
-		  0
-		) / reviews.length / (1000 * 3600 * 24); // converter para dias
-	  }
-  
-	  // Calcular a taxa de aceitação (exemplo simples)
-	  articlesReviewed = articlesReviewed || 0;
-	  articlesNeedingCorrections = articlesNeedingCorrections || 0;
-	  if (articlesReviewed > 0) {
-		acceptanceRate = (articlesReviewed - articlesNeedingCorrections) / articlesReviewed * 100;
-	  }
-  
-	  // Definir impacto dos artigos (simulação, pode vir do banco de dados ou de um campo específico)
-	  articleImpact = user.articleImpact || 3.8;
-  
-	  // Calcular o feedback médio (exemplo simples)
-	  if (user.feedback?.avgScore) {
-		averageFeedback = user.feedback.avgScore || 'N/A';
-	  }
-  
-	  // Calcular a porcentagem de progresso ou conclusão
-	  value = (recentReviewedArticles / totalReviewedArticles) * 100;
-	}
-  </script>
-  
 
+	if (user) {
+		notifications = user.notifications?.length || 0;
+		underNegotiation = user.underNegotiation?.length || 0;
+		messages = user.messages?.length || 0;
+		commentsSent = user.commentsSent?.length || 0;
+		reviewsRequested = user.reviewsRequested?.length || 0;
+
+		// Calcular o tempo médio de revisão, caso exista o campo 'reviewDate'
+		if (reviews?.length) {
+			avgReviewTime =
+				reviews.reduce(
+					(
+						sum: number,
+						review: { reviewDate: string | number | Date; createdAt: string | number | Date }
+					) => sum + (new Date(review.reviewDate).getTime() - new Date(review.createdAt).getTime()),
+					0
+				) /
+				reviews.length /
+				(1000 * 3600 * 24); // converter para dias
+		}
+
+		// Calcular a taxa de aceitação (exemplo simples)
+		articlesReviewed = articlesReviewed || 0;
+		articlesNeedingCorrections = articlesNeedingCorrections || 0;
+		if (articlesReviewed > 0) {
+			acceptanceRate = ((articlesReviewed - articlesNeedingCorrections) / articlesReviewed) * 100;
+		}
+
+		// Definir impacto dos artigos (simulação, pode vir do banco de dados ou de um campo específico)
+		articleImpact = user.articleImpact || 3.8;
+
+		// Calcular o feedback médio (exemplo simples)
+		if (user.feedback?.avgScore) {
+			averageFeedback = user.feedback.avgScore || 'N/A';
+		}
+
+		// Calcular a porcentagem de progresso ou conclusão
+		value = (recentReviewedArticles / totalReviewedArticles) * 100;
+	}
+</script>
 
 <!-- <section>
 	<div class="p-6 bg-surface-100 mb-4 text-surface-900">
@@ -103,7 +112,7 @@
 				</p>
 			</div> -->
 
-			<!-- <div class="relative">
+<!-- <div class="relative">
 				<a href="./review/messages" class="">
 					<p
 						class="text-ls font-semibold flex items-center gap-2 text-gray-700 hover:text-blue-600 hover:underline transition duration-300 ease-in-out cursor-pointer relative"
@@ -184,7 +193,7 @@
 				</a>
 			</div> -->
 
-			<!-- <div class="relative">
+<!-- <div class="relative">
 				<p
 					class="text-ls font-semibold flex items-center gap-2 text-gray-700 hover:text-blue-600 hover:underline transition duration-300 ease-in-out cursor-pointer relative"
 				>
@@ -209,7 +218,7 @@
 				</p>
 			</div> -->
 
-			<!-- <div class="relative">
+<!-- <div class="relative">
 				<p
 					class="text-ls font-semibold flex items-center gap-2 text-gray-700 hover:text-blue-600 hover:underline transition duration-300 ease-in-out cursor-pointer"
 				>
@@ -234,7 +243,7 @@
 				</p>
 			</div> -->
 
-			<!-- <div class="relative">
+<!-- <div class="relative">
 				<p
 					class="text-ls font-semibold flex items-center gap-2 text-gray-700 hover:text-blue-600 hover:underline transition duration-300 ease-in-out cursor-pointer"
 				>
@@ -264,7 +273,7 @@
 				</p>
 			</div> -->
 
-			<!-- <div class="relative">
+<!-- <div class="relative">
 				<p
 					class="text-ls font-semibold flex items-center gap-2 text-gray-700 hover:text-blue-600 hover:underline transition duration-300 ease-in-out cursor-pointer"
 				>
@@ -289,7 +298,7 @@
 				</p>
 			</div> -->
 
-			<!-- <div class="relative">
+<!-- <div class="relative">
 				<p
 					class="text-ls font-semibold flex items-center gap-2 text-gray-700 hover:text-blue-600 hover:underline transition duration-300 ease-in-out cursor-pointer relative"
 				>
@@ -314,7 +323,7 @@
 				</p>
 			</div> -->
 
-			<!-- <div class="relative">
+<!-- <div class="relative">
 				<p
 					class="text-ls font-semibold flex items-center gap-2 text-gray-700 hover:text-blue-600 hover:underline transition duration-300 ease-in-out cursor-pointer relative"
 				>
@@ -339,7 +348,7 @@
 				</p>
 			</div> -->
 
-			<!-- <div class="relative">
+<!-- <div class="relative">
 				<p
 					class="text-ls font-semibold flex items-center gap-2 text-gray-700 hover:text-blue-600 hover:underline transition duration-300 ease-in-out cursor-pointer relative"
 				>
@@ -352,7 +361,7 @@
 				</p>
 			</div> -->
 
-			<!-- <div class="relative">
+<!-- <div class="relative">
 				<p
 					class="text-ls font-semibold flex items-center gap-2 text-gray-700 hover:text-blue-600 hover:underline transition duration-300 ease-in-out cursor-pointer relative"
 				>
@@ -397,38 +406,69 @@
 			</button>
 		</div> -- >
 	</div>
-</section> -->
+</section>
 
 <!-- Section Personal Status -->
-<section>
-	<div class="text-xl font-bold mb-4 text-surface-900-50">Personal Statistics</div>
-	<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-		<div class="bg-white p-4 shadow-sm rounded-sm flex flex-col items-center text-surface-900">
-			<p class="text-lg font-semibold text-center">Average Review Time (days)</p>
-			<p class="text-2xl text-center">{avgReviewTime}</p>
-		</div>
+<section class="bg-surface-50/50 rounded-lg p-8 backdrop-blur-sm mt-8">
+	<div class="mb-12">
+		<h2 class="text-3xl font-light text-surface-900 mb-2">Personal Statistics</h2>
+		<div class="h-1 w-20 bg-primary-500 rounded-full"></div>
+	</div>
 
-		<div class="bg-white p-4 shadow-sm rounded-sm flex flex-col items-center text-surface-900">
-			<p class="text-lg font-semibold text-center">Total Articles Reviewed</p>
-			<p class="text-2xl text-center">{totalReviewedArticles}</p>
-		</div>
-
-		<!-- <div class="bg-white p-4 shadow-sm rounded-sm flex flex-col items-center text-surface-900 gap-4">
-			<p class="text-lg font-semibold text-center">Acceptance Rate (%)</p>
-			<div class="flex items-center justify-center">
-				<ProgressRadial
-					value={acceptanceRate}
-					meter="stroke-primary-500"
-					track="stroke-primary-500/30 text"
-				>
-					{acceptanceRate}%</ProgressRadial
-				>
+	<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+		<!-- Average Review Time Card -->
+		<div
+			class="bg-white p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300 border border-surface-200/50"
+		>
+			<div class="flex flex-col gap-2">
+				<span class="text-sm font-medium text-surface-600">Average Review Time</span>
+				<div class="flex items-end justify-between">
+					<div class="flex items-baseline gap-1">
+						<span class="text-3xl font-light text-surface-900">{avgReviewTime.toFixed(1)}</span>
+						<span class="text-sm text-surface-600">days</span>
+					</div>
+					<Icon icon="mdi-light:clock" class="text-blue-500" width="24" height="24" />
+				</div>
 			</div>
-		</div> -->
+		</div>
 
-		<div class="bg-white p-4 shadow-sm rounded-sm flex flex-col items-center text-surface-900">
-			<p class="text-lg font-semibold text-center">Average Feedback</p>
-			<p class="text-2xl text-center">{averageFeedback}</p>
+		<!-- Total Articles Card -->
+		<div
+			class="bg-white p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300 border border-surface-200/50"
+		>
+			<div class="flex flex-col gap-2">
+				<span class="text-sm font-medium text-surface-600">Total Articles Reviewed</span>
+				<div class="flex items-end justify-between">
+					<span class="text-3xl font-light text-surface-900">{totalReviewedArticles}</span>
+					<Icon icon="material-symbols-light:article-outline" class="text-blue-500" width="24" height="24" />
+				</div>
+			</div>
+		</div>
+
+		<!-- Acceptance Rate Card -->
+		<!-- <div class="bg-white p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300 border border-surface-200/50">
+            <div class="flex flex-col gap-2">
+                <span class="text-sm font-medium text-surface-600">Acceptance Rate</span>
+                <div class="flex items-end justify-between">
+                    <span class="text-3xl font-light text-surface-900">{acceptanceRate.toFixed(1)}%</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-primary-500" viewBox="0 0 24 24">
+                        <path fill="currentColor" d="m9.55 17.308l-4.97-4.97l.714-.713l4.256 4.256l9.156-9.156l.713.714z"/>
+                    </svg>
+                </div>
+            </div>
+        </div> -->
+
+		<!-- Average Feedback Card -->
+		<div
+			class="bg-white p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300 border border-surface-200/50"
+		>
+			<div class="flex flex-col gap-2">
+				<span class="text-sm font-medium text-surface-600">Average Feedback</span>
+				<div class="flex items-end justify-between">
+					<span class="text-3xl font-light text-surface-900">{averageFeedback}</span>
+					<Icon icon="material-symbols:star-rounded" class="text-blue-500" width="24" height="24" />
+				</div>
+			</div>
 		</div>
 	</div>
 </section>
