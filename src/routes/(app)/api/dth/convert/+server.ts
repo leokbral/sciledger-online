@@ -17,7 +17,9 @@ export const POST: RequestHandler = async ({ request }) => {
         console.log('Starting convertion...');
         //const result = await convertDocument(file);
 
-        const response = await fetch('http://127.0.0.1:8000/api/convert', {//modify this to the server in VM
+        // const response = await fetch('http://127.0.0.1:8000/api/convert', {//modify this to the server in VM
+
+        const response = await fetch('https://scideep.imd.ufrn.br/dth/api/convert', {//modify this to the server in VM
             method: 'POST',
             body: formData,
             mode: 'cors',
