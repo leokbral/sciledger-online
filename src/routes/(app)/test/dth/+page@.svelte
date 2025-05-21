@@ -45,7 +45,8 @@
 		console.log('File:', file);
 
 		try {
-			const response = await fetch('http://127.0.0.1:8000/api/convert', {
+			// const response = await fetch('http://127.0.0.1:8000/api/convert', {
+			const response = await fetch('https://scideep.imd.ufrn.br/dth/api/convert', {
 				method: 'POST',
 				body: formData,
 				mode: 'cors',
