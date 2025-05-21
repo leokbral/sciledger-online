@@ -38,6 +38,16 @@ pm2 start npm --name "sciledger" -- run preview -- --host --port 3000
 pm2 save
 ```
 
+2.5. Git Authentication Setup
+```bash
+# Set up Git credentials
+cd /var/www/sciledger
+git remote set-url origin https://YOUR_GITHUB_TOKEN@github.com/leokbral/sciledger-online.git
+
+# Verify remote URL is set correctly
+git remote -v
+```
+
 3. Verify Deployment
 ```bash
 # Check PM2 status
@@ -337,15 +347,53 @@ ls -la /etc/nginx/certs/certificado.crt
 ls -la /etc/nginx/certs/server.key
 
 # 2. Update Nginx configuration
+
+# ANTIGO
+# server {
+#     listen 443 ssl;
+#     listen [::]:443 ssl;
+#     server_name scideep.imd.ufrn.br;
+
+#     ssl_certificate /etc/nginx/certs/certificado.crt;
+#     ssl_certificate_key /etc/nginx/certs/server.key;
+
+#     location / {
+#         proxy_pass http://localhost:3000;
+#         proxy_http_version 1.1;
+#         proxy_set_header Upgrade $http_upgrade;
+#         proxy_set_header Connection 'upgrade';
+#         proxy_set_header Host $host;
+#         proxy_cache_bypass $http_upgrade;
+#         proxy_set_header X-Real-IP $remote_addr;
+#         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+#         proxy_set_header X-Forwarded-Proto $scheme;
+#     }
+# }
+# EOF
+
 sudo tee /etc/nginx/sites-available/sciledger << 'EOF'
 server {
     listen 443 ssl;
     listen [::]:443 ssl;
+    listen 9305;
+    listen [::]:9305;
+
     server_name scideep.imd.ufrn.br;
 
+    # SSL Configuration
     ssl_certificate /etc/nginx/certs/certificado.crt;
     ssl_certificate_key /etc/nginx/certs/server.key;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256;
+    ssl_prefer_server_ciphers off;
 
+    # Fix for header size issues
+    proxy_buffer_size 128k;
+    proxy_buffers 4 256k;
+    proxy_busy_buffers_size 256k;
+    large_client_header_buffers 4 16k;
+
+    # Original SciLedger location
     location / {
         proxy_pass http://localhost:3000;
         proxy_http_version 1.1;
@@ -356,6 +404,22 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # DTH Service location
+    location /dth/ {
+        proxy_pass http://127.0.0.1:8000/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # Handle multipart/form-data properly
+        client_max_body_size 20M;
     }
 }
 EOF
@@ -394,3 +458,33 @@ sudo netstat -tulpn | grep :9305
 # Check SSL handshake
 openssl s_client -connect localhost:9305
 ```
+
+### Working HTTPS Configuration
+
+1. SSL Setup Status ✓
+```bash
+# Certificate Details
+- Valid until: Sep 13 16:11:04 2025 GMT
+- Domain: *.imd.ufrn.br
+- Issuer: GlobalSign RSA OV SSL CA 2018
+
+# Active Ports
+- HTTP: 9305
+- HTTPS: 443
+
+# Working Access Points
+curl http://localhost:9305           # Local HTTP ✓
+curl -k https://localhost           # Local HTTPS ✓
+curl http://10.7.40.192:9305       # Internal HTTP ✓
+curl -k https://10.7.40.192        # Internal HTTPS ✓
+```
+
+2. Current Infrastructure
+```text
+Client -> HTTPS -> Hungria (177.20.147.141) -> HTTP -> VM (10.7.40.192:9305) -> App (localhost:3000)
+```
+
+3. Next Steps
+- Request port 443 forwarding on Hungria
+- Update DNS records
+- Implement automatic HTTP to HTTPS redirect
