@@ -123,7 +123,7 @@
 					class="flex items-center gap-2 text-blue-600 hover:text-blue-700"
 				>
 					<Icon icon="mdi:file-document-outline" width="24" height="24" />
-					<span class="underline">Diretrizes</span>
+					<span class="underline">Guidelines</span>
 				</a>
 			{/if}
 		</div>

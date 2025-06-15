@@ -164,7 +164,7 @@
                 {/each}
             </div>
         {:else}
-            <p class="text-gray-600 text-center py-8">Nenhum artigo submetido ainda.</p>
+            <p class="text-gray-600 text-center py-8">No articles submitted yet.</p>
         {/if}
     </div>
 </section>
