@@ -68,8 +68,24 @@
 		}
 	}
 
-	function hdlSaveDraft(event: MouseEvent & { currentTarget: EventTarget & HTMLButtonElement }) {
-		throw new Error('Function not implemented.');
+	async function handleAcceptReview() {
+		if (!paper || !$page.data.user) return;
+		
+		try {
+			const response = await post(`/review/paperspool/${paper.id}`, {
+				paperId: paper.id,
+				reviewerId: $page.data.user.id
+			});
+
+			if (response.success) {
+				await goto('/review/');
+			} else {
+				alert('Failed to accept review. Please try again.');
+			}
+		} catch (error) {
+			console.error(error);
+			alert('An error occurred while accepting the review.');
+		}
 	}
 
 	function hdlSubmit(event: MouseEvent & { currentTarget: EventTarget & HTMLButtonElement }) {
@@ -99,7 +115,7 @@
             </button>
             <button
                 class="btn variant-filled-success px-8 py-3 rounded-lg flex items-center gap-2"
-                onclick={hdlSaveDraft}
+                onclick={handleAcceptReview}
             >
                 <Icon icon="fluent-mdl2:accept" class="size-5" />
                 Accept Review
