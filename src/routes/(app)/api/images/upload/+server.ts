@@ -11,11 +11,11 @@ async function saveImage(file: File) {
     console.log('Saving image:', file.name, file.size, file.type, file.lastModified);
     const fileHash = await getUniqueFileHash(file);
     const customId = crypto.randomUUID();
-    
+
     // Check if image already exists
     const dbFile = await fsFiles.findOne({ 'metadata.fileHash': fileHash });
-    console.log(dbFile,fileHash)
-    
+    console.log(dbFile, fileHash);
+
     if (!dbFile) {
         const arrayBuffer = await file.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
@@ -30,7 +30,7 @@ async function saveImage(file: File) {
                 lastModified: file.lastModified,
                 size: file.size,
                 type: 'image' // Add type to distinguish from PDFs
-            },
+            }
         });
 
         await new Promise((resolve, reject) => {
@@ -52,22 +52,33 @@ async function getUniqueFileHash(file: File): Promise<string> {
     return hash;
 }
 
+export const OPTIONS: RequestHandler = async () => {
+    return new Response(null, {
+        status: 204,
+        headers: {
+            'Access-Control-Allow-Origin': '*', // ou 'http://localhost:8000' se quiser restringir
+            'Access-Control-Allow-Methods': 'POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type'
+        }
+    });
+};
+
 export const POST: RequestHandler = async ({ request }) => {
+    console.log('POST request received for image upload');
     console.log('Received request to upload image');
     try {
         const formData = await request.formData();
-        const file = formData.get('file') as File;
+        const file = formData.get('image') as File;
 
         if (!file) {
             return new Response(
-                JSON.stringify({ message: 'No image uploaded' }), 
+                JSON.stringify({ message: 'No image uploaded' }),
                 {
                     status: 400,
-                    headers: { 'Content-Type': 'application/json',
-                        'Access-Control-Allow-Origin': '*',  // Permitir todas as origens
-                        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',  // Permitir os métodos
-                        'Access-Control-Allow-Headers': 'Content-Type',  // Permitir cabeçalhos necessários
-                     }
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Access-Control-Allow-Origin': '*'
+                    }
                 }
             );
         }
@@ -75,10 +86,13 @@ export const POST: RequestHandler = async ({ request }) => {
         // Validate file type
         if (!file.type.startsWith('image/')) {
             return new Response(
-                JSON.stringify({ message: 'File must be an image' }), 
+                JSON.stringify({ message: 'File must be an image' }),
                 {
                     status: 400,
-                    headers: { 'Content-Type': 'application/json' }
+                    headers: { 
+                        'Content-Type': 'application/json', 
+                        'Access-Control-Allow-Origin': '*'
+                     }
                 }
             );
         }
@@ -92,20 +106,26 @@ export const POST: RequestHandler = async ({ request }) => {
             }),
             {
                 status: 200,
-                headers: { 'Content-Type': 'application/json' }
+                headers: { 
+                    'Content-Type': 'application/json',
+                     'Access-Control-Allow-Origin': '*' 
+                    }
             }
         );
 
     } catch (err) {
         console.error('Image upload failed:', err);
         return new Response(
-            JSON.stringify({ 
-                message: 'Failed to upload image', 
-                error: (err as Error).message 
+            JSON.stringify({
+                message: 'Failed to upload image',
+                error: (err as Error).message
             }),
             {
                 status: 500,
-                headers: { 'Content-Type': 'application/json' }
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*'
+                 }
             }
         );
     }
