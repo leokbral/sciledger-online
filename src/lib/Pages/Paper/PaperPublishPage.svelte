@@ -236,7 +236,7 @@
 		$store.status = 'under negotiation';
 		console.log($store);
 
-		hdlSaveDraft(event)
+		hdlSaveDraft(event);
 		//savePaper($store);
 	}
 
@@ -278,8 +278,6 @@
 			console.log('Document converted successfully!');
 		});
 	}
-
-	
 
 	interface ImageItem {
 		id?: string;
@@ -562,7 +560,9 @@
 		<div class="mb-8" id="docx">
 			<div class="border border-gray-300 p-4 h-[80vh] w-full overflow-auto">
 				{#if content}
-					<div class="mt-4">
+					<div
+						class="mt-4 text-surface-950 prose prose-m max-w-none [&>p]:text-lg [&>ol>li]:text-base [&>ol>li]:marker:text-primary-500 paper-content"
+					>
 						{@html content}
 					</div>
 				{:else if docxPreview}
