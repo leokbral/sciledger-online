@@ -13,6 +13,7 @@
 	import IconDropzone from '@lucide/svelte/icons/image-plus';
 	import IconFile from '@lucide/svelte/icons/paperclip';
 	import IconRemove from '@lucide/svelte/icons/circle-x';
+	import OrcidProfile from '$lib/components/OrcidProfile/OrcidProfile.svelte';
 
 	let fileName = $state('');
 	let pdfPaperPreview = $state();
@@ -20,6 +21,14 @@
 	// Add these new variables
 	let docxPreview = $state();
 	let docxFile: File | null = $state(null);
+
+	// ORCID search variables
+	let orcidId = $state('');
+	let orcidProfile = $state(null);
+	let isSearchingOrcid = $state(false);
+	let orcidError = $state('');
+	let isAddingOrcidUser = $state(false);
+	let selectedOrcidProfile = $state(false);
 
 	interface Props {
 		authorsOptions: any;
@@ -315,6 +324,117 @@
 	function deleteImage(id: string) {
 		imageItems = imageItems.filter((item) => item.id !== id);
 	}
+
+	// Function to search ORCID profile
+	async function searchOrcidProfile() {
+		if (!orcidId.trim()) {
+			orcidError = 'Please enter an ORCID ID';
+			return;
+		}
+
+		// Validate ORCID format (basic validation)
+		const orcidRegex = /^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$/;
+		if (!orcidRegex.test(orcidId)) {
+			orcidError = 'Invalid ORCID format. Use format: 0000-0000-0000-0000';
+			return;
+		}
+
+		isSearchingOrcid = true;
+		orcidError = '';
+
+		try {
+			const response = await fetch(`/api/orcid/${orcidId}`);
+			
+			if (!response.ok) {
+				throw new Error('ORCID profile not found');
+			}
+
+			const data = await response.json();
+			orcidProfile = data.profile;
+			orcidError = '';
+		} catch (error) {
+			console.error('Error fetching ORCID profile:', error);
+			orcidError = 'Error fetching ORCID profile. Please check the ID and try again.';
+			orcidProfile = null;
+		} finally {
+			isSearchingOrcid = false;
+		}
+	}
+
+	// Function to handle ORCID profile selection
+	function handleOrcidSelection(event: any) {
+		selectedOrcidProfile = event.detail.isSelected;
+	}
+
+	// Function to add ORCID profile as co-author
+	async function addOrcidAsCoauthor(event: any) {
+    const { profile, email } = event.detail;
+    
+    if (!selectedOrcidProfile) {
+        orcidError = 'Please select the profile first';
+        return;
+    }
+
+    isAddingOrcidUser = true;
+    
+    try {
+        const response = await fetch('/api/orcid/add-user', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 
+                orcidProfile: profile,
+                email: email
+            })
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            if (response.status === 409) {
+                // User already exists, add them anyway
+                const existingUser = errorData.user;
+                authorsOptions = [...authorsOptions, { ...existingUser, label: existingUser.username }];
+                inputAuthorList = [...inputAuthorList, existingUser.username];
+                clearOrcidSearch();
+                alert(`${existingUser.firstName} ${existingUser.lastName} added as co-author (existing user)!`);
+                return;
+            }
+            throw new Error(errorData.error || 'Failed to add ORCID user');
+        }
+        
+        const data = await response.json();
+        const newUser = data.user;
+        
+        // Adicionar o novo usuário às opções de autores
+        authorsOptions = [...authorsOptions, { ...newUser, label: newUser.username }];
+        
+        // Adicionar o usuário à lista de autores
+        inputAuthorList = [...inputAuthorList, newUser.username];
+        
+        // Limpar a busca ORCID
+        clearOrcidSearch();
+        
+        // Mostrar mensagem de sucesso
+        const emailInfo = data.hasEmail ? 'with email' : 'as pre-registration (no email)';
+        const passwordInfo = data.tempPassword ? ` Temporary password: ${data.tempPassword}` : '';
+        alert(`${newUser.firstName} ${newUser.lastName} added as co-author successfully ${emailInfo}!${passwordInfo}`);
+        
+    } catch (error) {
+        console.error('Error adding ORCID user:', error);
+        orcidError = error instanceof Error ? error.message : 'Failed to add ORCID profile as co-author. Please try again.';
+    } finally {
+        isAddingOrcidUser = false;
+    }
+	}
+
+	// Function to clear ORCID search
+	function clearOrcidSearch() {
+		orcidId = '';
+		orcidProfile = null;
+		orcidError = '';
+		selectedOrcidProfile = false;
+	}
 </script>
 
 <main class="grid p-5">
@@ -378,6 +498,86 @@
 				</div>
 			</section>
 
+			<!-- ORCID Search Section -->
+			<section class="mb-6 w-full">
+				<div class="bg-surface-50 dark:bg-surface-800 rounded-lg p-4 border">
+					<h3 class="text-lg font-semibold mb-3 text-surface-900 dark:text-surface-100">
+						ORCID Profile Search & Add Co-authors
+					</h3>
+					
+					<div class="flex gap-2 mb-4">
+						<div class="flex-1">
+							<label for="orcid-input" class="block mb-1 text-sm font-medium">
+								ORCID ID
+							</label>
+							<input
+								id="orcid-input"
+								type="text"
+								bind:value={orcidId}
+								placeholder="0000-0000-0000-0000"
+								class="w-full p-2 border border-surface-300 rounded-lg text-sm"
+								disabled={isSearchingOrcid}
+							/>
+						</div>
+						<div class="flex items-end gap-2">
+							<button
+								type="button"
+								onclick={searchOrcidProfile}
+								disabled={isSearchingOrcid || !orcidId.trim()}
+								class="bg-primary-500 hover:bg-primary-600 disabled:bg-surface-300 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+							>
+								{#if isSearchingOrcid}
+									Searching...
+								{:else}
+									Search
+								{/if}
+							</button>
+							
+							{#if orcidProfile || orcidId}
+								<button
+									type="button"
+									onclick={clearOrcidSearch}
+									disabled={isSearchingOrcid}
+									class="bg-surface-500 hover:bg-surface-600 disabled:bg-surface-300 text-white px-3 py-2 rounded-lg text-sm transition-colors"
+								>
+									Clear
+								</button>
+							{/if}
+						</div>
+					</div>
+
+					{#if orcidError}
+						<div class="mb-3 p-3 bg-error-100 border border-error-300 text-error-700 rounded-lg text-sm">
+							{orcidError}
+						</div>
+					{/if}
+
+					{#if isSearchingOrcid}
+						<div class="flex items-center justify-center py-8">
+							<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
+							<span class="ml-2 text-sm text-surface-600">Searching ORCID profile...</span>
+						</div>
+					{/if}
+
+					{#if orcidProfile}
+						<div class="mt-4">
+							<h4 class="text-md font-medium mb-2 text-surface-800 dark:text-surface-200">
+								Found Profile:
+							</h4>
+							<OrcidProfile 
+                                profile={orcidProfile} 
+                                showAddButton={true}
+                                canSelect={true}
+                                isSelected={selectedOrcidProfile}
+                                isAdding={isAddingOrcidUser}
+                                on:select={handleOrcidSelection}
+                                on:addAsCoauthor={addOrcidAsCoauthor}
+                            />
+						</div>
+					{/if}
+				</div>
+			</section>
+
 			<section class="mb-4 w-full">
 				<label for="abstract" class="block mb-1">Abstract</label>
 				<RichTextEditor
@@ -386,6 +586,13 @@
 					placeholder="Enter the abstract..."
 				/>
 			</section>
+
+			
+
+			<!-- Current Author Profile (if no ORCID search) -->
+			<!-- {#if !orcidProfile}
+				<OrcidProfile profile={author} />
+			{/if} -->
 
 			<!-- {$store.abstract}
 			<section class="mb-4 w-full">

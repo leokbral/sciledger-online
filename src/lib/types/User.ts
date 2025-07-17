@@ -12,6 +12,9 @@ export type User = {
     email: string; // Email do usuário
     password: string; // Senha do usuário
     refreshToken?: string; // Token para gerenciar sessões de login
+    resetPasswordToken: string;
+    resetPasswordExpiry: string; // Expiração do token de recuperação de senha
+    emailVerified: boolean; // Verificação de email
     darkMode: boolean; // Tema escuro
     roles: {
         author: boolean; // Se o usuário é um autor
