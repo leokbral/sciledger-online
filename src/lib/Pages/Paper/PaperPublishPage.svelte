@@ -344,7 +344,7 @@
 
 		try {
 			const response = await fetch(`/api/orcid/${orcidId}`);
-			
+
 			if (!response.ok) {
 				throw new Error('ORCID profile not found');
 			}
@@ -368,64 +368,90 @@
 
 	// Function to add ORCID profile as co-author
 	async function addOrcidAsCoauthor(event: any) {
-    const { profile, email } = event.detail;
-    
-    if (!selectedOrcidProfile) {
-        orcidError = 'Please select the profile first';
-        return;
-    }
+		const { profile, email } = event.detail;
 
-    isAddingOrcidUser = true;
-    
-    try {
-        const response = await fetch('/api/orcid/add-user', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ 
-                orcidProfile: profile,
-                email: email
-            })
-        });
-        
-        if (!response.ok) {
-            const errorData = await response.json();
-            if (response.status === 409) {
-                // User already exists, add them anyway
-                const existingUser = errorData.user;
-                authorsOptions = [...authorsOptions, { ...existingUser, label: existingUser.username }];
-                inputAuthorList = [...inputAuthorList, existingUser.username];
-                clearOrcidSearch();
-                alert(`${existingUser.firstName} ${existingUser.lastName} added as co-author (existing user)!`);
-                return;
-            }
-            throw new Error(errorData.error || 'Failed to add ORCID user');
-        }
-        
-        const data = await response.json();
-        const newUser = data.user;
-        
-        // Adicionar o novo usuário às opções de autores
-        authorsOptions = [...authorsOptions, { ...newUser, label: newUser.username }];
-        
-        // Adicionar o usuário à lista de autores
-        inputAuthorList = [...inputAuthorList, newUser.username];
-        
-        // Limpar a busca ORCID
-        clearOrcidSearch();
-        
-        // Mostrar mensagem de sucesso
-        const emailInfo = data.hasEmail ? 'with email' : 'as pre-registration (no email)';
-        const passwordInfo = data.tempPassword ? ` Temporary password: ${data.tempPassword}` : '';
-        alert(`${newUser.firstName} ${newUser.lastName} added as co-author successfully ${emailInfo}!${passwordInfo}`);
-        
-    } catch (error) {
-        console.error('Error adding ORCID user:', error);
-        orcidError = error instanceof Error ? error.message : 'Failed to add ORCID profile as co-author. Please try again.';
-    } finally {
-        isAddingOrcidUser = false;
-    }
+		if (!selectedOrcidProfile) {
+			orcidError = 'Please select the profile first';
+			return;
+		}
+
+		isAddingOrcidUser = true;
+
+		try {
+			const response = await fetch('/api/orcid/add-user', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					orcidProfile: profile,
+					email: email
+				})
+			});
+
+			if (!response.ok) {
+				const errorData = await response.json();
+				if (response.status === 409) {
+					// User already exists, add them anyway
+					const existingUser = errorData.user;
+					authorsOptions = [...authorsOptions, { ...existingUser, label: existingUser.username }];
+					inputAuthorList = [...inputAuthorList, existingUser.username];
+					clearOrcidSearch();
+					alert(
+						`${existingUser.firstName} ${existingUser.lastName} added as co-author (existing user)!`
+					);
+					return;
+				}
+				throw new Error(errorData.error || 'Failed to add ORCID user');
+			}
+
+			const data = await response.json();
+			const newUser = data.user;
+
+			// Adicionar o novo usuário às opções de autores
+			authorsOptions = [...authorsOptions, { ...newUser, label: newUser.username }];
+
+			// Adicionar o usuário à lista de autores
+			inputAuthorList = [...inputAuthorList, newUser.username];
+
+			// Limpar a busca ORCID
+			clearOrcidSearch();
+
+			if (newUser.email) {
+				try {
+					await fetch('/api/email/coauthor', {
+						method: 'POST',
+						headers: {
+							'Content-Type': 'application/json'
+						},
+						body: JSON.stringify({
+							coAuthorName: `${newUser.firstName} ${newUser.lastName}`,
+							coAuthorEmail: newUser.email,
+							inviterName: `${author.firstName} ${author.lastName}`,
+							projectTitle: $store.title,
+							loginUrl: 'https://scideep.imd.ufrn.br/recovery'
+						})
+					});
+				} catch (emailError) {
+					console.warn('Falha ao enviar e-mail ao coautor:', emailError);
+				}
+			}
+
+			// Mostrar mensagem de sucesso
+			const emailInfo = data.hasEmail ? 'with email' : 'as pre-registration (no email)';
+			const passwordInfo = data.tempPassword ? ` Temporary password: ${data.tempPassword}` : '';
+			alert(
+				`${newUser.firstName} ${newUser.lastName} added as co-author successfully ${emailInfo}!${passwordInfo}`
+			);
+		} catch (error) {
+			console.error('Error adding ORCID user:', error);
+			orcidError =
+				error instanceof Error
+					? error.message
+					: 'Failed to add ORCID profile as co-author. Please try again.';
+		} finally {
+			isAddingOrcidUser = false;
+		}
 	}
 
 	// Function to clear ORCID search
@@ -504,12 +530,10 @@
 					<h3 class="text-lg font-semibold mb-3 text-surface-900 dark:text-surface-100">
 						ORCID Profile Search & Add Co-authors
 					</h3>
-					
+
 					<div class="flex gap-2 mb-4">
 						<div class="flex-1">
-							<label for="orcid-input" class="block mb-1 text-sm font-medium">
-								ORCID ID
-							</label>
+							<label for="orcid-input" class="block mb-1 text-sm font-medium"> ORCID ID </label>
 							<input
 								id="orcid-input"
 								type="text"
@@ -532,7 +556,7 @@
 									Search
 								{/if}
 							</button>
-							
+
 							{#if orcidProfile || orcidId}
 								<button
 									type="button"
@@ -547,7 +571,9 @@
 					</div>
 
 					{#if orcidError}
-						<div class="mb-3 p-3 bg-error-100 border border-error-300 text-error-700 rounded-lg text-sm">
+						<div
+							class="mb-3 p-3 bg-error-100 border border-error-300 text-error-700 rounded-lg text-sm"
+						>
 							{orcidError}
 						</div>
 					{/if}
@@ -564,15 +590,15 @@
 							<h4 class="text-md font-medium mb-2 text-surface-800 dark:text-surface-200">
 								Found Profile:
 							</h4>
-							<OrcidProfile 
-                                profile={orcidProfile} 
-                                showAddButton={true}
-                                canSelect={true}
-                                isSelected={selectedOrcidProfile}
-                                isAdding={isAddingOrcidUser}
-                                on:select={handleOrcidSelection}
-                                on:addAsCoauthor={addOrcidAsCoauthor}
-                            />
+							<OrcidProfile
+								profile={orcidProfile}
+								showAddButton={true}
+								canSelect={true}
+								isSelected={selectedOrcidProfile}
+								isAdding={isAddingOrcidUser}
+								on:select={handleOrcidSelection}
+								on:addAsCoauthor={addOrcidAsCoauthor}
+							/>
 						</div>
 					{/if}
 				</div>
@@ -586,8 +612,6 @@
 					placeholder="Enter the abstract..."
 				/>
 			</section>
-
-			
 
 			<!-- Current Author Profile (if no ORCID search) -->
 			<!-- {#if !orcidProfile}
