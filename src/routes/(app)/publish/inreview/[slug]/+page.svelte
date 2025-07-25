@@ -93,7 +93,7 @@
 {#if paper}
 	<div class="container page max-w-[700px] p-4 m-auto">
 		<div>PROGRESS BAR TIME
-			<Progress value={60} max={100} class="my-8" />
+			<Progress value={60} max={100} />
 		</div>
 
 		<div class="row">
