@@ -1,5 +1,6 @@
 import type { Hub } from "./Hub";
 import type { User } from "./User";
+import type { Review } from "./Review";
 
 export type Paper = {
     _id: string; // ID interno do MongoDB
@@ -30,6 +31,11 @@ export type Paper = {
             status: 'pending' | 'accepted' | 'declined';
             responseDate?: Date;
         }>;
+        // Adicionar campos relacionados às reviews
+        reviews: Review[]; // Lista de reviews associadas
+        averageScore: number; // Média das avaliações
+        reviewCount: number; // Número de reviews completadas
+        reviewStatus: 'not_started' | 'in_progress' | 'completed';
     };
 
     /*  peer_review: {

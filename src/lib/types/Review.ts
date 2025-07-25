@@ -1,42 +1,61 @@
+import type { User } from "./User";
+import type { Paper } from "./Paper";
+
 // ReviewType.ts
 export type Review = {
     _id: string; // ID interno do MongoDB
 	id: string; // UUID gerado para identificação única da revisão
 
-	paper: string; // ID do artigo sendo avaliado
-	reviewer: string; // ID do revisor responsável pela avaliação
+	paperId: Paper | string; // ID do artigo sendo avaliado
+	reviewerId: User | string; // ID do revisor responsável pela avaliação
+	paperTitle: string; // Título do artigo
 
-	reviewType: 'open' | 'selected'; // Tipo de revisão: aberta para todos ou com revisores designados
+	// Parte I – Avaliação Quantitativa (notas de 1 a 5)
+	quantitativeEvaluation: {
+		originality: number; // Originalidade
+		clarity: number; // Clareza
+		literatureReview: number; // Revisão da literatura
+		theoreticalFoundation: number; // Fundamentação teórica
+		methodology: number; // Metodologia
+		reproducibility: number; // Reproduzibilidade
+		results: number; // Resultados
+		figures: number; // Figuras
+		limitations: number; // Limitações
+		language: number; // Linguagem
+		impact: number; // Impacto
+	};
 
-	// Avaliação por critérios técnicos
-	technicalCorrectness?: 'Excellent' | 'Good' | 'Acceptable' | 'Fair' | 'Very Poor'; // Correção técnica do conteúdo
-	novelty?: 'Excellent' | 'Good' | 'Acceptable' | 'Fair' | 'Very Poor'; // Inovação e originalidade do trabalho
-	figuresQuality?: 'Excellent' | 'Good' | 'Acceptable' | 'Fair' | 'Very Poor'; // Qualidade das figuras e ilustrações
-	experimentalQuality?: 'Excellent' | 'Good' | 'Acceptable' | 'Fair' | 'Very Poor'; // Confiabilidade e qualidade experimental
-	reproducibility?: 'Excellent' | 'Good' | 'Acceptable' | 'Fair' | 'Very Poor'; // Facilidade de reproduzir os resultados
-	importance?: 'Excellent' | 'Good' | 'Acceptable' | 'Fair' | 'Very Poor'; // Importância e impacto potencial da pesquisa
-	clarity?: 'Excellent' | 'Good' | 'Acceptable' | 'Fair' | 'Very Poor'; // Clareza do texto e organização
-	length?: 'Too Short' | 'Acceptable' | 'Too Long'; // Tamanho do artigo em relação ao conteúdo
-	generalOverview?: 'Excellent' | 'Good' | 'Acceptable' | 'Fair' | 'Very Poor'; // Avaliação geral qualitativa
+	// Parte II – Avaliação Qualitativa
+	qualitativeEvaluation: {
+		strengths: string; // Pontos fortes
+		weaknesses: string; // Pontos fracos
+	};
 
-	recommendation: 'Accept' | 'Weak accept' | 'Indifferent' | 'Weak reject' | 'Reject'; // Recomendação final do revisor
+	// Parte III – Ética
+	ethics: {
+		involvesHumanResearch: 'yes' | 'no' | ''; // Envolve pesquisa com humanos?
+		ethicsApproval?: 'adequate' | 'justified' | 'absent' | ''; // Aprovação ética
+	};
 
-	commentsToAuthor: string; // Comentários visíveis ao autor, explicando a decisão
-	confidentialComments?: string; // Comentários privados destinados apenas aos editores
+	// Parte IV – Recomendação
+	recommendation: 'accept_without_changes' | 'accept_with_minor_revisions' | 'major_revision' | 'reject' | '';
 
-	score?: number; // Pontuação numérica geral (0–5)
-	comments?: string; // Comentário geral do revisor
+	// Campos calculados
+	averageScore: number; // Pontuação média
+	weightedScore: number; // Pontuação ponderada
 
-	status: 'pending' | 'accepted' | 'rejected' | 'needs_revision'; // Estado atual da revisão
+	// Status e metadados
+	status: 'draft' | 'submitted' | 'completed'; // Estado da revisão
+	submissionDate?: Date; // Data de submissão
+	completionDate?: Date; // Data de conclusão
+	createdAt: Date; // Data de criação do registro
+	updatedAt: Date; // Data da última atualização do registro
+};
 
-	responseTime?: number; // Tempo (em dias) que o revisor levou para enviar a revisão
-	assignedAt?: string; // Data de atribuição da revisão
-	completedAt?: string; // Data em que a revisão foi finalizada
-
-	feedbackForAuthor?: string; // Feedback pós-submissão dado pelo editor ao autor
-	feedbackForReviewer?: string; // Feedback para o revisor, dado pelo autor ou editor
-	isFeedbackAcknowledged?: boolean; // Indica se o revisor ou autor visualizou/aceitou o feedback
-
-	createdAt: string; // Data de criação do registro
-	updatedAt: string; // Data da última atualização do registro
+export type ReviewCriteria = {
+	name: keyof Review['quantitativeEvaluation']; // Nome do critério
+	title: string; // Título do critério
+	description: string; // Descrição do critério
+	options: string[]; // Opções disponíveis para o critério
+	weight: string; // Peso do critério na avaliação
 };
