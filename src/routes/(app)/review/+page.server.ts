@@ -7,34 +7,57 @@ import { redirect } from '@sveltejs/kit';
 
 export async function load({ locals }) {
     const user = locals.user;
-    if (!user) { redirect(302, '/login') }
+    if (!user) redirect(302, '/login');
 
-    await start_mongo(); // Não necessário mais
+    await start_mongo(); // Pode ser removido se já estiver conectado
 
     const fetchUsers = async () => {
-        const users = await Users.find({}, {}).lean().exec();
-        return users;
+        return await Users.find({}, {}).lean().exec();
     };
 
-    // MUDAR AKI -- CONSERTAR O FILTRO E O POPULATE
     const fetchPapers = async () => {
-        const papers = await Papers.find({}, {})
+        const papersRaw = await Papers.find({}, {})
             .populate("mainAuthor")
             .populate("coAuthors")
             .populate("correspondingAuthor")
             .populate("hubId")
-
             .lean()
             .exec();
+
+        // Normalizar peer_review para cada paper
+        const papers = papersRaw.map((paper) => {
+            const peer_review = paper.peer_review
+                ? {
+                    reviewType: paper.peer_review.reviewType,
+                    assignedReviewers: paper.peer_review.assignedReviewers ?? [],
+                    responses: paper.peer_review.responses ?? [],
+                    reviews: paper.peer_review.reviews ?? [],
+                    averageScore: paper.peer_review.averageScore ?? 0,
+                    reviewCount: paper.peer_review.reviewCount ?? 0,
+                    reviewStatus: paper.peer_review.reviewStatus ?? 'not_started'
+                }
+                : {
+                    reviewType: "open",
+                    assignedReviewers: [],
+                    responses: [],
+                    reviews: [],
+                    averageScore: 0,
+                    reviewCount: 0,
+                    reviewStatus: "not_started"
+                };
+
+            return {
+                ...paper,
+                peer_review
+            };
+        });
+
         return papers;
     };
-    // Buscar as revisões do revisor
-    const fetchReviews = async (reviewerId: string) => {
-        const reviews = await Reviews.find({ reviewer: reviewerId }).lean().exec();
-        return reviews;
-    };
 
-    const reviews = await fetchReviews(user.id);  // Passando o _id do usuário como revisor
+    const fetchReviews = async (reviewerId: string) => {
+        return await Reviews.find({ reviewer: reviewerId }).lean().exec();
+    };
 
     const fetchReviewInvitation = async (reviewerId: string) => {
         const invitations = await Invitations.find({ reviewer: reviewerId }).lean().exec();
@@ -45,8 +68,8 @@ export async function load({ locals }) {
     return {
         users: await fetchUsers(),
         papers: await fetchPapers(),
-        reviews,  // Passando as revisões para o frontend
-        user,  // Passando as informações do usuário
-        reviewerInvitations: await fetchReviewInvitation(user.id) // Passando as convites de revisão
+        reviews: await fetchReviews(user.id),
+        user,
+        reviewerInvitations: await fetchReviewInvitation(user.id)
     };
 }
