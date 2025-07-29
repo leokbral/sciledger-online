@@ -1,4 +1,4 @@
-import /* mongoose, */ { Schema } from 'mongoose';
+import { Schema } from 'mongoose';
 import * as crypto from 'crypto';
 
 export const PaperSchema: Schema = new Schema({
@@ -30,7 +30,12 @@ export const PaperSchema: Schema = new Schema({
                 reviewerId: { type: String, ref: 'User' },
                 status: { type: String, enum: ['pending', 'accepted', 'declined'], default: 'pending' },
                 responseDate: { type: Date }
-            }]
+            }],
+            // Adicionar referências às reviews
+            reviews: [{ type: String, ref: 'Review' }], // Lista de reviews associadas
+            averageScore: { type: Number, default: 0, min: 0, max: 5 }, // Média das avaliações
+            reviewCount: { type: Number, default: 0 }, // Número de reviews completadas
+            reviewStatus: { type: String, enum: ['not_started', 'in_progress', 'completed'], default: 'not_started' }
         }
     },
 

@@ -427,7 +427,7 @@
 		</div> -->
 
 		<!-- Peer Review Options -->
-		<!-- <label for="peer_review" class="block mb-1">Peer Review Options</label>
+		<label for="peer_review" class="block mb-1">Peer Review Options</label>
 		<select
 			id="peer_review"
 			name="peer_review"
@@ -437,7 +437,7 @@
 			<option value="" disabled selected>Select peer review option</option>
 			<option value="open">Open</option>
 			<option value="selected">Selected</option>
-		</select> -->
+		</select>
 
 		{#if peer_review === 'selected'}
 			<AvailableReviewers {reviewers} {selectedReviewers} {toggleReviewerSelection} />

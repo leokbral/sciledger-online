@@ -5,32 +5,63 @@ import { start_mongo } from '$lib/db/mongo';
 import { redirect } from '@sveltejs/kit';
 
 export async function load({ locals }) {
-    const user = locals.user;
-    if (!user) { redirect(302, '/login') }
+	const user = locals.user;
+	if (!user) {
+		redirect(302, '/login');
+	}
 
-    await start_mongo(); // Não necessário mais
+	await start_mongo(); // Pode ser removido se a conexão já estiver gerenciada
 
-    const fetchUsers = async () => {
-        const users = await Users.find({}, {}).lean().exec();
-        return users;
-    };
+	const fetchUsers = async () => {
+		return await Users.find({}, {}).lean().exec();
+	};
 
-    // MUDAR AKI -- CONSERTAR O FILTRO E O POPULATE
-    const fetchPapers = async () => {
-		const papers = await Papers.find({}, {}).populate("mainAuthor").lean().exec();
+	const fetchPapers = async () => {
+		const papersRaw = await Papers.find({}, {})
+			.populate("mainAuthor")
+			.lean()
+			.exec();
+
+		const papers = papersRaw.map(paper => {
+			const peer_review = paper.peer_review
+				? {
+					reviewType: paper.peer_review.reviewType,
+					assignedReviewers: paper.peer_review.assignedReviewers ?? [],
+					responses: paper.peer_review.responses ?? [],
+					reviews: paper.peer_review.reviews ?? [],
+					averageScore: paper.peer_review.averageScore ?? 0,
+					reviewCount: paper.peer_review.reviewCount ?? 0,
+					reviewStatus: paper.peer_review.reviewStatus ?? 'not_started'
+				}
+				: {
+					reviewType: "open",
+					assignedReviewers: [],
+					responses: [],
+					reviews: [],
+					averageScore: 0,
+					reviewCount: 0,
+					reviewStatus: "not_started"
+				};
+
+			return {
+				...paper,
+				peer_review
+			};
+		});
+
 		return papers;
 	};
-    // Buscar as revisões do revisor
-    const fetchReviews = async (reviewerId: string) => {
-        const reviews = await Reviews.find({ reviewer: reviewerId }).lean().exec();
-        return reviews;
-    };
-    const reviews = await fetchReviews(user._id);  // Passando o _id do usuário como revisor
 
-    return {
-        users: await fetchUsers(),
-        papers: await fetchPapers(),
-        reviews,  // Passando as revisões para o frontend
-        user,  // Passando as informações do usuário
-    };
+	const fetchReviews = async (reviewerId: string) => {
+		return await Reviews.find({ reviewer: reviewerId }).lean().exec();
+	};
+
+	const reviews = await fetchReviews(user._id);
+
+	return {
+		users: await fetchUsers(),
+		papers: await fetchPapers(),
+		reviews,
+		user
+	};
 }
