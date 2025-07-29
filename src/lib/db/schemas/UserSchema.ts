@@ -12,6 +12,9 @@ export const UserSchema: Schema = new Schema({
     email: { type: String, required: true, unique: true }, // Email do usuário
     password: { type: String, required: true }, // Senha do usuário
     refreshToken: { type: String }, // Token para gerenciar sessões de login
+    resetPasswordToken: { type: String },
+    resetPasswordExpiry: { type: String }, // Expiração do token de recuperação de senha
+    emailVerified: { type: Boolean, default: false }, // Verificação de email
     darkMode: { type: Boolean, default: false }, // Tema escuro
     roles: { // Definição de roles do usuário
         author: { type: Boolean, default: true },
