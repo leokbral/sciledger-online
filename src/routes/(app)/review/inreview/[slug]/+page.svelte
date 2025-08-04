@@ -68,11 +68,41 @@
 			console.error('Erro na requisição:', error);
 		}
 	}
+
+	async function handleReviewSubmitted(event: CustomEvent) {
+		const { paperId } = event.detail;
+		
+		try {
+			// Update paper status to "in correction" - using the correct URL
+			const response = await fetch(`/review/inreview/${paperId}`, {
+				method: 'PATCH',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					status: 'needing corrections'
+				})
+			});
+
+			if (response.ok) {
+				// Redirect to home page
+				await goto('/');
+			} else {
+				const errorData = await response.json();
+				console.error('Error updating paper status:', errorData);
+				alert('Review submitted but failed to update paper status');
+			}
+		} catch (error) {
+			console.error('Error:', error);
+			alert('Review submitted but an error occurred during status update');
+		}
+	}
 </script>
 
 <PaperReviewPage
 	onsavePaper={handleSavePaper}
 	onsubmitReview={hdlSubmitReview}
+	on:reviewSubmitted={handleReviewSubmitted}
 	{paper}
 	{currentUser}
 	{messageFeed}
