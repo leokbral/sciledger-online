@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { FormType } from '$lib/types/FormType';
-	
+	import { createEventDispatcher } from 'svelte';
+
 	export let paperTitle: string;
 	export let paperId: string;
 	export let reviewerId: string; // Adicionar prop para o ID do revisor
@@ -206,6 +207,8 @@
 	let submitError = '';
 	let submitSuccess = false;
 
+	const dispatch = createEventDispatcher();
+
 	async function handleSubmit() {
 		if (isSubmitting) return;
 		
@@ -256,7 +259,12 @@
 			if (response.ok) {
 				submitSuccess = true;
 				console.log('Review submitted successfully:', result);
-				// Opcional: redirecionar ou mostrar mensagem de sucesso
+				
+				// Dispatch event to parent component
+				dispatch('reviewSubmitted', {
+					paperId: paperId,
+					reviewId: result.reviewId
+				});
 			} else {
 				submitError = result.error || 'Failed to submit review';
 			}

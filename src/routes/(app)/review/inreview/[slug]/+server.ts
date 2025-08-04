@@ -3,6 +3,7 @@ import { json } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import '$lib/db/models/User';
 import '$lib/db/models/MessageFeed';
+import Papers from '$lib/db/models/Paper';
 
 import MessageFeeds from '$lib/db/models/MessageFeed';
 
@@ -37,5 +38,37 @@ export const POST: RequestHandler = async ({ request }) => {
     } catch (error) {
         console.error('Erro ao registrar usuário:', error);
         return json({ error: 'Erro interno do servidor.' }, { status: 500 });
+    }
+};
+
+export const PATCH: RequestHandler = async ({ request, params }) => {
+    await start_mongo();
+
+    try {
+        const { status } = await request.json();
+        const paperId = params.slug; // Change from params.id to params.slug
+
+        if (!status) {
+            return json({ error: 'Status is required.' }, { status: 400 });
+        }
+
+        const updatedPaper = await Papers.findOneAndUpdate(
+            { id: paperId },
+            {
+                status: status,
+                updatedAt: new Date()
+            },
+            { new: true, runValidators: true }
+        ).lean().exec();
+
+        if (!updatedPaper) {
+            return json({ error: 'Paper not found.' }, { status: 404 });
+        }
+
+        return json({ success: true, paper: updatedPaper }, { status: 200 });
+        
+    } catch (error) {
+        console.error('Error updating paper status:', error);
+        return json({ error: 'Internal server error.' }, { status: 500 });
     }
 };

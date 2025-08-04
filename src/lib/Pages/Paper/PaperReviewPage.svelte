@@ -15,6 +15,11 @@
 
 	const dispatch = createEventDispatcher();
 
+	function handleReviewSubmitted(event: CustomEvent) {
+		// Forward the event to the parent page component
+		dispatch('reviewSubmitted', event.detail);
+	}
+
 	// interface MessageFeed {
 	// 	id: number; //trocar por uuid
 	// 	host: boolean; //trocar por user
@@ -302,6 +307,7 @@
 							paperTitle={paper.title}
 							paperId={paper.id}
 							reviewerId={currentUser?.id || ''}
+							on:reviewSubmitted={handleReviewSubmitted}
 						/>
 					</div>
 				{/if}
