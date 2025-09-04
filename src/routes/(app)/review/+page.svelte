@@ -70,9 +70,9 @@
 	let papersPool = papers
 		.filter((p: Paper) => {
 			const userId = user.id?.toString();
-			const isReviewerRole = user.roles?.reviewer === true; // ← checa se o usuário é revisor mesmo
+			const isReviewerRole = user.roles?.reviewer === true; // ← check if the user is really a reviewer
 
-			if (!isReviewerRole) return false; // ← se não é revisor, não pode ver nenhum artigo
+			if (!isReviewerRole) return false; // ← if not a reviewer, cannot see any paper
 
 			const correspondingAuthorId = p.correspondingAuthor?.toString();
 			const mainAuthorId = (

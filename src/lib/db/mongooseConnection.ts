@@ -1,4 +1,3 @@
-
 import { config } from 'dotenv';
 config();
 const MONGO_URL = process.env.MONGO_URL ||'';
@@ -9,6 +8,7 @@ if (!MONGO_URL) {
 
 import mongoose from 'mongoose';
 import './models/Hub';
+import './models/Draft';
 
 export async function start_mongo() {
     if (mongoose.connection.readyState === 0) { // Verifica se já existe uma conexão ativa

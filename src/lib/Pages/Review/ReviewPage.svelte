@@ -4,8 +4,12 @@
 	import MyPapers from '$lib/MyPapers.svelte';
 	import { Tabs } from '@skeletonlabs/skeleton-svelte';
 	import Icon from '@iconify/svelte';
+	import Notifications from '$lib/components/Notifications/Notifications.svelte';
+	import NotificationBadge from '$lib/components/Notifications/NotificationBadge.svelte';
 
 	let tabSet = $state('tab0');
+
+	let initialNotifications: never[] = [];
 
 	interface Props {
 		data: any;
@@ -30,7 +34,9 @@
 <div class="container page p-4 m-auto">
 	<div>
 		<ReviewDashboard {reviews} {user}></ReviewDashboard>
-		<ReviewerInvitations {reviewerInvitations} />
+		<!-- <ReviewerInvitations {reviewerInvitations} /> -->
+		<!-- <Notifications notifications={initialNotifications} /> -->
+		<!-- <NotificationBadge unreadCount={initialNotifications.length} /> -->
 		<!--TEM QUE PASSAR OS DADOS DO REVISOR AQUI-->
 	</div>
 	<div class="text-xl font-bold mb-6">Your Activities</div>
