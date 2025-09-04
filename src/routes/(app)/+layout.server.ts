@@ -1,40 +1,85 @@
-export function load({ locals }) {
-	// console.log('chamou layout home ---> locals = ', locals)
+import Notifications, { type INotification } from '$lib/db/models/Notification'; 
+import { start_mongo } from '$lib/db/mongooseConnection';
+import type { LayoutServerLoad } from './$types';
+import type { Notification } from '$lib/types/Notification'; // ajuste se necessário
+
+await start_mongo();
+
+export const load: LayoutServerLoad = async ({ locals }) => {
+	const user = locals.user;
+
+	if (!user) {
+		return {
+			user: user,
+			notifications: []
+		};
+	}
+
+	let notifications: Notification[] = [];
+
+	try {
+		const rawNotifications = await Notifications.find({ user: user._id })
+			.sort({ createdAt: -1 })
+			.lean<INotification>()
+			.exec();
+
+		notifications = rawNotifications.map((n): Notification => ({
+			_id: String(n._id),
+			id: n.id,
+			user: typeof n.user === 'string' ? n.user : String(n.user?._id ?? ''),
+			type: n.type,
+			title: n.title,
+			content: n.content,
+			relatedUser: n.relatedUser,
+			relatedPaperId: n.relatedPaperId,
+			relatedCommentId: n.relatedCommentId,
+			relatedHubId: n.relatedHubId,
+			relatedReviewId: n.relatedReviewId,
+			actionUrl: n.actionUrl,
+			metadata: n.metadata,
+			isRead: n.isRead,
+			priority: n.priority,
+			expiresAt: n.expiresAt,
+			createdAt: n.createdAt,
+			updatedAt: n.updatedAt,
+			readAt: n.readAt
+		}));
+	} catch (error) {
+		console.error('Erro ao buscar notificações:', error);
+	}
+
 	return {
-		user: locals.user && {
-			// username: locals.user.firstName,
-			username: locals.user.username,
-			email: locals.user.email,
-			//image: locals.user.profilePictureUrl,
-			bio: locals.user.bio,
-			//
-			id: locals.user.id, // ID único gerado para o usuário
-			firstName: locals.user.firstName,
-			lastName: locals.user.lastName,
-			country: locals.user.country,
-			dob: locals.user.dob,
-			password: locals.user.password,// Senha do usuário
-			refreshToken: locals.user.refreshToken,// Token para gerenciar sessões de login
-			darkMode: locals.user.darkMode, // Tema escuro
+		user: {
+			_id: user._id,
+			username: user.username,
+			email: user.email,
+			bio: user.bio,
+			id: user.id,
+			firstName: user.firstName,
+			lastName: user.lastName,
+			country: user.country,
+			dob: user.dob,
+			darkMode: user.darkMode,
 			roles: {
-				author: locals.user.roles.author, // Se o usuário é um autor
-				reviewer: locals.user.roles.reviewer, // Se o usuário é um revisor
+				author: user.roles?.author ?? false,
+				reviewer: user.roles?.reviewer ?? false,
 			},
-			profilePictureUrl: locals.user.profilePictureUrl,// URL da foto de perfil
-			institution: locals.user.institution,// Instituição de ensino associada ao usuário
-			position: locals.user.position,// Cargo do usuário
+			profilePictureUrl: user.profilePictureUrl,
+			institution: user.institution,
+			position: user.position,
 			performanceReviews: {
-				averageReviewDays: locals.user.performanceReviews.averageReviewDays, // Média de dias de revisão
-				recommendations: locals.user.performanceReviews.recommendations, // Recomendações recebidas
-				responseTime: locals.user.performanceReviews.responseTime, // Tempo médio de resposta (em horas, por exemplo)
-				expertise: locals.user.performanceReviews.expertise, // Áreas de expertise do usuário
+				averageReviewDays: user.performanceReviews?.averageReviewDays ?? null,
+				recommendations: user.performanceReviews?.recommendations ?? null,
+				responseTime: user.performanceReviews?.responseTime ?? null,
+				expertise: user.performanceReviews?.expertise ?? null,
 			},
-			connections: locals.user.connections,// IDs dos usuários conectados
-			followers: locals.user.followers,// IDs dos seguidores
-			following: locals.user.following,// IDs dos usuários seguidos
-			papers: locals.user.papers,// IDs das publicações do usuário
-			createdAt: locals.user.createdAt, // Data de criação
-			updatedAt: locals.user.updatedAt, // Data de atualização
-		}
+			connections: user.connections ?? [],
+			followers: user.followers ?? [],
+			following: user.following ?? [],
+			papers: user.papers ?? [],
+			createdAt: user.createdAt,
+			updatedAt: user.updatedAt,
+		},
+		notifications
 	};
-}
+};

@@ -101,7 +101,7 @@
 						>
 					</button>
 				</span>
-				<Nav pathname={page.url.pathname} user={data.user}></Nav>
+				<Nav pathname={page.url.pathname} user={data.user} notifications={data.notifications}></Nav>
 			{/snippet}
 		</AppBar>
 		{#if !data.user}

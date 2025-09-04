@@ -11,6 +11,7 @@
 	import Icon from '@iconify/svelte';
 	import { FileUpload } from '@skeletonlabs/skeleton-svelte';
 	import type { Hub } from '$lib/types/Hub';
+	import ReviewerModal from '$lib/components/ReviewerModal/ReviewerModal.svelte';
 
 	interface Props {
 		data: PageData;
@@ -54,11 +55,51 @@
 		reader.readAsDataURL(file);
 	}
 
-	function toggleReviewerSelection(reviewerId: string) {
-		if (selectedReviewers.includes(reviewerId)) {
-			selectedReviewers = selectedReviewers.filter((id) => id !== reviewerId);
-		} else {
-			selectedReviewers = [...selectedReviewers, reviewerId];
+	async function toggleReviewerSelection(reviewerId: string) {
+		try {
+			if (selectedReviewers.includes(reviewerId)) {
+				// Remove reviewer
+				selectedReviewers = selectedReviewers.filter((id) => id !== reviewerId);
+
+				// Call API to unassign reviewer
+				const response = await post(`/api/review/unassign`, {
+					paperId: paper?.id,
+					reviewerId: reviewerId
+				});
+
+				if (!response.success) {
+					console.error('Failed to unassign reviewer:', response.message);
+					// Revert the UI change if API call failed
+					selectedReviewers = [...selectedReviewers, reviewerId];
+					alert('Failed to unassign reviewer. Please try again.');
+				}
+			} else {
+				// Add reviewer
+				selectedReviewers = [...selectedReviewers, reviewerId];
+
+				// Call API to assign reviewer
+				const response = await post(`/api/review/assign`, {
+					paperId: paper?.id,
+					reviewerId: reviewerId,
+					peerReviewType: peer_review || 'selected'
+				});
+
+				if (!response.success) {
+					console.error('Failed to assign reviewer:', response.message);
+					// Revert the UI change if API call failed
+					selectedReviewers = selectedReviewers.filter((id) => id !== reviewerId);
+					alert('Failed to assign reviewer. Please try again.');
+				} else {
+					// Show success message
+					const reviewer = reviewers.find((r) => r.id === reviewerId);
+					alert(
+						`Reviewer ${reviewer?.firstName} ${reviewer?.lastName} has been assigned successfully!`
+					);
+				}
+			}
+		} catch (error) {
+			console.error('Error toggling reviewer selection:', error);
+			alert('An error occurred. Please try again.');
 		}
 	}
 
@@ -66,6 +107,16 @@
 		if (!paper) return;
 
 		try {
+			// Check if at least 3 reviewers have accepted
+			const acceptedReviewers = paper.peer_review?.responses?.filter(
+				response => response.status === 'accepted'
+			) || [];
+
+			if (acceptedReviewers.length < 3) {
+				alert(`You need at least 3 reviewers to accept before submitting to review. Currently ${acceptedReviewers.length} reviewer(s) have accepted.`);
+				return;
+			}
+
 			// Upload pending images
 			const newImageIds = await Promise.all(
 				imageItems
@@ -246,12 +297,16 @@
 <div class="grid grid-cols-[1fr_1fr_1fr] p-5">
 	<div></div>
 	<div class="flex justify-between gap-3">
-		<!-- <button class="bg-primary-500 text-white rounded-lg px-4 py-2" onclick={hdlSaveDraft}>
+		<button class="bg-primary-500 text-white rounded-lg px-4 py-2" onclick={hdlSaveDraft}>
 			Save Draft
 		</button>
-		<button class="bg-primary-500 text-white rounded-lg px-4 py-2" onclick={handleSavePaper}>
+		<button 
+			class="bg-primary-500 text-white rounded-lg px-4 py-2 disabled:bg-gray-400 disabled:cursor-not-allowed" 
+			onclick={handleSavePaper}
+			disabled={!paper?.peer_review?.responses || paper.peer_review.responses.filter(r => r.status === 'accepted').length < 3}
+		>
 			Submit to Review
-		</button> -->
+		</button>
 	</div>
 	<div></div>
 </div>
@@ -440,7 +495,48 @@
 		</select>
 
 		{#if peer_review === 'selected'}
-			<AvailableReviewers {reviewers} {selectedReviewers} {toggleReviewerSelection} />
+			<!-- <AvailableReviewers {reviewers} {selectedReviewers} {toggleReviewerSelection} /> -->
+			<ReviewerModal
+				paperId={paper.id}
+				users={reviewers}
+				assignedReviewers={selectedReviewers}
+				onReviewerChange={(newList) => (selectedReviewers = newList)}
+			/>
+			
+			<!-- Reviewer Status Display -->
+			{#if paper.peer_review?.responses}
+				{@const acceptedCount = paper.peer_review.responses.filter(r => r.status === 'accepted').length}
+				{@const pendingCount = paper.peer_review.responses.filter(r => r.status === 'pending').length}
+				{@const declinedCount = paper.peer_review.responses.filter(r => r.status === 'declined').length}
+				
+				<div class="mt-4 p-4 bg-surface-100 dark:bg-surface-700 rounded-lg">
+					<h6 class="text-lg font-semibold mb-2">Reviewer Status</h6>
+					<div class="grid grid-cols-3 gap-4 text-sm">
+						<div class="text-center">
+							<div class="text-2xl font-bold text-green-600">{acceptedCount}</div>
+							<div class="text-green-600">Accepted</div>
+						</div>
+						<div class="text-center">
+							<div class="text-2xl font-bold text-yellow-600">{pendingCount}</div>
+							<div class="text-yellow-600">Pending</div>
+						</div>
+						<div class="text-center">
+							<div class="text-2xl font-bold text-red-600">{declinedCount}</div>
+							<div class="text-red-600">Declined</div>
+						</div>
+					</div>
+					
+					{#if acceptedCount < 3}
+						<div class="mt-3 p-2 bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-300 rounded text-yellow-800 dark:text-yellow-200 text-sm">
+							⚠️ You need at least 3 reviewers to accept before submitting to review. Currently {acceptedCount}/3 accepted.
+						</div>
+					{:else}
+						<div class="mt-3 p-2 bg-green-100 dark:bg-green-900/30 border border-green-300 rounded text-green-800 dark:text-green-200 text-sm">
+							✅ You have enough reviewers to submit for review!
+						</div>
+					{/if}
+				</div>
+			{/if}
 		{/if}
 	</div>
 {/if}
