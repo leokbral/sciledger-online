@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { FormType } from '$lib/types/FormType';
-	import { createEventDispatcher } from 'svelte';
+	import { createEventDispatcher, onMount } from 'svelte';
 
 	export let paperTitle: string;
 	export let paperId: string;
@@ -206,8 +206,104 @@
 	let isSubmitting = false;
 	let submitError = '';
 	let submitSuccess = false;
+	
+	// Draft saving state
+	let isSavingDraft = false;
+	let draftSaveError = '';
+	let draftSaveSuccess = false;
+	let lastSavedTime = '';
+	let isDraftLoaded = false;
 
 	const dispatch = createEventDispatcher();
+
+	// Load existing draft on component mount
+	onMount(async () => {
+		await loadDraft();
+	});
+
+	async function loadDraft() {
+		try {
+			const response = await fetch(`/api/reviews/draft?paperId=${paperId}&reviewerId=${reviewerId}`);
+			
+			if (response.ok) {
+				const result = await response.json();
+				if (result.draft) {
+					form = { ...form, ...result.draft.form };
+					isDraftLoaded = true;
+					lastSavedTime = new Date(result.draft.updatedAt).toLocaleString();
+				}
+			}
+		} catch (error) {
+			console.error('Error loading draft:', error);
+		}
+	}
+
+	async function saveDraft() {
+		if (isSavingDraft) return;
+		
+		isSavingDraft = true;
+		draftSaveError = '';
+		draftSaveSuccess = false;
+
+		try {
+			const response = await fetch('/api/reviews/draft', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					paperId,
+					reviewerId,
+					paperTitle,
+					form: {
+						// Part I – Quantitative Evaluation
+						originality: form.originality,
+						clarity: form.clarity,
+						literatureReview: form.literatureReview,
+						theoreticalFoundation: form.theoreticalFoundation,
+						methodology: form.methodology,
+						reproducibility: form.reproducibility,
+						results: form.results,
+						figures: form.figures,
+						limitations: form.limitations,
+						language: form.language,
+						impact: form.impact,
+
+						// Part II – Qualitative Evaluation
+						strengths: form.strengths,
+						weaknesses: form.weaknesses,
+
+						// Part III – Ethics
+						involvesHumanResearch: form.involvesHumanResearch,
+						ethicsApproval: form.ethicsApproval,
+
+						// Part IV – Recommendation
+						recommendation: form.recommendation
+					}
+				})
+			});
+
+			const result = await response.json();
+
+			if (response.ok) {
+				draftSaveSuccess = true;
+				lastSavedTime = new Date().toLocaleString();
+				console.log('Draft saved successfully:', result);
+				
+				// Clear success message after 3 seconds
+				setTimeout(() => {
+					draftSaveSuccess = false;
+				}, 3000);
+			} else {
+				draftSaveError = result.error || 'Failed to save draft';
+			}
+		} catch (error) {
+			console.error('Error saving draft:', error);
+			draftSaveError = 'Network error. Please try again.';
+		} finally {
+			isSavingDraft = false;
+		}
+	}
 
 	async function handleSubmit() {
 		if (isSubmitting) return;
@@ -260,6 +356,9 @@
 				submitSuccess = true;
 				console.log('Review submitted successfully:', result);
 				
+				// Clear draft after successful submission
+				await clearDraft();
+				
 				// Dispatch event to parent component
 				dispatch('reviewSubmitted', {
 					paperId: paperId,
@@ -273,6 +372,16 @@
 			submitError = 'Network error. Please try again.';
 		} finally {
 			isSubmitting = false;
+		}
+	}
+
+	async function clearDraft() {
+		try {
+			await fetch(`/api/reviews/draft?paperId=${paperId}&reviewerId=${reviewerId}`, {
+				method: 'DELETE'
+			});
+		} catch (error) {
+			console.error('Error clearing draft:', error);
 		}
 	}
 
@@ -331,22 +440,65 @@
 	<div class="bg-blue-600 text-white p-6">
 		<h1 class="text-2xl font-bold">Scientific Article Review Form</h1>
 		<h2 class="text-lg mt-2 opacity-90">{paperTitle}</h2>
+		
+		<!-- Draft status -->
+		{#if isDraftLoaded && lastSavedTime}
+			<div class="mt-2 text-sm opacity-80">
+				<span class="bg-blue-500 px-2 py-1 rounded text-xs">DRAFT</span>
+				Last saved: {lastSavedTime}
+			</div>
+		{/if}
 	</div>
 
-	<!-- Progress Bar -->
+	<!-- Progress Bar with Save Draft Button -->
 	<div class="bg-gray-100 p-4">
-		<div class="flex justify-between mb-2">
-			{#each Array(totalSteps) as _, i}
-				<button
-					class="flex-1 text-center py-2 px-4 mx-1 rounded {currentStep === i
-						? 'bg-blue-600 text-white'
-						: 'bg-gray-200 hover:bg-gray-300'}"
-					on:click={() => goToStep(i)}
-				>
-					Part {i + 1}
-				</button>
-			{/each}
+		<div class="flex justify-between items-center mb-4">
+			<div class="flex flex-1">
+				{#each Array(totalSteps) as _, i}
+					<button
+						class="flex-1 text-center py-2 px-4 mx-1 rounded {currentStep === i
+							? 'bg-blue-600 text-white'
+							: 'bg-gray-200 hover:bg-gray-300'}"
+						on:click={() => goToStep(i)}
+					>
+						Part {i + 1}
+					</button>
+				{/each}
+			</div>
+			
+			<!-- Save Draft Button -->
+			<button
+				class="ml-4 px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
+				disabled={isSavingDraft}
+				on:click={saveDraft}
+			>
+				{#if isSavingDraft}
+					<span class="flex items-center">
+						<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+							<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+							<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+						</svg>
+						Saving...
+					</span>
+				{:else}
+					Save Draft
+				{/if}
+			</button>
 		</div>
+		
+		<!-- Draft Messages -->
+		{#if draftSaveError}
+			<div class="mb-2 bg-red-50 border border-red-200 rounded-lg p-2">
+				<p class="text-red-700 text-xs">{draftSaveError}</p>
+			</div>
+		{/if}
+
+		{#if draftSaveSuccess}
+			<div class="mb-2 bg-green-50 border border-green-200 rounded-lg p-2">
+				<p class="text-green-700 text-xs">Draft saved successfully!</p>
+			</div>
+		{/if}
+		
 		<div class="w-full bg-gray-200 rounded-full h-2">
 			<div
 				class="bg-blue-600 h-2 rounded-full transition-all duration-300"
@@ -613,25 +765,41 @@
 		</button>
 
 		{#if currentStep === totalSteps - 1}
-			<button
-				class="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
-				disabled={isSubmitting || submitSuccess}
-				on:click={handleSubmit}
-			>
-				{#if isSubmitting}
-					<span class="flex items-center">
-						<svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-							<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-							<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-						</svg>
-						Submitting...
-					</span>
-				{:else if submitSuccess}
-					Review Submitted ✓
-				{:else}
-					Submit Review
-				{/if}
-			</button>
+			<div class="flex space-x-3">
+				<!-- Save Draft Button (additional in final step) -->
+				<button
+					class="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
+					disabled={isSavingDraft}
+					on:click={saveDraft}
+				>
+					{#if isSavingDraft}
+						Saving...
+					{:else}
+						Save Draft
+					{/if}
+				</button>
+				
+				<!-- Submit Button -->
+				<button
+					class="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+					disabled={isSubmitting || submitSuccess}
+					on:click={handleSubmit}
+				>
+					{#if isSubmitting}
+						<span class="flex items-center">
+							<svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+								<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+								<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+							</svg>
+							Submitting...
+						</span>
+					{:else if submitSuccess}
+						Review Submitted ✓
+					{:else}
+						Submit Review
+					{/if}
+				</button>
+			</div>
 		{:else}
 			<button
 				class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"

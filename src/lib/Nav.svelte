@@ -3,25 +3,70 @@
 	import { post } from './utils';
 	import { invalidateAll } from '$app/navigation';
 	import type { User } from './types/User';
+	import type { Notification } from './types/Notification';
 	import { getInitials } from './utils/GetInitials';
-	import ReviewerInvitations from './components/ReviewerInvitations/ReviewerInvitations.svelte';
+	import NotificationBadge from './components/Notifications/NotificationBadge.svelte';
+	import Notifications from './components/Notifications/Notifications.svelte';
+	import { onMount } from 'svelte';
 
 	interface Props {
 		pathname: string;
 		user: User;
-		// reviewerInvitations: ReviewerInvitations;
+		notifications?: Notification[];
+		unreadCount?: number;
 	}
 
-	let { pathname, user/* , reviewerInvitations */ }: Props = $props();
+	let { pathname, user, notifications = [], unreadCount = 0 }: Props = $props();
 
 	let openState = $state(false); // popover do avatar
 	let showNotifications = $state(false); // popover das notificações
+	let currentNotifications = $state(notifications);
+	let currentUnreadCount = $state(unreadCount);
 
-	let notifications = [
-		{ id: 1, message: 'You have a new follower!' },
-		{ id: 2, message: 'Your post was liked!' },
-		{ id: 3, message: 'New comment on your photo.' }
-	];
+	// Atualizar estado quando props mudam
+	$effect(() => {
+		currentNotifications = notifications;
+		currentUnreadCount = unreadCount;
+	});
+
+	// Função para atualizar contador de não lidas
+	async function updateUnreadCount() {
+		try {
+			const response = await fetch('/api/notifications/unread-count');
+			if (response.ok) {
+				const data = await response.json();
+				currentUnreadCount = data.count || 0;
+			}
+		} catch (error) {
+			console.error('Error updating unread count:', error);
+		}
+	}
+
+	// Função para recarregar notificações
+	async function reloadNotifications() {
+		try {
+			const response = await fetch('/api/notifications');
+			if (response.ok) {
+				const data = await response.json();
+				currentNotifications = data.notifications || [];
+			}
+		} catch (error) {
+			console.error('Error reloading notifications:', error);
+		}
+	}
+
+	// Atualizar contador periodicamente
+	onMount(() => {
+		const interval = setInterval(updateUnreadCount, 30000); // A cada 30 segundos
+		return () => clearInterval(interval);
+	});
+
+	// Callback quando notificação é lida/deletada
+	function handleNotificationChange() {
+		updateUnreadCount();
+		// Opcionalmente recarregar todas as notificações
+		// reloadNotifications();
+	}
 
 	async function logout() {
 		await post(`/logout`);
@@ -40,52 +85,34 @@
 {#if user}
 	<div class="flex items-center gap-4">
 		<!-- Botão de Notificações -->
-		<!-- <Popover
+		<Popover
 			open={showNotifications}
-			onOpenChange={(e) => (showNotifications = e.open)}
+			onOpenChange={(e) => {
+				showNotifications = e.open;
+				// Atualizar contador quando fechar
+				if (!e.open) {
+					updateUnreadCount();
+				}
+			}}
 			positioning={{ placement: 'bottom-end' }}
 			triggerBase="relative"
-			contentBase="card bg-surface-950-50 card p-4 w-72 shadow-xl text-surface-50-950"
+			contentBase="card bg-surface-950-50 card p-4 w-80 shadow-xl text-surface-50-950 max-h-96 overflow-y-auto"
 			arrow
 			arrowBackground="!bg-surface-950 dark:!bg-surface-50"
 		>
 			{#snippet trigger()}
-				<button
-					class="relative w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
-					aria-label="Open notifications"
-				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="w-6 h-6 text-gray-600 dark:text-gray-300"
-						viewBox="0 0 24 24"
-						fill="currentColor"
-					>
-						<path
-							d="M12 24c1.104 0 2-.896 2-2h-4a2 2 0 0 0 2 2Zm6-6v-5c0-3.075-1.725-5.64-4.5-6.32V6a1.5 1.5 0 0 0-3 0v.68C7.725 7.36 6 9.925 6 13v5l-2 2v1h16v-1l-2-2Z"
-						/>
-					</svg>
-				</button>
+				<NotificationBadge unreadCount={currentUnreadCount} />
 			{/snippet}
 
 			{#snippet content()}
-				<h4 class="font-bold mb-2">Notifications</h4>
-				{#if notifications.length > 0}
-					<ul class="space-y-2">
-						{#each notifications as note}
-							<li class="text-sm bg-gray-100 dark:bg-gray-800 p-2 rounded">
-								<ReviewerInvitations {reviewerInvitations} />
-							</li>
-						{/each}
-					</ul>
-				{:else}
-					<p class="text-sm text-gray-400">No notifications</p>
-				{/if}
-
-				<! -- Passando o componente de convites aqui - ->
-				<! -- <h3 class="font-bold text-lg mb-2">Reviewer Invitations</h3>
-				<ReviewerInvitations {reviewerInvitations} /> - ->
+				<div class="max-h-80 overflow-y-auto">
+					<Notifications
+						notifications={currentNotifications}
+						on:notificationChange={handleNotificationChange}
+					/>
+				</div>
 			{/snippet}
-		</Popover> -->
+		</Popover>
 
 		<!-- Popover do Avatar do Usuário -->
 		<Popover

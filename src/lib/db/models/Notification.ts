@@ -1,7 +1,12 @@
 import mongoose from 'mongoose';
 import { NotificationSchema } from '../schemas/tempschema/NotificationSchema';
+import type { Notification } from '$lib/types/Notification';
 
-export interface INotification extends Notification, mongoose.Document {}
+export interface INotification extends Omit<Notification, '_id'> {
+	map(arg0: (n: Notification) => Notification): import("../../types/Notification").Notification[];
+}
 
-const NotificationModel = mongoose.model<INotification>('Notification', NotificationSchema);
+import type { Document } from 'mongoose';
+
+const NotificationModel = mongoose.model<INotification & Document>('Notification', NotificationSchema);
 export default NotificationModel;
