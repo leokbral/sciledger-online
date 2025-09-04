@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	// import PaperPublishPage from '$lib/Pages/Paper/PaperPublishPage.svelte';
 	import { post } from '$lib/utils/index.js';
 	import type { Paper } from '$lib/types/Paper';
 	import type { PaperPublishStoreData } from '$lib/types/PaperPublishStoreData';
@@ -10,6 +9,7 @@
 	import AvailableReviewers from '$lib/AvailableReviewers.svelte';
 	import type { User } from '$lib/types/User';
 	import Icon from '@iconify/svelte';
+	import AcceptPaperButton from '$lib/components/AcceptPaperButton.svelte';
 
 	interface Props {
 		data: PageData;
@@ -88,8 +88,15 @@
 		}
 	}
 
-	function hdlSubmit(event: MouseEvent & { currentTarget: EventTarget & HTMLButtonElement }) {
-		throw new Error('Function not implemented.');
+	// Handlers para o AcceptPaperButton
+	function handleAcceptSuccess(event: CustomEvent) {
+		alert(`Paper accepted successfully! ${event.detail.notificationsCreated} notifications sent.`);
+		goto('/review/');
+	}
+
+	function handleAcceptError(event: CustomEvent) {
+		alert(`Error: ${event.detail.message}`);
+		console.error('Accept paper error:', event.detail);
 	}
 </script>
 
@@ -113,6 +120,7 @@
                 <Icon icon="fluent-mdl2:cancel" class="size-5" />
                 Decline Review
             </button>
+            
             <button
                 class="btn variant-filled-success px-8 py-3 rounded-lg flex items-center gap-2"
                 onclick={handleAcceptReview}
@@ -120,6 +128,16 @@
                 <Icon icon="fluent-mdl2:accept" class="size-5" />
                 Accept Review
             </button>
+            
+            <!-- Botão para aceitar paper para revisão (diferente de aceitar fazer a revisão) -->
+            {#if $page.data.user?.roles?.reviewer || $page.data.user?.roles?.admin}
+                <AcceptPaperButton 
+                    paperId={paper.id} 
+					hubId={typeof paper.hubId === 'string' ? paper.hubId : undefined}
+                    on:success={handleAcceptSuccess}
+                    on:error={handleAcceptError}
+                />
+            {/if}
         </div>
     </div>
 {/if}
