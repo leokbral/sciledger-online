@@ -15,24 +15,53 @@ export const POST: RequestHandler = async ({ request }) => {
         }
 
         const paper = await Papers.findOne({ id: paperId });
-        
+
         if (!paper) {
             return json({ error: 'Paper not found.' }, { status: 404 });
         }
 
-        // Update paper with new reviewer and status
-        const updatedPaper = await Papers.findOneAndUpdate(
-            { id: paperId },
-            {
-                $addToSet: { reviewers: reviewerId }, // Add reviewer if not already present
-                status: 'in review',
-                updatedAt: new Date().toISOString()
-            },
-            { new: true }
-        );
+        if (!paper.peer_review) {
+            paper.peer_review = {
+                reviewType: 'selected',
+                responses: [],
+                reviews: [],
+                assignedReviewers: [],
+                averageScore: 0,
+                reviewCount: 0,
+                reviewStatus: 'not_started'
+            };
+        }
 
-        return json({ success: true, paper: updatedPaper }, { status: 200 });
-        
+        const response = paper.peer_review.responses.find(r => r.reviewerId === reviewerId);
+
+        if (!response) {
+            paper.peer_review.responses.push({
+                reviewerId,
+                status: 'accepted',
+                responseDate: new Date(),
+                assignedAt: new Date()
+            });
+        } else {
+            response.status = 'accepted';
+            response.responseDate = new Date();
+            response.assignedAt = new Date();
+        }
+
+        const acceptedCount = paper.peer_review.responses.filter(
+            r => r.status === 'accepted' || r.status === 'completed'
+        ).length;
+
+        if (acceptedCount >= 3) {
+            paper.status = 'in review';
+            paper.peer_review.reviewStatus = 'in_progress';
+        }
+
+        paper.updatedAt = new Date();
+        await paper.save();
+
+        return json({ success: true, paper }, { status: 200 });
+
+
     } catch (error) {
         console.error('Error accepting review:', error);
         return json({ error: 'Internal server error.' }, { status: 500 });

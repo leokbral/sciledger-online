@@ -25,12 +25,18 @@ export async function load({ locals }) {
             .exec();
 
         // Normalizar peer_review para cada paper
-        const papers = papersRaw.map((paper) => {
+        const normalizedPapers = papersRaw.map((paper) => {
             const peer_review = paper.peer_review
                 ? {
                     reviewType: paper.peer_review.reviewType,
                     assignedReviewers: paper.peer_review.assignedReviewers ?? [],
-                    responses: paper.peer_review.responses ?? [],
+                    responses: (paper.peer_review.responses ?? []).map((r: any) => ({
+                        reviewerId: r.reviewerId,
+                        status: r.status,
+                        responseDate: r.responseDate,
+                        _id: r._id?.toString?.()
+                    })),
+
                     reviews: paper.peer_review.reviews ?? [],
                     averageScore: paper.peer_review.averageScore ?? 0,
                     reviewCount: paper.peer_review.reviewCount ?? 0,
@@ -52,7 +58,15 @@ export async function load({ locals }) {
             };
         });
 
-        return papers;
+        const filteredPapers = normalizedPapers.filter((paper) => {
+            const responses = paper.peer_review.responses;
+            const acceptedCount = responses.filter(
+                (r) => r.status === 'accepted' || r.status === 'completed'
+            ).length;
+
+            return acceptedCount < 3;
+        });
+        return filteredPapers;
     };
 
     const fetchReviews = async (reviewerId: string) => {
