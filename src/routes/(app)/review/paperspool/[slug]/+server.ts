@@ -39,12 +39,21 @@ export const POST: RequestHandler = async ({ request }) => {
                 reviewerId,
                 status: 'accepted',
                 responseDate: new Date(),
-                assignedAt: new Date()
+                assignedAt: new Date(),
+                _id: undefined
             });
+            // Adiciona ao assignedReviewers se não estiver lá
+            if (!paper.peer_review.assignedReviewers.includes(reviewerId)) {
+                paper.peer_review.assignedReviewers.push(reviewerId);
+            }
         } else {
             response.status = 'accepted';
             response.responseDate = new Date();
             response.assignedAt = new Date();
+            // Adiciona ao assignedReviewers se não estiver lá
+            if (!paper.peer_review.assignedReviewers.includes(reviewerId)) {
+                paper.peer_review.assignedReviewers.push(reviewerId);
+            }
         }
 
         const acceptedCount = paper.peer_review.responses.filter(
