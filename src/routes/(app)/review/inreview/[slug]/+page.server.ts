@@ -3,29 +3,43 @@ import Papers from '$lib/db/models/Paper';
 import Users from '$lib/db/models/User';
 import { error, redirect } from '@sveltejs/kit';
 
-function sanitize(obj: any): any {
+// Type for MongoDB ObjectId
+interface ObjectId {
+	toString(): string;
+	constructor: { name: string };
+}
+
+function sanitize(obj: unknown): unknown {
+	if (obj === null || obj === undefined) {
+		return obj;
+	}
+	
 	if (Array.isArray(obj)) {
 		return obj.map(sanitize);
-	} else if (obj && typeof obj === 'object') {
-		const clean: Record<string, any> = {};
+	}
+	
+	if (obj && typeof obj === 'object') {
+		// Handle MongoDB ObjectId
+		if (obj.constructor?.name === 'ObjectId' && typeof (obj as ObjectId).toString === 'function') {
+			return (obj as ObjectId).toString();
+		}
+		
+		// Handle Date objects
+		if (obj instanceof Date) {
+			return obj.toISOString();
+		}
+		
+		// Handle regular objects
+		const clean: Record<string, unknown> = {};
 		for (const key in obj) {
-			const value = obj[key];
-
-			// Converte ObjectId para string
-			if (value?.constructor?.name === 'ObjectId' && typeof value.toString === 'function') {
-				clean[key] = value.toString();
-			}
-			// Converte Date para ISO
-			else if (value instanceof Date) {
-				clean[key] = value.toISOString();
-			}
-			// Recurse
-			else {
+			if (Object.prototype.hasOwnProperty.call(obj, key)) {
+				const value = (obj as Record<string, unknown>)[key];
 				clean[key] = sanitize(value);
 			}
 		}
 		return clean;
 	}
+	
 	return obj;
 }
 
