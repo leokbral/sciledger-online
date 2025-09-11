@@ -5,6 +5,47 @@ import Invitations from '$lib/db/models/Invitation';
 import { start_mongo } from '$lib/db/mongo';
 import { redirect } from '@sveltejs/kit';
 
+// Type for MongoDB ObjectId
+interface ObjectId {
+	toString(): string;
+	constructor: { name: string };
+}
+
+// Sanitize function to convert ObjectId and Date to strings
+function sanitize(obj: unknown): unknown {
+	if (obj === null || obj === undefined) {
+		return obj;
+	}
+	
+	if (Array.isArray(obj)) {
+		return obj.map(sanitize);
+	}
+	
+	if (obj && typeof obj === 'object') {
+		// Handle MongoDB ObjectId
+		if (obj.constructor?.name === 'ObjectId' && typeof (obj as ObjectId).toString === 'function') {
+			return (obj as ObjectId).toString();
+		}
+		
+		// Handle Date objects
+		if (obj instanceof Date) {
+			return obj.toISOString();
+		}
+		
+		// Handle regular objects
+		const clean: Record<string, unknown> = {};
+		for (const key in obj) {
+			if (Object.prototype.hasOwnProperty.call(obj, key)) {
+				const value = (obj as Record<string, unknown>)[key];
+				clean[key] = sanitize(value);
+			}
+		}
+		return clean;
+	}
+	
+	return obj;
+}
+
 export async function load({ locals }) {
 	const user = locals.user;
 	if (!user) redirect(302, '/login');
@@ -89,10 +130,10 @@ export async function load({ locals }) {
 	};
 
 	return {
-		users: await fetchUsers(),
-		papers: await fetchPapers(),
-		reviews: await fetchReviews(user.id),
-		user,
-		reviewerInvitations: await fetchReviewInvitation(user.id)
+		users: sanitize(await fetchUsers()),
+		papers: sanitize(await fetchPapers()),
+		reviews: sanitize(await fetchReviews(user.id)),
+		user: sanitize(user),
+		reviewerInvitations: sanitize(await fetchReviewInvitation(user.id))
 	};
 }
