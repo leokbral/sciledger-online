@@ -54,6 +54,13 @@ export async function load({ locals, params }) {
 		.populate("authors")
 		.populate("mainAuthor")
 		.populate("coAuthors")
+		.populate({
+			path: 'peer_review.reviews',
+			populate: {
+				path: 'reviewerId',
+				model: 'User'
+			}
+		})
 		.lean()
 		.exec();
 
