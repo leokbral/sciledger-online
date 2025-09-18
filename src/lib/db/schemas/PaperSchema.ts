@@ -28,8 +28,15 @@ export const PaperSchema: Schema = new Schema({
             assignedReviewers: [{ type: String, ref: 'User' }],
             responses: [{
                 reviewerId: { type: String, ref: 'User' },
-                status: { type: String, enum: ['pending', 'accepted', 'declined'], default: 'pending' },
-                responseDate: { type: Date }
+                status: {
+                    type: String,
+                    enum: ['pending', 'accepted', 'declined', 'completed'],
+                    default: 'pending'
+                },
+                responseDate: { type: Date },         // Quando aceitou/recusou
+                assignedAt: { type: Date },           // Quando foi oficialmente atribuído
+                completedAt: { type: Date },          // Quando terminou a revisão
+                reviewId: { type: String, ref: 'Review' }  // ID da review conectada
             }],
             // Adicionar referências às reviews
             reviews: [{ type: String, ref: 'Review' }], // Lista de reviews associadas

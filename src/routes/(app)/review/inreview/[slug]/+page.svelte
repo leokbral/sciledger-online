@@ -71,21 +71,17 @@
 
 	async function handleReviewSubmitted(event: CustomEvent) {
 		const { paperId } = event.detail;
-		
 		try {
-			// Update paper status to "in correction" - using the correct URL
 			const response = await fetch(`/review/inreview/${paperId}`, {
 				method: 'PATCH',
 				headers: {
 					'Content-Type': 'application/json'
 				},
 				body: JSON.stringify({
-					status: 'needing corrections'
+					reviewerId: currentUser.id // Envia o id do revisor atual
 				})
 			});
-
 			if (response.ok) {
-				// Redirect to home page
 				await goto('/');
 			} else {
 				const errorData = await response.json();
