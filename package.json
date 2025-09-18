@@ -61,7 +61,7 @@
     "mammoth": "^1.9.0",
     "mongodb": "^6.13.1",
     "mongoose": "^6.0.13",
-    "nodemailer": "^7.0.5",
+    "nodemailer": "^7.0.6",
     "quill": "^2.0.3",
     "resend": "^4.6.0",
     "sanitize-html": "^2.15.0"
