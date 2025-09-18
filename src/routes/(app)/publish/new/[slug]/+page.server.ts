@@ -1,12 +1,45 @@
 import { error, redirect } from '@sveltejs/kit';
-//import * as api from '$lib/api.js';
+import Papers from '$lib/db/models/Paper.js';
+import Users from '$lib/db/models/User.js';
+import '$lib/db/mongooseConnection.js';
 
-export async function load({ locals/* , params */ }) {
+export async function load({ locals, params }) {
 	if (!locals.user) redirect(302, `/login`);
 
-	/* const { article } = await api.get(`articles/${params.slug}`, locals.user.token);
-	return { article }; */
-    return { paper: {}}
+	try {
+		// Buscar o paper pelo ID
+		const paper = await Papers.findById(params.slug)
+			.populate('mainAuthor')
+			.populate('coAuthors')
+			.populate('correspondingAuthor')
+			.lean();
+
+		if (!paper) {
+			throw error(404, 'Paper not found');
+		}
+
+		// Verificar se o usuário tem permissão para editar este paper
+		const userId = locals.user.id;
+		const canEdit = paper.mainAuthor._id.toString() === userId || 
+			paper.coAuthors.some((author: { _id: { toString: () => string } }) => author._id.toString() === userId) ||
+			paper.correspondingAuthor._id.toString() === userId;
+
+		if (!canEdit) {
+			throw error(403, 'You do not have permission to edit this paper');
+		}
+
+		// Buscar todos os usuários para as opções de autores
+		const users = await Users.find({}).lean();
+
+		return {
+			paper: JSON.parse(JSON.stringify(paper)),
+			users: JSON.parse(JSON.stringify(users)),
+			user: locals.user
+		};
+	} catch (err) {
+		console.error('Error loading paper:', err);
+		throw error(500, 'Internal server error');
+	}
 }
 
 
