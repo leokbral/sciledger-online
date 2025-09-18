@@ -1,10 +1,13 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import PaperReviewPage from '$lib/Pages/Paper/PaperReviewPage.svelte';
+	import PaperPublishPage from '$lib/Pages/Paper/PaperPublishPage.svelte';
 	import { post } from '$lib/utils/index.js';
 	import type { Paper } from '$lib/types/Paper';
 	import type { Review } from '$lib/types/Review';
+	import type { User } from '$lib/types/User';
 	import type { PageData } from './$types';
+	import type { PaperPublishStoreData } from '$lib/types/PaperPublishStoreData';
 	import { Avatar } from '@skeletonlabs/skeleton-svelte';
 
 	interface Props {
@@ -13,10 +16,20 @@
 
 	let { data }: Props = $props();
 
-	let paper = data.paper;
-	let currentUser = data.user;
-	let messageFeed = data.messageFeed;
+	let paper = $state(data.paper as Paper);
+	let currentUser = $state(data.user as User);
+	let messageFeed = $state(data.messageFeed);
 	let users: Array<{ id: string; firstName: string; lastName: string }> = data.users as Array<{ id: string; firstName: string; lastName: string }>;
+	let userProfiles = data.users; // Para o PaperPublishPage
+
+	// Estado para controlar se estamos em modo de edição
+	let isEditMode = $state(false);
+
+	// Valor inicial para o editor
+	let inicialValue: PaperPublishStoreData = $state({
+		...(data.paper as any),
+		mainAuthor: (data.paper as Paper)?.mainAuthor
+	} as PaperPublishStoreData);
 
 	// Function to get reviewer name by ID
 	function getReviewerName(reviewerId: string | any): string {
@@ -103,10 +116,11 @@
 
 	// Function to get all unique weaknesses/areas for improvement
 	function getAllCriticalComments(): string[] {
-		if (!paper.peer_review?.reviews) return [];
+		const paperData = paper as Paper;
+		if (!paperData.peer_review?.reviews) return [];
 		
 		const comments: string[] = [];
-		paper.peer_review.reviews.forEach((review, index) => {
+		paperData.peer_review.reviews.forEach((review: Review, index: number) => {
 			if (review.qualitativeEvaluation?.weaknesses) {
 				comments.push(`Review ${index + 1}: ${review.qualitativeEvaluation.weaknesses}`);
 			}
@@ -116,15 +130,16 @@
 
 	// Function to get lowest scoring criteria
 	function getLowestScoringCriteria(): Array<{criterion: string, scores: number[], average: number}> {
-		if (!paper.peer_review?.reviews) return [];
+		const paperData = paper as Paper;
+		if (!paperData.peer_review?.reviews) return [];
 		
 		const criteriaScores: Record<string, number[]> = {};
 		
-		paper.peer_review.reviews.forEach(review => {
+		paperData.peer_review.reviews.forEach((review: Review) => {
 			if (review.quantitativeEvaluation) {
 				Object.entries(review.quantitativeEvaluation).forEach(([criterion, score]) => {
 					if (!criteriaScores[criterion]) criteriaScores[criterion] = [];
-					criteriaScores[criterion].push(score);
+					criteriaScores[criterion].push(score as number);
 				});
 			}
 		});
@@ -141,10 +156,11 @@
 
 	// Function to count recommendations
 	function getRecommendationSummary(): Record<string, number> {
-		if (!paper.peer_review?.reviews) return {};
+		const paperData = paper as Paper;
+		if (!paperData.peer_review?.reviews) return {};
 		
 		const summary: Record<string, number> = {};
-		paper.peer_review.reviews.forEach(review => {
+		paperData.peer_review.reviews.forEach((review: Review) => {
 			const rec = review.recommendation;
 			summary[rec] = (summary[rec] || 0) + 1;
 		});
@@ -170,6 +186,45 @@
 		}
 	}
 
+	// Nova função para salvar via PaperPublishPage
+	async function savePaper(store: any) {
+		console.log('Saving corrected paper:', store);
+
+		try {
+			const response = await post(`/publish/edit/${store.id}`, store);
+			console.log(response);
+			if (response.paper) {
+				// Atualizar o paper local com as mudanças
+				paper = response.paper;
+				inicialValue = {
+					...response.paper,
+					mainAuthor: response.paper?.mainAuthor
+				} as PaperPublishStoreData;
+				
+				// Sair do modo de edição
+				isEditMode = false;
+				alert('Article updated successfully!');
+			} else {
+				alert(`Issue! ${JSON.stringify(response)}`);
+			}
+		} catch (error) {
+			console.log(error);
+			alert('An error occurred. Please try again.');
+		}
+	}
+
+	// Função para alternar modo de edição
+	function toggleEditMode() {
+		isEditMode = !isEditMode;
+		if (isEditMode) {
+			// Atualizar o valor inicial quando entrar no modo de edição
+			inicialValue = {
+				...(data.paper as any),
+				mainAuthor: (data.paper as Paper)?.mainAuthor
+			} as PaperPublishStoreData;
+		}
+	}
+
 	async function hdlSubmitPublish(event: CustomEvent) {
 		let { newMessage } = event.detail;
 		console.log(event.detail);
@@ -185,7 +240,7 @@
 				},
 				body: JSON.stringify({
 					newMessage,
-					id: messageFeed?.id
+					id: (messageFeed as any)?.id
 				})
 			});
 			console.log(response.body);
@@ -220,14 +275,26 @@
 		</p>
 		<div class="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
 			<h3 class="font-semibold text-blue-800 mb-2">📋 Article Information</h3>
-			<p><strong>Title:</strong> {paper.title}</p>
-			<p><strong>Status:</strong> <span class="capitalize">{paper.status}</span></p>
-			<p><strong>Submitted:</strong> {new Date(paper.createdAt).toLocaleDateString()}</p>
+			<p><strong>Title:</strong> {(paper as Paper).title}</p>
+			<p><strong>Status:</strong> <span class="capitalize">{(paper as Paper).status}</span></p>
+			<p><strong>Submitted:</strong> {new Date((paper as Paper).createdAt).toLocaleDateString()}</p>
+		</div>
+		
+		<!-- Instructions for making corrections -->
+		<div class="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+			<h3 class="font-semibold text-green-800 mb-2">🚀 How to Make Corrections</h3>
+			<ol class="text-green-700 text-sm space-y-1 list-decimal list-inside">
+				<li>Review the feedback and recommendations from reviewers below</li>
+				<li>Click the "✏️ Edit Article" button in the article section to enter edit mode</li>
+				<li>Make the necessary changes to address reviewer concerns</li>
+				<li>Save your changes - they will be automatically applied to your article</li>
+				<li>When ready, contact the editorial team to resubmit for review</li>
+			</ol>
 		</div>
 	</div>
 
 	<!-- Critical Summary Section -->
-	{#if paper.peer_review && paper.peer_review.reviews && paper.peer_review.reviews.length > 0}
+	{#if paper && (paper as Paper)?.peer_review?.reviews?.length}
 		<div class="mb-8 bg-white rounded-lg shadow-md p-6">
 			<h2 class="text-2xl font-semibold text-gray-800 mb-4">🎯 Priority Corrections Summary</h2>
 			
@@ -290,10 +357,10 @@
 	{/if}
 
 	<!-- Review Summary Section -->
-	{#if paper.peer_review && paper.peer_review.reviews && paper.peer_review.reviews.length > 0}
+	{#if paper && (paper as Paper)?.peer_review?.reviews?.length}
 		<div class="mb-8 bg-white rounded-lg shadow-md p-6">
 			<h2 class="text-2xl font-semibold text-gray-800 mb-4">
-				📋 Review Summary ({paper.peer_review.reviews.length} review{paper.peer_review.reviews.length !== 1 ? 's' : ''})
+				📋 Review Summary ({(paper as Paper).peer_review?.reviews?.length || 0} review{(paper as Paper).peer_review?.reviews?.length !== 1 ? 's' : ''})
 			</h2>
 			
 			<!-- Overall Status -->
@@ -301,23 +368,23 @@
 				<div class="bg-blue-50 p-4 rounded-lg">
 					<h3 class="font-semibold text-blue-800">Average Score</h3>
 					<p class="text-2xl font-bold text-blue-600">
-						{paper.peer_review.averageScore ? paper.peer_review.averageScore.toFixed(1) : 'N/A'}/5.0
+						{(paper as Paper).peer_review?.averageScore ? (paper as Paper).peer_review?.averageScore?.toFixed(1) : 'N/A'}/5.0
 					</p>
 				</div>
 				<div class="bg-green-50 p-4 rounded-lg">
 					<h3 class="font-semibold text-green-800">Reviews Completed</h3>
-					<p class="text-2xl font-bold text-green-600">{paper.peer_review.reviewCount || 0}</p>
+					<p class="text-2xl font-bold text-green-600">{(paper as Paper).peer_review?.reviewCount || 0}</p>
 				</div>
 				<div class="bg-purple-50 p-4 rounded-lg">
 					<h3 class="font-semibold text-purple-800">Status</h3>
 					<p class="text-lg font-medium text-purple-600 capitalize">
-						{paper.peer_review.reviewStatus?.replace('_', ' ') || 'Unknown'}
+						{(paper as Paper).peer_review?.reviewStatus?.replace('_', ' ') || 'Unknown'}
 					</p>
 				</div>
 			</div>
 
 			<!-- Individual Reviews -->
-			{#each paper.peer_review.reviews as review, index}
+			{#each (paper as Paper).peer_review?.reviews || [] as review, index}
 				<div class="border border-gray-200 rounded-lg p-6 mb-6 bg-gray-50">
 					<div class="flex justify-between items-start mb-4">
 						<h3 class="text-xl font-semibold text-gray-800">
@@ -363,7 +430,7 @@
 										<div class="w-full bg-gray-200 rounded-full h-2 mt-1">
 											<div 
 												class="bg-blue-600 h-2 rounded-full" 
-												style="width: {(score / 5) * 100}%"
+												style="width: {((score as number) / 5) * 100}%"
 											></div>
 										</div>
 									</div>
@@ -471,16 +538,16 @@
 			</div>
 		</div>
 		
-		{#if paper.peer_review && paper.peer_review.reviews && paper.peer_review.reviews.length > 0}
+		{#if paper && (paper as Paper)?.peer_review?.reviews?.length}
 			<div class="space-y-6">
-				{#each paper.peer_review.reviews as review, reviewIndex}
+				{#each (paper as Paper).peer_review?.reviews || [] as review, reviewIndex}
 					<div class="border border-gray-200 rounded-lg p-4">
 						<h3 class="font-semibold text-gray-800 mb-3">Review #{reviewIndex + 1} Corrections</h3>
 						
 						<!-- Low-scoring criteria to address -->
 						{#if review.quantitativeEvaluation}
 							{#each Object.entries(review.quantitativeEvaluation) as [criterion, score]}
-								{#if score < 3.5}
+								{#if (score as number) < 3.5}
 									<div class="flex items-center gap-3 p-2 mb-2 bg-orange-50 rounded">
 										<input 
 											type="checkbox" 
@@ -578,16 +645,37 @@
 				<div>
 					<h2 class="text-2xl font-semibold text-gray-800">📄 Your Article</h2>
 					<p class="text-gray-600 mt-1">
-						Review your article content and make necessary corrections based on reviewer feedback.
+						{#if isEditMode}
+							Edit your article content based on reviewer feedback.
+						{:else}
+							Review your article content and make necessary corrections based on reviewer feedback.
+						{/if}
 					</p>
 				</div>
 				<div class="flex flex-col items-end gap-2">
-					<button 
-						class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-						onclick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-					>
-						📋 Back to Review Summary
-					</button>
+					<div class="flex gap-2">
+						{#if isEditMode}
+							<button 
+								class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+								onclick={() => isEditMode = false}
+							>
+								❌ Cancel Edit
+							</button>
+						{:else}
+							<button 
+								class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+								onclick={toggleEditMode}
+							>
+								✏️ Edit Article
+							</button>
+						{/if}
+						<button 
+							class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+							onclick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+						>
+							📋 Back to Review Summary
+						</button>
+					</div>
 					<span class="text-sm text-gray-500">
 						{getCompletionPercentage()}% corrections completed
 					</span>
@@ -596,11 +684,29 @@
 		</div>
 		
 		<div class="p-6">
-			<PaperReviewPage
-				{paper}
-				{currentUser}
-				{messageFeed}
-			/>
+			{#if isEditMode}
+				<!-- Modo de edição com PaperPublishPage -->
+				<div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+					<h3 class="font-semibold text-yellow-800 mb-2">✏️ Edit Mode Active</h3>
+					<p class="text-yellow-700 text-sm">
+						You are now editing your article. Make the necessary changes based on reviewer feedback above, 
+						then save your changes. The article will remain in corrections status until you're ready to resubmit.
+					</p>
+				</div>
+				<PaperPublishPage
+					{savePaper}
+					{inicialValue}
+					author={currentUser as User}
+					authorsOptions={userProfiles}
+				/>
+			{:else}
+				<!-- Modo de visualização com PaperReviewPage -->
+				<PaperReviewPage
+					paper={paper as Paper}
+					currentUser={currentUser as User}
+					{messageFeed}
+				/>
+			{/if}
 		</div>
 	</div>
 </div>
