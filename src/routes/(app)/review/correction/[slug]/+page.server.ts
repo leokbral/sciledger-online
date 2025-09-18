@@ -3,68 +3,109 @@ import Users from '$lib/db/models/User';
 import { error, redirect } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongo';
 
+// Type for MongoDB ObjectId
+interface ObjectId {
+	toString(): string;
+	constructor: { name: string };
+}
+
+// Função sanitize para converter ObjectId e Date em strings
+function sanitize(obj: unknown): unknown {
+	if (obj === null || obj === undefined) {
+		return obj;
+	}
+	
+	if (Array.isArray(obj)) {
+		return obj.map(sanitize);
+	}
+	
+	if (obj && typeof obj === 'object') {
+		// Handle MongoDB ObjectId
+		if (obj.constructor?.name === 'ObjectId' && typeof (obj as ObjectId).toString === 'function') {
+			return (obj as ObjectId).toString();
+		}
+		
+		// Handle Date objects
+		if (obj instanceof Date) {
+			return obj.toISOString();
+		}
+		
+		// Handle regular objects
+		const clean: Record<string, unknown> = {};
+		for (const key in obj) {
+			if (Object.prototype.hasOwnProperty.call(obj, key)) {
+				const value = (obj as Record<string, unknown>)[key];
+				clean[key] = sanitize(value);
+			}
+		}
+		return clean;
+	}
+	
+	return obj;
+}
+
 export async function load({ locals, params }) {
-    if (!locals.user) redirect(302, `/login`);
+	if (!locals.user) redirect(302, `/login`);
 
-    await start_mongo();
+	await start_mongo();
 
-    try {
-        // Buscar paper pelo slug (ajuste se o campo correto for outro)
-        const paperRaw = await Papers.findOne({ id: params.slug }, {})
-            .populate("authors")
-            .populate("mainAuthor")
-            .populate("coAuthors")
-            .lean()
-            .exec();
+	try {
+		// Buscar paper pelo slug (ajuste se o campo correto for outro)
+		const paperRaw = await Papers.findOne({ id: params.slug }, {})
+			.populate("authors")
+			.populate("mainAuthor")
+			.populate("coAuthors")
+			.lean()
+			.exec();
 
-        if (!paperRaw) {
-            throw error(404, 'Paper not found');
-        }
+		if (!paperRaw) {
+			throw error(404, 'Paper not found');
+		}
 
-        // Normalizar peer_review igual ao primeiro código
-        const peer_review = paperRaw.peer_review
-            ? {
-                reviewType: paperRaw.peer_review.reviewType,
-                assignedReviewers: paperRaw.peer_review.assignedReviewers ?? [],
-                responses: paperRaw.peer_review.responses ?? [],
-                reviews: paperRaw.peer_review.reviews ?? [],
-                averageScore: paperRaw.peer_review.averageScore ?? 0,
-                reviewCount: paperRaw.peer_review.reviewCount ?? 0,
-                reviewStatus: paperRaw.peer_review.reviewStatus ?? 'not_started'
-            }
-            : {
-                reviewType: "open",
-                assignedReviewers: [],
-                responses: [],
-                reviews: [],
-                averageScore: 0,
-                reviewCount: 0,
-                reviewStatus: "not_started"
-            };
+		// Normalizar peer_review igual ao primeiro código
+		const peer_review = paperRaw.peer_review
+			? {
+					reviewType: paperRaw.peer_review.reviewType,
+					assignedReviewers: paperRaw.peer_review.assignedReviewers ?? [],
+					responses: paperRaw.peer_review.responses ?? [],
+					reviews: paperRaw.peer_review.reviews ?? [],
+					averageScore: paperRaw.peer_review.averageScore ?? 0,
+					reviewCount: paperRaw.peer_review.reviewCount ?? 0,
+					reviewStatus: paperRaw.peer_review.reviewStatus ?? 'not_started'
+			  }
+			: {
+					reviewType: "open",
+					assignedReviewers: [],
+					responses: [],
+					reviews: [],
+					averageScore: 0,
+					reviewCount: 0,
+					reviewStatus: "not_started"
+			  };
 
-        const paper = {
-            ...paperRaw,
-            peer_review
-        };
+		const paper = {
+			...paperRaw,
+			peer_review
+		};
 
-        // Buscar usuários
-        const fetchUsers = async () => {
-            return await Users.find({}, {}).lean().exec();
-        };
+		// Buscar usuários
+		const usersRaw = await Users.find({}, {}).lean().exec();
 
-        return {
-            paper,
-            users: await fetchUsers()
-        };
+		// Sanitizar antes de retornar
+		return {
+			paper: sanitize(paper),
+			users: sanitize(usersRaw)
+		};
 
-    } catch (err) {
-        console.error('Error loading paper:', err);
-        throw error(500, 'Internal Server Error');
-    }
+	} catch (err) {
+		console.error('Error loading paper:', err);
+		throw error(500, 'Internal Server Error');
+	}
 }
 
 export const actions = {
-    default: async ({ locals }) => {
-        if (!locals.user) throw error(401, 'Unauthorized');
-    }
+	default: async ({ locals }) => {
+		if (!locals.user) throw error(401, 'Unauthorized');
+		return { success: true };
+	}
 };

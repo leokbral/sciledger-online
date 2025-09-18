@@ -45,28 +45,46 @@ export const PATCH: RequestHandler = async ({ request, params }) => {
     await start_mongo();
 
     try {
-        const { status } = await request.json();
-        const paperId = params.slug; // Change from params.id to params.slug
+        const { reviewerId } = await request.json();
+        const paperId = params.slug;
 
-        if (!status) {
-            return json({ error: 'Status is required.' }, { status: 400 });
+        if (!reviewerId) {
+            return json({ error: 'Reviewer ID is required.' }, { status: 400 });
         }
+
+        // Atualiza o status da revisão individual para 'completed'
+        const paper = await Papers.findOne({ id: paperId }).lean().exec();
+        if (!paper) {
+            return json({ error: 'Paper not found.' }, { status: 404 });
+        }
+
+        // Atualiza a resposta do revisor para 'completed'
+        const responses = paper.peer_review?.responses?.map((resp) => {
+            if (resp.reviewerId === reviewerId) {
+                return { ...resp, status: 'completed', completedAt: new Date() };
+            }
+            return resp;
+        }) ?? [];
+
+        // Verifica se todos os revisores que ACEITARAM completaram
+        const acceptedReviewers = responses.filter(r => r.status === 'accepted' || r.status === 'completed');
+        const completedReviewers = responses.filter(r => r.status === 'completed');
+        const allAcceptedCompleted = acceptedReviewers.length > 0 && acceptedReviewers.length === completedReviewers.length;
+
+        // Atualiza o status do artigo se todos que aceitaram completaram
+        const newStatus = allAcceptedCompleted ? 'needing corrections' : paper.status;
 
         const updatedPaper = await Papers.findOneAndUpdate(
             { id: paperId },
             {
-                status: status,
+                'peer_review.responses': responses,
+                status: newStatus,
                 updatedAt: new Date()
             },
             { new: true, runValidators: true }
         ).lean().exec();
 
-        if (!updatedPaper) {
-            return json({ error: 'Paper not found.' }, { status: 404 });
-        }
-
         return json({ success: true, paper: updatedPaper }, { status: 200 });
-        
     } catch (error) {
         console.error('Error updating paper status:', error);
         return json({ error: 'Internal server error.' }, { status: 500 });

@@ -27,9 +27,13 @@ export type Paper = {
         reviewType: 'open' | 'selected';
         assignedReviewers: User[];
         responses: Array<{
+			_id: any;
             reviewerId: User;
-            status: 'pending' | 'accepted' | 'declined';
+            status: 'pending' | 'accepted' | 'declined' | 'completed';
             responseDate?: Date;
+            assignedAt?: Date;
+            completedAt?: Date;
+            reviewId?: string;
         }>;
         // Adicionar campos relacionados às reviews
         reviews: Review[]; // Lista de reviews associadas

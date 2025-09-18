@@ -1,46 +1,63 @@
 import Users from '$lib/db/models/User';
-import { start_mongo } from '$lib/db/mongo';
-import { error, /* fail, */ redirect } from '@sveltejs/kit';
-//import * as api from '$lib/api.js';
+import { start_mongo } from '$lib/db/mongooseConnection';
+import { error, redirect } from '@sveltejs/kit';
 
+// Type for MongoDB ObjectId
+interface ObjectId {
+	toString(): string;
+	constructor: { name: string };
+}
+
+// Função de sanitização
+function sanitize(obj: unknown): unknown {
+	if (obj === null || obj === undefined) {
+		return obj;
+	}
+	
+	if (Array.isArray(obj)) {
+		return obj.map(sanitize);
+	}
+	
+	if (obj && typeof obj === 'object') {
+		// Handle MongoDB ObjectId
+		if (obj.constructor?.name === 'ObjectId' && typeof (obj as ObjectId).toString === 'function') {
+			return (obj as ObjectId).toString();
+		}
+		
+		// Handle Date objects
+		if (obj instanceof Date) {
+			return obj.toISOString();
+		}
+		
+		// Handle regular objects
+		const clean: Record<string, unknown> = {};
+		for (const key in obj) {
+			if (Object.prototype.hasOwnProperty.call(obj, key)) {
+				const value = (obj as Record<string, unknown>)[key];
+				clean[key] = sanitize(value);
+			}
+		}
+		return clean;
+	}
+	
+	return obj;
+}
 
 export async function load({ locals }) {
 	if (!locals.user) redirect(302, `/login`);
-	await start_mongo(); // Não necessário mais
+	
+	await start_mongo();
 
-    const fetchUsers = async () => {
-        const users = await Users.find({}, { _id: 0 }).lean().exec();
-        console.log('users');
-		return users;
-    };
+	const usersDoc = await Users.find({}, {}).lean().exec();
 
-    return {
-        users: await fetchUsers()
-    };
+	return {
+		users: sanitize(usersDoc)
+	};
 }
 
-
 export const actions = {
-	default: async ({ locals/* , request  */}) => {
+	default: async ({ locals }) => {
 		if (!locals.user) error(401);
-
-		//const data = await request.formData();
-
-		/* const result = await api.post(
-			'articles',
-			{
-				article: {
-					title: data.get('title'),
-					description: data.get('description'),
-					body: data.get('body'),
-					tagList: data.getAll('tag')
-				}
-			},
-			locals.user.token
-		); */
-
-		//if (result.errors) return fail(400, result);
-
-		//redirect(303, `/article/${result.article.slug}`);
+		return { success: true };
 	}
 };
