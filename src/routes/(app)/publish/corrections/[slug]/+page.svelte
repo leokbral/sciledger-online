@@ -22,6 +22,11 @@
 	let users: Array<{ id: string; firstName: string; lastName: string }> = data.users as Array<{ id: string; firstName: string; lastName: string }>;
 	let userProfiles = data.users; // Para o PaperPublishPage
 
+	// Initialize correction progress from paper data
+	let correctionProgress: Record<string, boolean> = $state(
+		(paper as Paper)?.correctionProgress || {}
+	);
+
 	// Estado para controlar se estamos em modo de edição
 	let isEditMode = $state(false);
 
@@ -99,12 +104,70 @@
 		return names[key] || key;
 	}
 
-	let correctionProgress: Record<string, boolean> = $state({});
+	// Save status tracking
+	let isSaving = $state(false);
+	let lastSaved = $state<Date | null>(null);
+
+	// Debounce function to avoid too many API calls
+	let saveTimeout: NodeJS.Timeout | null = null;
+	
+	// Reactive statement to auto-save progress changes
+	$effect(() => {
+		// Only auto-save if there are items in progress (not on initial load)
+		if (Object.keys(correctionProgress).length > 0) {
+			if (saveTimeout) {
+				clearTimeout(saveTimeout);
+			}
+			saveTimeout = setTimeout(() => {
+				saveCorrectionProgress();
+			}, 1000); // Debounce for 1 second
+		}
+	});
+
+	// Function to save correction progress to database
+	async function saveCorrectionProgress() {
+		if (isSaving) return; // Prevent multiple simultaneous saves
+		
+		console.log('Saving correction progress:', correctionProgress);
+		isSaving = true;
+		try {
+			const response = await fetch(`/publish/corrections/${data.id}`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					action: 'saveCorrectionProgress',
+					correctionProgress
+				})
+			});
+
+			console.log('Save response status:', response.status);
+			const responseData = await response.json();
+			console.log('Save response data:', responseData);
+
+			if (response.ok) {
+				lastSaved = new Date();
+				console.log('Progress saved successfully at:', lastSaved);
+			} else {
+				console.error('Erro ao salvar progresso:', responseData);
+			}
+		} catch (error) {
+			console.error('Erro na requisição de salvamento:', error);
+		} finally {
+			isSaving = false;
+		}
+	}
 
 	// Function to toggle correction completion
 	function toggleCorrection(reviewIndex: number, type: 'weaknesses' | 'criterion', identifier: string) {
 		const key = `${reviewIndex}-${type}-${identifier}`;
+		console.log('Toggling correction:', key, 'to', !correctionProgress[key]);
 		correctionProgress[key] = !correctionProgress[key];
+		console.log('Current correctionProgress:', correctionProgress);
+		
+		// Force immediate save for testing
+		saveCorrectionProgress();
 	}
 
 	// Function to calculate completion percentage
@@ -535,6 +598,20 @@
 						style="width: {getCompletionPercentage()}%"
 					></div>
 				</div>
+				<!-- Save status indicator -->
+				{#if isSaving}
+					<div class="flex items-center gap-1 text-sm text-blue-600">
+						<svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+							<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+							<path class="opacity-75" fill="currentColor" d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+						</svg>
+						Saving...
+					</div>
+				{:else if lastSaved}
+					<div class="text-sm text-green-600">
+						✓ Saved {lastSaved.toLocaleTimeString()}
+					</div>
+				{/if}
 			</div>
 		</div>
 		
