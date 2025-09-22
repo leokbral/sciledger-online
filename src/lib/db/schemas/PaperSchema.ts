@@ -63,7 +63,14 @@ export const PaperSchema: Schema = new Schema({
     updatedAt: { type: String, default: () => new Date().toISOString() },
     submittedBy: { type: String, required: true, ref: 'User' }, // Campo adicionado para quem submeteu o paper
     hubId: { type: String, ref: 'Hub', required: false },
-    isLinkedToHub: { type: Boolean, default: false }
+    isLinkedToHub: { type: Boolean, default: false },
+    
+    // Campo para armazenar o progresso das correções (checklist)
+    correctionProgress: {
+        type: Map,
+        of: Boolean,
+        default: new Map()
+    }
 
 }, { collection: 'papers' });
 
