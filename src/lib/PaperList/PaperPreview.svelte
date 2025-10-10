@@ -3,6 +3,7 @@
 	import type { Paper } from '$lib/types/Paper';
 	import { getInitials } from '$lib/utils/GetInitials';
 	import { Avatar, Rating } from '@skeletonlabs/skeleton-svelte';
+	import CorrectionProgressBar from '$lib/components/CorrectionProgressBar/CorrectionProgressBar.svelte';
 
 	let { paper, user } = $props();
 	let starValue = $state(2);
@@ -146,6 +147,18 @@
 		</div>
 	</div>
 </div>
+
+<!-- Barra de Progresso (apenas para papers em revisão ou correção) -->
+{#if paper.status === 'in review' || paper.status === 'needing corrections'}
+	<div class="my-4">
+		<CorrectionProgressBar 
+			{paper} 
+			currentUser={user} 
+			showDetails={false} 
+			size="sm" 
+		/>
+	</div>
+{/if}
 
 <div class="">
 	<Rating value={starValue} allowHalf readOnly></Rating>

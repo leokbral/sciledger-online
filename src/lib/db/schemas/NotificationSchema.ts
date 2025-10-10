@@ -22,7 +22,14 @@ export const NotificationSchema: Schema = new Schema({
             'mention',
             'paper_published',
             'hub_paper_pending',
-            'standalone_paper_pending'
+            'standalone_paper_pending',
+            'paper_accepted_for_review',
+            'reviewer_assigned',
+            'reviewer_accepted_review',
+            'review_submitted',
+            'corrections_submitted',
+            'paper_final_acceptance',
+            'paper_final_rejection'
         ],
         required: true,
     },

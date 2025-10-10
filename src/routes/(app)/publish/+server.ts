@@ -4,7 +4,7 @@ import { MONGO_URL } from '$env/static/private';
 import * as crypto from 'crypto';
 import { start_mongo } from '$lib/db/mongo';
 import Papers from '$lib/db/models/Paper';
-import { createNotification, NotificationTemplates } from '$lib/helpers/notificationHelper';
+import { NotificationService } from '$lib/services/NotificationService';
 
 const client = new MongoClient(MONGO_URL);
 
@@ -87,15 +87,14 @@ export const POST: RequestHandler = async ({ request, locals }) => {
         await newPaper.save();
 
         // Create notification for paper submission
-        const template = NotificationTemplates.paperSubmitted(title);
-        await createNotification({
-            userId: user.id,
+        await NotificationService.createNotification({
+            user: user.id,
             type: 'paper_submitted',
-            title: template.title,
-            content: template.content,
+            title: 'Artigo enviado com sucesso',
+            content: `Seu artigo "${title}" foi enviado e está aguardando avaliação`,
             relatedPaperId: newPaper.id,
             actionUrl: `/publish/edit/${newPaper.id}`,
-            priority: template.priority
+            priority: 'medium'
         });
 
         return new Response(
