@@ -99,8 +99,8 @@ export class NotificationService {
             type: 'review_request',
             title: `Nova solicitação de revisão`,
             content: isHubPaper 
-                ? `Você foi convidado para revisar o artigo "${data.paperTitle}" no hub "${data.hubName}"`
-                : `Você foi convidado para revisar o artigo "${data.paperTitle}" de ${data.authorName}`,
+                ? `You have been invited to review the paper "${data.paperTitle}" in the hub "${data.hubName}"`
+                : `You have been invited to review the paper "${data.paperTitle}" by ${data.authorName}`,
             relatedPaperId: data.paperId,
             relatedHubId: data.hubId,
             actionUrl: `/papers/${data.paperId}/review`,
@@ -127,10 +127,10 @@ export class NotificationService {
         const notifications = data.adminIds.map(adminId => ({
             user: adminId,
             type: isHubPaper ? 'hub_paper_pending' as const : 'standalone_paper_pending' as const,
-            title: `Novo artigo pendente`,
+            title: `New Pending Paper Submission`,
             content: isHubPaper
-                ? `Novo artigo "${data.paperTitle}" submetido ao hub "${data.hubName}" aguardando aprovação`
-                : `Novo artigo "${data.paperTitle}" de ${data.authorName} aguardando aprovação`,
+                ? `A new paper "${data.paperTitle}" has been submitted to the hub "${data.hubName}" and is awaiting approval`
+                : `A new paper "${data.paperTitle}" by ${data.authorName} is awaiting approval`,
             relatedPaperId: data.paperId,
             relatedHubId: data.hubId,
             actionUrl: `/admin/papers/${data.paperId}`,
@@ -158,8 +158,8 @@ export class NotificationService {
         return await this.createNotification({
             user: data.userId,
             type: 'hub_invitation',
-            title: `Convite para hub`,
-            content: `${data.inviterName} convidou você para participar do hub "${data.hubName}" como ${data.role}`,
+            title: `Hub Invitation`,
+            content: `${data.inviterName} invited you to join the hub "${data.hubName}" as ${data.role}`,
             relatedHubId: data.hubId,
             actionUrl: `/hubs/${data.hubId}/invitation`,
             priority: 'high',
@@ -174,7 +174,7 @@ export class NotificationService {
     // NEW NOTIFICATION METHODS FOR PAPER REVIEW LIFECYCLE
 
     /**
-     * Cenário 1: Quando um editor aceita um artigo para revisão
+     * Scenario 1: When an editor accepts a paper for review
      */
     static async createPaperAcceptedForReviewNotifications(data: {
         paperId: string;
@@ -188,13 +188,13 @@ export class NotificationService {
     }) {
         const notifications = [];
 
-        // Notificar o autor que o artigo foi aceito para revisão
+        // Notify the author that the paper has been accepted for review
         notifications.push(
             this.createNotification({
                 user: data.authorId,
                 type: 'paper_accepted_for_review',
-                title: `Artigo aceito para revisão`,
-                content: `Seu artigo "${data.paperTitle}" foi aceito para revisão por ${data.editorName}`,
+                title: `Paper Accepted for Review`,
+                content: `Your paper "${data.paperTitle}" has been accepted for review by ${data.editorName}`,
                 relatedPaperId: data.paperId,
                 relatedHubId: data.hubId,
                 actionUrl: `/papers/${data.paperId}`,
@@ -207,14 +207,14 @@ export class NotificationService {
             })
         );
 
-        // Notificar os revisores designados com os detalhes do artigo
+        // Notify the assigned reviewers with the paper details
         for (const reviewerId of data.reviewerIds) {
             notifications.push(
                 this.createNotification({
                     user: reviewerId,
                     type: 'reviewer_assigned',
-                    title: `Novo artigo para revisão`,
-                    content: `Você foi designado para revisar o artigo "${data.paperTitle}" de ${data.authorName}`,
+                    title: `New Paper for Review`,
+                    content: `You have been assigned to review the paper "${data.paperTitle}" by ${data.authorName}`,
                     relatedPaperId: data.paperId,
                     relatedUser: data.authorId,
                     relatedHubId: data.hubId,
@@ -234,7 +234,7 @@ export class NotificationService {
     }
 
     /**
-     * Cenário 2: Quando um revisor aceita fazer a revisão
+     * Scenario 2: When a reviewer accepts to review a paper
      */
     static async createReviewerAcceptedNotifications(data: {
         paperId: string;
@@ -247,13 +247,13 @@ export class NotificationService {
     }) {
         const notifications = [];
 
-        // Notificar o editor que o revisor aceitou
+        // Notify the editor that the reviewer has accepted
         notifications.push(
             this.createNotification({
                 user: data.editorId,
                 type: 'reviewer_accepted_review',
-                title: `Revisor aceitou a revisão`,
-                content: `${data.reviewerName} aceitou revisar o artigo "${data.paperTitle}"`,
+                title: `Reviewer Accepted Review`,
+                content: `${data.reviewerName} has accepted to review the paper "${data.paperTitle}"`,
                 relatedPaperId: data.paperId,
                 relatedUser: data.reviewerId,
                 relatedHubId: data.hubId,
@@ -266,13 +266,13 @@ export class NotificationService {
             })
         );
 
-        // Notificar o autor que o revisor aceitou
+        // Notify the author that the reviewer has accepted
         notifications.push(
             this.createNotification({
                 user: data.authorId,
                 type: 'reviewer_accepted_review',
-                title: `Revisor designado`,
-                content: `Um revisor aceitou revisar seu artigo "${data.paperTitle}"`,
+                title: `Reviewer Assigned`,
+                content: `A reviewer has accepted to review your paper "${data.paperTitle}"`,
                 relatedPaperId: data.paperId,
                 relatedHubId: data.hubId,
                 actionUrl: `/papers/${data.paperId}`,
@@ -288,7 +288,7 @@ export class NotificationService {
     }
 
     /**
-     * Cenário 3: Quando um revisor finaliza a revisão
+     * Scenario 3: When a reviewer submits their review
      */
     static async createReviewSubmittedNotifications(data: {
         paperId: string;
@@ -310,13 +310,13 @@ export class NotificationService {
             'major_revision': 'solicitou revisões maiores'
         };
 
-        // Notificar o editor que a revisão foi concluída
+        // Notify the editor that the review has been completed
         notifications.push(
             this.createNotification({
                 user: data.editorId,
                 type: 'review_submitted',
-                title: `Revisão concluída`,
-                content: `${data.reviewerName} concluiu a revisão do artigo "${data.paperTitle}" e ${decisionText[data.reviewDecision]}`,
+                title: `Review Completed`,
+                content: `${data.reviewerName} has completed the review of the paper "${data.paperTitle}" and ${decisionText[data.reviewDecision]}`,
                 relatedPaperId: data.paperId,
                 relatedReviewId: data.reviewId,
                 relatedUser: data.reviewerId,
@@ -331,15 +331,15 @@ export class NotificationService {
             })
         );
 
-        // Notificar o autor que a revisão foi feita (dependendo da decisão)
+        // Notify the author that the review has been completed (depending on the decision)
         const shouldNotifyAuthor = ['minor_revision', 'major_revision', 'accept'].includes(data.reviewDecision);
         if (shouldNotifyAuthor) {
             notifications.push(
                 this.createNotification({
                     user: data.authorId,
                     type: 'review_submitted',
-                    title: `Revisão recebida`,
-                    content: `Seu artigo "${data.paperTitle}" foi revisado. O revisor ${decisionText[data.reviewDecision]}.`,
+                    title: `Review Received`,
+                    content: `Your paper "${data.paperTitle}" has been reviewed. The reviewer ${decisionText[data.reviewDecision]}.`,
                     relatedPaperId: data.paperId,
                     relatedReviewId: data.reviewId,
                     relatedHubId: data.hubId,
@@ -357,7 +357,7 @@ export class NotificationService {
     }
 
     /**
-     * Cenário 4: Quando o autor envia as correções
+     * Scenario 4: When the author submits corrections
      */
     static async createCorrectionsSubmittedNotifications(data: {
         paperId: string;
@@ -372,13 +372,13 @@ export class NotificationService {
     }) {
         const notifications = [];
 
-        // Notificar o editor
+        // Notify the editor
         notifications.push(
             this.createNotification({
                 user: data.editorId,
                 type: 'corrections_submitted',
-                title: `Correções enviadas`,
-                content: `${data.authorName} enviou a versão ${data.correctionVersion} com correções do artigo "${data.paperTitle}"`,
+                title: `Corrections Submitted`,
+                content: `${data.authorName} has submitted version ${data.correctionVersion} with corrections for the paper "${data.paperTitle}"`,
                 relatedPaperId: data.paperId,
                 relatedUser: data.authorId,
                 relatedHubId: data.hubId,
@@ -393,15 +393,15 @@ export class NotificationService {
             })
         );
 
-        // Se necessária nova rodada de revisão, notificar os revisores
+        // If a new review round is required, notify the reviewers
         if (data.requiresNewReview) {
             for (const reviewerId of data.reviewerIds) {
                 notifications.push(
                     this.createNotification({
                         user: reviewerId,
                         type: 'corrections_submitted',
-                        title: `Nova versão para revisão`,
-                        content: `${data.authorName} enviou correções do artigo "${data.paperTitle}". Uma nova revisão é necessária.`,
+                        title: `New Version for Review`,
+                        content: `${data.authorName} has submitted corrections for the paper "${data.paperTitle}". A new review is required.`,
                         relatedPaperId: data.paperId,
                         relatedUser: data.authorId,
                         relatedHubId: data.hubId,
@@ -421,7 +421,7 @@ export class NotificationService {
     }
 
     /**
-     * Cenário 5: Quando o artigo é aceito para publicação
+     * Scenario 5: When the paper is accepted for publication
      */
     static async createPaperFinalAcceptanceNotifications(data: {
         paperId: string;
@@ -437,13 +437,13 @@ export class NotificationService {
     }) {
         const notifications = [];
 
-        // Notificar o autor da aceitação final
+        // Notify the author of the final acceptance
         notifications.push(
             this.createNotification({
                 user: data.authorId,
                 type: 'paper_final_acceptance',
-                title: `Artigo aceito para publicação! 🎉`,
-                content: `Parabéns! Seu artigo "${data.paperTitle}" foi aceito para publicação por ${data.editorName}`,
+                title: `Paper Accepted for Publication! 🎉`,
+                content: `Congratulations! Your paper "${data.paperTitle}" has been accepted for publication by ${data.editorName}`,
                 relatedPaperId: data.paperId,
                 relatedHubId: data.hubId,
                 actionUrl: `/papers/${data.paperId}`,
@@ -457,14 +457,14 @@ export class NotificationService {
             })
         );
 
-        // Opcionalmente notificar revisores do status final
+        // Optionally notify reviewers of the final status
         for (const reviewerId of data.reviewerIds) {
             notifications.push(
                 this.createNotification({
                     user: reviewerId,
                     type: 'paper_final_acceptance',
-                    title: `Artigo aceito para publicação`,
-                    content: `O artigo "${data.paperTitle}" que você revisou foi aceito para publicação`,
+                    title: `Paper Accepted for Publication`,
+                    content: `The paper "${data.paperTitle}" you reviewed has been accepted for publication`,
                     relatedPaperId: data.paperId,
                     relatedUser: data.authorId,
                     relatedHubId: data.hubId,
@@ -483,7 +483,7 @@ export class NotificationService {
     }
 
     /**
-     * Quando o artigo é rejeitado finalmente
+     * Scenario 6: When the paper is finally rejected
      */
     static async createPaperFinalRejectionNotifications(data: {
         paperId: string;
@@ -499,13 +499,13 @@ export class NotificationService {
     }) {
         const notifications = [];
 
-        // Notificar o autor da rejeição final
+        // Notify the author of the final rejection
         notifications.push(
             this.createNotification({
                 user: data.authorId,
                 type: 'paper_final_rejection',
-                title: `Decisão final sobre o artigo`,
-                content: `Seu artigo "${data.paperTitle}" não foi aceito para publicação. ${data.rejectionReason || 'Consulte os comentários dos revisores para mais detalhes.'}`,
+                title: `Final Decision on Paper`,
+                content: `Your paper "${data.paperTitle}" has not been accepted for publication. ${data.rejectionReason || 'Please refer to the reviewers\' comments for more details.'}`,
                 relatedPaperId: data.paperId,
                 relatedHubId: data.hubId,
                 actionUrl: `/papers/${data.paperId}`,
@@ -519,14 +519,14 @@ export class NotificationService {
             })
         );
 
-        // Opcionalmente notificar revisores do status final
+        // Optionally notify reviewers of the final status
         for (const reviewerId of data.reviewerIds) {
             notifications.push(
                 this.createNotification({
                     user: reviewerId,
                     type: 'paper_final_rejection',
-                    title: `Decisão final sobre artigo`,
-                    content: `O artigo "${data.paperTitle}" que você revisou não foi aceito para publicação`,
+                    title: `Final Decision on Paper`,
+                    content: `The paper "${data.paperTitle}" you reviewed has not been accepted for publication`,
                     relatedPaperId: data.paperId,
                     relatedUser: data.authorId,
                     relatedHubId: data.hubId,
