@@ -10,6 +10,7 @@
 	import type { User } from '$lib/types/User';
 	import Icon from '@iconify/svelte';
 	import AcceptPaperButton from '$lib/components/AcceptPaperButton.svelte';
+	import CorrectionProgressBar from '$lib/components/CorrectionProgressBar/CorrectionProgressBar.svelte';
 
 	interface Props {
 		data: PageData;
@@ -23,7 +24,7 @@
 
 	// let user = data.user;
 
-	let paper: Paper | null = $state(data.paper);
+	let paper: Paper | null = $state(data.paper as Paper);
 	//console.log("www",paper?.authors)
 	let userProfiles = data.users; // Ajuste conforme necessário
 
@@ -102,6 +103,18 @@
 
 {#if paper}
     <div class="container page max-w-[900px] p-4 m-auto">
+        <!-- Barra de Progresso do Tempo de Revisão -->
+        {#if paper.status === 'in review' || paper.status === 'needing corrections'}
+            <div class="mb-6">
+                <CorrectionProgressBar 
+                    {paper} 
+                    currentUser={$page.data.user} 
+                    showDetails={true} 
+                    size="lg" 
+                />
+            </div>
+        {/if}
+        
         <div class="mb-6">
             <h2 class="text-2xl font-bold text-primary-500 mb-2">Review Request</h2>
             <p class="text-surface-600">Please review the paper details below and decide if you would like to accept this review assignment.</p>

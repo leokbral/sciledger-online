@@ -26,7 +26,14 @@
             | 'mention'
             | 'paper_published'
             | 'hub_paper_pending'
-            | 'standalone_paper_pending';
+            | 'standalone_paper_pending'
+            | 'paper_accepted_for_review'
+            | 'reviewer_assigned'
+            | 'reviewer_accepted_review'
+            | 'review_submitted'
+            | 'corrections_submitted'
+            | 'paper_final_acceptance'
+            | 'paper_final_rejection';
         title: string;
         content: string;
         relatedUser?: string;
@@ -67,7 +74,14 @@
         mention: { icon: 'mdi:at', color: 'text-blue-500' },
         paper_published: { icon: 'mdi:publish', color: 'text-green-500' },
         hub_paper_pending: { icon: 'mdi:hub-outline', color: 'text-yellow-500' },
-        standalone_paper_pending: { icon: 'mdi:file-clock-outline', color: 'text-yellow-500' }
+        standalone_paper_pending: { icon: 'mdi:file-clock-outline', color: 'text-yellow-500' },
+        paper_accepted_for_review: { icon: 'mdi:check-circle', color: 'text-emerald-500' },
+        reviewer_assigned: { icon: 'mdi:account-arrow-right', color: 'text-blue-600' },
+        reviewer_accepted_review: { icon: 'mdi:account-check', color: 'text-green-600' },
+        review_submitted: { icon: 'mdi:clipboard-check', color: 'text-teal-500' },
+        corrections_submitted: { icon: 'mdi:pencil-circle', color: 'text-amber-500' },
+        paper_final_acceptance: { icon: 'mdi:trophy', color: 'text-yellow-500' },
+        paper_final_rejection: { icon: 'mdi:close-circle', color: 'text-red-600' }
     };
 
     // Priority colors

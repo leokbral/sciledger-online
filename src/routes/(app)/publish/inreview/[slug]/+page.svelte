@@ -10,20 +10,21 @@
 	import AvailableReviewers from '$lib/AvailableReviewers.svelte';
 	import type { User } from '$lib/types/User';
 	import { Progress } from '@skeletonlabs/skeleton-svelte';
+	import CorrectionProgressBar from '$lib/components/CorrectionProgressBar/CorrectionProgressBar.svelte';
 
 	interface Props {
 		data: PageData;
 	}
 
 	let { data }: Props = $props();
-	let reviewers = data.users.filter((u: User) => u.roles.reviewer === true);
+	let reviewers = (data.users as User[]).filter((u: User) => u.roles.reviewer === true);
 	// State for peer review option
 	let peer_review: string = '';
 	// let reviewers: User;
 
 	// let user = data.user;
 
-	let paper: Paper | null = data.paper;
+	let paper: Paper | null = data.paper as Paper;
 	//console.log("www",paper?.authors)
 	let userProfiles = data.users; // Ajuste conforme necessário
 
@@ -92,8 +93,13 @@
 
 {#if paper}
 	<div class="container page max-w-[700px] p-4 m-auto">
-		<div>PROGRESS BAR TIME
-			<Progress value={60} max={100} />
+		<div class="mb-6">
+			<CorrectionProgressBar 
+				{paper} 
+				currentUser={$page.data.user} 
+				showDetails={true} 
+				size="lg" 
+			/>
 		</div>
 
 		<div class="row">

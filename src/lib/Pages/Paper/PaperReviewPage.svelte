@@ -12,6 +12,7 @@
 	import type { User } from '$lib/types/User';
 	import { createEventDispatcher } from 'svelte';
 	import ReviewForms from '../Review/ReviewForms.svelte';
+	import CorrectionProgressBar from '$lib/components/CorrectionProgressBar/CorrectionProgressBar.svelte';
 
 	const dispatch = createEventDispatcher();
 
@@ -185,6 +186,18 @@
 
 <main class="w-full max-w-none px-2 md:px-4">
 	<fieldset class="py-4 md:py-6">
+		<!-- Barra de Progresso do Tempo de Revisão -->
+		{#if paper.status === 'in review' || paper.status === 'needing corrections'}
+			<div class="mb-6">
+				<CorrectionProgressBar 
+					{paper} 
+					{currentUser} 
+					showDetails={true} 
+					size="lg" 
+				/>
+			</div>
+		{/if}
+		
 		{#if editable}
 			<div class="flex justify-end gap-3 mb-4">
 				<button class="bg-primary-500 text-white rounded-lg px-4 py-2" onclick={hdlSaveDraft}

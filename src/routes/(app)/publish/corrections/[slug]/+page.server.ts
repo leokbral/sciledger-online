@@ -91,7 +91,10 @@ export async function load({ locals, params }) {
 
 	const paper = {
 		...paperDoc,
-		peer_review
+		peer_review,
+		correctionProgress: paperDoc.correctionProgress instanceof Map
+			? Object.fromEntries(paperDoc.correctionProgress) 
+			: paperDoc.correctionProgress || {}
 	};
 
 	// Buscar o MessageFeed
