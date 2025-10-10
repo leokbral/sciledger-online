@@ -41,7 +41,7 @@
 				<Tabs.Panel value={tabs[0].value}>
 					<div class="card page max-w-[700px] p-4 m-auto">
 						<div class="text-surface-900">
-							<MyPapers papersData={tabsContent[0]}></MyPapers>
+							<MyPapers papersData={tabsContent[0]} currentUser={data.user}></MyPapers>
 						</div>
 					</div>
 				</Tabs.Panel>

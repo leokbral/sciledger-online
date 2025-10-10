@@ -64,7 +64,7 @@
 					{#if tabSet === 'tab' + i.toString()}
 						<div class="card page max-w-[700px] p-4 m-auto">
 							<div class="text-surface-900">
-								<MyPapers rota={tabs[i].rota} {papersData}></MyPapers>
+								<MyPapers rota={tabs[i].rota} {papersData} currentUser={user}></MyPapers>
 							</div>
 						</div>
 					{/if}

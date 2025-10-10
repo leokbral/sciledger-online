@@ -27,7 +27,7 @@ export type Paper = {
         reviewType: 'open' | 'selected';
         assignedReviewers: User[];
         responses: Array<{
-			_id: any;
+			_id: string;
             reviewerId: User;
             status: 'pending' | 'accepted' | 'declined' | 'completed';
             responseDate?: Date;
@@ -56,5 +56,6 @@ export type Paper = {
     updatedAt: Date;
     submittedBy: User; // Campo adicionado para quem submeteu o paper
     hubId?: string | Hub| null;
-    isLinkedToHub?: boolean
+    isLinkedToHub?: boolean;
+    correctionProgress?: Record<string, boolean>; // Progresso das correções (checklist)
 }

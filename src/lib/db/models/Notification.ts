@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { NotificationSchema } from '../schemas/tempschema/NotificationSchema';
+import { NotificationSchema } from '../schemas/NotificationSchema';
 import type { Notification } from '$lib/types/Notification';
 
 export interface INotification extends Omit<Notification, '_id'> {

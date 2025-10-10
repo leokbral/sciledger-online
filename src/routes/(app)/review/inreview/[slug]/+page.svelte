@@ -3,6 +3,8 @@
 	import PaperReviewPage from '$lib/Pages/Paper/PaperReviewPage.svelte';
 	import { post } from '$lib/utils/index.js';
 	import type { Paper } from '$lib/types/Paper';
+	import type { User } from '$lib/types/User';
+	import type { MessageFeed } from '$lib/types/MessageFeed';
 	//import type { PaperPublishStoreData } from '$lib/types/PaperPublishStoreData';
 	import type { PageData } from './$types';
 
@@ -13,9 +15,9 @@
 	let { data }: Props = $props();
 	console.log("www0",data)
 
-	let paper = data.paper;
-	let currentUser = data.user;
-	let messageFeed = data.messageFeed;
+	let paper = data.paper as Paper;
+	let currentUser = data.user as User;
+	let messageFeed = data.messageFeed as MessageFeed;
 	//console.log("www",paper?.authors)
 
 	async function handleSavePaper(event: { detail: { store: Paper } }) {
@@ -55,7 +57,7 @@
 				},
 				body: JSON.stringify({
 					newMessage,
-					id: messageFeed?.id
+					id: (messageFeed as any)?.id
 				})
 			});
 			console.log(response.body);
@@ -78,7 +80,7 @@
 					'Content-Type': 'application/json'
 				},
 				body: JSON.stringify({
-					reviewerId: currentUser.id // Envia o id do revisor atual
+					reviewerId: (currentUser as User).id // Envia o id do revisor atual
 				})
 			});
 			if (response.ok) {
@@ -96,8 +98,6 @@
 </script>
 
 <PaperReviewPage
-	onsavePaper={handleSavePaper}
-	onsubmitReview={hdlSubmitReview}
 	on:reviewSubmitted={handleReviewSubmitted}
 	{paper}
 	{currentUser}
