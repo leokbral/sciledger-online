@@ -65,7 +65,7 @@
 								{@render requested?.()}
 							{:else}
 								<div class="text-surface-900">
-									<MyPapers rota={tabs[i].rota} {papersData}></MyPapers>
+									<MyPapers rota={tabs[i].rota} {papersData} currentUser={user}></MyPapers>
 								</div>
 							{/if}
 						</div>

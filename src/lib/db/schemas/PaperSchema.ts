@@ -27,6 +27,7 @@ export const PaperSchema: Schema = new Schema({
             reviewType: { type: String, enum: ['open', 'selected'], required: true },
             assignedReviewers: [{ type: String, ref: 'User' }],
             responses: [{
+                _id: { type: String, default: () => crypto.randomUUID() },
                 reviewerId: { type: String, ref: 'User' },
                 status: {
                     type: String,

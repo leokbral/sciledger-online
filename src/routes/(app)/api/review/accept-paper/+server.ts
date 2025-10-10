@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { db } from '$lib/db/mongo';
-import { createNotification } from '$lib/helpers/notificationHelper';
+import { NotificationService } from '$lib/services/NotificationService';
 import { ObjectId } from 'mongodb';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
@@ -57,8 +57,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
             return json({ error: 'Insufficient permissions' }, { status: 403 });
         }
 
-        const acceptedByName = `${user.firstName} ${user.lastName}`;
         const paperTitle = paper.title;
+        const authorId = paper.author || paper.createdBy;
 
         // Atualizar status do paper
         await db.collection('papers').updateOne(
@@ -74,63 +74,45 @@ export const POST: RequestHandler = async ({ request, locals }) => {
             }
         );
 
-        // Criar template de notificação customizado para aceitação
-        const template = {
-            title: 'Paper Accepted for Review',
-            content: `Your paper "${paperTitle}" has been accepted for review by ${acceptedByName}. The review process will begin soon.`,
-            priority: 'medium' as const
-        };
+        // Buscar informações adicionais do editor e revisores designados
+        const editor = await db.collection('users').findOne({ _id: user._id });
+        const editorName = `${editor?.firstName || ''} ${editor?.lastName || ''}`.trim();
 
-        // Notificar o autor do paper
-        const authorId = paper.author || paper.createdBy;
-        if (authorId && authorId !== user._id) {
-            await createNotification({
-                userId: String(authorId),
-                type: 'paper_accepted',
-                title: template.title,
-                content: template.content,
-                relatedUser: String(user._id),
-                relatedPaperId: String(paperObjectId),
-                relatedHubId: hubId ? String(hubId) : undefined,
-                actionUrl: `/notifications?highlight=${paperObjectId}`,
-                metadata: {
-                    acceptedBy: String(user._id),
-                    acceptedByName,
-                    paperTitle,
-                    reviewType,
-                    acceptedAt: new Date()
-                },
-                priority: template.priority
-            });
-        }
+        // Buscar revisores designados (se existirem)
+        const reviewerIds = paper.peer_review?.assignedReviewers || [];
+        
+        // Criar notificações usando o novo sistema
+        await NotificationService.createPaperAcceptedForReviewNotifications({
+            paperId: String(paperObjectId),
+            paperTitle: paperTitle,
+            authorId: String(authorId),
+            authorName: paper.authorName || 'Autor',
+            reviewerIds: reviewerIds.map((id: string) => String(id)),
+            editorName: editorName,
+            hubId: hubId ? String(hubId) : undefined,
+            hubName: paper.hubName
+        });
 
-        // Se houver coautores, notificar também
+        // Se houver coautores, incluir nas notificações
         if (paper.coAuthors && Array.isArray(paper.coAuthors)) {
-            const { createBulkNotifications } = await import('$lib/helpers/notificationHelper');
-            
-            const coAuthorNotifications = paper.coAuthors
-                .filter((coAuthorId: string) => coAuthorId !== user._id && coAuthorId !== authorId)
-                .map((coAuthorId: string) => ({
-                    userId: String(coAuthorId),
-                    type: 'paper_accepted' as const,
-                    title: template.title,
-                    content: template.content,
-                    relatedUser: String(user._id),
-                    relatedPaperId: String(paperObjectId),
-                    relatedHubId: hubId ? String(hubId) : undefined,
-                    actionUrl: `/notifications?highlight=${paperObjectId}`,
-                    metadata: {
-                        acceptedBy: String(user._id),
-                        acceptedByName,
-                        paperTitle,
-                        reviewType,
-                        acceptedAt: new Date()
-                    },
-                    priority: template.priority
-                }));
-
-            if (coAuthorNotifications.length > 0) {
-                await createBulkNotifications(coAuthorNotifications);
+            for (const coAuthorId of paper.coAuthors) {
+                if (coAuthorId !== user._id && coAuthorId !== authorId) {
+                    await NotificationService.createNotification({
+                        user: String(coAuthorId),
+                        type: 'paper_accepted_for_review',
+                        title: `Artigo aceito para revisão`,
+                        content: `O artigo "${paperTitle}" foi aceito para revisão por ${editorName}`,
+                        relatedPaperId: String(paperObjectId),
+                        relatedHubId: hubId ? String(hubId) : undefined,
+                        actionUrl: `/papers/${paperObjectId}`,
+                        priority: 'high',
+                        metadata: {
+                            paperTitle: paperTitle,
+                            editorName: editorName,
+                            acceptedAt: new Date()
+                        }
+                    });
+                }
             }
         }
 

@@ -2,6 +2,8 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import Reviews from '$lib/db/models/Review';
 import Papers from '$lib/db/models/Paper';
+import Users from '$lib/db/models/User';
+import { NotificationService } from '$lib/services/NotificationService';
 import * as crypto from 'crypto';
 import { start_mongo } from '$lib/db/mongooseConnection';
 
@@ -130,6 +132,30 @@ export const POST: RequestHandler = async ({ request }) => {
 		}
 
 		await paper.save();
+
+		// Buscar informações para as notificações
+		const reviewer = await Users.findOne({ id: reviewerId });
+		const reviewerName = reviewer ? `${reviewer.firstName} ${reviewer.lastName}` : 'Revisor';
+		const authorId = typeof paper.mainAuthor === 'string' ? paper.mainAuthor : String(paper.mainAuthor);
+		const submittedById = typeof paper.submittedBy === 'string' ? paper.submittedBy : String(paper.submittedBy);
+
+		// Criar notificações para quando revisor finaliza a revisão
+		try {
+			await NotificationService.createReviewSubmittedNotifications({
+				paperId: paper.id,
+				paperTitle: paper.title,
+				reviewId: reviewId,
+				reviewerId: reviewerId,
+				reviewerName: reviewerName,
+				authorId: authorId,
+				editorId: submittedById, // usando submittedBy como fallback para editor
+				reviewDecision: form.recommendation as 'accept' | 'reject' | 'minor_revision' | 'major_revision',
+				hubId: typeof paper.hubId === 'string' ? paper.hubId : undefined
+			});
+		} catch (notificationError) {
+			console.error('Error creating review notifications:', notificationError);
+			// Não falhar a operação principal por causa das notificações
+		}
 
 		return json(
 			{

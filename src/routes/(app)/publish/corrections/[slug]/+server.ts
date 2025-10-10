@@ -4,9 +4,11 @@ import { start_mongo } from '$lib/db/mongooseConnection';
 import '$lib/db/models/User';
 import '$lib/db/models/MessageFeed';
 import '$lib/db/models/Paper';
+import { NotificationService } from '$lib/services/NotificationService';
 
 import MessageFeeds from '$lib/db/models/MessageFeed';
 import Papers from '$lib/db/models/Paper';
+import Users from '$lib/db/models/User';
 
 export const POST: RequestHandler = async ({ request, params }) => {
     await start_mongo();
@@ -47,6 +49,41 @@ export const POST: RequestHandler = async ({ request, params }) => {
             if (!updatedPaper) {
                 console.log('Erro: Paper não encontrado com ID:', paperId);
                 return json({ error: 'Paper não encontrado.' }, { status: 404 });
+            }
+
+            // Verificar se é uma nova versão com correções significativas
+            const existingProgress = updatedPaper.correctionProgress || {};
+            const newProgressEntries = Object.entries(correctionProgress);
+            const completedCorrections = newProgressEntries.filter(([, completed]) => completed).length;
+            const hasSignificantProgress = completedCorrections > Object.keys(existingProgress).length * 0.5;
+
+            // Se houver progresso significativo, criar notificações
+            if (hasSignificantProgress) {
+                try {
+                    // Buscar informações do autor
+                    const author = await Users.findOne({ id: updatedPaper.mainAuthor || updatedPaper.submittedBy });
+                    const authorName = author ? `${author.firstName} ${author.lastName}` : 'Autor';
+                    const authorId = typeof updatedPaper.mainAuthor === 'string' ? updatedPaper.mainAuthor : String(updatedPaper.mainAuthor);
+                    const submittedById = typeof updatedPaper.submittedBy === 'string' ? updatedPaper.submittedBy : String(updatedPaper.submittedBy);
+
+                    // Buscar revisores se houver
+                    const reviewerIds = updatedPaper.peer_review?.assignedReviewers?.map((r: string | object) => String(r)) || [];
+
+                    await NotificationService.createCorrectionsSubmittedNotifications({
+                        paperId: updatedPaper.id,
+                        paperTitle: updatedPaper.title,
+                        authorId: authorId,
+                        authorName: authorName,
+                        editorId: submittedById, // usando submittedBy como fallback para editor
+                        reviewerIds: reviewerIds,
+                        correctionVersion: 1, // pode ser melhorado para rastrear versões
+                        requiresNewReview: completedCorrections > 0.8 * newProgressEntries.length, // se > 80% completado
+                        hubId: typeof updatedPaper.hubId === 'string' ? updatedPaper.hubId : undefined
+                    });
+                } catch (notificationError) {
+                    console.error('Error creating correction notifications:', notificationError);
+                    // Não falhar a operação principal por causa das notificações
+                }
             }
             
             const responseProgress = updatedPaper.correctionProgress instanceof Map 

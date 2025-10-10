@@ -9,6 +9,7 @@
 	import type { PageData } from './$types';
 	import type { PaperPublishStoreData } from '$lib/types/PaperPublishStoreData';
 	import { Avatar } from '@skeletonlabs/skeleton-svelte';
+	import CorrectionProgressBar from '$lib/components/CorrectionProgressBar/CorrectionProgressBar.svelte';
 
 	interface Props {
 		data: PageData;
@@ -23,9 +24,14 @@
 	let userProfiles = data.users; // Para o PaperPublishPage
 
 	// Initialize correction progress from paper data
-	let correctionProgress: Record<string, boolean> = $state(
-		(paper as Paper)?.correctionProgress || {}
-	);
+	let correctionProgress: Record<string, boolean> = $state({});
+	
+	// Set initial state after component mount
+	$effect(() => {
+		if (paper && !Object.keys(correctionProgress).length) {
+			correctionProgress = (paper as Paper)?.correctionProgress || {};
+		}
+	});
 
 	// Estado para controlar se estamos em modo de edição
 	let isEditMode = $state(false);
@@ -336,6 +342,17 @@
 		<p class="text-gray-600">
 			Review the feedback from peer reviewers and make the necessary corrections to your article.
 		</p>
+		
+		<!-- Barra de Progresso do Tempo de Correção -->
+		<div class="mt-4">
+			<CorrectionProgressBar 
+				{paper} 
+				currentUser={currentUser} 
+				showDetails={true} 
+				size="lg" 
+			/>
+		</div>
+		
 		<div class="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
 			<h3 class="font-semibold text-blue-800 mb-2">📋 Article Information</h3>
 			<p><strong>Title:</strong> {(paper as Paper).title}</p>
