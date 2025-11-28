@@ -219,7 +219,7 @@
 				.filter((item) => item.file)
 				.map(async (item) => {
 					const formData = new FormData();
-					formData.append('file', item.file!);
+					formData.append('image', item.file!);
 					const response = await fetch('/api/images/upload', {
 						method: 'POST',
 						body: formData
