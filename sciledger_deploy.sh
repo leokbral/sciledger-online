@@ -16,9 +16,10 @@ npm run build
 # Stop all existing instances (ignore errors if not running)
 pm2 delete sciledger || true
 
-# Start new instance using node directly
-# The build/index.js from adapter-node handles --port and --host
-pm2 start build/index.js --name "sciledger" -- --port 3000 --host 0.0.0.0
+# Start new instance with environment variables
+# BODY_SIZE_LIMIT sets max upload size (adapter-node)
+# PORT and HOST configure the server
+BODY_SIZE_LIMIT=10485760 PORT=3000 HOST=0.0.0.0 pm2 start build/index.js --name "sciledger"
 
 # Save PM2 process list
 pm2 save
