@@ -23,11 +23,7 @@ const config = {
 			out: 'build',
 			precompress: true,
 			envPrefix: ''
-		}),
-		// Increase body size limit to 10MB for image uploads
-		bodySize: {
-			max: 10 * 1024 * 1024 // 10MB in bytes
-		}
+		})
 	}
 };
 export default config;
