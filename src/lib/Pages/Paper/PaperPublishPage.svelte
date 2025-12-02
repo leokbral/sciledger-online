@@ -481,11 +481,18 @@
 	<fieldset class="py-4 md:py-6">
 		<section id="article-basic-info" class="flex flex-col items-center max-w-[700px] m-auto">
 			<section class="mb-4 w-full">
-				<input
+				<!-- <input
 					name="title"
 					class="w-full p-2 border border-surface-300 rounded-lg text-lg"
 					placeholder="Article Title"
 					bind:value={$store.title}
+				/> -->
+				<label for="title" class="block mb-1">Title</label>
+				<RichTextEditor
+					id="title"
+					bind:content={$store.title}
+					placeholder="Article Title..."
+					minHeight="80px"
 				/>
 			</section>
 			<section id="authors" class="w-full flex flex-col gap-2">

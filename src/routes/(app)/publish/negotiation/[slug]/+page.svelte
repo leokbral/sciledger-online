@@ -351,14 +351,16 @@
 										: ''}"
 									onclick={() => (selectedHub = hub.id)}
 								>
-									<!-- Card image -->
+								<!-- Card image -->
+								{#if hub.cardUrl}
 									<img
-										src={hub.cardUrl ? `/api/images/${hub.cardUrl}` : '/placeholder-card.jpg'}
+										src={`/api/images/${hub.cardUrl}`}
 										alt={`${hub.title} Card`}
 										class="absolute w-full h-full object-cover"
 									/>
-
-									<!-- Gradient overlay -->
+								{:else}
+									<div class="absolute w-full h-full bg-gradient-to-br from-primary-500 to-primary-700"></div>
+								{/if}									<!-- Gradient overlay -->
 									<div
 										class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent"
 									></div>

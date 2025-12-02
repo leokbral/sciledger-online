@@ -20,10 +20,17 @@
 	// 	return paper.hubId === hub._id && paper.status === 'published';
 	// });
 	const userId = data.user._id;
+	const isCreator = data.hub.createdBy._id === data.user.id;
+	const isReviewer = hub.reviewers?.includes(data.user.id);
 
 	const filteredPapers = data.papers?.filter((paper) => {
+		// Se for published, todos podem ver
 		if (paper.status === 'published') return true;
 
+		// Se for criador ou revisor do hub, pode ver todos os papers do hub
+		if (isCreator || isReviewer) return true;
+
+		// Caso contrário, só vê se estiver envolvido no paper
 		const isMainAuthor = paper.mainAuthor?.id === userId;
 		const isCoAuthor = paper.coAuthors?.some((ca) => ca.id === userId);
 		const isCorresponding = paper.correspondingAuthor?.id === userId;
@@ -55,11 +62,10 @@
 		);
 	};
 
-	const isCreator = data.hub.createdBy._id === data.user.id;
 	// console.log('Quem foi o responsavel foi esse',data.hub.createdBy._id);
 	// console.log('Is creator:', isCreator);
 	const shouldHighlight = (paper: any) => {
-		const isOwnerOrReviewer = isCreator || hub.reviewers?.includes(data.user.id);
+		const isOwnerOrReviewer = isCreator || isReviewer;
 		return paper.status !== 'published' && (isUserInvolved(paper) || isOwnerOrReviewer);
 	};
 </script>
@@ -78,19 +84,25 @@
 	{#if hub.cardUrl}
 		<img src={`/api/images/${hub.cardUrl}`} alt="Card" class="w-full h-full object-cover" />
 	{:else}
-		<div class="w-full h-full bg-gray-200 flex items-center justify-center text-gray-500">
-			Sem Card
+		<div class="w-full h-full bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center text-white text-2xl font-semibold">
+			{hub.title}
 		</div>
 	{/if}
 </div>
 
 <!-- Cabeçalho com logo -->
 <div class="bg-white shadow-md rounded-xl p-6 flex flex-col md:flex-row gap-6">
-	<img
-		src={hub.logoUrl ? `/api/images/${hub.logoUrl}` : '/placeholder-logo.jpg'}
-		alt="Logo"
-		class="w-28 h-28 object-contain rounded-full"
-	/>
+	{#if hub.logoUrl}
+		<img
+			src={`/api/images/${hub.logoUrl}`}
+			alt="Logo"
+			class="w-28 h-28 object-contain rounded-full"
+		/>
+	{:else}
+		<div class="w-28 h-28 bg-primary-500 rounded-full flex items-center justify-center text-white text-4xl font-bold">
+			{hub.title.substring(0, 2).toUpperCase()}
+		</div>
+	{/if}
 	<div class="flex-1 flex flex-col justify-between min-h-full">
 		<!-- Top section with title and guidelines -->
 		<div class="flex justify-between items-start">
