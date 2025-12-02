@@ -239,7 +239,7 @@
 			{/if}
 
 			<!-- Ações -->
-			{#if hub.acknowledgement}
+			{#if hub.acknowledgement && hub.acknowledgement.replace(/<[^>]*>/g, '').trim()}
 				<Modal
 					open={openAcknowledgementModal}
 					onOpenChange={(e) => (openAcknowledgementModal = e.open)}
