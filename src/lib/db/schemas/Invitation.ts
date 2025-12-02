@@ -6,7 +6,7 @@ export const InvitationSchema: Schema = new Schema({
     // paperId: { type: String, required: true }, // ID do paper
     reviewer: {  type: String, ref: 'User', required: true }, // Um único revisor
     // peerReviewType: { type: String, enum: ['open', 'selected'], required: true }, // Tipo de revisão
-    hubId: { type: String, required: true }, // ID do hub (opcional)
+    hubId: { type: String, ref: 'Hub', required: true }, // ID do hub com referência
     // isLinkedToHub: { type: Boolean, required: true }, // Se está vinculado a um hub
     status: { type: String, enum: ['pending', 'accepted', 'declined'], required: true }, // Status
     assignedAt: { type: Date, required: true, default: Date.now }, // Quando foi designado

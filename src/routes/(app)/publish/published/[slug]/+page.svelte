@@ -62,7 +62,7 @@
 			{/if}
 
 			<!-- Título do Paper -->
-			<h2 class="text-3xl font-semibold text-gray-800 mb-4">{paper.title}</h2>
+			<h2 class="text-3xl font-semibold text-gray-800 mb-4">{@html paper.title}</h2>
 
 			<!-- Autores -->
 			<div class="flex gap-3 items-center mb-4">

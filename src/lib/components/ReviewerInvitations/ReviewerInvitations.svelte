@@ -87,14 +87,30 @@
 			<p class="text-sm text-gray-400">No reviewer invitations at the moment.</p>
 		{:else}
 			{#each invitations as invite (invite._id)}
-				<div class="card p-4 flex items-center justify-between">
-					<div>
-						<p class="font-medium">Invitation to review hub</p>
-						<p class="text-sm text-gray-500">
-							Received {new Date(invite.createdAt).toLocaleDateString()}
-						</p>
+				<div class="card p-4 flex items-center justify-between gap-4">
+					<div class="flex items-center gap-4">
+						{#if invite.hubId?.logoUrl}
+							<img
+								src={`/api/images/${invite.hubId.logoUrl}`}
+								alt="Hub logo"
+								class="w-12 h-12 rounded-full object-cover"
+							/>
+						{:else}
+							<div class="w-12 h-12 bg-primary-500 rounded-full flex items-center justify-center text-white font-bold">
+								{invite.hubId?.title?.substring(0, 2).toUpperCase() || 'HB'}
+							</div>
+						{/if}
+						<div>
+							<p class="font-medium">Invitation to review: {invite.hubId?.title || 'Unknown Hub'}</p>
+							<p class="text-sm text-gray-500">
+								{invite.hubId?.type || 'Hub'} • Received {new Date(invite.createdAt).toLocaleDateString()}
+							</p>
+							{#if invite.hubId?.description}
+								<p class="text-xs text-gray-400 mt-1 line-clamp-2">{invite.hubId.description}</p>
+							{/if}
+						</div>
 					</div>
-					<div class="flex gap-2">
+					<div class="flex gap-2 flex-shrink-0">
 						<button
 							class="btn preset-filled-success-500"
 							disabled={loading}

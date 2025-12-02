@@ -130,7 +130,7 @@
 		class="w-full h-48 object-cover rounded-sm"
 	/>
 
-	<h4 class="h4 font-bold">{paper.title}</h4>
+	<h4 class="h4 font-bold">{@html paper.title}</h4>
 	<p>{@html paper.abstract}</p>
 	<div class="flex justify-between my-3">
 		<span class="text-xs"

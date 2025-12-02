@@ -64,7 +64,7 @@
 						href={`/review/published/${paper.id}`}
 						class="hover:text-primary-600 transition-colors"
 					>
-						{paper.title}
+						{@html paper.title}
 					</a>
 				</h2>
 

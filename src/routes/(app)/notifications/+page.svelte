@@ -4,10 +4,12 @@
     import type { PageData } from './$types';
     import { formatDistance } from 'date-fns';
     import { ptBR } from 'date-fns/locale';
+    import Icon from '@iconify/svelte';
 
     export let data: PageData;
 
     let highlightedNotificationId = '';
+    let loadingInvite = '';
 
     onMount(() => {
         // Verificar se há um parâmetro highlight na URL
@@ -23,6 +25,30 @@
             }, 500);
         }
     });
+
+    async function handleInvitation(inviteId: string, action: 'accept' | 'reject') {
+        loadingInvite = inviteId;
+        try {
+            const response = await fetch(`/api/reviewer-invitations/${inviteId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action })
+            });
+
+            if (response.ok) {
+                data.invitations = data.invitations.filter(invite => invite._id !== inviteId);
+                // Reload page to update notifications
+                window.location.reload();
+            } else {
+                alert(`Failed to ${action} invitation`);
+            }
+        } catch (error) {
+            console.error(`Error ${action}ing invitation:`, error);
+            alert(`Failed to ${action} invitation`);
+        } finally {
+            loadingInvite = '';
+        }
+    }
 
     async function markAsRead(notificationId: string) {
         try {
@@ -97,6 +123,64 @@
             </p>
         </header>
 
+        <!-- Pending Invitations Section -->
+        {#if data.invitations && data.invitations.length > 0}
+            <div class="mb-8">
+                <h2 class="text-2xl font-semibold text-gray-900 dark:text-white mb-4">Pending Invitations</h2>
+                <div class="space-y-4">
+                    {#each data.invitations as invite (invite._id)}
+                        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border-l-4 border-l-purple-500 p-6">
+                            <div class="flex items-center justify-between gap-4">
+                                <div class="flex items-center gap-4">
+                                    {#if invite.hubId?.logoUrl}
+                                        <img
+                                            src={`/api/images/${invite.hubId.logoUrl}`}
+                                            alt="Hub logo"
+                                            class="w-12 h-12 rounded-full object-cover"
+                                        />
+                                    {:else}
+                                        <div class="w-12 h-12 bg-primary-500 rounded-full flex items-center justify-center text-white font-bold">
+                                            {invite.hubId?.title?.substring(0, 2).toUpperCase() || 'HB'}
+                                        </div>
+                                    {/if}
+                                    <div>
+                                        <p class="font-medium text-gray-900 dark:text-white">
+                                            Invitation to review: {invite.hubId?.title || 'Unknown Hub'}
+                                        </p>
+                                        <p class="text-sm text-gray-500">
+                                            {invite.hubId?.type || 'Hub'} • Received {new Date(invite.createdAt).toLocaleDateString()}
+                                        </p>
+                                        {#if invite.hubId?.description}
+                                            <p class="text-xs text-gray-400 mt-1 line-clamp-2">{invite.hubId.description}</p>
+                                        {/if}
+                                    </div>
+                                </div>
+                                <div class="flex gap-2 flex-shrink-0">
+                                    <button
+                                        class="inline-flex items-center px-4 py-2 rounded-md text-sm font-medium text-white bg-green-600 hover:bg-green-700 transition-colors disabled:opacity-50"
+                                        disabled={loadingInvite === invite._id}
+                                        onclick={() => handleInvitation(invite._id, 'accept')}
+                                    >
+                                        <Icon icon="mdi:check" class="mr-2" />
+                                        Accept
+                                    </button>
+                                    <button
+                                        class="inline-flex items-center px-4 py-2 rounded-md text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-colors disabled:opacity-50"
+                                        disabled={loadingInvite === invite._id}
+                                        onclick={() => handleInvitation(invite._id, 'reject')}
+                                    >
+                                        <Icon icon="mdi:close" class="mr-2" />
+                                        Reject
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    {/each}
+                </div>
+            </div>
+        {/if}
+
+        <!-- Notifications Section -->
         {#if data.notifications.length === 0}
             <div class="text-center py-12">
                 <div class="text-6xl mb-4">🔔</div>
@@ -160,7 +244,7 @@
                                 <div class="flex items-center space-x-2">
                                     {#if !notification.isRead}
                                         <button
-                                            on:click={() => markAsRead(notification._id)}
+                                            onclick={() => markAsRead(notification._id)}
                                             class="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:text-blue-300 dark:hover:bg-blue-900/20 transition-colors"
                                         >
                                             Mark as read

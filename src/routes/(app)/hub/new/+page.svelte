@@ -255,40 +255,59 @@
 	}
 
 	async function saveImages() {
-		// Upload logo if exists
-		if (logoItem?.file) {
-			const formData = new FormData();
-			formData.append('file', logoItem.file);
-			const response = await fetch('/api/images/upload', {
-				method: 'POST',
-				body: formData
-			});
-			const data = await response.json();
-			form.logoUrl = data.id;
-		}
+		try {
+			// Upload logo if exists
+			if (logoItem?.file) {
+				const formData = new FormData();
+				formData.append('image', logoItem.file);
+				const response = await fetch('/api/images/upload', {
+					method: 'POST',
+					body: formData
+				});
+				const data = await response.json();
+				console.log('Logo upload response:', data);
+				if (data.id) {
+					form.logoUrl = data.id;
+				}
+			}
 
-		// Upload banner if exists
-		if (bannerItem?.file) {
-			const formData = new FormData();
-			formData.append('file', bannerItem.file);
-			const response = await fetch('/api/images/upload', {
-				method: 'POST',
-				body: formData
-			});
-			const data = await response.json();
-			form.bannerUrl = data.id;
-		}
+			// Upload banner if exists
+			if (bannerItem?.file) {
+				const formData = new FormData();
+				formData.append('image', bannerItem.file);
+				const response = await fetch('/api/images/upload', {
+					method: 'POST',
+					body: formData
+				});
+				const data = await response.json();
+				console.log('Banner upload response:', data);
+				if (data.id) {
+					form.bannerUrl = data.id;
+				}
+			}
 
-		// Upload card if exists
-		if (cardItem?.file) {
-			const formData = new FormData();
-			formData.append('file', cardItem.file);
-			const response = await fetch('/api/images/upload', {
-				method: 'POST',
-				body: formData
+			// Upload card if exists
+			if (cardItem?.file) {
+				const formData = new FormData();
+				formData.append('image', cardItem.file);
+				const response = await fetch('/api/images/upload', {
+					method: 'POST',
+					body: formData
+				});
+				const data = await response.json();
+				console.log('Card upload response:', data);
+				if (data.id) {
+					form.cardUrl = data.id;
+				}
+			}
+			
+			console.log('All images uploaded. Form URLs:', {
+				logoUrl: form.logoUrl,
+				bannerUrl: form.bannerUrl,
+				cardUrl: form.cardUrl
 			});
-			const data = await response.json();
-			form.cardUrl = data.id;
+		} catch (error) {
+			console.error('Error uploading images:', error);
 		}
 	}
 
@@ -303,11 +322,12 @@
 	}
 
 	async function handleSubmit() {
-		console.log('Form Data:', form);
+		console.log('Form Data before image upload:', form);
 		try {
 			// First save any uploaded images
-			const imgRes = await saveImages();
-			console.log('Image Upload Response:', imgRes);
+			await saveImages();
+			
+			console.log('Form Data after image upload:', form);
 
 			const formData = {
 				...form,
@@ -318,6 +338,8 @@
 					eventEnd: form.dates.eventEnd
 				}
 			};
+			
+			console.log('Sending to server:', formData);
 
 			const response = await fetch('/hub/new', {
 				method: 'POST',
@@ -494,7 +516,7 @@
 		Who can create peer reviews?
 		<select bind:value={form.peerReview} class="w-full p-2 border rounded">
 			<option>Everyone</option>
-			<option>Only invited reviewers</option>
+			<option>Only Reviewers</option>
 		</select>
 		Can authors invite reviewers to their publications?
 		<select bind:value={form.authorInvite} class="w-full p-2 border rounded">

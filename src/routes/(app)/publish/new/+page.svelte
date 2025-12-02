@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { page } from '$app/stores';
 	import PaperPublishPage from '$lib/Pages/Paper/PaperPublishPage.svelte';
 	import { post } from '$lib/utils/index.js';
 	//import { userProfiles } from '../../UserProfile';
@@ -12,11 +13,16 @@
 	let { data }: Props = $props();
 	let userProfiles = data.users;
 	//let articleComponent: PaperPublishPage;
+	
+	let hubId = $derived($page.url.searchParams.get('hubId'));
 
 	async function savePaper( store: any) {
 		console.log(store);
 
-		const paper = store;
+		const paper = {
+			...store,
+			...(hubId && { hubId, isLinkedToHub: true })
+		};
 		console.log(paper)
 		try {
 			const response = await post(`/publish/new`, paper);

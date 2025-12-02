@@ -12,7 +12,7 @@
 </script>
 
 <div>
-	<h1>{paper.title}</h1>
+	<h1>{@html paper.title}</h1>
 	<p>{paper.abstract}</p>
 
 	<h2>Autores</h2>

@@ -161,7 +161,7 @@ export class NotificationService {
             title: `Hub Invitation`,
             content: `${data.inviterName} invited you to join the hub "${data.hubName}" as ${data.role}`,
             relatedHubId: data.hubId,
-            actionUrl: `/hubs/${data.hubId}/invitation`,
+            actionUrl: `/notifications`,
             priority: 'high',
             metadata: {
                 hubName: data.hubName,

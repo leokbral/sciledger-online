@@ -21,9 +21,9 @@
 				<div class="flex flex-col gap-2 mb-4">
 					<a data-sveltekit-reload href="{rota}/{paper.id}" class="flex flex-col gap-2 hover:text-secondary-500">
 						<div class="flex items-center space-x-4 p-2 bg-gray-100 rounded-lg">
-							<span class="badge bg-primary-500">💀</span>
+							<img src="/favicon.png" alt="Paper" class="w-8 h-8" />
 							<span class="flex-auto">
-								<button><dt class="font-bold">{paper.title}</dt></button>
+								<button><dt class="font-bold">{@html paper.title}</dt></button>
 								<p class="text-sm text-gray-600 capitalize">Status: {paper.status}</p>
 							</span>
 						</div>
