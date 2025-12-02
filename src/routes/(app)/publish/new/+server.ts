@@ -12,7 +12,7 @@ export const POST: RequestHandler = async ({ request }) => {
     await start_mongo(); // Não necessário mais
 
     try {
-        const { paperPictures, content, mainAuthor, correspondingAuthor, title, abstract, keywords, pdfUrl, submittedBy, price, coAuthors, status, authors } =
+        const { paperPictures, content, mainAuthor, correspondingAuthor, title, abstract, keywords, pdfUrl, submittedBy, price, coAuthors, status, authors, hubId, isLinkedToHub } =
             await request.json();
         console.log("chamou server")
         console.log(mainAuthor, correspondingAuthor, title, abstract, keywords, pdfUrl, submittedBy)
@@ -38,6 +38,7 @@ export const POST: RequestHandler = async ({ request }) => {
             status,
             content,
             paperPictures, title, abstract, keywords, pdfUrl, submittedBy: submittedBy.id, price,
+            ...(hubId && { hubId, isLinkedToHub: true }),
             createdAt: new Date(),
             updatedAt: new Date()
         });

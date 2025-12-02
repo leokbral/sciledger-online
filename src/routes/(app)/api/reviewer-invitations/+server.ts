@@ -1,11 +1,25 @@
 import Invitation from '$lib/db/models/Invitation';
+import Hubs from '$lib/db/models/Hub';
+import Users from '$lib/db/models/User';
 import { json } from '@sveltejs/kit';
 import crypto from 'crypto';
+import { NotificationService } from '$lib/services/NotificationService';
 
-export async function POST({ request }) {
+export async function POST({ request, locals }) {
 	try {
 		const { hubId, reviewerId } = await request.json();
 		console.log('Received data:', { hubId, reviewerId });
+
+		// Get hub and inviter information
+		const hub = await Hubs.findById(hubId).populate('createdBy');
+		if (!hub) {
+			return json({ error: 'Hub not found' }, { status: 404 });
+		}
+
+		const inviter = locals.user;
+		if (!inviter) {
+			return json({ error: 'Unauthorized' }, { status: 401 });
+		}
 
 		const id = crypto.randomUUID();
 
@@ -22,6 +36,16 @@ export async function POST({ request }) {
 
 		await invitation.save();
 
+		// Create notification for the invited reviewer
+		const inviterName = `${inviter.firstName || ''} ${inviter.lastName || ''}`.trim() || inviter.email;
+		await NotificationService.createHubInvitationNotification({
+			userId: reviewerId,
+			hubId: String(hubId),
+			hubName: hub.title,
+			inviterName: inviterName,
+			role: 'reviewer'
+		});
+
 		return json({ success: true, invitation });
 	} catch (error) {
 		console.error('Error creating invitation:', error);
@@ -34,15 +58,21 @@ export async function POST({ request }) {
 
 export async function GET({ locals }) {
 	try {
-		const user = locals.user; // use isso se você já está definindo o usuário em hooks.server.ts
+		const user = locals.user;
 
 		if (!user) {
 			return json({ error: 'Unauthorized' }, { status: 401 });
 		}
 
-		const invitations = await Invitation.find({ reviewer: user.id });
+		// Populate hub information for better display
+		const invitations = await Invitation.find({ reviewer: user.id, status: 'pending' })
+			.populate({
+				path: 'hubId',
+				select: 'title type description logoUrl createdBy'
+			})
+			.lean();
 
-		return json({ success: true, invitations });
+		return json({ success: true, reviewerInvitations: invitations });
 	} catch (error) {
 		console.error('Error fetching invitations:', error);
 		return json({ error: 'Failed to fetch invitations' }, { status: 500 });
