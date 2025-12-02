@@ -215,7 +215,7 @@
 			<section class="flex-1 min-w-0">
 				<div class="p-4 md:p-6 bg-white rounded-lg shadow-lg">
 					<!-- Título do Paper -->
-					<h2 class="text-3xl font-semibold text-gray-800 mb-4">{paper.title}</h2>
+					<h2 class="text-3xl font-semibold text-gray-800 mb-4">{@html paper.title}</h2>
 
 					<!-- Autores -->
 					<div class="flex gap-3 items-center mb-4">

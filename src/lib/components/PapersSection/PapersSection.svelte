@@ -10,11 +10,23 @@
     export let isCreator: boolean;
     export let userId: string;
     export let shouldHighlight: (paper: any) => boolean;
+    
+    $: hubId = hub._id;
 </script>
 
 <section>
     <div class="mt-6 bg-white shadow-md rounded-xl p-6">
-        <h2 class="text-xl font-semibold text-gray-800 mb-4">Submitted Articles</h2>
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-semibold text-gray-800">Submitted Articles</h2>
+            <a
+                data-sveltekit-reload
+                href="/publish/new?hubId={hubId}"
+                class="btn preset-filled-primary-500 text-white"
+                data-sveltekit-preload-data="hover"
+            >
+                Submit a New Article
+            </a>
+        </div>
 
         {#if papers && papers.length > 0}
             <div class="space-y-4">
@@ -52,7 +64,7 @@
                                         href={`/publish/published/${paper._id}`}
                                         class="hover:text-primary-600 transition-colors"
                                     >
-                                        {paper.title}
+                                        {@html paper.title}
                                     </a>
                                 </h3>
                                 <div class="text-sm text-gray-600 mt-1 flex items-center">

@@ -151,7 +151,7 @@
 										class="hover:text-primary-600 transition-colors"
 										data-sveltekit-reload
 									>
-										{paper.title}
+										{@html paper.title}
 									</a>
 								</h3>
 

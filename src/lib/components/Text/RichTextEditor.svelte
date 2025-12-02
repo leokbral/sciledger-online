@@ -9,9 +9,10 @@
 		id: string;
 		content?: string;
 		placeholder?: string;
+		minHeight?: string;
 	}
 
-	let { id, content = $bindable(''), placeholder = 'Enter text...' }: Props = $props();
+	let { id, content = $bindable(''), placeholder = 'Enter text...', minHeight = '200px' }: Props = $props();
 
 	// Insere estrutura inicial do artigo
 	function insertArticleTemplate() {
@@ -79,22 +80,30 @@
 	onMount(async () => {
 		const Quill = (await import('quill')).default;
 
+		// Define toolbar baseada no id - título tem opções limitadas
+		const toolbarConfig = id === 'title' 
+			? [
+				['bold', 'italic', 'underline'],
+				['clean']
+			]
+			: [
+				[{ header: [1, 2, 3, false] }],
+				['bold', 'italic', 'underline'],
+				[{ list: 'ordered' }, { list: 'bullet' }],
+				['link', 'blockquote', 'code-block'],
+				[{ align: [] }],
+				[{ background: [] }],
+				['clean'],
+				[ `${id !== 'abstract' ? 'image' : '' }` ],
+				['template', 'addRef']
+			];
+
 		editor = new Quill(`#${id}`, {
 			theme: 'snow',
 			placeholder,
 			modules: {
 				toolbar: {
-					container: [
-						[{ header: [1, 2, 3, false] }],
-						['bold', 'italic', 'underline'],
-						[{ list: 'ordered' }, { list: 'bullet' }],
-						['link', 'blockquote', 'code-block'],
-						[{ align: [] }],
-						[{ background: [] }],
-						['clean'],
-						[ `${id !== 'abstract' ? 'image' : '' }` ],
-						['template', 'addRef']
-					],
+					container: toolbarConfig,
 					// handlers: {
 					// 	template: insertArticleTemplate,
 					// 	addRef: addReference
@@ -103,7 +112,7 @@
 			}
 		});
 
-		if (id !== 'abstract') {
+		if (id !== 'abstract' && id !== 'title') {
 			const templateBtn = document.querySelector('.ql-template') as HTMLElement;
 			const addRefButton = document.querySelector('.ql-addRef') as HTMLElement;
 
@@ -167,12 +176,11 @@
 </script>
 
 <div class="h-full border border-surface-300 rounded-lg mb-4">
-	<div {id} class="min-h-[200px]"></div>
+	<div {id} style="min-height: {minHeight}"></div>
 </div>
 
 <style>
 	:global(.ql-editor) {
-		min-height: 200px;
 		height: 100%;
 	}
 	:global(.ql-container) {

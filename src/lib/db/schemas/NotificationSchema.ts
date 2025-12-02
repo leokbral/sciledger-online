@@ -29,7 +29,9 @@ export const NotificationSchema: Schema = new Schema({
             'review_submitted',
             'corrections_submitted',
             'paper_final_acceptance',
-            'paper_final_rejection'
+            'paper_final_rejection',
+            'hub_reviewer_accepted',
+            'hub_reviewer_declined'
         ],
         required: true,
     },
