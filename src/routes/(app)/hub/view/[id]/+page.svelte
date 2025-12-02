@@ -104,7 +104,7 @@
 		</div>
 	{/if}
 	<div class="flex-1 flex flex-col justify-between min-h-full">
-		<!-- Top section with title and guidelines -->
+		<!-- Top section with title, guidelines, and edit button -->
 		<div class="flex justify-between items-start">
 			<div class="space-y-2">
 				<h1 class="text-2xl font-semibold text-gray-900">
@@ -127,17 +127,29 @@
 				{/if}
 			</div>
 
-			<!-- Guidelines moved to right -->
-			{#if hub.guidelinesUrl}
-				<a
-					href={hub.guidelinesUrl}
-					target="_blank"
-					class="flex items-center gap-2 text-blue-600 hover:text-blue-700"
-				>
-					<Icon icon="mdi:file-document-outline" width="24" height="24" />
-					<span class="underline">Guidelines</span>
-				</a>
-			{/if}
+			<!-- Guidelines and Edit Button -->
+			<div class="flex items-center gap-4">
+				{#if hub.guidelinesUrl}
+					<a
+						href={hub.guidelinesUrl}
+						target="_blank"
+						class="flex items-center gap-2 text-blue-600 hover:text-blue-700"
+					>
+						<Icon icon="mdi:file-document-outline" width="24" height="24" />
+						<span class="underline">Guidelines</span>
+					</a>
+				{/if}
+				
+				{#if isCreator}
+					<a
+						href="/hub/edit/{hub._id}"
+						class="btn preset-tonal flex items-center gap-2"
+					>
+						<Icon icon="mdi:pencil" width="20" />
+						Edit Hub
+					</a>
+				{/if}
+			</div>
 		</div>
 
 		<!-- Description -->
