@@ -39,7 +39,7 @@
 	>
 		<form class="flex flex-col w-4/5 md:w-full md:px-16 md:py-14" onsubmit={preventDefault(submit)}>
 			<img
-				src="https://t4.ftcdn.net/jpg/05/44/04/47/360_F_544044746_Swth0lqH9CcTci8S5p2FS4Jqpcy6HWoI.jpg"
+				src="/favicon.png"
 				alt="Logo"
 				width="64px"
 				height="60px"
@@ -79,7 +79,7 @@
 			<div class="flex flex-col mt-12 w-full">
 				<button
 					type="submit"
-					class=" text-black font-bold py-2 px-4 rounded-sm hover:bg-primary-500 self-end"
+					class="group text-black font-bold py-2 px-4 rounded-sm hover:bg-primary-500 hover:text-black self-end"
 				>
 					Start
 					<img
@@ -87,7 +87,7 @@
 						alt="Entrar"
 						width="20"
 						height="20"
-						class="ml-2 inline"
+						class="ml-2 inline [filter:invert(36%)_sepia(93%)_saturate(1826%)_hue-rotate(202deg)_brightness(97%)_contrast(92%)] group-hover:[filter:brightness(0)_invert(1)]"
 					/>
 				</button>
 				<div class="flex flex-col">
