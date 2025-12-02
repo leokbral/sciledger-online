@@ -46,8 +46,8 @@ export const PUT: RequestHandler = async ({ request, params }) => {
         hub.description = description;
         hub.location = location;
         hub.issn = issn;
-        hub.guidelinesUrl = guidelinesUrl;
-        hub.acknowledgement = acknowledgement;
+        hub.guidelinesUrl = guidelinesUrl || undefined;
+        hub.acknowledgement = acknowledgement || undefined;
         hub.licenses = licenses || [];
         hub.extensions = extensions;
         hub.logoUrl = logoUrl;
