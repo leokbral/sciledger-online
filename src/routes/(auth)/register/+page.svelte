@@ -200,15 +200,16 @@
 				>
 				<button
 					type="submit"
-					class="flex items-center px-4 py-2 text-white bg-primary-600 rounded-md hover:bg-primary-700"
+					class="group text-black font-bold py-2 px-4 rounded-sm hover:bg-primary-500 hover:text-black"
 					disabled={processing}
 				>
-					<span class="mr-2 font-bold">Start</span>
+					Start
 					<img
 						src="https://raw.githubusercontent.com/AulaZero/icons/main/icons/loginarrow.svg"
 						alt="Entrar"
 						width="20"
 						height="20"
+						class="ml-2 inline [filter:invert(36%)_sepia(93%)_saturate(1826%)_hue-rotate(202deg)_brightness(97%)_contrast(92%)] group-hover:[filter:brightness(0)_invert(1)]"
 					/>
 				</button>
 			</div>
