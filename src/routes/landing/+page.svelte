@@ -209,7 +209,7 @@
 						<div class="w-40 h-40 flex items-center justify-center">
 							<img src="/imd-logo.svg" alt="IMD" class="w-full h-full object-contain" />
 						</div>
-						<span class="text-xs text-surface-600 leading-relaxed">Metropolis Digital Institute</span>
+						<span class="text-xs text-surface-600 leading-relaxed">Instituto Metrópole Digital</span>
 					</div>
 					
 					<!-- UFRN Logo -->
