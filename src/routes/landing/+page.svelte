@@ -441,7 +441,7 @@
 	</section>
 
 	<!-- Comparison Section -->
-	<section class="py-32 px-6 bg-surface-50">
+	<!-- <section class="py-32 px-6 bg-surface-50">
 		<div class="max-w-6xl mx-auto">
 			<h2 class="text-center text-5xl md:text-6xl font-semibold mb-8 text-surface-900 tracking-tight">
 				Why Choose SciLedger?
@@ -578,7 +578,7 @@
 				</table>
 			</div>
 		</div>
-	</section>
+	</section> -->
 
 	<!-- CTA Section -->
 	<section class="py-40 px-6">
