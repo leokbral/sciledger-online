@@ -88,12 +88,12 @@
 			<h1
 				class="text-6xl sm:text-7xl md:text-8xl font-semibold text-surface-900 mb-6 tracking-tight leading-[1.05]"
 			>
-				The future of<br />scientific publishing.
+				Sustainable future for<br />scientific publishing.
 			</h1>
 			<p
 				class="text-2xl sm:text-3xl text-surface-600 mb-12 font-normal max-w-3xl mx-auto leading-snug"
 			>
-				Transparent peer review. Powered by blockchain.
+				A non-commercial, blockchain-powered platform that lowers publication costs, accelerates scientific communication, and elevates the role of reviewers.
 			</p>
 			<div class="flex gap-6 justify-center flex-wrap mb-24">
 				<button
@@ -127,7 +127,7 @@
 			>
 				Why SciLedger
 			</h2>
-			<div class="grid grid-cols-1 md:grid-cols-3 gap-16">
+			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-16 mb-16">
 				<div class="text-center">
 					<div class="text-5xl mb-6">🔒</div>
 					<h3 class="text-2xl mb-4 text-surface-900 font-semibold">Blockchain Verified</h3>
@@ -147,6 +147,52 @@
 					<h3 class="text-2xl mb-4 text-surface-900 font-semibold">Global Network</h3>
 					<p class="text-lg text-surface-600 leading-relaxed">
 						Connect with researchers worldwide across all scientific disciplines.
+					</p>
+				</div>
+			</div>
+			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
+				<div class="text-center group">
+					<div class="w-16 h-16 bg-primary-100 rounded-2xl flex items-center justify-center mb-6 mx-auto group-hover:scale-110 transition-transform duration-300">
+						<svg class="w-8 h-8 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+						</svg>
+					</div>
+					<h3 class="text-xl mb-3 text-surface-900 font-semibold">Non-Commercial & Sustainable</h3>
+					<p class="text-base text-surface-600 leading-relaxed">
+						Community-driven platform focused on advancing science, not profit margins.
+					</p>
+				</div>
+				<div class="text-center group">
+					<div class="w-16 h-16 bg-secondary-100 rounded-2xl flex items-center justify-center mb-6 mx-auto group-hover:scale-110 transition-transform duration-300">
+						<svg class="w-8 h-8 text-secondary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
+						</svg>
+					</div>
+					<h3 class="text-xl mb-3 text-surface-900 font-semibold">Lower Publication Costs</h3>
+					<p class="text-base text-surface-600 leading-relaxed">
+						Significantly reduced fees compared to traditional journals, making publishing accessible to all.
+					</p>
+				</div>
+				<div class="text-center group">
+					<div class="w-16 h-16 bg-accent-100 rounded-2xl flex items-center justify-center mb-6 mx-auto group-hover:scale-110 transition-transform duration-300">
+						<svg class="w-8 h-8 text-accent-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+						</svg>
+					</div>
+					<h3 class="text-xl mb-3 text-surface-900 font-semibold">Open Access</h3>
+					<p class="text-base text-surface-600 leading-relaxed">
+						All published research is freely accessible to readers worldwide, maximizing impact.
+					</p>
+				</div>
+				<div class="text-center group">
+					<div class="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center mb-6 mx-auto group-hover:scale-110 transition-transform duration-300">
+						<svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+						</svg>
+					</div>
+					<h3 class="text-xl mb-3 text-surface-900 font-semibold">Reviewer Compensation</h3>
+					<p class="text-base text-surface-600 leading-relaxed">
+						Fair recognition and compensation for reviewers' valuable time and expertise.
 					</p>
 				</div>
 			</div>
@@ -393,6 +439,146 @@
 		</div>
 		{/if}
 	</section>
+
+	<!-- Comparison Section -->
+	<!-- <section class="py-32 px-6 bg-surface-50">
+		<div class="max-w-6xl mx-auto">
+			<h2 class="text-center text-5xl md:text-6xl font-semibold mb-8 text-surface-900 tracking-tight">
+				Why Choose SciLedger?
+			</h2>
+			<p class="text-center text-xl text-surface-600 mb-20 max-w-3xl mx-auto leading-relaxed">
+				See how we compare to traditional publishing platforms
+			</p>
+			
+			<div class="overflow-x-auto">
+				<table class="w-full bg-white rounded-2xl shadow-lg overflow-hidden">
+					<thead>
+						<tr class="bg-gradient-to-r from-primary-600 to-primary-700">
+							<th class="py-6 px-8 text-left text-white font-semibold text-lg">Feature</th>
+							<th class="py-6 px-8 text-center text-white font-semibold text-lg">SciLedger</th>
+							<th class="py-6 px-8 text-center text-white font-semibold text-lg">Traditional Publishing</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr class="border-b border-surface-100 hover:bg-surface-50 transition-colors duration-200">
+							<td class="py-6 px-8 font-medium text-surface-900">Review Time</td>
+							<td class="py-6 px-8 text-center">
+								<div class="flex flex-col items-center gap-2">
+									<svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+									</svg>
+									<span class="text-surface-900 font-semibold">2-4 weeks</span>
+								</div>
+							</td>
+							<td class="py-6 px-8 text-center">
+								<div class="flex flex-col items-center gap-2">
+									<svg class="w-8 h-8 text-surface-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+									</svg>
+									<span class="text-surface-600">3-6 months</span>
+								</div>
+							</td>
+						</tr>
+						<tr class="border-b border-surface-100 hover:bg-surface-50 transition-colors duration-200">
+							<td class="py-6 px-8 font-medium text-surface-900">Transparency</td>
+							<td class="py-6 px-8 text-center">
+								<div class="flex flex-col items-center gap-2">
+									<svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+									</svg>
+									<span class="text-surface-900 font-semibold">Blockchain verified</span>
+								</div>
+							</td>
+							<td class="py-6 px-8 text-center">
+								<div class="flex flex-col items-center gap-2">
+									<svg class="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+									</svg>
+									<span class="text-surface-600">Hidden process</span>
+								</div>
+							</td>
+						</tr>
+						<tr class="border-b border-surface-100 hover:bg-surface-50 transition-colors duration-200">
+							<td class="py-6 px-8 font-medium text-surface-900">Review Tracking</td>
+							<td class="py-6 px-8 text-center">
+								<div class="flex flex-col items-center gap-2">
+									<svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+									</svg>
+									<span class="text-surface-900 font-semibold">Real-time updates</span>
+								</div>
+							</td>
+							<td class="py-6 px-8 text-center">
+								<div class="flex flex-col items-center gap-2">
+									<svg class="w-8 h-8 text-surface-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+									</svg>
+									<span class="text-surface-600">Limited visibility</span>
+								</div>
+							</td>
+						</tr>
+						<tr class="border-b border-surface-100 hover:bg-surface-50 transition-colors duration-200">
+							<td class="py-6 px-8 font-medium text-surface-900">Publication Fees</td>
+							<td class="py-6 px-8 text-center">
+								<div class="flex flex-col items-center gap-2">
+									<svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+									</svg>
+									<span class="text-surface-900 font-semibold">Free to submit</span>
+								</div>
+							</td>
+							<td class="py-6 px-8 text-center">
+								<div class="flex flex-col items-center gap-2">
+									<svg class="w-8 h-8 text-surface-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
+									</svg>
+									<span class="text-surface-600">$1,500 - $5,000+</span>
+								</div>
+							</td>
+						</tr>
+						<tr class="border-b border-surface-100 hover:bg-surface-50 transition-colors duration-200">
+							<td class="py-6 px-8 font-medium text-surface-900">Reviewer Accountability</td>
+							<td class="py-6 px-8 text-center">
+								<div class="flex flex-col items-center gap-2">
+									<svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+									</svg>
+									<span class="text-surface-900 font-semibold">Verified on blockchain</span>
+								</div>
+							</td>
+							<td class="py-6 px-8 text-center">
+								<div class="flex flex-col items-center gap-2">
+									<svg class="w-8 h-8 text-surface-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+									</svg>
+									<span class="text-surface-600">Anonymous</span>
+								</div>
+							</td>
+						</tr>
+						<tr class="hover:bg-surface-50 transition-colors duration-200">
+							<td class="py-6 px-8 font-medium text-surface-900">Collaboration Tools</td>
+							<td class="py-6 px-8 text-center">
+								<div class="flex flex-col items-center gap-2">
+									<svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+									</svg>
+									<span class="text-surface-900 font-semibold">Built-in revision tools</span>
+								</div>
+							</td>
+							<td class="py-6 px-8 text-center">
+								<div class="flex flex-col items-center gap-2">
+									<svg class="w-8 h-8 text-surface-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+									</svg>
+									<span class="text-surface-600">Email only</span>
+								</div>
+							</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+		</div>
+	</section> -->
 
 	<!-- CTA Section -->
 	<section class="py-40 px-6">
