@@ -5,15 +5,35 @@ import { error, redirect } from '@sveltejs/kit';
 export async function load({ locals, params }) {
 	if (!locals.user) redirect(302, `/login`);
 
+	const userId = locals.user.id;
+
 	const paperRaw = await Papers.findOne({ id: params.slug })
 		.populate("authors")
 		.populate("mainAuthor")
 		.populate("coAuthors")
 		.populate("reviewers")
+		.populate("hubId")
 		.lean()
 		.exec();
 
 	if (!paperRaw) throw error(404, "Paper não encontrado");
+
+	// Verificar permissões: revisor do hub ou dono do hub
+	const isHubReviewer = typeof paperRaw.hubId === 'object' && 
+		Array.isArray(paperRaw.hubId?.reviewers) && 
+		paperRaw.hubId?.reviewers?.includes(userId);
+	
+	const hubCreatorId = typeof paperRaw.hubId === 'object'
+		? (paperRaw.hubId?.createdBy?._id || paperRaw.hubId?.createdBy?.id || paperRaw.hubId?.createdBy)
+		: null;
+	const isHubOwner = hubCreatorId?.toString() === userId;
+
+	// Para papers "under negotiation" sem hub, qualquer revisor pode ver
+	const isOpenReviewer = !paperRaw.hubId && locals.user.roles?.reviewer === true;
+
+	if (!isHubReviewer && !isHubOwner && !isOpenReviewer) {
+		throw error(403, 'You do not have permission to view this paper');
+	}
 
 	// 🔧 Normaliza o campo peer_review (se existir)
 	const peer_review = paperRaw.peer_review

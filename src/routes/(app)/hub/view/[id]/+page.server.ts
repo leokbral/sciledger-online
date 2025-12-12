@@ -12,6 +12,7 @@ export async function load({ params, locals }) {
 	const fetchHub = async () => {
 		const hub = await Hubs.findById(params.id)
 			.populate('createdBy', 'name email')
+			.populate('reviewers', '_id firstName lastName email profilePictureUrl')
 			.lean();
 
 		if (!hub) {
