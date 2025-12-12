@@ -12,6 +12,7 @@ export async function load({ params, locals }) {
 	const fetchHub = async () => {
 		const hub = await Hubs.findById(params.id)
 			.populate('createdBy', 'name email')
+			.populate('reviewers', '_id firstName lastName email profilePictureUrl')
 			.lean();
 
 		if (!hub) {
@@ -34,12 +35,22 @@ export async function load({ params, locals }) {
 		const isCreator = hub.createdBy.toString() === locals.user.id;
 		const isReviewer = hub.reviewers?.includes(locals.user.id);
 
+		// Buscar papers que o usuário aceitou revisar via ReviewQueue
+		const ReviewQueue = (await import('$lib/db/models/ReviewQueue')).default;
+		const acceptedReviews = await ReviewQueue.find({
+			reviewer: locals.user.id,
+			hubId: params.id,
+			status: 'accepted'
+		}).lean();
+		const acceptedPaperIds = acceptedReviews.map(r => r.paperId);
+
 		const paperQuery = isCreator || isReviewer
 			? { hubId: params.id }
 			: {
 				hubId: params.id,
 				$or: [
 					{ status: 'published' },
+					{ id: { $in: acceptedPaperIds } }, // Adicionar papers aceitos para revisão
 					{
 						status: { $ne: 'published' },
 						$or: [
@@ -81,9 +92,13 @@ export async function load({ params, locals }) {
 					reviewStatus: "not_started"
 				};
 
+			// Marcar se o usuário aceitou revisar este paper
+			const isAcceptedForReview = acceptedPaperIds.includes(paper.id);
+
 			return {
 				...paper,
-				peer_review
+				peer_review,
+				isAcceptedForReview
 			};
 		});
 

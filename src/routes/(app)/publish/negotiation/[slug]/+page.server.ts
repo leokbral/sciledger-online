@@ -54,6 +54,13 @@ export async function load({ locals, params }) {
 		.populate("mainAuthor")
 		.populate("coAuthors")
 		.populate({
+			path: 'hubId',
+			populate: {
+				path: 'reviewers',
+				model: 'User'
+			}
+		})
+		.populate({
 			path: 'peer_review.reviews',
 			populate: {
 				path: 'reviewerId',
@@ -69,9 +76,15 @@ export async function load({ locals, params }) {
 
 	const usersDoc = await Users.find({}, {}).lean().exec();
 
+	// Verificar se é dono do hub
+	const isHubOwner = typeof paperDoc.hubId === 'object' && paperDoc.hubId 
+		? (paperDoc.hubId.createdBy?.toString() === locals.user.id || paperDoc.hubId.createdBy?._id?.toString() === locals.user.id)
+		: false;
+
 	return {
 		paper: sanitize(paperDoc),
-		users: sanitize(usersDoc)
+		users: sanitize(usersDoc),
+		isHubOwner
 	};
 }
 
