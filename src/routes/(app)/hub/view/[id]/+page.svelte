@@ -30,6 +30,12 @@
 		// Se for criador ou revisor do hub, pode ver todos os papers do hub
 		if (isCreator || isReviewer) return true;
 
+		// Verificar se o usuário aceitou revisar este paper específico
+		// Os papers já vêm filtrados do servidor, então se chegou até aqui
+		// e tem peer_review, pode ser que seja um paper aceito para revisão
+		const hasAcceptedReview = paper.isAcceptedForReview || false;
+		if (hasAcceptedReview) return true;
+
 		// Caso contrário, só vê se estiver envolvido no paper
 		const isMainAuthor = paper.mainAuthor?.id === userId;
 		const isCoAuthor = paper.coAuthors?.some((ca) => ca.id === userId);
