@@ -47,40 +47,38 @@ export async function load({ locals, params }) {
 	if (!locals.user) redirect(302, `/login`);
 
 	const id = params.slug;
+	const userId = locals.user.id;
 
-	// Busca o paper apenas se o revisor aceitou mas ainda não completou sua revisão
+	// Busca o paper com status "in review"
 	const paperDoc = await Papers.findOne({
 		id,
-		status: "in review",
-		"peer_review.assignedReviewers": locals.user.id,
-		$and: [
-			{
-				"peer_review.responses": {
-					$elemMatch: {
-						reviewerId: locals.user.id,
-						status: "accepted"
-					}
-				}
-			},
-			{
-				"peer_review.responses": {
-					$not: {
-						$elemMatch: {
-							reviewerId: locals.user.id,
-							status: "completed"
-						}
-					}
-				}
-			}
-		]
+		status: "in review"
 	}, {})
 		.populate('authors')
 		.populate('mainAuthor')
 		.populate('coAuthors')
+		.populate('hubId')
 		.lean()
 		.exec();
 
-	if (!paperDoc) throw error(404, 'Paper not found or review already completed');
+	if (!paperDoc) throw error(404, 'Paper not found');
+
+	// Verificar se o usuário tem permissão para REVISAR este paper
+	// Precisa ter aceitado revisar (estar nos responses com status 'accepted')
+	const isReviewerAccepted = paperDoc.peer_review?.responses?.some(
+		(r: any) => r.reviewerId === userId && r.status === 'accepted'
+	);
+	
+	// Dono do hub pode ver (mas não necessariamente revisar)
+	const hubCreatorId = typeof paperDoc.hubId === 'object'
+		? (paperDoc.hubId?.createdBy?._id || paperDoc.hubId?.createdBy?.id || paperDoc.hubId?.createdBy)
+		: null;
+	const isHubOwner = hubCreatorId?.toString() === userId;
+
+	// Para REVISAR o paper: precisa ter aceitado OU ser dono do hub
+	if (!isReviewerAccepted && !isHubOwner) {
+		throw error(403, 'You need to accept this review request before you can review this paper');
+	}
 
 	// Mesmo se você quiser manter essa estrutura...
 	const peerReview = paperDoc.peer_review

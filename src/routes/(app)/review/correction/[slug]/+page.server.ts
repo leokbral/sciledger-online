@@ -50,16 +50,37 @@ export async function load({ locals, params }) {
 	await start_mongo();
 
 	try {
+		const userId = locals.user.id;
+
 		// Buscar paper pelo slug (ajuste se o campo correto for outro)
 		const paperRaw = await Papers.findOne({ id: params.slug }, {})
 			.populate("authors")
 			.populate("mainAuthor")
 			.populate("coAuthors")
+			.populate("hubId")
 			.lean()
 			.exec();
 
 		if (!paperRaw) {
 			throw error(404, 'Paper not found');
+		}
+
+		// Verificar permissões: revisor aceito, revisor do hub ou dono do hub
+		const isReviewerAccepted = paperRaw.peer_review?.responses?.some(
+			(r: any) => r.reviewerId === userId && (r.status === 'accepted' || r.status === 'completed')
+		);
+		
+		const isHubReviewer = typeof paperRaw.hubId === 'object' && 
+			Array.isArray(paperRaw.hubId?.reviewers) && 
+			paperRaw.hubId?.reviewers?.includes(userId);
+		
+		const hubCreatorId = typeof paperRaw.hubId === 'object'
+			? (paperRaw.hubId?.createdBy?._id || paperRaw.hubId?.createdBy?.id || paperRaw.hubId?.createdBy)
+			: null;
+		const isHubOwner = hubCreatorId?.toString() === userId;
+
+		if (!isReviewerAccepted && !isHubReviewer && !isHubOwner) {
+			throw error(403, 'You do not have permission to view this paper');
 		}
 
 		// Normalizar peer_review igual ao primeiro código

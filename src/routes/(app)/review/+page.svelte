@@ -1,6 +1,7 @@
 <script lang="ts">
 	import PaperPool from '$lib/Pages/Paper/PaperPool.svelte';
 	import ReviewPage from '$lib/Pages/Review/ReviewPage.svelte';
+	import PaperReviewInvitations from '$lib/components/PaperReviewInvitations/PaperReviewInvitations.svelte';
 	import type { Paper } from '$lib/types/Paper';
 	import type { PageData } from './$types';
 
@@ -83,13 +84,15 @@
 			const isCoAuthor = p.coAuthors?.some((author) => author.id?.toString() === userId);
 
 			const isHubReviewer = typeof p.hubId === 'object' && p.hubId?.reviewers?.includes(userId);
+			const isHubOwner = typeof p.hubId === 'object' && 
+				(p.hubId?.createdBy?.id || p.hubId?.createdBy)?.toString() === userId;
 			const isPaperInHub = !!p.hubId;
 
 			const isUnderNegotiation = p.status === 'under negotiation';
 			const isInvolved = isAuthor || isCoAuthor || isMainAuthor;
 
 			const canSeeWithoutHub = !isPaperInHub && isUnderNegotiation && !isInvolved;
-			const canSeeWithHub = isPaperInHub && isUnderNegotiation && isHubReviewer && !isInvolved;
+			const canSeeWithHub = isPaperInHub && isUnderNegotiation && (isHubReviewer || isHubOwner) && !isInvolved;
 
 			return canSeeWithoutHub || canSeeWithHub;
 		})
@@ -99,9 +102,62 @@
 		}));
 
 	console.log(papersPool);
-	let inReview = papers.filter((p: Paper) => p.status === 'in review');
-	let correction = papers.filter((p: Paper) => p.status === 'needing corrections');
-	let reviewed = papers.filter((p: Paper) => p.status === 'published');
+	
+	// Filtrar papers "in review" - APENAS revisores designados, revisores do hub ou dono do hub (autores NÃO veem aqui)
+	let inReview = papers.filter((p: Paper) => {
+		if (p.status !== 'in review') return false;
+		
+		const userId = user.id?.toString();
+		
+		// Verifica se é dono do hub
+		const hubCreatorId = typeof p.hubId === 'object' ? p.hubId?.createdBy?.id || p.hubId?.createdBy : null;
+		const isHubOwner = hubCreatorId?.toString() === userId;
+		
+		// Verifica se é revisor do hub
+		const isHubReviewer = typeof p.hubId === 'object' && p.hubId?.reviewers?.includes(userId);
+		
+		// Verifica se é revisor designado
+		const isReviewer = p.peer_review?.responses?.some(
+			(r) => r.reviewerId === userId && (r.status === 'accepted' || r.status === 'completed')
+		);
+		
+		return isReviewer || isHubReviewer || isHubOwner;
+	});
+	
+	// Filtrar papers "needing corrections" - APENAS revisores designados, revisores do hub ou dono do hub (autores NÃO veem aqui)
+	let correction = papers.filter((p: Paper) => {
+		if (p.status !== 'needing corrections') return false;
+		
+		const userId = user.id?.toString();
+		
+		// Verifica se é dono do hub
+		const hubCreatorId = typeof p.hubId === 'object' ? p.hubId?.createdBy?.id || p.hubId?.createdBy : null;
+		const isHubOwner = hubCreatorId?.toString() === userId;
+		
+		// Verifica se é revisor do hub
+		const isHubReviewer = typeof p.hubId === 'object' && p.hubId?.reviewers?.includes(userId);
+		
+		// Verifica se é revisor designado
+		const isReviewer = p.peer_review?.responses?.some(
+			(r) => r.reviewerId === userId && (r.status === 'accepted' || r.status === 'completed')
+		);
+		
+		return isReviewer || isHubReviewer || isHubOwner;
+	});
+	
+	// Filtrar papers "published" - apenas os que o usuário revisou
+	let reviewed = papers.filter((p: Paper) => {
+		if (p.status !== 'published') return false;
+		
+		const userId = user.id?.toString();
+		
+		// Verificar se o usuário completou uma revisão deste paper
+		const hasCompleted = p.peer_review?.responses?.some(
+			(r) => r.reviewerId === userId && r.status === 'completed'
+		);
+		
+		return hasCompleted;
+	});
 
 	let papersData = [papersPool, inReview, correction, reviewed];
 	let publishData = {
@@ -114,6 +170,11 @@
 </script>
 
 <div class="container page p-4 m-auto">
+	<!-- Paper Review Invitations -->
+	<div class="mb-6">
+		<PaperReviewInvitations />
+	</div>
+
 	<ReviewPage data={publishData}>
 		{#snippet requested()}
 			<div class="text-surface-900 w-full">
