@@ -19,6 +19,11 @@
     
     let hubId = $derived(hub._id);
     
+    // Verificar se o usuário é revisor designado deste paper
+    function isDesignatedReviewer(paper: Paper): boolean {
+        return paper.isAcceptedForReview === true;
+    }
+    
     let selectedPaper: Paper | null = $state(null);
     let selectedReviewers: string[] = $state([]);
     let openInviteModal = $state(false);
@@ -104,10 +109,21 @@
                 {#each papers as paper}
                     <div
                         class="border rounded-lg p-4 transition-colors"
-                        class:bg-yellow-50={shouldHighlight(paper)}
-                        class:border-yellow-300={shouldHighlight(paper)}
+                        class:bg-yellow-50={shouldHighlight(paper) && !isDesignatedReviewer(paper)}
+                        class:border-yellow-300={shouldHighlight(paper) && !isDesignatedReviewer(paper)}
+                        class:bg-blue-50={isDesignatedReviewer(paper)}
+                        class:border-blue-400={isDesignatedReviewer(paper)}
                     >
-                        {#if shouldHighlight(paper)}
+                        {#if isDesignatedReviewer(paper)}
+                            <div
+                                class="mb-3 p-3 bg-blue-100 border border-blue-400 rounded text-blue-900 text-sm font-medium flex items-center gap-2"
+                            >
+                                <Icon icon="mdi:account-check" width="20" height="20" class="text-blue-600" />
+                                <span>
+                                    You are the <strong>designated reviewer</strong> for this article. You can view and review it.
+                                </span>
+                            </div>
+                        {:else if shouldHighlight(paper)}
                             <div
                                 class="mb-3 p-2 bg-yellow-100 border border-yellow-300 rounded text-yellow-800 text-sm font-medium"
                             >

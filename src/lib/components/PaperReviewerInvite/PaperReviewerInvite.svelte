@@ -45,9 +45,13 @@
 			const data = await response.json();
 
 			if (response.ok) {
-				toaster.success(`Invited ${selectedReviewers.length} reviewer(s) successfully!`);
+				toaster.success(`Invited ${selectedReviewers.length} reviewer(s) successfully! They will receive a notification.`);
 				selectedReviewers = [];
 				openModal = false;
+				// Atualizar a lista de revisores convidados
+				currentAssignedReviewers = [...currentAssignedReviewers, ...selectedReviewers];
+				// Reload the page to update the list
+				window.location.reload();
 			} else {
 				toaster.error(data.error || 'Failed to send invitations');
 			}

@@ -79,7 +79,15 @@ export async function load({ locals, params }) {
 			: null;
 		const isHubOwner = hubCreatorId?.toString() === userId;
 
-		if (!isReviewerAccepted && !isHubReviewer && !isHubOwner) {
+		// Verificar se aceitou via ReviewQueue (novo sistema)
+		const ReviewQueue = (await import('$lib/db/models/ReviewQueue')).default;
+		const hasAcceptedViaQueue = await ReviewQueue.findOne({
+			paperId: params.slug,
+			reviewer: userId,
+			status: 'accepted'
+		}).lean();
+
+		if (!isReviewerAccepted && !isHubReviewer && !isHubOwner && !hasAcceptedViaQueue) {
 			throw error(403, 'You do not have permission to view this paper');
 		}
 

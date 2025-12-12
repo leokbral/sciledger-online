@@ -26,7 +26,7 @@
         }
     });
 
-    async function handleInvitation(inviteId: string, action: 'accept' | 'reject') {
+    async function handleHubInvitation(inviteId: string, action: 'accept' | 'reject') {
         loadingInvite = inviteId;
         try {
             const response = await fetch(`/api/reviewer-invitations/${inviteId}`, {
@@ -36,7 +36,7 @@
             });
 
             if (response.ok) {
-                data.invitations = data.invitations.filter(invite => invite._id !== inviteId);
+                data.hubInvitations = data.hubInvitations.filter(invite => invite._id !== inviteId);
                 // Reload page to update notifications
                 window.location.reload();
             } else {
@@ -44,6 +44,35 @@
             }
         } catch (error) {
             console.error(`Error ${action}ing invitation:`, error);
+            alert(`Failed to ${action} invitation`);
+        } finally {
+            loadingInvite = '';
+        }
+    }
+
+    async function handlePaperReviewInvitation(inviteId: string, action: 'accept' | 'decline') {
+        loadingInvite = inviteId;
+        try {
+            const response = await fetch(`/api/paper-reviewer-invitations/${inviteId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action })
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                data.paperReviewInvitations = data.paperReviewInvitations.filter(
+                    invite => invite._id !== inviteId && invite.id !== inviteId
+                );
+                alert(result.message || `Successfully ${action}ed the review invitation`);
+                // Reload page to update notifications
+                window.location.reload();
+            } else {
+                alert(result.error || `Failed to ${action} invitation`);
+            }
+        } catch (error) {
+            console.error(`Error ${action}ing paper review invitation:`, error);
             alert(`Failed to ${action} invitation`);
         } finally {
             loadingInvite = '';
@@ -123,12 +152,12 @@
             </p>
         </header>
 
-        <!-- Pending Invitations Section -->
-        {#if data.invitations && data.invitations.length > 0}
+        <!-- Hub Invitations Section -->
+        {#if data.hubInvitations && data.hubInvitations.length > 0}
             <div class="mb-8">
-                <h2 class="text-2xl font-semibold text-gray-900 dark:text-white mb-4">Pending Invitations</h2>
+                <h2 class="text-2xl font-semibold text-gray-900 dark:text-white mb-4">Hub Invitations</h2>
                 <div class="space-y-4">
-                    {#each data.invitations as invite (invite._id)}
+                    {#each data.hubInvitations as invite (invite._id)}
                         <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border-l-4 border-l-purple-500 p-6">
                             <div class="flex items-center justify-between gap-4">
                                 <div class="flex items-center gap-4">
@@ -159,7 +188,7 @@
                                     <button
                                         class="inline-flex items-center px-4 py-2 rounded-md text-sm font-medium text-white bg-green-600 hover:bg-green-700 transition-colors disabled:opacity-50"
                                         disabled={loadingInvite === invite._id}
-                                        onclick={() => handleInvitation(invite._id, 'accept')}
+                                        onclick={() => handleHubInvitation(invite._id, 'accept')}
                                     >
                                         <Icon icon="mdi:check" class="mr-2" />
                                         Accept
@@ -167,10 +196,73 @@
                                     <button
                                         class="inline-flex items-center px-4 py-2 rounded-md text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-colors disabled:opacity-50"
                                         disabled={loadingInvite === invite._id}
-                                        onclick={() => handleInvitation(invite._id, 'reject')}
+                                        onclick={() => handleHubInvitation(invite._id, 'reject')}
                                     >
                                         <Icon icon="mdi:close" class="mr-2" />
                                         Reject
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    {/each}
+                </div>
+            </div>
+        {/if}
+
+        <!-- Paper Review Invitations Section -->
+        {#if data.paperReviewInvitations && data.paperReviewInvitations.length > 0}
+            <div class="mb-8">
+                <h2 class="text-2xl font-semibold text-gray-900 dark:text-white mb-4">Paper Review Invitations</h2>
+                <div class="space-y-4">
+                    {#each data.paperReviewInvitations as invite (invite._id || invite.id)}
+                        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border-l-4 border-l-blue-500 p-6">
+                            <div class="flex items-start justify-between gap-4">
+                                <div class="flex-1">
+                                    <div class="flex items-center gap-2 mb-2">
+                                        <Icon icon="mdi:file-document-edit" class="text-2xl text-blue-600" />
+                                        <div>
+                                            <p class="font-semibold text-gray-900 dark:text-white text-lg">
+                                                Paper Review Request
+                                            </p>
+                                            <p class="text-sm text-gray-500">
+                                                {invite.hubId?.title || 'Unknown Hub'} • Received {new Date(invite.invitedAt || invite.createdAt).toLocaleDateString()}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="mt-3 pl-8">
+                                        <p class="font-medium text-gray-900 dark:text-white mb-1">
+                                            {invite.paper?.title || 'Untitled Paper'}
+                                        </p>
+                                        {#if invite.paper?.abstract}
+                                            <p class="text-sm text-gray-600 dark:text-gray-400 mb-2 line-clamp-3">
+                                                {invite.paper.abstract}
+                                            </p>
+                                        {/if}
+                                        {#if invite.invitedBy}
+                                            <p class="text-xs text-gray-500">
+                                                Invited by: {invite.invitedBy.firstName} {invite.invitedBy.lastName}
+                                            </p>
+                                        {/if}
+                                    </div>
+                                </div>
+                                
+                                <div class="flex gap-2 flex-shrink-0">
+                                    <button
+                                        class="inline-flex items-center px-4 py-2 rounded-md text-sm font-medium text-white bg-green-600 hover:bg-green-700 transition-colors disabled:opacity-50"
+                                        disabled={loadingInvite === invite._id || loadingInvite === invite.id}
+                                        onclick={() => handlePaperReviewInvitation(invite.id || invite._id, 'accept')}
+                                    >
+                                        <Icon icon="mdi:check" class="mr-2" />
+                                        Accept
+                                    </button>
+                                    <button
+                                        class="inline-flex items-center px-4 py-2 rounded-md text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-colors disabled:opacity-50"
+                                        disabled={loadingInvite === invite._id || loadingInvite === invite.id}
+                                        onclick={() => handlePaperReviewInvitation(invite.id || invite._id, 'decline')}
+                                    >
+                                        <Icon icon="mdi:close" class="mr-2" />
+                                        Decline
                                     </button>
                                 </div>
                             </div>

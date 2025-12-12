@@ -2,7 +2,8 @@ import { json } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import Papers from '$lib/db/models/Paper';
 import Users from '$lib/db/models/User';
-import Invitations from '$lib/db/models/Invitation';
+import PaperReviewInvitation from '$lib/db/models/PaperReviewInvitation';
+import { NotificationService } from '$lib/services/NotificationService';
 import type { RequestHandler } from './$types';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
@@ -38,39 +39,52 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		const invitations = [];
 		for (const reviewerId of reviewerIds) {
 			// Verificar se já existe convite pendente
-			const existingInvite = await Invitations.findOne({
+			const existingInvite = await PaperReviewInvitation.findOne({
 				paper: paperId,
 				reviewer: reviewerId,
 				status: 'pending'
 			});
 
 			if (!existingInvite) {
-				const invitation = new Invitations({
-					id: crypto.randomUUID(),
+				const inviteId = crypto.randomUUID();
+				const invitation = new PaperReviewInvitation({
+					_id: inviteId,
+					id: inviteId,
 					paper: paperId,
 					reviewer: reviewerId,
 					invitedBy: user.id,
 					hubId: hubId,
 					status: 'pending',
-					invitedAt: new Date(),
-					type: 'paper_review' // Novo tipo para diferenciar de convite para hub
+					invitedAt: new Date()
 				});
 
 				await invitation.save();
 				invitations.push(invitation);
+
+				// Criar notificação para o revisor
+				const reviewer = await Users.findOne({ id: reviewerId });
+				if (reviewer) {
+					await NotificationService.createNotification({
+						user: String(reviewerId),
+						type: 'review_request',
+						title: 'New Paper Review Request',
+						content: `You have been invited to review the paper "${paper.title}"`,
+						relatedPaperId: paperId,
+						relatedHubId: hubId,
+						actionUrl: `/notifications?inviteId=${inviteId}`,
+						priority: 'high',
+						metadata: {
+							paperId,
+							paperTitle: paper.title,
+							invitedBy: user.id,
+							invitedByName: `${user.firstName} ${user.lastName}`,
+							inviteId: inviteId,
+							inviteType: 'paper_review'
+						}
+					});
+				}
 			}
 		}
-
-		// Buscar informações dos revisores para notificações
-		const reviewers = await Users.find({ id: { $in: reviewerIds } });
-
-		// TODO: Criar notificações para os revisores convidados
-		// await NotificationService.createPaperReviewInvitationNotifications({
-		//     paperId,
-		//     paperTitle: paper.title,
-		//     reviewerIds,
-		//     invitedBy: user.id
-		// });
 
 		return json({
 			success: true,

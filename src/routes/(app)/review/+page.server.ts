@@ -60,6 +60,16 @@ export async function load({ locals }) {
 
 	// Buscar papers disponíveis ou atribuídos ao revisor logado
 	const fetchPapers = async () => {
+		// Primeiro, buscar papers da ReviewQueue aceitos pelo revisor
+		const ReviewQueue = (await import('$lib/db/models/ReviewQueue')).default;
+		const acceptedReviews = await ReviewQueue.find({ 
+			reviewer: user.id, 
+			status: 'accepted' 
+		}).lean().exec();
+
+		// Extrair os paperIds aceitos
+		const acceptedPaperIds = acceptedReviews.map(r => r.paperId);
+
 		const papersRaw = await Papers.find({}, {})
 			.populate("mainAuthor")
 			.populate("coAuthors")
@@ -97,13 +107,20 @@ export async function load({ locals }) {
 
 			return {
 				...paper,
-				peer_review
+				peer_review,
+				isAcceptedForReview: acceptedPaperIds.includes(paper.id)
 			};
 		});
 
 		// Filtrar papers com base no status e envolvimento do usuário
 		const filteredPapers = normalizedPapers.filter((paper) => {
 			try {
+				// NOVO: Paperspool só mostra papers SEM hub associado
+				// Papers de hub devem ser visualizados na página do hub
+				if (paper.hubId) {
+					return false;
+				}
+
 				const userId = user.id;
 			const responses = paper.peer_review.responses;
 			const acceptedOrCompleted = responses.filter(
@@ -143,10 +160,13 @@ export async function load({ locals }) {
 			// Verifica se o user é revisor designado do paper
 			const isReviewer = acceptedOrCompleted.some(r => r.reviewerId === userId);
 
+			// Verifica se o user aceitou revisar este paper via ReviewQueue
+			const hasAcceptedReview = paper.isAcceptedForReview;
+
 			// Para papers "in review" ou "needing corrections": 
-			// só mostra se for revisor designado, revisor do hub ou dono do hub (AUTORES NÃO VEEM AQUI)
+			// só mostra se for revisor designado, revisor do hub, dono do hub ou aceitou via ReviewQueue
 			if (paper.status === 'in review' || paper.status === 'needing corrections') {
-				return isReviewer || isHubReviewer || isHubOwner;
+				return isReviewer || isHubReviewer || isHubOwner || hasAcceptedReview;
 			}
 
 			// Para papers "published": só mostra se completou a revisão
@@ -157,9 +177,9 @@ export async function load({ locals }) {
 				return hasCompleted;
 			}
 
-			// Para papers "under negotiation": mostra se ainda não tem 3 revisores, se já é revisor, ou se é revisor do hub
+			// Para papers "under negotiation": mostra se ainda não tem 3 revisores, se já é revisor, se é revisor do hub ou aceitou via ReviewQueue
 			if (paper.status === 'under negotiation') {
-				return acceptedOrCompleted.length < 3 || isReviewer || isHubReviewer;
+				return acceptedOrCompleted.length < 3 || isReviewer || isHubReviewer || hasAcceptedReview;
 			}
 
 				// Outros status: não mostra

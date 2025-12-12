@@ -69,14 +69,27 @@ export async function load({ locals, params }) {
 		(r: any) => r.reviewerId === userId && r.status === 'accepted'
 	);
 	
+	// Verificar se aceitou via ReviewQueue (novo sistema)
+	const ReviewQueue = (await import('$lib/db/models/ReviewQueue')).default;
+	const hasAcceptedViaQueue = await ReviewQueue.findOne({
+		paperId: id,
+		reviewer: userId,
+		status: 'accepted'
+	}).lean();
+	
 	// Dono do hub pode ver (mas não necessariamente revisar)
 	const hubCreatorId = typeof paperDoc.hubId === 'object'
 		? (paperDoc.hubId?.createdBy?._id || paperDoc.hubId?.createdBy?.id || paperDoc.hubId?.createdBy)
 		: null;
 	const isHubOwner = hubCreatorId?.toString() === userId;
 
-	// Para REVISAR o paper: precisa ter aceitado OU ser dono do hub
-	if (!isReviewerAccepted && !isHubOwner) {
+	// Verificar se é revisor do hub
+	const isHubReviewer = typeof paperDoc.hubId === 'object' && 
+		Array.isArray(paperDoc.hubId?.reviewers) && 
+		paperDoc.hubId?.reviewers?.includes(userId);
+
+	// Para REVISAR o paper: precisa ter aceitado (via responses OU ReviewQueue) OU ser dono do hub OU ser revisor do hub
+	if (!isReviewerAccepted && !hasAcceptedViaQueue && !isHubOwner && !isHubReviewer) {
 		throw error(403, 'You need to accept this review request before you can review this paper');
 	}
 
