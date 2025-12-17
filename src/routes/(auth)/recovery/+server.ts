@@ -15,8 +15,8 @@ const transporter = nodemailer.createTransport({
     port: 587,
     secure: false,
     auth: {
-        user: 'snackonapp@gmail.com',
-        pass: 'foriuquhhkipihfv' // Same password that worked
+        user: 'sciledger@imd.ufrn.br',
+        pass: 'zfpzbhyzbozzqlvx' // App Password
     },
     debug: true,
     logger: true
@@ -146,7 +146,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
         console.log('📧 Sending recovery email...');
         const info = await transporter.sendMail({
-            from: '"SciLedger Team" <snackonapp@gmail.com>',
+            from: '"SciLedger Team" <sciledger@imd.ufrn.br>',
             to: user.email,
             subject: '🔐 Reset Password - SciLedger',
             html: generatePasswordResetEmailTemplate(user.firstName, resetUrl)
