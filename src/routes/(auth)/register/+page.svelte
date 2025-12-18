@@ -5,6 +5,8 @@
 	import { goto } from '$app/navigation';
 	import { post } from '$lib/utils';
 	import { fade } from 'svelte/transition';
+	import { page } from '$app/stores';
+	import { onMount } from 'svelte';
 
 	let firstName = $state('');
 	let lastName = $state('');
@@ -17,6 +19,28 @@
 	let processing = $state(false);
 	let isAdmin = false;
 	let formWarning = $state('');
+	
+	// Parâmetros do convite (se vier de um email de convite)
+	let inviteToken = $state('');
+	let inviteHubId = $state('');
+	let isInvite = $state(false);
+
+	onMount(() => {
+		const params = new URLSearchParams(window.location.search);
+		inviteToken = params.get('inviteToken') || '';
+		inviteHubId = params.get('hubId') || '';
+		const inviteEmail = params.get('email') || '';
+		const error = params.get('error');
+		
+		if (inviteToken) {
+			isInvite = true;
+			email = inviteEmail;
+		}
+		
+		if (error) {
+			formWarning = decodeURIComponent(error);
+		}
+	});
 
 	async function submit(event: Event) {
 		//event.preventDefault();
@@ -46,6 +70,24 @@
 			});
 
 			if (response.user) {
+				// Se for um registro através de convite, criar um convite de hub
+				if (isInvite && inviteToken && inviteHubId) {
+					try {
+						// Criar convite de hub para o usuário aceitar depois
+						await fetch('/api/email-reviewer-invitation/convert', {
+							method: 'POST',
+							headers: { 'Content-Type': 'application/json' },
+							body: JSON.stringify({
+								token: inviteToken,
+								userId: response.user.id
+							})
+						});
+					} catch (inviteError) {
+						console.error('Error converting invitation:', inviteError);
+						// Continua mesmo se houver erro no convite
+					}
+				}
+				
 				goto('/');
 			} else {
 				formWarning = `User already registered or other issue! ${JSON.stringify(response)}`;
@@ -74,7 +116,15 @@
 				class="mx-auto"
 			/>
 
-			<h3 class="text-2xl font-bold text-center text-surface-900">Create Your Account</h3>
+			<h3 class="text-2xl font-bold text-center text-surface-900">
+				{isInvite ? 'Complete Your Reviewer Registration' : 'Create Your Account'}
+			</h3>
+
+			{#if isInvite}
+				<p class="text-center text-sm text-surface-600">
+					You've been invited to join as a reviewer. Complete your registration below.
+				</p>
+			{/if}
 
 			<div class="space-y-4">
 				<div class="grid grid-cols-2 w-full gap-1">
@@ -155,7 +205,8 @@
 						required
 						placeholder="Email"
 						bind:value={email}
-						class="w-full p-2 border border-surface-500 rounded-md text-surface-900"
+						disabled={isInvite}
+						class="w-full p-2 border border-surface-500 rounded-md text-surface-900 disabled:bg-surface-100 disabled:cursor-not-allowed"
 					/>
 				</fieldset>
 

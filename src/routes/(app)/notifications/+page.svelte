@@ -5,6 +5,7 @@
     import { formatDistance } from 'date-fns';
     import { ptBR } from 'date-fns/locale';
     import Icon from '@iconify/svelte';
+    import { toaster } from '$lib/toaster-svelte';
 
     export let data: PageData;
 
@@ -37,14 +38,24 @@
 
             if (response.ok) {
                 data.hubInvitations = data.hubInvitations.filter(invite => invite._id !== inviteId);
+                toaster.success({
+                    title: action === 'accept' ? 'Invitation Accepted' : 'Invitation Declined',
+                    description: `Successfully ${action}ed the invitation`
+                });
                 // Reload page to update notifications
                 window.location.reload();
             } else {
-                alert(`Failed to ${action} invitation`);
+                toaster.error({
+                    title: 'Error',
+                    description: `Failed to ${action} invitation`
+                });
             }
         } catch (error) {
             console.error(`Error ${action}ing invitation:`, error);
-            alert(`Failed to ${action} invitation`);
+            toaster.error({
+                title: 'Error',
+                description: `Failed to ${action} invitation`
+            });
         } finally {
             loadingInvite = '';
         }
@@ -65,15 +76,24 @@
                 data.paperReviewInvitations = data.paperReviewInvitations.filter(
                     invite => invite._id !== inviteId && invite.id !== inviteId
                 );
-                alert(result.message || `Successfully ${action}ed the review invitation`);
+                toaster.success({
+                    title: action === 'accept' ? 'Invitation Accepted' : 'Invitation Declined',
+                    description: result.message || `Successfully ${action}ed the review invitation`
+                });
                 // Reload page to update notifications
                 window.location.reload();
             } else {
-                alert(result.error || `Failed to ${action} invitation`);
+                toaster.error({
+                    title: 'Error',
+                    description: result.error || `Failed to ${action} invitation`
+                });
             }
         } catch (error) {
             console.error(`Error ${action}ing paper review invitation:`, error);
-            alert(`Failed to ${action} invitation`);
+            toaster.error({
+                title: 'Error',
+                description: `Failed to ${action} invitation`
+            });
         } finally {
             loadingInvite = '';
         }
@@ -311,7 +331,7 @@
                                             {/if}
                                         </div>
                                         <p class="text-gray-600 dark:text-gray-400 mb-3">
-                                            {notification.content}
+                                            {@html notification.content}
                                         </p>
                                         <div class="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
                                             <span>

@@ -21,18 +21,26 @@
 
 	async function loadInvitations() {
 		if (invitations.length > 0) {
+			console.log('Skipping load - already have invitations:', invitations.length);
 			return; // Skip loading if we already have invitations from props
 		}
 
+		console.log('Loading invitations from API...');
 		loading = true;
 		try {
 			const response = await fetch('/api/reviewer-invitations');
+			console.log('API response status:', response.status);
+			
 			if (!response.ok) {
+				const errorData = await response.json();
+				console.error('API error:', errorData);
 				throw new Error('Failed to fetch invitations');
 			}
+			
 			const data = await response.json();
+			console.log('API response data:', data);
 			invitations = data.reviewerInvitations || [];
-			console.log('Loaded invitations:', invitations);
+			console.log('Loaded invitations:', invitations.length, invitations);
 		} catch (error) {
 			console.error('Error loading invitations:', error);
 			toaster.error({
