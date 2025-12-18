@@ -348,7 +348,7 @@
 									{/if}
 								</div>
 
-								<p class="text-sm text-gray-600 mb-2">{notification.content}</p>
+								<p class="text-sm text-gray-600 mb-2">{@html notification.content}</p>
 
 								<div class="flex items-center gap-4 text-xs text-gray-500">
 									<span>{getTimeAgo(notification.createdAt)}</span>

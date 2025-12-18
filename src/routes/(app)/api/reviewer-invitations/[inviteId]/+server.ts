@@ -51,7 +51,7 @@ export async function POST({ params, request, locals }) {
                 title: 'Reviewer Accepted Invitation',
                 content: `${reviewerName} has accepted the invitation to review for "${hub.title}"`,
                 relatedHubId: String(invitation.hubId),
-                actionUrl: `/hub/view/${invitation.hubId}`,
+                actionUrl: `/notifications`,
                 priority: 'medium',
                 metadata: {
                     reviewerName: reviewerName,
@@ -67,7 +67,7 @@ export async function POST({ params, request, locals }) {
                 title: 'Reviewer Declined Invitation',
                 content: `${reviewerName} has declined the invitation to review for "${hub.title}"`,
                 relatedHubId: String(invitation.hubId),
-                actionUrl: `/hub/view/${invitation.hubId}`,
+                actionUrl: `/notifications`,
                 priority: 'low',
                 metadata: {
                     reviewerName: reviewerName,

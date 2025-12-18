@@ -69,6 +69,31 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 
 			await reviewQueueEntry.save();
 
+			// Adicionar revisor ao campo reviewers do Paper
+			const paperDoc = await Papers.findOne({ id: typeof paper === 'object' ? paper.id : paper });
+			if (paperDoc) {
+				console.log('📄 Paper found:', paperDoc.id, 'Status:', paperDoc.status);
+				console.log('👤 Adding reviewer:', user.id, '(type:', typeof user.id, ')');
+				console.log('📋 Current reviewers:', paperDoc.reviewers, '(types:', paperDoc.reviewers?.map(r => typeof r));
+				
+				if (!paperDoc.reviewers) {
+					paperDoc.reviewers = [];
+				}
+				if (!paperDoc.reviewers.includes(user.id)) {
+					paperDoc.reviewers.push(user.id);
+					await paperDoc.save();
+					
+					// Verificar se realmente salvou
+					const verifyPaper = await Papers.findOne({ id: paperDoc.id }).lean();
+					console.log('✅ Reviewer added successfully.');
+					console.log('🔍 Verification - Paper reviewers in DB:', verifyPaper?.reviewers);
+				} else {
+					console.log('ℹ️ Reviewer already in list');
+				}
+			} else {
+				console.error('❌ Paper not found for ID:', typeof paper === 'object' ? paper.id : paper);
+			}
+
 			// Notificar o criador do hub que o revisor aceitou
 			if (invitedBy) {
 				await NotificationService.createNotification({
@@ -78,7 +103,7 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 					content: `${user.firstName} ${user.lastName} accepted the invitation to review "${paper?.title}"`,
 					relatedPaperId: typeof paper === 'object' ? paper.id : paper,
 					relatedHubId: String(invitation.hubId),
-					actionUrl: `/paper/${typeof paper === 'object' ? paper.id : paper}`,
+					actionUrl: `/notifications`,
 					priority: 'medium',
 					metadata: {
 						reviewerName: `${user.firstName} ${user.lastName}`,

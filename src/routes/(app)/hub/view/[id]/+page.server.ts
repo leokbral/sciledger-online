@@ -33,42 +33,59 @@ export async function load({ params, locals }) {
 			throw error(404, 'Hub not found');
 		}
 		const isCreator = hub.createdBy.toString() === locals.user.id;
-		const isReviewer = hub.reviewers?.includes(locals.user.id);
+		const isHubReviewer = hub.reviewers?.includes(locals.user.id);
 
-		// Buscar papers que o usuário aceitou revisar via ReviewQueue
-		const ReviewQueue = (await import('$lib/db/models/ReviewQueue')).default;
-		const acceptedReviews = await ReviewQueue.find({
-			reviewer: locals.user.id,
-			hubId: params.id,
-			status: 'accepted'
-		}).lean();
-		const acceptedPaperIds = acceptedReviews.map(r => r.paperId);
+		console.log('🔍 Fetching papers for user:', locals.user.id);
+		console.log('📊 isCreator:', isCreator, 'isHubReviewer:', isHubReviewer);
 
-		const paperQuery = isCreator || isReviewer
-			? { hubId: params.id }
-			: {
+		let paperQuery;
+
+		if (isCreator) {
+			// Admin do hub: vê todos os papers exceto drafts
+			paperQuery = { 
+				hubId: params.id,
+				status: { $ne: 'draft' }
+			};
+		} else {
+			// Outros usuários: vê papers onde é revisor, autor ou publicados
+			paperQuery = {
 				hubId: params.id,
 				$or: [
 					{ status: 'published' },
-					{ id: { $in: acceptedPaperIds } }, // Adicionar papers aceitos para revisão
+					{ 
+						reviewers: { $in: [locals.user.id] }, 
+						status: { $ne: 'draft' } 
+					}, // Papers onde é revisor (não draft)
 					{
 						status: { $ne: 'published' },
 						$or: [
 							{ mainAuthor: locals.user.id },
 							{ correspondingAuthor: locals.user.id },
-							{ coAuthors: locals.user.id },
+							{ coAuthors: { $in: [locals.user.id] } },
 							{ submittedBy: locals.user.id }
 						]
 					}
 				]
 			};
+		}
+
+		console.log('📋 Paper query:', JSON.stringify(paperQuery, null, 2));
+		console.log('👤 User ID:', locals.user.id);
 
 		const papersRaw = await Papers.find(paperQuery)
 			.populate("mainAuthor")
 			.populate("coAuthors")
 			.populate("submittedBy")
+			.populate("reviewers")
 			.lean()
 			.exec();
+
+		console.log('📄 Found', papersRaw.length, 'papers');
+		papersRaw.forEach(p => {
+			console.log(`  - Paper: ${p.title} (${p.id})`);
+			console.log(`    Status: ${p.status}`);
+			console.log(`    Reviewers: ${p.reviewers?.map(r => typeof r === 'object' ? r._id : r).join(', ') || 'none'}`);
+		});
 
 		// Normalizar peer_review para evitar erro de serialização
 		const papers = papersRaw.map(paper => {
@@ -92,8 +109,14 @@ export async function load({ params, locals }) {
 					reviewStatus: "not_started"
 				};
 
-			// Marcar se o usuário aceitou revisar este paper
-			const isAcceptedForReview = acceptedPaperIds.includes(paper.id);
+			// Marcar se o usuário é revisor deste paper (está no campo reviewers)
+			// reviewers pode conter objetos populados ou strings
+			const reviewerIds = paper.reviewers?.map(r => typeof r === 'object' ? (r._id || r.id) : r) || [];
+			const isAcceptedForReview = reviewerIds.includes(locals.user.id);
+			
+			console.log(`  📋 Paper ${paper.id} - isAcceptedForReview: ${isAcceptedForReview}`);
+			console.log(`     Reviewer IDs: [${reviewerIds.join(', ')}]`);
+			console.log(`     User ID: ${locals.user.id}`);
 
 			return {
 				...paper,
