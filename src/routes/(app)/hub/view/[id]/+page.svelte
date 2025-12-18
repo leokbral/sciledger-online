@@ -24,19 +24,50 @@
 	const isReviewer = hub.reviewers?.includes(data.user.id);
 
 	const filteredPapers = data.papers?.filter((paper) => {
+		console.log(`🔍 Filtering paper: ${paper.title}`);
+		console.log(`   - status: ${paper.status}`);
+		console.log(`   - isCreator: ${isCreator}`);
+		console.log(`   - isReviewer (hub): ${isReviewer}`);
+		console.log(`   - isAcceptedForReview: ${paper.isAcceptedForReview}`);
+		
 		// Se for published, todos podem ver
-		if (paper.status === 'published') return true;
+		if (paper.status === 'published') {
+			console.log(`   ✅ Showing (published)`);
+			return true;
+		}
 
-		// Se for criador ou revisor do hub, pode ver todos os papers do hub
-		if (isCreator || isReviewer) return true;
+		// Se for criador do hub, pode ver todos os papers do hub (exceto drafts que já são filtrados no servidor)
+		if (isCreator) {
+			console.log(`   ✅ Showing (creator)`);
+			return true;
+		}
 
-		// Caso contrário, só vê se estiver envolvido no paper
+		// Se for revisor do hub, pode ver todos os papers do hub
+		if (isReviewer) {
+			console.log(`   ✅ Showing (hub reviewer)`);
+			return true;
+		}
+
+		// Verificar se o usuário é revisor deste paper específico
+		const hasAcceptedReview = paper.isAcceptedForReview || false;
+		if (hasAcceptedReview) {
+			console.log(`   ✅ Showing (paper reviewer)`);
+			return true;
+		}
+
+		// Caso contrário, só vê se estiver envolvido no paper como autor
 		const isMainAuthor = paper.mainAuthor?.id === userId;
 		const isCoAuthor = paper.coAuthors?.some((ca) => ca.id === userId);
 		const isCorresponding = paper.correspondingAuthor?.id === userId;
 		const isSubmittedBy = paper.submittedBy?.id === userId;
 
-		return isMainAuthor || isCoAuthor || isCorresponding || isSubmittedBy;
+		if (isMainAuthor || isCoAuthor || isCorresponding || isSubmittedBy) {
+			console.log(`   ✅ Showing (author)`);
+			return true;
+		}
+
+		console.log(`   ❌ Hidden`);
+		return false;
 	});
 
 	console.log('Papers after filtering:', filteredPapers);

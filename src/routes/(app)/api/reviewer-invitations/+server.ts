@@ -61,8 +61,11 @@ export async function GET({ locals }) {
 		const user = locals.user;
 
 		if (!user) {
+			console.log('GET reviewer-invitations: No user in locals');
 			return json({ error: 'Unauthorized' }, { status: 401 });
 		}
+
+		console.log('GET reviewer-invitations: Fetching for user', user.id);
 
 		// Populate hub information for better display
 		const invitations = await Invitation.find({ reviewer: user.id, status: 'pending' })
@@ -71,6 +74,8 @@ export async function GET({ locals }) {
 				select: 'title type description logoUrl createdBy'
 			})
 			.lean();
+
+		console.log('GET reviewer-invitations: Found', invitations.length, 'invitations');
 
 		return json({ success: true, reviewerInvitations: invitations });
 	} catch (error) {

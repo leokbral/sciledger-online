@@ -12,6 +12,7 @@
 	import { FileUpload } from '@skeletonlabs/skeleton-svelte';
 	import type { Hub } from '$lib/types/Hub';
 	import ReviewerModal from '$lib/components/ReviewerModal/ReviewerModal.svelte';
+	import PaperReviewerInvite from '$lib/components/PaperReviewerInvite/PaperReviewerInvite.svelte';
 
 	interface Props {
 		data: PageData;
@@ -504,6 +505,18 @@
 				assignedReviewers={selectedReviewers}
 				onReviewerChange={(newList) => (selectedReviewers = newList)}
 			/>
+			
+			<!-- Invite Hub Reviewers (Only for hub owners) -->
+			{#if data.isHubOwner && paper.hubId && typeof paper.hubId === 'object' && paper.hubId.reviewers}
+				<div class="mt-4">
+					<PaperReviewerInvite
+						paperId={paper.id}
+						hubId={typeof paper.hubId === 'object' ? paper.hubId._id || paper.hubId.id : paper.hubId}
+						hubReviewers={paper.hubId.reviewers}
+						currentAssignedReviewers={paper.peer_review?.assignedReviewers?.map(r => typeof r === 'object' ? r._id || r.id : r) || []}
+					/>
+				</div>
+			{/if}
 			
 			<!-- Reviewer Status Display -->
 			{#if paper.peer_review?.responses}
