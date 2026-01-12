@@ -3,6 +3,8 @@ import { json } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import Papers from '$lib/db/models/Paper';
 import Users from '$lib/db/models/User';
+import ReviewQueue from '$lib/db/models/ReviewQueue';
+import ReviewAssignment from '$lib/db/models/ReviewAssignment';
 import { NotificationService } from '$lib/services/NotificationService';
 import type { User } from '$lib/types/User';
 import * as crypto from 'crypto';
@@ -64,11 +66,70 @@ export const POST: RequestHandler = async ({ request, locals }) => {
             }
         }
 
+        // Adicionar revisor ao campo reviewers do paper (permite acesso individual)
+        if (!paper.reviewers) {
+            paper.reviewers = [];
+        }
+        if (!paper.reviewers.includes(reviewerId)) {
+            paper.reviewers.push(reviewerId);
+        }
+
+        // Criar ReviewQueue para o revisor (permite acesso individual)
+        const existingQueue = await ReviewQueue.findOne({
+            paperId: paperId,
+            reviewer: reviewerId
+        });
+
+        if (!existingQueue) {
+            const queueId = crypto.randomUUID();
+            const reviewQueueEntry = new ReviewQueue({
+                _id: queueId,
+                id: queueId,
+                paperId: paperId,
+                reviewer: reviewerId,
+                peerReviewType: 'selected',
+                hubId: typeof paper.hubId === 'string' ? paper.hubId : undefined,
+                isLinkedToHub: !!paper.hubId,
+                status: 'accepted',
+                assignedAt: new Date()
+            });
+            await reviewQueueEntry.save();
+        }
+
+        // Criar ReviewAssignment (permite acesso individual com deadline)
+        const existingAssignment = await ReviewAssignment.findOne({
+            paperId: paperId,
+            reviewerId: reviewerId
+        });
+
+        if (!existingAssignment) {
+            const deadlineDays = 15; // Default 15 dias
+            const acceptedAt = new Date();
+            const deadline = new Date(acceptedAt.getTime() + deadlineDays * 24 * 60 * 60 * 1000);
+
+            const assignmentId = crypto.randomUUID();
+            const reviewAssignment = new ReviewAssignment({
+                _id: assignmentId,
+                id: assignmentId,
+                paperId: paperId,
+                reviewerId: reviewerId,
+                status: 'accepted',
+                assignedAt: new Date(),
+                acceptedAt: acceptedAt,
+                deadline: deadline,
+                hubId: typeof paper.hubId === 'string' ? paper.hubId : undefined,
+                isLinkedToHub: !!paper.hubId
+            });
+            await reviewAssignment.save();
+        }
+
         const acceptedCount = paper.peer_review.responses.filter(
             r => r.status === 'accepted' || r.status === 'completed'
         ).length;
 
-        if (acceptedCount >= 3) {
+        // Mudar status do paper para "in review" se tiver pelo menos 1 revisor aceito
+        // (permite acesso individual imediato)
+        if (acceptedCount >= 1 && paper.status === 'under negotiation') {
             paper.status = 'in review';
             paper.peer_review.reviewStatus = 'in_progress';
         }

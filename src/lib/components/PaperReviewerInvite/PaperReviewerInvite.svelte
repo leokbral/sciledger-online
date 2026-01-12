@@ -9,15 +9,30 @@
 		hubId: string;
 		hubReviewers: User[];
 		currentAssignedReviewers: string[];
+		reviewSlots?: Array<{
+			slotNumber: number;
+			reviewerId: string | null;
+			status: 'available' | 'pending' | 'occupied' | 'declined';
+		}>;
 	}
 
-	let { paperId, hubId, hubReviewers, currentAssignedReviewers }: Props = $props();
+	let { paperId, hubId, hubReviewers, currentAssignedReviewers, reviewSlots = [] }: Props = $props();
 
 	let openModal = $state(false);
 	let selectedReviewers = $state<string[]>([]);
 	let loading = $state(false);
 	let activeTab = $state<'hub' | 'email'>('hub');
 	let emailInvite = $state('');
+	let customDeadlineDays = $state(15); // Prazo padrão de 15 dias
+
+	// Calcular slots disponíveis
+	let availableSlotsCount = $derived(
+		reviewSlots.filter(slot => slot.status === 'available' || slot.status === 'declined').length
+	);
+	let occupiedSlotsCount = $derived(
+		reviewSlots.filter(slot => slot.status === 'occupied').length
+	);
+	let maxSlots = $derived(reviewSlots.length || 3);
 
 	// Filtrar revisores que ainda não foram convidados para este paper
 	let availableReviewers = $derived(
@@ -40,18 +55,21 @@
 				body: JSON.stringify({
 					paperId,
 					hubId,
-					reviewerIds: selectedReviewers
+					reviewerIds: selectedReviewers,
+					customDeadlineDays // Enviar o prazo customizado
 				})
 			});
 
 			const data = await response.json();
 
 			if (response.ok) {
-				toaster.success({ title: `Invited ${selectedReviewers.length} reviewer(s) successfully!`, description: 'They will receive a notification.' });
+				toaster.success({ 
+					title: `Invited ${data.invitations} reviewer(s)!`, 
+					description: data.message
+				});
 				selectedReviewers = [];
+				customDeadlineDays = 15; // Resetar para o padrão
 				openModal = false;
-				// Atualizar a lista de revisores convidados
-				currentAssignedReviewers = [...currentAssignedReviewers, ...selectedReviewers];
 				// Reload the page to update the list
 				window.location.reload();
 			} else {
@@ -132,6 +150,56 @@
 		<div class="p-6">
 			<h3 class="text-2xl font-bold mb-4">Invite Reviewers to Review Paper</h3>
 
+			<!-- Slots Status Display -->
+			<div class="mb-6 p-4 bg-surface-50 dark:bg-surface-800 rounded-lg border border-surface-200 dark:border-surface-700">
+				<div class="flex items-center justify-between mb-3">
+					<h4 class="font-semibold text-surface-900 dark:text-surface-100">Review Slots Status</h4>
+					<span class="text-sm text-surface-600 dark:text-surface-400">
+						{occupiedSlotsCount} / {maxSlots} occupied
+					</span>
+				</div>
+				
+				<div class="flex gap-3 mb-2">
+					{#each Array(maxSlots) as _, i}
+						{@const slot = reviewSlots[i]}
+						<div class="flex-1 h-12 rounded-lg border-2 flex items-center justify-center font-semibold text-sm
+							{slot?.status === 'occupied' ? 'bg-green-100 border-green-500 text-green-700 dark:bg-green-900 dark:text-green-200' : 
+							 slot?.status === 'pending' ? 'bg-yellow-100 border-yellow-500 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-200' : 
+							 'bg-surface-100 border-surface-300 text-surface-500 dark:bg-surface-700 dark:border-surface-600'}">
+							{#if slot?.status === 'occupied'}
+								<Icon icon="mdi:check-circle" class="size-5 mr-1" />
+								Slot {i + 1}
+							{:else if slot?.status === 'pending'}
+								<Icon icon="mdi:clock-outline" class="size-5 mr-1" />
+								Slot {i + 1}
+							{:else}
+								<Icon icon="mdi:checkbox-blank-circle-outline" class="size-5 mr-1" />
+								Slot {i + 1}
+							{/if}
+						</div>
+					{/each}
+				</div>
+				
+				<div class="flex gap-4 text-xs text-surface-600 dark:text-surface-400 mb-2">
+					<div class="flex items-center gap-1">
+						<div class="w-3 h-3 rounded-full bg-surface-300"></div>
+						Available
+					</div>
+					<div class="flex items-center gap-1">
+						<div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+						Pending
+					</div>
+					<div class="flex items-center gap-1">
+						<div class="w-3 h-3 rounded-full bg-green-500"></div>
+						Occupied
+					</div>
+				</div>
+
+				<div class="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded text-sm text-blue-700 dark:text-blue-300">
+					💡 You can invite as many reviewers as you want. The first {maxSlots} to accept will occupy the review slots.
+				</div>
+			</div>
+
 			<!-- Custom Tab Navigation -->
 			<div class="flex border-b border-surface-300 mb-6">
 				<button
@@ -162,9 +230,36 @@
 								All hub reviewers have already been invited to review this paper.
 							</p>
 						{:else}
-							<p class="text-surface-600 mb-4">
-								Select reviewers from your hub to invite them to review this paper:
-							</p>
+							<div class="flex items-center justify-between mb-4 text-surface-600">
+								<p>Select reviewers from your hub to invite them to review this paper:</p>
+								<span class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-semibold bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-200">
+									<Icon icon="mdi:account-multiple" class="size-4" />
+									Selected: {selectedReviewers.length}
+								</span>
+							</div>
+
+							<!-- Campo de prazo customizado -->
+							<div class="mb-4 p-4 bg-primary-50 dark:bg-primary-900/20 rounded-lg">
+								<label class="block mb-2">
+									<span class="text-sm font-semibold text-gray-700 dark:text-gray-300">Review Deadline (days)</span>
+									<p class="text-xs text-gray-600 dark:text-gray-400 mb-2">
+										Set the number of days reviewers will have to complete the review after accepting
+									</p>
+									<div class="flex items-center gap-3">
+										<input
+											type="number"
+											bind:value={customDeadlineDays}
+											min="1"
+											max="90"
+											class="input w-32 text-center"
+											placeholder="15"
+										/>
+										<span class="text-sm text-gray-600 dark:text-gray-400">
+											days from acceptance
+										</span>
+									</div>
+								</label>
+							</div>
 
 							<div class="space-y-2 mb-6 max-h-96 overflow-y-auto">
 					{#each availableReviewers as reviewer}

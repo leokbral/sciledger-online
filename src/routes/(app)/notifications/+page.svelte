@@ -252,17 +252,29 @@
                                     
                                     <div class="mt-3 pl-8">
                                         <p class="font-medium text-gray-900 dark:text-white mb-1">
-                                            {invite.paper?.title || 'Untitled Paper'}
+                                            {@html invite.paper?.title || 'Untitled Paper'}
                                         </p>
                                         {#if invite.paper?.abstract}
                                             <p class="text-sm text-gray-600 dark:text-gray-400 mb-2 line-clamp-3">
-                                                {invite.paper.abstract}
+                                                {@html invite.paper.abstract}
                                             </p>
                                         {/if}
                                         {#if invite.invitedBy}
                                             <p class="text-xs text-gray-500">
                                                 Invited by: {invite.invitedBy.firstName} {invite.invitedBy.lastName}
                                             </p>
+                                        {/if}
+                                        
+                                        <!-- Read More Link -->
+                                        {#if invite.paper?.id}
+                                            <a 
+                                                href="/review/paperspool/{invite.paper.id}"
+                                                class="inline-flex items-center mt-2 text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+                                            >
+                                                <Icon icon="mdi:book-open-page-variant" class="mr-1" />
+                                                Read full abstract and review details
+                                                <Icon icon="mdi:arrow-right" class="ml-1" />
+                                            </a>
                                         {/if}
                                     </div>
                                 </div>

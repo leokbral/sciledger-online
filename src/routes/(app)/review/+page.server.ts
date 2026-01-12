@@ -4,6 +4,7 @@ import Reviews from '$lib/db/models/Review';
 import Invitations from '$lib/db/models/Invitation';
 import { start_mongo } from '$lib/db/mongo';
 import { redirect } from '@sveltejs/kit';
+import { sanitizePaper } from '$lib/helpers/sanitizePaper';
 
 // Type for MongoDB ObjectId
 interface ObjectId {
@@ -190,7 +191,7 @@ export async function load({ locals }) {
 			}
 		});
 
-		return filteredPapers;
+		return filteredPapers.map(sanitizePaper);
 	};
 
 	// Buscar reviews feitas pelo usuário
@@ -205,12 +206,38 @@ export async function load({ locals }) {
 		return invitations;
 	};
 
+	// Buscar ReviewAssignments do revisor para obter deadlines customizados
+	const fetchReviewerAssignments = async (reviewerId: string) => {
+		const ReviewAssignment = (await import('$lib/db/models/ReviewAssignment')).default;
+		const assignments = await ReviewAssignment.find({
+			reviewerId: reviewerId,
+			status: { $in: ['accepted', 'pending'] }
+		}).lean().exec();
+		
+		console.log(`📋 Found ${assignments.length} ReviewAssignments for reviewer ${reviewerId}`);
+		
+		// Converter para formato serializável
+		return assignments.map(a => ({
+			_id: a._id,
+			id: a.id,
+			paperId: a.paperId,
+			reviewerId: a.reviewerId,
+			status: a.status,
+			deadline: a.deadline,
+			hubId: a.hubId,
+			assignedAt: a.assignedAt,
+			acceptedAt: a.acceptedAt,
+			updatedAt: a.updatedAt
+		}));
+	};
+
 		return {
 			users: sanitize(await fetchUsers()),
 			papers: sanitize(await fetchPapers()),
 			reviews: sanitize(await fetchReviews(user.id)),
 			user: sanitize(user),
-			reviewerInvitations: sanitize(await fetchReviewInvitation(user.id))
+			reviewerInvitations: sanitize(await fetchReviewInvitation(user.id)),
+			reviewAssignments: sanitize(await fetchReviewerAssignments(user.id))
 		};
 	} catch (err) {
 		console.error('Error loading review page:', err);

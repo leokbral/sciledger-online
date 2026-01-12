@@ -14,6 +14,8 @@ export const PaperReviewInvitationSchema: Schema = new Schema(
 			default: 'pending',
 			required: true
 		},
+		customDeadlineDays: { type: Number, default: 15 }, // Prazo customizado em dias (padrão 15)
+		reviewAssignmentId: { type: String, ref: 'ReviewAssignment' }, // Referência ao ReviewAssignment criado ao aceitar
 		invitedAt: { type: Date, default: Date.now, required: true },
 		respondedAt: { type: Date },
 		createdAt: { type: Date, default: Date.now },

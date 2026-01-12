@@ -24,11 +24,13 @@
 	let reviews = data.reviews; // Recebendo as revisões
 	let user = data.user;
 	let reviewerInvitations = data.reviewerInvitations;
+	let reviewAssignments = data.reviewAssignments;
 
 	// console.log('Review tabs', tabs);
 	// console.log('Review papers', papers);
 	// console.log('Review data', reviews); // Verificando as revisões
 	console.log('reviewerInvitations', reviewerInvitations); // Verificando as revisões
+	console.log('reviewAssignments', reviewAssignments); // Verificando os assignments
 </script>
 
 <div class="container page p-4 m-auto">
@@ -65,7 +67,7 @@
 								{@render requested?.()}
 							{:else}
 								<div class="text-surface-900">
-									<MyPapers rota={tabs[i].rota} {papersData} currentUser={user}></MyPapers>
+									<MyPapers rota={tabs[i].rota} {papersData} currentUser={user} {reviewAssignments}></MyPapers>
 								</div>
 							{/if}
 						</div>

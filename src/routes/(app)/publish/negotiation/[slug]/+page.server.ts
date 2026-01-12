@@ -81,10 +81,21 @@ export async function load({ locals, params }) {
 		? (paperDoc.hubId.createdBy?.toString() === locals.user.id || paperDoc.hubId.createdBy?._id?.toString() === locals.user.id)
 		: false;
 
+	// Buscar ReviewAssignments para este paper (se hub owner)
+	let reviewAssignments = [];
+	if (isHubOwner) {
+		const ReviewAssignment = (await import('$lib/db/models/ReviewAssignment')).default;
+		reviewAssignments = await ReviewAssignment.find({ paperId: params.slug })
+			.populate('reviewerId')
+			.lean()
+			.exec();
+	}
+
 	return {
 		paper: sanitize(paperDoc),
 		users: sanitize(usersDoc),
-		isHubOwner
+		isHubOwner,
+		reviewAssignments: sanitize(reviewAssignments)
 	};
 }
 

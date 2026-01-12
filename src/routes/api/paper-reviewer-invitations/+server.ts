@@ -15,11 +15,14 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			return json({ error: 'User not authenticated' }, { status: 401 });
 		}
 
-		const { paperId, hubId, reviewerIds } = await request.json();
+		const { paperId, hubId, reviewerIds, customDeadlineDays } = await request.json();
 
 		if (!paperId || !hubId || !reviewerIds || !Array.isArray(reviewerIds)) {
 			return json({ error: 'Invalid request data' }, { status: 400 });
 		}
+
+		// Validar prazo customizado (padrão 15 dias se não fornecido)
+		const deadlineDays = customDeadlineDays && customDeadlineDays > 0 ? customDeadlineDays : 15;
 
 		// Verificar se o usuário é o dono do hub
 		const paper = await Papers.findOne({ id: paperId }).populate('hubId');
@@ -35,8 +38,27 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			return json({ error: 'Only hub owner can invite reviewers' }, { status: 403 });
 		}
 
-		// Criar convites para cada revisor
+		// Inicializar reviewSlots se não existir
+		if (!paper.reviewSlots || paper.reviewSlots.length === 0) {
+			paper.reviewSlots = [
+				{ slotNumber: 1, reviewerId: null, status: 'available' },
+				{ slotNumber: 2, reviewerId: null, status: 'available' },
+				{ slotNumber: 3, reviewerId: null, status: 'available' }
+			];
+			paper.maxReviewSlots = 3;
+			paper.availableSlots = 3;
+			await paper.save();
+		}
+
+		// Verificar slots disponíveis (apenas para informação, não bloqueia convites)
+		const availableSlotsList = paper.reviewSlots.filter(
+			slot => slot.status === 'available' || slot.status === 'declined'
+		);
+		const availableSlotsCount = availableSlotsList.length;
+
+		// Criar convites para cada revisor (sem limitar pelo número de slots)
 		const invitations = [];
+		
 		for (const reviewerId of reviewerIds) {
 			// Verificar se já existe convite pendente
 			const existingInvite = await PaperReviewInvitation.findOne({
@@ -55,6 +77,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 					invitedBy: user.id,
 					hubId: hubId,
 					status: 'pending',
+					customDeadlineDays: deadlineDays,
 					invitedAt: new Date()
 				});
 
@@ -68,7 +91,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 						user: String(reviewerId),
 						type: 'review_request',
 						title: 'New Paper Review Request',
-						content: `You have been invited to review the paper "${paper.title}"`,
+						content: `You have been invited to review the paper "${paper.title}". ${availableSlotsCount} slot(s) available.`,
 						relatedPaperId: paperId,
 						relatedHubId: hubId,
 						actionUrl: `/notifications?inviteId=${inviteId}`,
@@ -89,7 +112,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		return json({
 			success: true,
 			invitations: invitations.length,
-			message: `Successfully invited ${invitations.length} reviewer(s)`
+			message: `Successfully invited ${invitations.length} reviewer(s). The first 3 to accept will occupy the review slots.`,
+			availableSlots: availableSlotsCount,
+			maxSlots: paper.maxReviewSlots || 3
 		});
 	} catch (error) {
 		console.error('Error creating paper review invitations:', error);

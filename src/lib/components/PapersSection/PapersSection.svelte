@@ -6,6 +6,7 @@
     import type { Paper } from '$lib/types/Paper';
 	import type { Hub } from '$lib/types/Hub';
 	import type { User } from '$lib/types/User';
+	import ManageReviewerDeadline from '$lib/components/ReviewerManagement/ManageReviewerDeadline.svelte';
 
     interface Props {
         papers: Paper[];
@@ -13,9 +14,10 @@
         isCreator: boolean;
         userId: string;
         shouldHighlight: (paper: any) => boolean;
+        reviewAssignments?: any[];
     }
 
-    let { papers, hub, isCreator, userId, shouldHighlight }: Props = $props();
+    let { papers, hub, isCreator, userId, shouldHighlight, reviewAssignments }: Props = $props();
     
     let hubId = $derived(hub._id);
     
@@ -28,6 +30,7 @@
     let selectedReviewers: string[] = $state([]);
     let openInviteModal = $state(false);
     let openManageReviewersModal = $state(false);
+    let openManageDeadlinesModal = $state(false);
     let loading = $state(false);
     let searchTerm = $state('');
     
@@ -73,6 +76,11 @@
         openManageReviewersModal = true;
     }
     
+    function openManageDeadlinesDialog(paper: Paper) {
+        selectedPaper = paper;
+        openManageDeadlinesModal = true;
+    }
+    
     async function removeReviewer(reviewerId: string) {
         if (!selectedPaper) return;
         
@@ -81,10 +89,13 @@
         
         loading = true;
         try {
-            const response = await fetch(`/api/papers/${selectedPaper.id}/remove-reviewer`, {
+            const response = await fetch(`/api/paper-reviewer-invitations/remove-reviewer`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ reviewerId })
+                body: JSON.stringify({ 
+                    paperId: selectedPaper.id,
+                    reviewerId: reviewerId
+                })
             });
             
             if (response.ok) {
@@ -311,6 +322,13 @@
                                             <Icon icon="mdi:account-cog" width="20" height="20" />
                                             Manage Reviewers
                                         </button>
+                                        <button
+                                            class="btn btn-sm bg-orange-600 hover:bg-orange-700 text-white shadow-md hover:shadow-lg transition-all duration-200 flex items-center gap-1"
+                                            onclick={() => openManageDeadlinesDialog(paper)}
+                                        >
+                                            <Icon icon="mdi:calendar-clock" width="20" height="20" />
+                                            Manage Deadlines
+                                        </button>
                                     {/if}
                                 {/if}
                                 <a
@@ -442,6 +460,13 @@
                         class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
                     />
                 </div>
+                <div class="flex items-center justify-between mt-3 mb-1 text-sm text-gray-600 dark:text-gray-300">
+                    <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-200 font-semibold">
+                        <Icon icon="mdi:account-multiple" class="size-4" />
+                        Selected: {selectedReviewers.length}
+                    </span>
+                    <span class="text-xs text-gray-500 dark:text-gray-400">First 3 acceptances occupy slots; extra invites stay pending.</span>
+                </div>
                 
                 <!-- Lista de revisores filtrados -->
                 {#if getFilteredReviewers(selectedPaper).length > 0}
@@ -501,6 +526,130 @@
                     <p class="text-center text-gray-500 dark:text-gray-400">No reviewers found</p>
                 {/if}
             {/if}
+        {/if}
+    {/snippet}
+</Modal>
+
+<!-- Modal para gerenciar deadlines -->
+<Modal
+    open={openManageDeadlinesModal}
+    onOpenChange={(e) => (openManageDeadlinesModal = e.open)}
+    contentBase="card bg-white dark:bg-surface-800 p-6 space-y-6 shadow-2xl rounded-lg max-w-3xl w-full sm:w-[90vw]"
+>
+    {#snippet content()}
+        {#if selectedPaper}
+            <div class="space-y-4">
+                <div class="flex justify-between items-center border-b pb-4">
+                    <div>
+                        <h3 class="text-xl font-bold text-gray-900 dark:text-white">
+                            Manage Review Deadlines
+                        </h3>
+                        <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                            {@html selectedPaper.title}
+                        </p>
+                    </div>
+                    <button
+                        class="btn-icon btn-icon-sm"
+                        onclick={() => (openManageDeadlinesModal = false)}
+                    >
+                        <Icon icon="mdi:close" class="text-gray-600" />
+                    </button>
+                </div>
+
+                {#if selectedPaper.reviewers && selectedPaper.reviewers.length > 0}
+                    <div class="space-y-3">
+                        {#each selectedPaper.reviewers as reviewerRef, idx}
+                            {@const reviewer = typeof reviewerRef === 'object' ? reviewerRef : hub.reviewers?.find((r: any) => {
+                                const rId = typeof r === 'object' ? (r._id || r.id) : r;
+                                return rId === reviewerRef;
+                            })}
+                            {@const reviewerId = typeof reviewerRef === 'object' ? (reviewerRef._id || reviewerRef.id) : reviewerRef}
+                            {@const assignment = reviewAssignments?.find(a => {
+                                const aReviewerId = typeof a.reviewerId === 'object' ? (a.reviewerId._id || a.reviewerId.id) : a.reviewerId;
+                                const aPaperId = typeof a.paperId === 'object' ? (a.paperId._id || a.paperId.id) : a.paperId;
+                                console.log(`🔍 Checking assignment for reviewer ${idx}:`, {
+                                    aReviewerId,
+                                    reviewerId,
+                                    match: aReviewerId === reviewerId,
+                                    aPaperId,
+                                    selectedPaperId: selectedPaper.id,
+                                    paperMatch: aPaperId === selectedPaper.id,
+                                    assignment: a
+                                });
+                                return aReviewerId === reviewerId && aPaperId === selectedPaper.id;
+                            })}
+                            {#if idx === 0}
+                                {console.log('📊 Modal Debug:', {
+                                    reviewAssignmentsLength: reviewAssignments?.length,
+                                    selectedPaperId: selectedPaper.id,
+                                    reviewerId,
+                                    foundAssignment: !!assignment,
+                                    assignmentDeadline: assignment?.deadline,
+                                    assignmentId: assignment?._id || assignment?.id
+                                })}
+                            {/if}
+                            
+                            {#if reviewer}
+                                {@const rev = typeof reviewer === 'object' ? reviewer : null}
+                                {#if rev}
+                                    <div class="flex items-center justify-between p-4 bg-surface-50 dark:bg-surface-900 rounded-lg border border-surface-200 dark:border-surface-700">
+                                        <div class="flex items-center gap-3 flex-1">
+                                            {#if rev.profilePictureUrl}
+                                                <img
+                                                    src={rev.profilePictureUrl}
+                                                    alt={rev.firstName}
+                                                    class="w-12 h-12 rounded-full"
+                                                />
+                                            {:else}
+                                                <div class="w-12 h-12 rounded-full bg-primary-500 flex items-center justify-center text-white font-bold">
+                                                    {rev.firstName?.[0]}{rev.lastName?.[0]}
+                                                </div>
+                                            {/if}
+                                            <div class="flex-1">
+                                                <p class="font-semibold text-gray-900 dark:text-white">
+                                                    {rev.firstName} {rev.lastName}
+                                                </p>
+                                                <p class="text-xs text-gray-600 dark:text-gray-400">
+                                                    {rev.email}
+                                                </p>
+                                                {#if assignment?.deadline}
+                                                    {@const deadline = new Date(assignment.deadline)}
+                                                    {@const now = new Date()}
+                                                    {@const daysRemaining = Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))}
+                                                    <p class="text-xs mt-1 {daysRemaining > 0 ? 'text-green-600' : 'text-red-600'}">
+                                                        <Icon icon="mdi:calendar-clock" class="inline size-3" />
+                                                        {deadline.toLocaleDateString()} 
+                                                        {daysRemaining > 0 ? `(${daysRemaining} days)` : `(${Math.abs(daysRemaining)} days overdue)`}
+                                                    </p>
+                                                {:else}
+                                                    <p class="text-xs mt-1 text-orange-600">
+                                                        <Icon icon="mdi:alert-circle" class="inline size-3" />
+                                                        No deadline set
+                                                    </p>
+                                                {/if}
+                                            </div>
+                                        </div>
+
+                                        <ManageReviewerDeadline
+                                            paperId={selectedPaper.id}
+                                            reviewer={rev}
+                                            currentDeadline={assignment?.deadline}
+                                            reviewAssignmentId={assignment?._id || assignment?.id}
+                                        />
+                                    </div>
+                                {/if}
+                            {/if}
+                        {/each}
+                    </div>
+                {:else}
+                    <div class="text-center p-8 bg-surface-50 dark:bg-surface-900 rounded-lg">
+                        <Icon icon="mdi:calendar-blank" class="size-12 mx-auto text-gray-400 mb-2" />
+                        <p class="text-gray-600 dark:text-gray-400">
+                            No reviewers assigned to this paper yet.
+                        </p>
+                    </div>
+                {/if}
+            </div>
         {/if}
     {/snippet}
 </Modal>

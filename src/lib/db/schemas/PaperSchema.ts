@@ -27,7 +27,7 @@ export const PaperSchema: Schema = new Schema({
             reviewType: { type: String, enum: ['open', 'selected'], required: true },
             assignedReviewers: [{ type: String, ref: 'User' }],
             responses: [{
-                _id: { type: String, default: () => crypto.randomUUID() },
+                _id: false, // Desabilitar _id automático do Mongoose
                 reviewerId: { type: String, ref: 'User' },
                 status: {
                     type: String,
@@ -71,7 +71,24 @@ export const PaperSchema: Schema = new Schema({
         type: Map,
         of: Boolean,
         default: new Map()
-    }
+    },
+    
+    // Sistema de Slots de Revisão (máximo 3 revisores)
+    reviewSlots: [{
+        _id: false, // Desabilitar _id automático do Mongoose
+        slotNumber: { type: Number, required: true }, // 1, 2, ou 3
+        reviewerId: { type: String, ref: 'User', default: null }, // ID do revisor (null se vazio)
+        status: { 
+            type: String, 
+            enum: ['available', 'pending', 'occupied', 'declined'], 
+            default: 'available' 
+        },
+        invitedAt: { type: Date }, // Quando o convite foi enviado
+        acceptedAt: { type: Date }, // Quando o revisor aceitou
+        declinedAt: { type: Date } // Quando o revisor recusou
+    }],
+    maxReviewSlots: { type: Number, default: 3 }, // Número máximo de slots
+    availableSlots: { type: Number, default: 3 } // Slots disponíveis
 
 }, { collection: 'papers' });
 

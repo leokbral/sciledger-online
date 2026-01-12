@@ -58,4 +58,16 @@ export type Paper = {
     hubId?: string | Hub| null;
     isLinkedToHub?: boolean;
     correctionProgress?: Record<string, boolean>; // Progresso das correções (checklist)
+    
+    // Sistema de Slots de Revisão (máximo 3 revisores)
+    reviewSlots?: Array<{
+        slotNumber: number; // 1, 2, ou 3
+        reviewerId: string | User | null; // ID do revisor que ocupa o slot (null se vazio)
+        status: 'available' | 'pending' | 'occupied' | 'declined'; // Status do slot
+        invitedAt?: Date; // Quando o convite foi enviado
+        acceptedAt?: Date; // Quando o revisor aceitou
+        declinedAt?: Date; // Quando o revisor recusou
+    }>;
+    maxReviewSlots?: number; // Número máximo de slots (padrão: 3)
+    availableSlots?: number; // Slots disponíveis (calculado)
 }
