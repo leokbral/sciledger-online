@@ -3,6 +3,9 @@ import { start_mongo } from '$lib/db/mongooseConnection';
 import Papers from '$lib/db/models/Paper';
 import Users from '$lib/db/models/User';
 import PaperReviewInvitation from '$lib/db/models/PaperReviewInvitation';
+import ReviewAssignment from '$lib/db/models/ReviewAssignment';
+import Hubs from '$lib/db/models/Hub';
+import { checkReviewerEligibility } from '$lib/helpers/reviewerEligibility';
 import { NotificationService } from '$lib/services/NotificationService';
 import type { RequestHandler } from './$types';
 
@@ -56,10 +59,52 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		);
 		const availableSlotsCount = availableSlotsList.length;
 
-		// Criar convites para cada revisor (sem limitar pelo número de slots)
-		const invitations = [];
+		// Preparar dados de elegibilidade
+		const hubReviewerIds: string[] = [];
+		try {
+			const hubDoc = await Hubs.findById(typeof paper.hubId === 'object' ? (paper.hubId as any).id || (paper.hubId as any)._id : paper.hubId).lean();
+			if (hubDoc?.reviewers && Array.isArray(hubDoc.reviewers)) {
+				hubReviewerIds.push(...hubDoc.reviewers.map((r: any) => String(r)));
+			}
+		} catch (e) {
+			// Falha ao carregar hub não impede convite, mas afeta verificação de elegibilidade
+		}
+
+		const alreadyAssignedIds: string[] = (paper.peer_review?.assignedReviewers || []).map((r: any) => String(r));
+
+		// Criar convites para cada revisor, aplicando elegibilidade
+		const invitations = [] as any[];
+		const skipped = [] as { reviewerId: string; reasons: string[] }[];
 		
 		for (const reviewerId of reviewerIds) {
+			// Carregar dados do revisor
+			const reviewer = await Users.findOne({ id: reviewerId });
+			if (!reviewer) {
+				skipped.push({ reviewerId: String(reviewerId), reasons: ['Reviewer not found'] });
+				continue;
+			}
+
+			// Capacidade ativa do revisor
+			const activeAssignmentsCount = await ReviewAssignment.countDocuments({ reviewerId: reviewerId, status: { $in: ['accepted', 'pending'] } });
+
+			// Verificar elegibilidade
+			const eligibility = checkReviewerEligibility(
+				paper as any,
+				reviewer as any,
+				{
+					hubReviewerIds,
+					alreadyAssignedIds,
+					activeAssignmentsCount,
+					maxActiveAssignments: 3,
+					requireExpertiseMatch: false
+				}
+			);
+
+			if (!eligibility.eligible) {
+				skipped.push({ reviewerId: String(reviewerId), reasons: eligibility.reasons });
+				continue;
+			}
+
 			// Verificar se já existe convite pendente
 			const existingInvite = await PaperReviewInvitation.findOne({
 				paper: paperId,
@@ -85,7 +130,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				invitations.push(invitation);
 
 				// Criar notificação para o revisor
-				const reviewer = await Users.findOne({ id: reviewerId });
 				if (reviewer) {
 					await NotificationService.createNotification({
 						user: String(reviewerId),
@@ -112,7 +156,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		return json({
 			success: true,
 			invitations: invitations.length,
-			message: `Successfully invited ${invitations.length} reviewer(s). The first 3 to accept will occupy the review slots.`,
+			skipped: skipped,
+			message: `Invited ${invitations.length} reviewer(s). Skipped ${skipped.length} due to ineligibility. The first 3 to accept will occupy the review slots.`,
 			availableSlots: availableSlotsCount,
 			maxSlots: paper.maxReviewSlots || 3
 		});

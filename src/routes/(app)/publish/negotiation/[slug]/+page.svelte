@@ -516,6 +516,9 @@
 						hubReviewers={paper.hubId.reviewers}
 						currentAssignedReviewers={paper.peer_review?.assignedReviewers?.map(r => typeof r === 'object' ? r._id || r.id : r) || []}
 						reviewSlots={paper.reviewSlots || []}
+						mainAuthorId={typeof paper.mainAuthor === 'object' ? paper.mainAuthor._id || paper.mainAuthor.id : paper.mainAuthor}
+						coAuthorIds={paper.coAuthors?.map(a => typeof a === 'object' ? a._id || a.id : a) || []}
+						submittedById={typeof paper.submittedBy === 'object' ? paper.submittedBy._id || paper.submittedBy.id : paper.submittedBy}
 					/>
 				</div>
 			{/if}

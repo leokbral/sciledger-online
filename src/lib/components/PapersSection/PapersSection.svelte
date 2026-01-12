@@ -35,6 +35,7 @@
     let searchTerm = $state('');
     
     // Filtrar revisores disponíveis que ainda não foram convidados
+    // Excluir também autores, co-autores e submitter
     function getAvailableReviewers(paper: Paper) {
         if (!hub.reviewers || !Array.isArray(hub.reviewers)) return [];
         
@@ -42,9 +43,46 @@
             typeof r === 'object' ? (r._id || r.id) : r
         ) || [];
         
+        // Coletar IDs de autores, co-autores e submitter
+        const authorIds = new Set<string>();
+        
+        // Adicionar autor principal
+        if (paper.mainAuthor) {
+            const mainId = typeof paper.mainAuthor === 'object' 
+                ? (paper.mainAuthor._id || paper.mainAuthor.id)
+                : paper.mainAuthor;
+            authorIds.add(String(mainId));
+        }
+        
+        // Adicionar co-autores
+        if (paper.coAuthors && Array.isArray(paper.coAuthors)) {
+            paper.coAuthors.forEach((author: any) => {
+                const authorId = typeof author === 'object'
+                    ? (author._id || author.id)
+                    : author;
+                authorIds.add(String(authorId));
+            });
+        }
+        
+        // Adicionar submitter
+        if (paper.submittedBy) {
+            const submitterId = typeof paper.submittedBy === 'object'
+                ? (paper.submittedBy._id || paper.submittedBy.id)
+                : paper.submittedBy;
+            authorIds.add(String(submitterId));
+        }
+        
         return hub.reviewers.filter((reviewer: any) => {
             const reviewerId = typeof reviewer === 'object' ? (reviewer._id || reviewer.id) : reviewer;
-            return !assignedIds.includes(reviewerId);
+            // Excluir se já foi atribuído
+            if (assignedIds.includes(reviewerId)) {
+                return false;
+            }
+            // Excluir se é autor/coautor/submitter
+            if (authorIds.has(String(reviewerId))) {
+                return false;
+            }
+            return true;
         });
     }
     
