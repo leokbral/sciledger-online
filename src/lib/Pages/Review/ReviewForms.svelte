@@ -435,11 +435,11 @@
 	}
 </script>
 
-<div class="max-w-4xl mx-auto bg-white shadow-lg rounded-lg overflow-hidden">
+<div class="w-full bg-white shadow-lg rounded-lg overflow-hidden">
 	<!-- Header -->
 	<div class="bg-blue-600 text-white p-6">
 		<h1 class="text-2xl font-bold">Scientific Article Review Form</h1>
-		<h2 class="text-lg mt-2 opacity-90">{paperTitle}</h2>
+		<h2 class="text-lg mt-2 opacity-90">{@html paperTitle}</h2>
 		
 		<!-- Draft status -->
 		{#if isDraftLoaded && lastSavedTime}

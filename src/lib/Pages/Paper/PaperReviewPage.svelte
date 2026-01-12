@@ -316,16 +316,14 @@
 			</section>
 
 			<!-- ReviewForms à direita -->
-			<section class="w-96 flex-shrink-0">
+			<section class="flex-1 min-w-0">
 				{#if page.url.pathname.startsWith('/review/inreview/')}
-					<div class="card p-4 h-full">
-						<ReviewForms
-							paperTitle={paper.title}
-							paperId={paper.id}
-							reviewerId={currentUser?.id || ''}
-							on:reviewSubmitted={handleReviewSubmitted}
-						/>
-					</div>
+					<ReviewForms
+						paperTitle={paper.title}
+						paperId={paper.id}
+						reviewerId={currentUser?.id || ''}
+						on:reviewSubmitted={handleReviewSubmitted}
+					/>
 				{/if}
 			</section>
 		</div>
