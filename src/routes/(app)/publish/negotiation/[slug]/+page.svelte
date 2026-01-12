@@ -13,6 +13,7 @@
 	import type { Hub } from '$lib/types/Hub';
 	import ReviewerModal from '$lib/components/ReviewerModal/ReviewerModal.svelte';
 	import PaperReviewerInvite from '$lib/components/PaperReviewerInvite/PaperReviewerInvite.svelte';
+	import ManageReviewerDeadline from '$lib/components/ReviewerManagement/ManageReviewerDeadline.svelte';
 
 	interface Props {
 		data: PageData;
@@ -514,6 +515,7 @@
 						hubId={typeof paper.hubId === 'object' ? paper.hubId._id || paper.hubId.id : paper.hubId}
 						hubReviewers={paper.hubId.reviewers}
 						currentAssignedReviewers={paper.peer_review?.assignedReviewers?.map(r => typeof r === 'object' ? r._id || r.id : r) || []}
+						reviewSlots={paper.reviewSlots || []}
 					/>
 				</div>
 			{/if}
@@ -551,6 +553,102 @@
 						</div>
 					{/if}
 				</div>
+
+				<!-- DEBUG: Verificar dados -->
+				<div class="mt-4 p-3 bg-gray-100 dark:bg-gray-800 rounded text-xs">
+					<p><strong>Debug Info:</strong></p>
+					<p>isHubOwner: {data.isHubOwner}</p>
+					<p>Has reviewers: {paper.reviewers ? 'Yes' : 'No'}</p>
+					<p>Reviewers count: {paper.reviewers?.length || 0}</p>
+					<p>ReviewAssignments count: {data.reviewAssignments?.length || 0}</p>
+				</div>
+
+				<!-- Lista de Revisores Aceitos com Gerenciamento de Deadline -->
+				{#if data.isHubOwner && paper.reviewers && paper.reviewers.length > 0}
+					<div class="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border-2 border-blue-500">
+						<h6 class="text-lg font-semibold mb-3 flex items-center gap-2">
+							<Icon icon="mdi:account-check" class="size-5" />
+							🎯 Manage Reviewer Deadlines (Admin Only)
+						</h6>
+						<p class="text-sm text-gray-600 dark:text-gray-400 mb-3">
+							Set or update review deadlines for each accepted reviewer
+						</p>
+						<div class="space-y-3">
+							{#each paper.reviewers as reviewer}
+								{@const reviewerData = typeof reviewer === 'object' ? reviewer : data.users?.find(u => u.id === reviewer || u._id === reviewer)}
+								{@const reviewerId = typeof reviewer === 'object' ? (reviewer._id || reviewer.id) : reviewer}
+								{@const assignment = data.reviewAssignments?.find(a => {
+									const aReviewerId = typeof a.reviewerId === 'object' ? (a.reviewerId._id || a.reviewerId.id) : a.reviewerId;
+									return aReviewerId === reviewerId;
+								})}
+								
+								{#if reviewerData}
+									<div class="flex items-center justify-between p-3 bg-white dark:bg-surface-800 rounded border border-surface-200 dark:border-surface-700">
+										<div class="flex items-center gap-3">
+											{#if reviewerData.profilePictureUrl}
+												<img
+													src={reviewerData.profilePictureUrl}
+													alt={reviewerData.firstName}
+													class="w-10 h-10 rounded-full"
+												/>
+											{:else}
+												<div class="w-10 h-10 rounded-full bg-primary-500 flex items-center justify-center text-white font-bold">
+													{reviewerData.firstName?.[0]}{reviewerData.lastName?.[0]}
+												</div>
+											{/if}
+											<div>
+												<p class="font-semibold">
+													{reviewerData.firstName} {reviewerData.lastName}
+												</p>
+												<p class="text-xs text-surface-600 dark:text-surface-400">
+													{reviewerData.email}
+												</p>
+												{#if assignment?.deadline}
+													{@const deadline = new Date(assignment.deadline)}
+													{@const now = new Date()}
+													{@const daysRemaining = Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))}
+													<p class="text-xs mt-1 {daysRemaining > 0 ? 'text-green-600' : 'text-red-600'}">
+														<Icon icon="mdi:calendar-clock" class="inline size-3" />
+														Deadline: {deadline.toLocaleDateString()} 
+														{daysRemaining > 0 ? `(${daysRemaining} days left)` : `(${Math.abs(daysRemaining)} days overdue)`}
+													</p>
+												{:else}
+													<p class="text-xs mt-1 text-gray-500">
+														No deadline set yet
+													</p>
+												{/if}
+											</div>
+										</div>
+										<ManageReviewerDeadline
+											paperId={paper.id}
+											reviewer={reviewerData}
+											currentDeadline={assignment?.deadline}
+											reviewAssignmentId={assignment?._id || assignment?.id}
+										/>
+									</div>
+								{/if}
+							{/each}
+						</div>
+					</div>
+				{:else}
+					<div class="mt-4 p-3 bg-red-50 dark:bg-red-900/20 rounded border border-red-300 text-sm">
+						<p><strong>Section not showing because:</strong></p>
+						<ul class="list-disc ml-5">
+							{#if !data.isHubOwner}
+								<li>❌ You are not the hub owner</li>
+							{:else}
+								<li>✅ You are the hub owner</li>
+							{/if}
+							{#if !paper.reviewers}
+								<li>❌ No reviewers array in paper</li>
+							{:else if paper.reviewers.length === 0}
+								<li>❌ Reviewers array is empty (count: {paper.reviewers.length})</li>
+							{:else}
+								<li>✅ Has reviewers (count: {paper.reviewers.length})</li>
+							{/if}
+						</ul>
+					</div>
+				{/if}
 			{/if}
 		{/if}
 	</div>

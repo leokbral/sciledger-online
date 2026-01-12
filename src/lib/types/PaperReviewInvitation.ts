@@ -10,6 +10,8 @@ export type PaperReviewInvitation = {
     invitedBy: User | string;
     hubId: Hub | string;
     status: 'pending' | 'accepted' | 'declined';
+    customDeadlineDays?: number; // Prazo customizado em dias (padrão 15)
+    reviewAssignmentId?: string; // Referência ao ReviewAssignment criado
     invitedAt: Date;
     respondedAt?: Date;
     createdAt: Date;

@@ -9,7 +9,6 @@
 	import AvailableReviewers from '$lib/AvailableReviewers.svelte';
 	import type { User } from '$lib/types/User';
 	import Icon from '@iconify/svelte';
-	import AcceptPaperButton from '$lib/components/AcceptPaperButton.svelte';
 	import CorrectionProgressBar from '$lib/components/CorrectionProgressBar/CorrectionProgressBar.svelte';
 
 	interface Props {
@@ -89,16 +88,6 @@
 		}
 	}
 
-	// Handlers para o AcceptPaperButton
-	function handleAcceptSuccess(event: CustomEvent) {
-		alert(`Paper accepted successfully! ${event.detail.notificationsCreated} notifications sent.`);
-		goto('/review/');
-	}
-
-	function handleAcceptError(event: CustomEvent) {
-		alert(`Error: ${event.detail.message}`);
-		console.error('Accept paper error:', event.detail);
-	}
 </script>
 
 {#if paper}
@@ -141,16 +130,6 @@
                 <Icon icon="fluent-mdl2:accept" class="size-5" />
                 Accept Review
             </button>
-            
-            <!-- Botão para aceitar paper para revisão (diferente de aceitar fazer a revisão) -->
-            {#if $page.data.user?.roles?.reviewer || $page.data.user?.roles?.admin}
-                <AcceptPaperButton 
-                    paperId={paper.id} 
-					hubId={typeof paper.hubId === 'string' ? paper.hubId : undefined}
-                    on:success={handleAcceptSuccess}
-                    on:error={handleAcceptError}
-                />
-            {/if}
         </div>
     </div>
 {/if}

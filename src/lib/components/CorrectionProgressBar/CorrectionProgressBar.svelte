@@ -9,15 +9,16 @@
         currentUser?: User;
         showDetails?: boolean;
         size?: 'sm' | 'md' | 'lg';
+        reviewAssignments?: any[];
     }
     
-    let { paper, currentUser, showDetails = true, size = 'md' }: Props = $props();
+    let { paper, currentUser, showDetails = true, size = 'md', reviewAssignments }: Props = $props();
     
     // Calcular informações de tempo usando o novo sistema de fases
-    const phaseTimeInfo = getPhaseBasedTimeRemaining(paper, currentUser);
+    const phaseTimeInfo = getPhaseBasedTimeRemaining(paper, currentUser, reviewAssignments);
     
     // Fallback para o sistema antigo se não houver informações de fase
-    const timeInfo = phaseTimeInfo.hasDeadline ? phaseTimeInfo : getCorrectionTimeRemainingAuto(paper, currentUser);
+    const timeInfo = phaseTimeInfo.hasDeadline ? phaseTimeInfo : getCorrectionTimeRemainingAuto(paper, currentUser, reviewAssignments);
     const progressPercentage = getCorrectionProgressPercentage(timeInfo);
     const enhancedTimeDescription = getEnhancedTimeDescription(timeInfo);
     
@@ -78,23 +79,19 @@
     // Determinar o tipo de correção para exibição usando sistema de fases
     function getCorrectionPhase() {
         if (!timeInfo.hasDeadline) return null;
-        
         // Se temos informações de fase, usar elas
         if (phaseTimeInfo.hasDeadline && phaseTimeInfo.phaseName) {
             return `${phaseTimeInfo.phaseName} (${phaseTimeInfo.totalDays} days)`;
         }
-        
-        // Fallback para sistema antigo
+        // Fallback para sistema antigo, mas usando totalDays dinâmico
         if (paper.status === 'in review' && timeInfo.correctionType === 'reviewer') {
-            return currentUser ? 'Your Review Deadline (15 days)' : 'Reviewer Correction Phase (15 days each)';
+            return currentUser ? `Your Review Deadline (${timeInfo.totalDays} days)` : `Reviewer Correction Phase (${timeInfo.totalDays} days each)`;
         }
-        
         if (paper.status === 'needing corrections' && timeInfo.correctionType === 'author') {
-            return 'Author Correction Phase (15 days)';
+            return `Author Correction Phase (${timeInfo.totalDays} days)`;
         }
-        
         // Fallback genérico
-        return timeInfo.correctionType === 'reviewer' ? 'Reviewer Phase (15 days)' : 'Author Phase (15 days)';
+        return timeInfo.correctionType === 'reviewer' ? `Reviewer Phase (${timeInfo.totalDays} days)` : `Author Phase (${timeInfo.totalDays} days)`;
     }
 </script>
 

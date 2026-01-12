@@ -233,6 +233,15 @@
 							/>
 						</div>
 
+						<!-- Selected counter -->
+						<div class="flex items-center justify-between mt-3 mb-1 text-sm text-gray-600 dark:text-gray-300">
+							<span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-200 font-semibold">
+								<Icon icon="mdi:account-multiple" class="size-4" />
+								Selected: {selectedUsers.length}
+							</span>
+							<span class="text-xs text-gray-500 dark:text-gray-400">Invite selected users to become hub reviewers.</span>
+						</div>
+
 						<!-- Lista de usuários filtrados -->
 						{#if filteredUsers.length > 0}
 							<div class="max-h-64 overflow-y-auto space-y-3">
@@ -288,7 +297,7 @@
 									disabled={selectedUsers.length === 0 || loading}
 								>
 									<Icon icon="mdi:email-send" class="mr-2" />
-									Send Invitations
+									Send Invitations ({selectedUsers.length})
 								</button>
 							</div>
 						{:else}

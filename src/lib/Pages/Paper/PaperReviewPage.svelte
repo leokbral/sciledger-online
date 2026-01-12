@@ -127,13 +127,15 @@
 		paper: any;
 		editable?: boolean;
 		currentUser?: User;
+		reviewAssignments?: any[];
 	}
 
 	let {
 		messageFeed,
 		paper,
 		editable = false,
-		currentUser
+		currentUser,
+		reviewAssignments
 	}: Props = $props();
 	// console.log('current', currentUser);
 	// console.log('Reviewers', paper.reviewers);
@@ -193,7 +195,8 @@
 					{paper} 
 					{currentUser} 
 					showDetails={true} 
-					size="lg" 
+					size="lg"
+					{reviewAssignments}
 				/>
 			</div>
 		{/if}

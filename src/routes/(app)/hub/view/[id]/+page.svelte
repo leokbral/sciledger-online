@@ -6,6 +6,7 @@
 	import ReviewerManagement from '$lib/components/ReviewerManagement/ReviewerManagement.svelte';
 	import type { Paper } from '$lib/types/Paper.js';
 	import PapersSection from '$lib/components/PapersSection/PapersSection.svelte';
+	import ManageReviewerDeadline from '$lib/components/ReviewerManagement/ManageReviewerDeadline.svelte';
 
 	let { data } = $props();
 	const hub = data.hub;
@@ -22,6 +23,34 @@
 	const userId = data.user._id;
 	const isCreator = data.hub.createdBy._id === data.user.id;
 	const isReviewer = hub.reviewers?.includes(data.user.id);
+
+	let expandedPapers = $state<string[]>([]);
+
+	let creatingAssignments = $state(false);
+
+	async function createMissingAssignments() {
+		creatingAssignments = true;
+		try {
+			const response = await fetch(`/api/hubs/${hub._id}/create-review-assignments`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' }
+			});
+
+			const result = await response.json();
+
+			if (response.ok) {
+				alert(`✅ Created ${result.created} review assignments!`);
+				window.location.reload();
+			} else {
+				alert(`❌ Error: ${result.error}`);
+			}
+		} catch (error) {
+			console.error('Error creating assignments:', error);
+			alert('❌ Failed to create assignments');
+		} finally {
+			creatingAssignments = false;
+		}
+	}
 
 	const filteredPapers = data.papers?.filter((paper) => {
 		console.log(`🔍 Filtering paper: ${paper.title}`);
@@ -417,7 +446,14 @@
 {/if}
 
 <!-- Papers Section -->
-<PapersSection papers={filteredPapers} {hub} {isCreator} userId={data.user.id} {shouldHighlight} />
+<PapersSection 
+	papers={filteredPapers} 
+	{hub} 
+	{isCreator} 
+	userId={data.user.id} 
+	{shouldHighlight} 
+	reviewAssignments={data.reviewAssignments}
+/>
 
 <!-- Informações Gerais -->
 <!-- <div class="mt-6 bg-white shadow rounded-xl p-4 space-y-2">
