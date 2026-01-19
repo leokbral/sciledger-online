@@ -20,6 +20,34 @@
     let { papers, hub, isCreator, userId, shouldHighlight, reviewAssignments }: Props = $props();
     
     let hubId = $derived(hub._id);
+
+    function getPaperSlug(paper: any): string {
+        return (paper?.id || paper?._id || '') as string;
+    }
+
+    function getReadMoreHref(paper: any): string {
+        const slug = getPaperSlug(paper);
+        if (!slug) return '#';
+
+        // Hub admin: publication approval requested after round 2
+        if (isCreator && paper?.status === 'under negotiation' && paper?.reviewRound === 2) {
+            return `/publish/publication-approval/${slug}`;
+        }
+
+        // Designated reviewer: show review form instead of author view
+        if (isDesignatedReviewer(paper)) {
+            if (paper?.status === 'in review') return `/review/inreview/${slug}`;
+            if (paper?.status === 'needing corrections') return `/review/correction/${slug}`;
+        }
+
+        // Default routing by status (for authors/creators)
+        if (paper?.status === 'under negotiation') return `/publish/negotiation/${slug}`;
+        if (paper?.status === 'in review') return `/publish/inreview/${slug}`;
+        if (paper?.status === 'needing corrections' || paper?.status === 'under correction') {
+            return `/publish/corrections/${slug}`;
+        }
+        return `/publish/published/${slug}`;
+    }
     
     // Verificar se o usuário é revisor designado deste paper
     function isDesignatedReviewer(paper: Paper): boolean {
@@ -127,11 +155,10 @@
         
         loading = true;
         try {
-            const response = await fetch(`/api/paper-reviewer-invitations/remove-reviewer`, {
+            const response = await fetch(`/api/papers/${selectedPaper.id}/remove-reviewer`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
-                    paperId: selectedPaper.id,
                     reviewerId: reviewerId
                 })
             });
@@ -211,30 +238,34 @@
                 {#each papers as paper}
                     <div
                         class="border rounded-lg p-4 transition-colors"
-                        class:bg-yellow-50={shouldHighlight(paper) && !isDesignatedReviewer(paper)}
-                        class:border-yellow-300={shouldHighlight(paper) && !isDesignatedReviewer(paper)}
-                        class:bg-blue-50={isDesignatedReviewer(paper)}
-                        class:border-blue-400={isDesignatedReviewer(paper)}
+                        class:bg-white={paper.status === 'published'}
+                        class:border-gray-300={paper.status === 'published'}
+                        class:bg-yellow-50={paper.status !== 'published' && shouldHighlight(paper) && !isDesignatedReviewer(paper)}
+                        class:border-yellow-300={paper.status !== 'published' && shouldHighlight(paper) && !isDesignatedReviewer(paper)}
+                        class:bg-blue-50={paper.status !== 'published' && isDesignatedReviewer(paper)}
+                        class:border-blue-400={paper.status !== 'published' && isDesignatedReviewer(paper)}
                     >
-                        {#if isDesignatedReviewer(paper)}
-                            <div
-                                class="mb-3 p-3 bg-blue-100 border border-blue-400 rounded text-blue-900 text-sm font-medium flex items-center gap-2"
-                            >
-                                <Icon icon="mdi:account-check" width="20" height="20" class="text-blue-600" />
-                                <span>
-                                    You are the <strong>designated reviewer</strong> for this article. You can view and review it.
-                                </span>
-                            </div>
-                        {:else if shouldHighlight(paper)}
-                            <div
-                                class="mb-3 p-2 bg-yellow-100 border border-yellow-300 rounded text-yellow-800 text-sm font-medium"
-                            >
-                                {#if isCreator || hub.reviewers?.includes(userId)}
-                                    This article has <strong>not been published</strong> yet and is visible to you as a hub {isCreator ? 'owner' : 'reviewer'}.
-                                {:else}
-                                    This article has <strong>not been published</strong> yet and is visible only to you and the authors involved.
-                                {/if}
-                            </div>
+                        {#if paper.status !== 'published'}
+                            {#if isDesignatedReviewer(paper)}
+                                <div
+                                    class="mb-3 p-3 bg-blue-100 border border-blue-400 rounded text-blue-900 text-sm font-medium flex items-center gap-2"
+                                >
+                                    <Icon icon="mdi:account-check" width="20" height="20" class="text-blue-600" />
+                                    <span>
+                                        You are the <strong>designated reviewer</strong> for this article. You can view and review it.
+                                    </span>
+                                </div>
+                            {:else if shouldHighlight(paper)}
+                                <div
+                                    class="mb-3 p-2 bg-yellow-100 border border-yellow-300 rounded text-yellow-800 text-sm font-medium"
+                                >
+                                    {#if isCreator || hub.reviewers?.includes(userId)}
+                                        This article has <strong>not been published</strong> yet and is visible to you as a hub {isCreator ? 'owner' : 'reviewer'}.
+                                    {:else}
+                                        This article has <strong>not been published</strong> yet and is visible only to you and the authors involved.
+                                    {/if}
+                                </div>
+                            {/if}
                         {/if}
 
                         <div class="flex justify-between items-start">
@@ -370,7 +401,7 @@
                                     {/if}
                                 {/if}
                                 <a
-                                    href={`/publish/published/${paper._id}`}
+                                    href={getReadMoreHref(paper)}
                                     class="btn btn-sm bg-primary-100-700 text-primary-700-100 hover:bg-primary-200-600 hover:text-primary-800-50 transition-colors duration-200 flex items-center gap-1"
                                 >
                                     Read More

@@ -88,7 +88,20 @@ export const PaperSchema: Schema = new Schema({
         declinedAt: { type: Date } // Quando o revisor recusou
     }],
     maxReviewSlots: { type: Number, default: 3 }, // Número máximo de slots
-    availableSlots: { type: Number, default: 3 } // Slots disponíveis
+    availableSlots: { type: Number, default: 3 }, // Slots disponíveis
+    
+    // Track which review round this paper is in (1 = first review, 2 = review after corrections)
+    reviewRound: { type: Number, default: 1 },
+    
+    // Track phase timestamps for each round
+    phaseTimestamps: {
+        round1Start: { type: Date },
+        round1End: { type: Date },
+        correctionStart: { type: Date },
+        correctionEnd: { type: Date },
+        round2Start: { type: Date },
+        round2End: { type: Date }
+    }
 
 }, { collection: 'papers' });
 

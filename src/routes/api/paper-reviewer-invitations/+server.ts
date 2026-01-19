@@ -62,9 +62,23 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		// Preparar dados de elegibilidade
 		const hubReviewerIds: string[] = [];
 		try {
-			const hubDoc = await Hubs.findById(typeof paper.hubId === 'object' ? (paper.hubId as any).id || (paper.hubId as any)._id : paper.hubId).lean();
-			if (hubDoc?.reviewers && Array.isArray(hubDoc.reviewers)) {
-				hubReviewerIds.push(...hubDoc.reviewers.map((r: any) => String(r)));
+			// Preferir a lista populada no próprio paper (evita confusão entre _id vs id)
+			if (typeof paper.hubId === 'object' && (paper.hubId as any)?.reviewers) {
+				hubReviewerIds.push(
+					...(paper.hubId as any).reviewers.map((r: any) => String(r?._id || r?.id || r))
+				);
+			} else {
+				// Fallback: buscar no banco
+				const hubIdValue = typeof paper.hubId === 'object'
+					? String((paper.hubId as any)._id || (paper.hubId as any).id)
+					: String(paper.hubId);
+				let hubDoc = await Hubs.findById(hubIdValue).lean();
+				if (!hubDoc) {
+					hubDoc = await Hubs.findOne({ id: hubIdValue }).lean();
+				}
+				if (hubDoc?.reviewers && Array.isArray(hubDoc.reviewers)) {
+					hubReviewerIds.push(...hubDoc.reviewers.map((r: any) => String(r?._id || r?.id || r)));
+				}
 			}
 		} catch (e) {
 			// Falha ao carregar hub não impede convite, mas afeta verificação de elegibilidade
@@ -78,7 +92,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		
 		for (const reviewerId of reviewerIds) {
 			// Carregar dados do revisor
-			const reviewer = await Users.findOne({ id: reviewerId });
+			const reviewer = await Users.findOne({ $or: [{ id: reviewerId }, { _id: reviewerId }] });
 			if (!reviewer) {
 				skipped.push({ reviewerId: String(reviewerId), reasons: ['Reviewer not found'] });
 				continue;
@@ -105,51 +119,66 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				continue;
 			}
 
-			// Verificar se já existe convite pendente
-			const existingInvite = await PaperReviewInvitation.findOne({
+			// Verificar se já existe convite pendente (não permitir duplicatas de pending)
+			// Se houver convite aceito ou recusado, remover antes de criar novo
+			const existingInvites = await PaperReviewInvitation.find({
 				paper: paperId,
-				reviewer: reviewerId,
-				status: 'pending'
+				reviewer: reviewerId
 			});
 
-			if (!existingInvite) {
-				const inviteId = crypto.randomUUID();
-				const invitation = new PaperReviewInvitation({
-					_id: inviteId,
-					id: inviteId,
-					paper: paperId,
-					reviewer: reviewerId,
-					invitedBy: user.id,
-					hubId: hubId,
-					status: 'pending',
-					customDeadlineDays: deadlineDays,
-					invitedAt: new Date()
-				});
-
-				await invitation.save();
-				invitations.push(invitation);
-
-				// Criar notificação para o revisor
-				if (reviewer) {
-					await NotificationService.createNotification({
-						user: String(reviewerId),
-						type: 'review_request',
-						title: 'New Paper Review Request',
-						content: `You have been invited to review the paper "${paper.title}". ${availableSlotsCount} slot(s) available.`,
-						relatedPaperId: paperId,
-						relatedHubId: hubId,
-						actionUrl: `/notifications?inviteId=${inviteId}`,
-						priority: 'high',
-						metadata: {
-							paperId,
-							paperTitle: paper.title,
-							invitedBy: user.id,
-							invitedByName: `${user.firstName} ${user.lastName}`,
-							inviteId: inviteId,
-							inviteType: 'paper_review'
-						}
+			// Se há convites anteriores (aceitos ou recusados), remover para permitir novo convite
+			if (existingInvites.length > 0) {
+				const pendingInvite = existingInvites.find(inv => inv.status === 'pending');
+				if (pendingInvite) {
+					// Se há pending, skip (não criar duplicata)
+					skipped.push({ reviewerId: String(reviewerId), reasons: ['Already invited (pending)'] });
+					continue;
+				} else {
+					// Se não há pending (só accepted/declined), remover anteriores para permitir novo convite
+					await PaperReviewInvitation.deleteMany({
+						paper: paperId,
+						reviewer: reviewerId
 					});
+					console.log(`🔄 Removed previous invitations for ${reviewerId} to allow re-invitation`);
 				}
+			}
+
+			const inviteId = crypto.randomUUID();
+			const invitation = new PaperReviewInvitation({
+				_id: inviteId,
+				id: inviteId,
+				paper: paperId,
+				reviewer: reviewerId,
+				invitedBy: user.id,
+				hubId: hubId,
+				status: 'pending',
+				customDeadlineDays: deadlineDays,
+				invitedAt: new Date()
+			});
+
+			await invitation.save();
+			invitations.push(invitation);
+
+			// Criar notificação para o revisor
+			if (reviewer) {
+				await NotificationService.createNotification({
+					user: String(reviewerId),
+					type: 'review_request',
+					title: 'New Paper Review Request',
+					content: `You have been invited to review the paper "${paper.title}". ${availableSlotsCount} slot(s) available.`,
+					relatedPaperId: paperId,
+					relatedHubId: hubId,
+					actionUrl: `/notifications?inviteId=${inviteId}`,
+					priority: 'high',
+					metadata: {
+						paperId,
+						paperTitle: paper.title,
+						invitedBy: user.id,
+						invitedByName: `${user.firstName} ${user.lastName}`,
+						inviteId: inviteId,
+						inviteType: 'paper_review'
+					}
+				});
 			}
 		}
 

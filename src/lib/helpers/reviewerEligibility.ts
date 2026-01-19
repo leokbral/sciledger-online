@@ -38,7 +38,10 @@ export function checkReviewerEligibility(
         reasons.push('Reviewer role not enabled');
     }
 
-    const reviewerId = String(reviewer._id || reviewer.id);
+    const reviewerId = String(reviewer.id || reviewer._id);
+    const reviewerAltId = reviewer.id && (reviewer as any)._id && String(reviewer.id) !== String((reviewer as any)._id)
+        ? String((reviewer as any)._id)
+        : undefined;
 
     // Conflict of interest: author/co-author/submittedBy
     const mainAuthorId = typeof paper.mainAuthor === 'object' ? String(paper.mainAuthor._id || paper.mainAuthor.id) : String(paper.mainAuthor);
@@ -53,13 +56,13 @@ export function checkReviewerEligibility(
     const isLinkedToHub = !!paper.hubId;
     if (isLinkedToHub) {
         const hubReviewerIds = new Set((opts?.hubReviewerIds || []).map(String));
-        if (!hubReviewerIds.has(reviewerId)) {
+        if (!hubReviewerIds.has(reviewerId) && !(reviewerAltId && hubReviewerIds.has(reviewerAltId))) {
             reasons.push('Reviewer not part of this hub');
         }
     }
 
     // Already assigned to paper
-    if (assignedIds.has(reviewerId)) {
+    if (assignedIds.has(reviewerId) || (reviewerAltId && assignedIds.has(reviewerAltId))) {
         reasons.push('Reviewer already assigned to this paper');
     }
 

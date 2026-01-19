@@ -6,5 +6,5 @@ export interface IHub extends Hub, Document {
     pdfId: ObjectId | undefined;
 }
 
-const Hubs = mongoose.model<IHub>('Hub', HubSchema);
+const Hubs = mongoose.models.Hub || mongoose.model<IHub>('Hub', HubSchema);
 export default Hubs;

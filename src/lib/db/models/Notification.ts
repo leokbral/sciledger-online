@@ -8,5 +8,5 @@ export interface INotification extends Omit<Notification, '_id'> {
 
 import type { Document } from 'mongoose';
 
-const NotificationModel = mongoose.model<INotification & Document>('Notification', NotificationSchema);
+const NotificationModel = mongoose.models.Notification || mongoose.model<INotification & Document>('Notification', NotificationSchema);
 export default NotificationModel;

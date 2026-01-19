@@ -23,6 +23,9 @@
 	let reviewers = data.users.filter((u: User) => u.roles.reviewer === true);
 	let peer_review: string = $state('');
 	let paper: Paper | null = $state(data.paper);
+	let isHubOwner: boolean = $state(!!(data as any).isHubOwner);
+	let isApprovingPublication = $state(false);
+	let approvePublicationError = $state('');
 
 	interface ImageItem {
 		id?: string;
@@ -293,19 +296,44 @@
 			alert('An error occurred while linking the hub.');
 		}
 	}
+
+	async function approvePublication() {
+		if (!paper?.id) return;
+		isApprovingPublication = true;
+		approvePublicationError = '';
+		try {
+			const resp = await fetch(`/api/papers/${paper.id}/approve-publication`, { method: 'POST' });
+			const result = await resp.json();
+			if (!resp.ok) {
+				approvePublicationError = result.error || 'Failed to approve publication';
+				return;
+			}
+			paper = { ...paper, status: result.status || 'published' } as Paper;
+			await goto(`/publish/published/${paper.id}`);
+		} catch (error) {
+			console.error('Error approving publication:', error);
+			approvePublicationError = 'Network error. Please try again.';
+		} finally {
+			isApprovingPublication = false;
+		}
+	}
 </script>
 
 <!-- UI HTML -->
 <div class="grid grid-cols-[1fr_1fr_1fr] p-5">
 	<div></div>
 	<div class="flex justify-between gap-3">
-		<button class="bg-primary-500 text-white rounded-lg px-4 py-2" onclick={hdlSaveDraft}>
+		<button
+			class="bg-primary-500 text-white rounded-lg px-4 py-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
+			onclick={hdlSaveDraft}
+			disabled={!!paper?.hubId}
+		>
 			Save Draft
 		</button>
 		<button 
 			class="bg-primary-500 text-white rounded-lg px-4 py-2 disabled:bg-gray-400 disabled:cursor-not-allowed" 
 			onclick={handleSavePaper}
-			disabled={!paper?.peer_review?.responses || paper.peer_review.responses.filter(r => r.status === 'accepted').length < 3}
+			disabled={!!paper?.hubId || !paper?.peer_review?.responses || paper.peer_review.responses.filter(r => r.status === 'accepted').length < 3}
 		>
 			Submit to Review
 		</button>
@@ -317,13 +345,55 @@
 	<div class="container page max-w-[700px] p-4 m-auto">
 		<h4 class="h4 px-4 text-primary-500 font font-semibold">Under Negotiation</h4>
 		<hr class="mt-2 mb-4 border-t-2!" />
+		{#if paper.hubId}
+			<div class="mb-4 rounded-lg border-l-4 border-blue-500 bg-blue-50 p-4">
+				<div class="flex gap-3">
+					<Icon icon="mdi:information" class="h-5 w-5 flex-shrink-0 text-blue-600" />
+					<div class="text-sm text-blue-900">
+						<strong>Status: Under Negotiation (Hub)</strong>
+						<p class="mt-1">
+							Este paper já foi submetido a um Hub e está em negociação. Enquanto estiver neste status,
+							ele não pode ser editado.
+						</p>
+					</div>
+				</div>
+			</div>
+
+			{#if isHubOwner && (paper as any)?.reviewRound === 2}
+				<div class="mb-4 rounded-lg border-l-4 border-green-500 bg-green-50 p-4">
+					<div class="text-sm text-green-900">
+						<strong>Publication approval</strong>
+						<p class="mt-1">
+							The author requested permission to publish this paper. Approving will set the status to
+							<b>published</b>.
+						</p>
+						<div class="mt-3 flex items-center gap-3">
+							<button
+								class="btn preset-filled-primary-500"
+								disabled={isApprovingPublication}
+								onclick={approvePublication}
+							>
+								{#if isApprovingPublication}
+									Approving...
+								{:else}
+									Approve publication
+								{/if}
+							</button>
+							{#if approvePublicationError}
+								<span class="text-red-600 text-sm">{approvePublicationError}</span>
+							{/if}
+						</div>
+					</div>
+				</div>
+			{/if}
+		{/if}
 		<PaperPreview {paper} user={$page.data.user} />
 
 		<!-- Hub Selection Section -->
 		<div class="mt-6 space-y-4">
 			<div class="flex items-center gap-2">
 				<label class="relative inline-flex items-center cursor-pointer">
-					<input type="checkbox" bind:checked={isLinkedToHub} class="sr-only peer" />
+					<input type="checkbox" bind:checked={isLinkedToHub} class="sr-only peer" disabled={!!paper?.hubId} />
 					<div
 						class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"
 					></div>

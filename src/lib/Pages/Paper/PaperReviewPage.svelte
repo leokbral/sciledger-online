@@ -128,6 +128,7 @@
 		editable?: boolean;
 		currentUser?: User;
 		reviewAssignments?: any[];
+		isHubAdmin?: boolean;
 	}
 
 	let {
@@ -135,7 +136,8 @@
 		paper,
 		editable = false,
 		currentUser,
-		reviewAssignments
+		reviewAssignments,
+		isHubAdmin = false
 	}: Props = $props();
 	// console.log('current', currentUser);
 	// console.log('Reviewers', paper.reviewers);
@@ -213,9 +215,9 @@
 		{/if}
 
 		<!-- Nova seção com Paper completo e ReviewForms lado a lado -->
-		<div class="mb-8 flex gap-4 w-full">
+		<div class="mb-8 {isHubAdmin ? 'w-full' : 'flex gap-4 w-full'}">
 			<!-- Paper completo à esquerda -->
-			<section class="flex-1 min-w-0">
+			<section class="{isHubAdmin ? 'w-full' : 'flex-1 min-w-0'}">
 				<div class="p-4 md:p-6 bg-white rounded-lg shadow-lg">
 					<!-- Título do Paper -->
 					<h2 class="text-3xl font-semibold text-gray-800 mb-4">{@html paper.title}</h2>
@@ -315,17 +317,20 @@
 				</div>
 			</section>
 
-			<!-- ReviewForms à direita -->
-			<section class="flex-1 min-w-0">
-				{#if page.url.pathname.startsWith('/review/inreview/')}
-					<ReviewForms
-						paperTitle={paper.title}
-						paperId={paper.id}
-						reviewerId={currentUser?.id || ''}
-						on:reviewSubmitted={handleReviewSubmitted}
-					/>
-				{/if}
-			</section>
+			<!-- ReviewForms à direita (apenas para revisores, não para admin do hub) -->
+			{#if !isHubAdmin}
+				<section class="flex-1 min-w-0">
+					{#if page.url.pathname.startsWith('/review/inreview/') || page.url.pathname.startsWith('/review/correction/')}
+						<ReviewForms
+							paperTitle={paper.title}
+							paperId={paper.id}
+							reviewerId={currentUser?.id || ''}
+							paper={paper}
+							on:reviewSubmitted={handleReviewSubmitted}
+						/>
+					{/if}
+				</section>
+			{/if}
 		</div>
 
 		<hr class="my-4" />
