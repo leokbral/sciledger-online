@@ -14,9 +14,12 @@
 			reviewerId: string | null;
 			status: 'available' | 'pending' | 'occupied' | 'declined';
 		}>;
+		mainAuthorId?: string;
+		coAuthorIds?: string[];
+		submittedById?: string;
 	}
 
-	let { paperId, hubId, hubReviewers, currentAssignedReviewers, reviewSlots = [] }: Props = $props();
+	let { paperId, hubId, hubReviewers, currentAssignedReviewers, reviewSlots = [], mainAuthorId, coAuthorIds = [], submittedById }: Props = $props();
 
 	let openModal = $state(false);
 	let selectedReviewers = $state<string[]>([]);
@@ -35,9 +38,29 @@
 	let maxSlots = $derived(reviewSlots.length || 3);
 
 	// Filtrar revisores que ainda não foram convidados para este paper
+	// Também excluir autores, co-autores e quem submeteu o paper
 	let availableReviewers = $derived(
 		hubReviewers.filter(
-			(reviewer) => !currentAssignedReviewers.includes(reviewer.id || reviewer._id)
+			(reviewer) => {
+				const reviewerId = reviewer.id || reviewer._id;
+				// Verificar se já foi convidado
+				if (currentAssignedReviewers.includes(reviewerId)) {
+					return false;
+				}
+				// Excluir autor principal
+				if (mainAuthorId && mainAuthorId === reviewerId) {
+					return false;
+				}
+				// Excluir co-autores
+				if (coAuthorIds && coAuthorIds.includes(reviewerId)) {
+					return false;
+				}
+				// Excluir submitter
+				if (submittedById && submittedById === reviewerId) {
+					return false;
+				}
+				return true;
+			}
 		)
 	);
 

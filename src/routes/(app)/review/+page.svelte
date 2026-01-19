@@ -145,7 +145,7 @@
 		return isReviewer || isHubReviewer || isHubOwner;
 	});
 	
-	// Filtrar papers "published" - apenas os que o usuário revisou
+	// Filtrar papers "published" - apenas os que o usuário revisou (incluindo papers do hub)
 	let reviewed = papers.filter((p: Paper) => {
 		if (p.status !== 'published') return false;
 		

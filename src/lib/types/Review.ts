@@ -46,6 +46,7 @@ export type Review = {
 
 	// Status e metadados
 	status: 'draft' | 'submitted' | 'completed'; // Estado da revisão
+	reviewRound: 1 | 3; // 1 = primeira rodada (phase 1), 3 = segunda rodada (phase 3)
 	submissionDate?: Date; // Data de submissão
 	completionDate?: Date; // Data de conclusão
 	createdAt: Date; // Data de criação do registro

@@ -2,6 +2,8 @@ import { json } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import Papers from '$lib/db/models/Paper';
 import Hubs from '$lib/db/models/Hub';
+import PaperReviewInvitation from '$lib/db/models/PaperReviewInvitation';
+import ReviewAssignment from '$lib/db/models/ReviewAssignment';
 
 export async function POST({ params, request, locals }) {
     try {
@@ -34,6 +36,19 @@ export async function POST({ params, request, locals }) {
         // Remover o revisor do array
         if (paper.reviewers && paper.reviewers.includes(reviewerId)) {
             paper.reviewers = paper.reviewers.filter(r => r !== reviewerId);
+            
+            // Limpar convites de revisão anteriores do revisor para este paper
+            await PaperReviewInvitation.deleteMany({
+                paper: paperId,
+                reviewer: reviewerId
+            });
+
+            // Limpar ReviewAssignments do revisor para este paper
+            await ReviewAssignment.deleteMany({
+                paperId: paperId,
+                reviewerId: reviewerId
+            });
+
             await paper.save();
             
             console.log(`✅ Reviewer ${reviewerId} removed from paper ${paperId}`);
@@ -47,6 +62,11 @@ export async function POST({ params, request, locals }) {
         } else {
             return json({ error: 'Reviewer not found in paper' }, { status: 404 });
         }
+    } catch (error) {
+        console.error('Error removing reviewer:', error);
+        return json({ error: 'Failed to remove reviewer' }, { status: 500 });
+    }
+}
 
     } catch (error) {
         console.error('Error removing reviewer:', error);

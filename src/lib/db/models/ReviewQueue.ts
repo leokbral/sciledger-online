@@ -5,5 +5,5 @@ import { ReviewQueueSchema } from '../schemas/ReviewQueue';
 
 export interface IReviewQueue extends ReviewQueue, mongoose.Document {}
 
-const ReviewQueueModel = mongoose.model<IReviewQueue>('ReviewQueue', ReviewQueueSchema);
+const ReviewQueueModel = mongoose.models.ReviewQueue || mongoose.model<IReviewQueue>('ReviewQueue', ReviewQueueSchema);
 export default ReviewQueueModel;

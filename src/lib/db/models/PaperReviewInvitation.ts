@@ -4,7 +4,7 @@ import { PaperReviewInvitationSchema } from '../schemas/PaperReviewInvitation';
 
 export interface IPaperReviewInvitation extends PaperReviewInvitation, mongoose.Document {}
 
-const PaperReviewInvitationModel = mongoose.model<IPaperReviewInvitation>(
+const PaperReviewInvitationModel = mongoose.models.PaperReviewInvitation || mongoose.model<IPaperReviewInvitation>(
 	'PaperReviewInvitation',
 	PaperReviewInvitationSchema
 );

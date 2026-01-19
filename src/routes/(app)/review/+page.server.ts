@@ -116,67 +116,73 @@ export async function load({ locals }) {
 		// Filtrar papers com base no status e envolvimento do usuário
 		const filteredPapers = normalizedPapers.filter((paper) => {
 			try {
-				// NOVO: Paperspool só mostra papers SEM hub associado
-				// Papers de hub devem ser visualizados na página do hub
-				if (paper.hubId) {
-					return false;
-				}
-
 				const userId = user.id;
-			const responses = paper.peer_review.responses;
-			const acceptedOrCompleted = responses.filter(
-				(r) => r.status === 'accepted' || r.status === 'completed'
-			);
+				const responses = paper.peer_review.responses;
+				const acceptedOrCompleted = responses.filter(
+					(r) => r.status === 'accepted' || r.status === 'completed'
+				);
 
-			// Verifica se o user é autor/coautor/submitter do paper
-			const mainAuthorId = typeof paper.mainAuthor === 'object' 
-				? (paper.mainAuthor._id || paper.mainAuthor.id) 
-				: paper.mainAuthor;
-			const correspondingAuthorId = typeof paper.correspondingAuthor === 'object'
-				? (paper.correspondingAuthor._id || paper.correspondingAuthor.id)
-				: paper.correspondingAuthor;
-			const submittedById = typeof paper.submittedBy === 'object'
-				? (paper.submittedBy._id || paper.submittedBy.id)
-				: paper.submittedBy;
-			
-			const isMainAuthor = mainAuthorId?.toString() === userId;
-			const isCorrespondingAuthor = correspondingAuthorId?.toString() === userId;
-			const isSubmitter = submittedById?.toString() === userId;
-			const isCoAuthor = paper.coAuthors?.some((author: any) => {
-				const authorId = typeof author === 'object' ? (author._id || author.id) : author;
-				return authorId?.toString() === userId;
-			});
-			const isPaperAuthor = isMainAuthor || isCorrespondingAuthor || isSubmitter || isCoAuthor;
+				// Verifica se o user é autor/coautor/submitter do paper
+				const mainAuthorId = typeof paper.mainAuthor === 'object' 
+					? (paper.mainAuthor._id || paper.mainAuthor.id) 
+					: paper.mainAuthor;
+				const correspondingAuthorId = typeof paper.correspondingAuthor === 'object'
+					? (paper.correspondingAuthor._id || paper.correspondingAuthor.id)
+					: paper.correspondingAuthor;
+				const submittedById = typeof paper.submittedBy === 'object'
+					? (paper.submittedBy._id || paper.submittedBy.id)
+					: paper.submittedBy;
+				
+				const isMainAuthor = mainAuthorId?.toString() === userId;
+				const isCorrespondingAuthor = correspondingAuthorId?.toString() === userId;
+				const isSubmitter = submittedById?.toString() === userId;
+				const isCoAuthor = paper.coAuthors?.some((author: any) => {
+					const authorId = typeof author === 'object' ? (author._id || author.id) : author;
+					return authorId?.toString() === userId;
+				});
+				const isPaperAuthor = isMainAuthor || isCorrespondingAuthor || isSubmitter || isCoAuthor;
 
-			// Verifica se o user é dono do hub ou revisor do hub
-			const hubCreatorId = typeof paper.hubId === 'object'
-				? (paper.hubId?.createdBy?._id || paper.hubId?.createdBy?.id || paper.hubId?.createdBy)
-				: null;
-			const isHubOwner = hubCreatorId?.toString() === userId;
-			
-			const isHubReviewer = typeof paper.hubId === 'object' && 
-				Array.isArray(paper.hubId?.reviewers) && 
-				paper.hubId?.reviewers?.includes(userId);
+				// Verifica se o user é dono do hub ou revisor do hub
+				const hubCreatorId = typeof paper.hubId === 'object'
+					? (paper.hubId?.createdBy?._id || paper.hubId?.createdBy?.id || paper.hubId?.createdBy)
+					: null;
+				const isHubOwner = hubCreatorId?.toString() === userId;
+				
+				const isHubReviewer = typeof paper.hubId === 'object' && 
+					Array.isArray(paper.hubId?.reviewers) && 
+					paper.hubId?.reviewers?.includes(userId);
 
-			// Verifica se o user é revisor designado do paper
-			const isReviewer = acceptedOrCompleted.some(r => r.reviewerId === userId);
+				// Verifica se o user é revisor designado do paper
+				const isReviewer = acceptedOrCompleted.some(r => r.reviewerId === userId);
 
-			// Verifica se o user aceitou revisar este paper via ReviewQueue
-			const hasAcceptedReview = paper.isAcceptedForReview;
+				// Verifica se o user aceitou revisar este paper via ReviewQueue
+				const hasAcceptedReview = paper.isAcceptedForReview;
 
-			// Para papers "in review" ou "needing corrections": 
-			// só mostra se for revisor designado, revisor do hub, dono do hub ou aceitou via ReviewQueue
-			if (paper.status === 'in review' || paper.status === 'needing corrections') {
-				return isReviewer || isHubReviewer || isHubOwner || hasAcceptedReview;
-			}
-
-			// Para papers "published": só mostra se completou a revisão
-			if (paper.status === 'published') {
+				// Verificar se completou a revisão
 				const hasCompleted = responses.some(
 					r => r.reviewerId === userId && r.status === 'completed'
 				);
-				return hasCompleted;
-			}
+
+				// NOVO: Papers de hub: só mostra papers published que foram revisados
+				if (paper.hubId) {
+					// Papers publicados do hub: mostra se completou a revisão
+					if (paper.status === 'published') {
+						return hasCompleted;
+					}
+					// Outros status de hub: não mostra no paper pool
+					return false;
+				}
+
+				// Para papers "in review" ou "needing corrections": 
+				// só mostra se for revisor designado, revisor do hub, dono do hub ou aceitou via ReviewQueue
+				if (paper.status === 'in review' || paper.status === 'needing corrections') {
+					return isReviewer || isHubReviewer || isHubOwner || hasAcceptedReview;
+				}
+
+				// Para papers "published": só mostra se completou a revisão
+				if (paper.status === 'published') {
+					return hasCompleted;
+				}
 
 			// Para papers "under negotiation": mostra se ainda não tem 3 revisores, se já é revisor, se é revisor do hub ou aceitou via ReviewQueue
 			if (paper.status === 'under negotiation') {

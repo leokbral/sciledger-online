@@ -156,7 +156,8 @@ export async function load({ locals, params }) {
 		paper: sanitize(paper),
 		users: sanitize(users),
 		messageFeed: sanitize(messageFeed),
-		reviewAssignments: sanitize(serializedAssignments)
+		reviewAssignments: sanitize(serializedAssignments),
+		isHubOwner: isHubOwner
 	};
 }
 

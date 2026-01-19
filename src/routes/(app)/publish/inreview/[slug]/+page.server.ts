@@ -1,5 +1,6 @@
 import Papers from '$lib/db/models/Paper';
 import Users from '$lib/db/models/User';
+import '$lib/db/models/Review'; // ensure Review schema is registered for populate
 import { error, redirect } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongooseConnection';
 

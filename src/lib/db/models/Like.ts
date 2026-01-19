@@ -22,5 +22,5 @@ const LikeSchema: Schema = new Schema({
 });
 
 // Exportando o modelo
-const Like = mongoose.model<ILike>('Like', LikeSchema);
+const Like = mongoose.models.Like || mongoose.model<ILike>('Like', LikeSchema);
 export default Like;

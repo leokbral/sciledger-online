@@ -363,7 +363,7 @@
                                             class="btn btn-xs preset-filled-primary-500 ml-2"
                                             onclick={(e) => {
                                                 e.stopPropagation();
-                                                window.location.href = `/review/under-negotiation/${notification.relatedPaperId}`;
+                                                window.location.href = `/notifications`;
                                             }}
                                         >
                                             Read more

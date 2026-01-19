@@ -1,11 +1,14 @@
 import { start_mongo } from '$lib/db/mongooseConnection';
 import { redirect, error } from '@sveltejs/kit';
+import type { PageServerLoad } from './$types';
 import Users from '$lib/db/models/User';
 import Papers from '$lib/db/models/Paper';
 import Hubs from '$lib/db/models/Hub';
+import Invitation from '$lib/db/models/Invitation';
+import PaperReviewInvitation from '$lib/db/models/PaperReviewInvitation';
 import { sanitizePaper } from '$lib/helpers/sanitizePaper';
 
-export async function load({ params, locals }) {
+export const load: PageServerLoad = async ({ params, locals }) => {
 	if (!locals.user) redirect(302, `/login`);
 
 	await start_mongo();
@@ -146,7 +149,7 @@ export async function load({ params, locals }) {
 			? (hubData.createdBy._id || hubData.createdBy.id || hubData.createdBy)
 			: hubData.createdBy;
 		const isCreator = createdById.toString() === locals.user.id;
-		let reviewAssignments = [];
+		let reviewAssignments: any[] = [];
 		
 		console.log('🔍 Fetching ReviewAssignments - isCreator:', isCreator);
 		console.log('📋 Hub ID:', params.id);
@@ -164,11 +167,11 @@ export async function load({ params, locals }) {
 			console.log('✅ Found ReviewAssignments:', assignmentsRaw.length);
 			
 			// Converter para formato serializável (evitar objetos populados)
-			reviewAssignments = assignmentsRaw.map(ra => ({
+			reviewAssignments = assignmentsRaw.map((ra: any) => ({
 				_id: ra._id,
 				id: ra.id,
 				paperId: ra.paperId,
-				reviewerId: typeof ra.reviewerId === 'object' ? (ra.reviewerId._id || ra.reviewerId.id) : ra.reviewerId,
+				reviewerId: typeof ra.reviewerId === 'object' ? (ra.reviewerId?._id || ra.reviewerId?.id) : ra.reviewerId,
 				status: ra.status,
 				deadline: ra.deadline,
 				hubId: ra.hubId,
@@ -177,7 +180,7 @@ export async function load({ params, locals }) {
 				updatedAt: ra.updatedAt
 			}));
 			
-			assignmentsRaw.forEach((ra, idx) => {
+			assignmentsRaw.forEach((ra: any, idx: number) => {
 				console.log(`  - Assignment ${idx + 1}:`, {
 					_id: ra._id,
 					paperId: ra.paperId,
@@ -190,11 +193,68 @@ export async function load({ params, locals }) {
 			console.log('❌ User is NOT creator, skipping ReviewAssignments fetch');
 		}
 
+		// Buscar convites pendentes para o usuário neste hub
+		let hubInvitations = [];
+		let paperReviewInvitations = [];
+		
+		console.log('🔔 Fetching invitations for hub:', params.id, 'user:', locals.user.id);
+		
+		// Hub invitations
+		const hubInvitesRaw = await Invitation.find({ 
+			reviewer: locals.user.id, 
+			hubId: params.id,
+			status: 'pending' 
+		})
+		.populate({
+			path: 'hubId',
+			select: 'title type description logoUrl'
+		})
+		.lean();
+		
+		hubInvitations = hubInvitesRaw.map((inv: any) => ({
+			_id: String(inv._id),
+			hubId: typeof inv.hubId === 'object' ? inv.hubId : null,
+			status: inv.status,
+			createdAt: inv.createdAt
+		}));
+		
+		console.log('✅ Found hub invitations:', hubInvitations.length);
+		
+		// Paper review invitations for papers in this hub
+		const paperReviewInvitesRaw = await PaperReviewInvitation.find({ 
+			reviewer: locals.user.id,
+			hubId: params.id,
+			status: 'pending'
+		})
+		.populate({
+			path: 'paper',
+			select: 'title hubId'
+		})
+		.populate({
+			path: 'invitedBy',
+			select: 'firstName lastName'
+		})
+		.lean();
+		
+		paperReviewInvitations = (paperReviewInvitesRaw as any[])
+			.filter(inv => inv.paper) // Filter out invites for deleted papers
+			.map(inv => ({
+				_id: String(inv._id),
+				paperId: typeof inv.paper === 'object' ? inv.paper : null,
+				invitedBy: typeof inv.invitedBy === 'object' ? inv.invitedBy : null,
+				status: inv.status,
+				createdAt: inv.createdAt
+			}));
+		
+		console.log('✅ Found paper review invitations:', paperReviewInvitations.length);
+
 		return {
 			hub: hubData,
 			users: usersData,
 			papers: papersData,
-			reviewAssignments: reviewAssignments
+			reviewAssignments: reviewAssignments,
+			hubInvitations: hubInvitations,
+			paperReviewInvitations: paperReviewInvitations
 		};
 	} catch (e) {
 		console.error('Error loading data:', e);

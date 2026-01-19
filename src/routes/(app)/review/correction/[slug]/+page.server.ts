@@ -123,7 +123,8 @@ export async function load({ locals, params }) {
 		// Sanitizar antes de retornar
 		return {
 			paper: sanitize(paper),
-			users: sanitize(usersRaw)
+			users: sanitize(usersRaw),
+			isHubOwner
 		};
 
 	} catch (err) {

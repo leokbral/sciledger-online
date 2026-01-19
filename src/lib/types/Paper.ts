@@ -70,4 +70,13 @@ export type Paper = {
     }>;
     maxReviewSlots?: number; // Número máximo de slots (padrão: 3)
     availableSlots?: number; // Slots disponíveis (calculado)
+    reviewRound?: number; // Track which review round (1 = first, 2 = after corrections)
+    phaseTimestamps?: {
+        round1Start?: Date;
+        round1End?: Date;
+        correctionStart?: Date;
+        correctionEnd?: Date;
+        round2Start?: Date;
+        round2End?: Date;
+    };
 }
