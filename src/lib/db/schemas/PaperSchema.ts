@@ -101,7 +101,11 @@ export const PaperSchema: Schema = new Schema({
         correctionEnd: { type: Date },
         round2Start: { type: Date },
         round2End: { type: Date }
-    }
+    },
+    
+    // Scopus subject classification
+    scopusArea: { type: String },
+    scopusSubArea: { type: String }
 
 }, { collection: 'papers' });
 

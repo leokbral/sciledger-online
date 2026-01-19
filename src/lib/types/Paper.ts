@@ -79,4 +79,6 @@ export type Paper = {
         round2Start?: Date;
         round2End?: Date;
     };
+    scopusArea?: string; // Scopus subject area
+    scopusSubArea?: string; // Scopus subject sub-area
 }

@@ -14,6 +14,7 @@
 	import IconFile from '@lucide/svelte/icons/paperclip';
 	import IconRemove from '@lucide/svelte/icons/circle-x';
 	import OrcidProfile from '$lib/components/OrcidProfile/OrcidProfile.svelte';
+	import { SCOPUS_AREAS, getSubAreasForArea, getAllAreaNames } from '$lib/constants/scopusAreas';
 
 	let fileName = $state('');
 	let pdfPaperPreview = $state();
@@ -72,6 +73,35 @@
 	}: Props = $props();
 
 	export const store = writable<PaperPublishStoreData>(inicialValue);
+
+	// Scopus classification variables (after inicialValue is declared)
+	let selectedScopusArea = $state(inicialValue.scopusArea || '');
+	let selectedScopusSubArea = $state(inicialValue.scopusSubArea || '');
+	
+	// Derive sub-areas based on selected area
+	let availableScopusSubAreas = $derived(
+		selectedScopusArea ? getSubAreasForArea(selectedScopusArea) : []
+	);
+
+	// Handler to update store and reset sub-area when area changes
+	function handleScopusAreaChange() {
+		// Check if current sub-area is valid for new area
+		if (selectedScopusArea) {
+			const subAreas = getSubAreasForArea(selectedScopusArea);
+			if (!subAreas.find((sub) => sub.name === selectedScopusSubArea)) {
+				selectedScopusSubArea = '';
+			}
+		} else {
+			selectedScopusSubArea = '';
+		}
+		// Update store
+		$store.scopusArea = selectedScopusArea;
+		$store.scopusSubArea = selectedScopusSubArea;
+	}
+
+	function handleScopusSubAreaChange() {
+		$store.scopusSubArea = selectedScopusSubArea;
+	}
 
 	// let files: FileList = $state();
 
@@ -644,6 +674,60 @@
 					onValueChange={(e) => ($store.keywords = e.value)}
 					classes="bg-[rgb(240,240,240)] dark:bg-surface-900 rounded-lg"
 				/>
+			</section>
+
+			<!-- Scopus Classification Section -->
+			<section class="mb-6 w-full">
+				<div class="bg-surface-50 dark:bg-surface-800 rounded-lg p-4 border">
+					<h3 class="text-lg font-semibold mb-3 text-surface-900 dark:text-surface-100">
+						Scopus Subject Classification
+					</h3>
+					
+					<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+						<!-- Scopus Area -->
+						<div>
+							<label for="scopus-area" class="block mb-1 text-sm font-medium">
+								Subject Area
+							</label>
+							<select
+								id="scopus-area"
+								bind:value={selectedScopusArea}
+								onchange={handleScopusAreaChange}
+								class="w-full p-2 border border-surface-300 rounded-lg text-sm bg-white dark:bg-surface-700"
+							>
+								<option value="">Select a subject area...</option>
+								{#each getAllAreaNames() as areaName}
+									<option value={areaName}>{areaName}</option>
+								{/each}
+							</select>
+						</div>
+
+						<!-- Scopus Sub-Area -->
+						<div>
+							<label for="scopus-subarea" class="block mb-1 text-sm font-medium">
+								Subject Sub-Area
+							</label>
+							<select
+								id="scopus-subarea"
+								bind:value={selectedScopusSubArea}
+								onchange={handleScopusSubAreaChange}
+								disabled={!selectedScopusArea}
+								class="w-full p-2 border border-surface-300 rounded-lg text-sm bg-white dark:bg-surface-700 disabled:bg-surface-200 disabled:cursor-not-allowed"
+							>
+								<option value="">
+									{selectedScopusArea ? 'Select a sub-area...' : 'First select an area'}
+								</option>
+								{#each availableScopusSubAreas as subArea}
+									<option value={subArea.name}>{subArea.name}</option>
+								{/each}
+							</select>
+						</div>
+					</div>
+
+					<p class="mt-2 text-xs text-surface-600 dark:text-surface-400">
+						Select the Scopus subject classification that best describes your paper. This helps with categorization and indexing.
+					</p>
+				</div>
 			</section>
 
 			<section>
