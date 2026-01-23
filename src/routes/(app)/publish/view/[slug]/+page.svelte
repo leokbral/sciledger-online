@@ -1,0 +1,216 @@
+<script lang="ts">
+	import { Avatar } from '@skeletonlabs/skeleton-svelte';
+	import type { PageData } from './$types';
+	import { onMount } from 'svelte';
+
+	// Receber os dados do servidor
+	export let data: PageData;
+
+	// Usar o paper diretamente (não filtrar por status)
+	$: paper = data.paper;
+
+	// Function to style reference links
+	function styleReferenceLinks() {
+		if (typeof window !== 'undefined') {
+			// Find all elements that might contain reference links
+			const contentElements = document.querySelectorAll('.paper-content');
+
+			contentElements.forEach((element) => {
+				// Look for text patterns like [1], [2], etc.
+				const html = element.innerHTML;
+				const styledHtml = html.replace(
+					/\[(\d+)\]/g,
+					'<span class="reference-link text-primary-500 hover:text-primary-950 cursor-pointer font-medium">[<span class="reference-number">$1</span>]</span>'
+				);
+				element.innerHTML = styledHtml;
+			});
+		}
+	}
+
+	onMount(() => {
+		styleReferenceLinks();
+	});
+</script>
+
+<!-- Lista de Papers -->
+<div class="space-y-6 max-w-[900px] ml-6">
+	{#if paper}
+		<div class="p-6 bg-white rounded-lg shadow-lg hover:shadow-xl transition-shadow">
+			<!-- Status Badge -->
+			{#if paper.status !== 'published'}
+				<div class="mb-4">
+					{#if paper.rejectedByHub || paper.status === 'rejected'}
+						<span class="inline-flex items-center gap-2 px-3 py-1.5 bg-red-100 text-red-800 text-sm font-medium rounded-lg">
+							<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+								<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+							</svg>
+							Paper Rejected
+						</span>
+					{:else if paper.status === 'under negotiation'}
+						<span class="inline-flex items-center gap-2 px-3 py-1.5 bg-yellow-100 text-yellow-800 text-sm font-medium rounded-lg">
+							<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+								<path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+							</svg>
+							Under Negotiation
+						</span>
+					{:else}
+						<span class="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-100 text-blue-800 text-sm font-medium rounded-lg">
+							Status: {paper.status}
+						</span>
+					{/if}
+				</div>
+			{/if}
+
+			<!-- Rejection Reason -->
+			{#if (paper.rejectedByHub || paper.status === 'rejected') && paper.rejectionReason}
+				<div class="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+					<p class="text-sm font-semibold text-red-900 mb-1">Rejection Reason:</p>
+					<p class="text-sm text-red-800">{paper.rejectionReason}</p>
+					{#if paper.rejectedAt}
+						<p class="text-xs text-red-600 mt-2">
+							Rejected on {new Date(paper.rejectedAt).toLocaleDateString()}
+						</p>
+					{/if}
+				</div>
+			{/if}
+
+			<!-- Hub Info (if exists) -->
+			{#if paper.hubId && paper.isLinkedToHub}
+				<div class="flex flex-col gap-1 mb-2">
+					<span class="text-xs font-medium text-primary-700 bg-primary-100 px-2 py-1 rounded w-fit">
+						{typeof paper.hubId === 'object' && paper.hubId !== null && 'type' in paper.hubId
+							? paper.hubId.type.toUpperCase() + ' PAPER'
+							: 'Hub'}
+					</span>
+					<span class="text-xs text-gray-600 ml-2">
+						<a
+							href={`/hub/view/${typeof paper.hubId === 'object' && paper.hubId !== null && '_id' in paper.hubId ? paper.hubId._id : paper.hubId}`}
+							class="text-primary-500 hover:text-primary-700"
+						>
+							{typeof paper.hubId === 'object' && paper.hubId !== null && 'title' in paper.hubId
+								? paper.hubId.title
+								: 'Unknown Hub'}
+						</a>
+					</span>
+				</div>
+			{/if}
+
+			<!-- Título do Paper -->
+			<h2 class="text-3xl font-semibold text-gray-800 mb-4">{@html paper.title}</h2>
+
+			<!-- Autores -->
+			<div class="flex gap-3 items-center mb-4">
+				{#if paper.mainAuthor?.profilePictureUrl}
+					<Avatar
+						src={paper.mainAuthor.profilePictureUrl}
+						name={`${paper.mainAuthor.firstName} ${paper.mainAuthor.lastName}`}
+						size="w-9"
+					/>
+				{:else}
+					<Avatar
+						name="{paper.mainAuthor.firstName} {paper.mainAuthor.lastName}"
+						size="w-9"
+						style="width: 2.25rem; height: 2.25rem; display: flex; align-items: center; justify-content: center; background-color: silver; color: white; border-radius: 9999px;"
+					/>
+				{/if}
+				<div class="flex items-center">
+					<a
+						class="text-primary-500 whitespace-nowrap"
+						href="/profile/{paper.mainAuthor?.username}"
+					>
+						{paper.mainAuthor.firstName}
+						{paper.mainAuthor.lastName}
+					</a>
+				</div>
+
+				<!-- Coautores -->
+				{#each paper.coAuthors as ca}
+					<div class="flex items-center gap-2">
+						{#if ca.profilePictureUrl}
+							<Avatar
+								src={ca.profilePictureUrl}
+								name={`${ca.firstName} ${ca.lastName}`}
+								size="w-9"
+							/>
+						{:else}
+							<Avatar
+								name="{ca.firstName} {ca.lastName}"
+								size="w-9"
+								style="width: 2.25rem; height: 2.25rem; display: flex; align-items: center; justify-content: center; background-color: silver; color: white; border-radius: 9999px;"
+							/>
+						{/if}
+						<div class="flex items-center">
+							<a class="text-primary-500 whitespace-nowrap" href="/profile/{ca.username}">
+								{ca.firstName}
+								{ca.lastName}
+							</a>
+						</div>
+					</div>
+				{/each}
+			</div>
+
+			<span class="text-xs">Created: {new Date(paper.createdAt).toDateString()}</span>
+
+			<!-- Imagem Principal -->
+			{#if paper.paperPictures && paper.paperPictures.length > 0}
+				<img
+					src={`/api/images/${paper.paperPictures[0]}`}
+					alt="Imagem do artigo"
+					class="w-full h-full object-cover rounded-sm mb-4"
+				/>
+			{:else}
+				<!-- Placeholder caso não haja imagem -->
+				<div
+					class="bg-gray-300 w-full h-48 rounded-sm flex items-center justify-center text-gray-500 mb-4"
+				>
+					<span>No image available</span>
+				</div>
+			{/if}
+
+			<!-- Corpo do Texto (Abstract) -->
+			<h2 class="mt-4 text-surface-900 font-bold prose text-2xl max-w-none">Abstract</h2>
+
+			<div class="mt-4 text-surface-950 prose prose-m max-w-none [&>p]:text-lg paper-content">
+				{@html paper.abstract}
+			</div>
+
+			<!-- Corpo do Texto (Content) -->
+			<div
+				class="mt-4 text-surface-950 prose prose-m max-w-none [&>p]:text-lg [&>ol>li]:text-base [&>ol>li]:marker:text-primary-500 paper-content"
+			>
+				{@html paper.content}
+			</div>
+
+			<!-- Tags/Keywords -->
+			{#if paper.keywords && paper.keywords.length > 0}
+				<div class="mt-4 flex flex-wrap gap-2">
+					{#each paper.keywords as keyword}
+						<span class="bg-primary-100 text-primary-800 text-xs px-2 py-1 rounded">
+							{keyword}
+						</span>
+					{/each}
+				</div>
+			{/if}
+		</div>
+	{/if}
+</div>
+
+<!-- Se não houver paper -->
+{#if !paper}
+	<div class="text-center py-10">
+		<p class="text-gray-600">Paper not found.</p>
+	</div>
+{/if}
+
+<!-- Skeleton Loading (Placeholder) -->
+{#if !data}
+	<div class="space-y-6">
+		{#each [1, 2, 3] as _}
+			<div class="p-6 bg-white rounded-lg shadow-lg animate-pulse">
+				<div class="h-6 bg-gray-300 rounded w-3/4 mb-4"></div>
+				<div class="h-4 bg-gray-300 rounded w-1/2 mb-2"></div>
+				<div class="h-4 bg-gray-300 rounded w-5/6"></div>
+			</div>
+		{/each}
+	</div>
+{/if}

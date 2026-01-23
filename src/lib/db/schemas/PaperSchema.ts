@@ -18,7 +18,7 @@ export const PaperSchema: Schema = new Schema({
     likes: [{ type: String }], // Lista de usuários que curtiram como UUIDs
     comments: [{ type: String }], // Lista de comentários como UUIDs
     tags: [{ type: String }],
-    status: { type: String, required: true, enum: ['draft', 'under negotiation', 'in review', 'needing corrections', 'published'], default: 'draft' },
+    status: { type: String, required: true, enum: ['draft', 'under negotiation', 'in review', 'needing corrections', 'published', 'rejected'], default: 'draft' },
     price: { type: Number, required: true }, // Campo para o preço da publicação
     score: { type: Number, default: 0, min: 0, max: 5 }, // Campo para a pontuação da publicação, com um valor padrão de 0 e limite de 0 a 5
     authors: [{ type: String, ref: 'User' }],
@@ -105,7 +105,13 @@ export const PaperSchema: Schema = new Schema({
     
     // Scopus subject classification
     scopusArea: { type: String },
-    scopusSubArea: { type: String }
+    scopusSubArea: { type: String },
+    
+    // Hub rejection fields
+    rejectedByHub: { type: Boolean, default: false },
+    rejectionReason: { type: String },
+    rejectedAt: { type: Date },
+    rejectedBy: { type: String, ref: 'User' }
 
 }, { collection: 'papers' });
 

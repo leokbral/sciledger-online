@@ -81,4 +81,8 @@ export type Paper = {
     };
     scopusArea?: string; // Scopus subject area
     scopusSubArea?: string; // Scopus subject sub-area
+    rejectedByHub?: boolean; // Paper rejected by hub admin
+    rejectionReason?: string; // Reason for rejection
+    rejectedAt?: Date; // When it was rejected
+    rejectedBy?: User | string; // Who rejected it
 }

@@ -41,10 +41,18 @@
         }
 
         // Default routing by status (for authors/creators)
-        if (paper?.status === 'under negotiation') return `/publish/negotiation/${slug}`;
+        if (paper?.status === 'under negotiation') {
+            // Se for creator (hub owner), mostra na rota view
+            if (isCreator) return `/publish/view/${slug}`;
+            return `/publish/negotiation/${slug}`;
+        }
         if (paper?.status === 'in review') return `/publish/inreview/${slug}`;
         if (paper?.status === 'needing corrections' || paper?.status === 'under correction') {
             return `/publish/corrections/${slug}`;
+        }
+        if (paper?.status === 'rejected' || paper?.rejectedByHub) {
+            // Papers rejeitados vão para view se for creator
+            if (isCreator) return `/publish/view/${slug}`;
         }
         return `/publish/published/${slug}`;
     }
@@ -59,6 +67,8 @@
     let openInviteModal = $state(false);
     let openManageReviewersModal = $state(false);
     let openManageDeadlinesModal = $state(false);
+    let openRejectModal = $state(false);
+    let rejectionReason = $state('');
     let loading = $state(false);
     let searchTerm = $state('');
     
@@ -145,6 +155,45 @@
     function openManageDeadlinesDialog(paper: Paper) {
         selectedPaper = paper;
         openManageDeadlinesModal = true;
+    }
+    
+    function openRejectDialog(paper: Paper) {
+        selectedPaper = paper;
+        rejectionReason = '';
+        openRejectModal = true;
+    }
+    
+    async function rejectPaper() {
+        if (!selectedPaper || !rejectionReason.trim()) {
+            toaster.error('Please provide a rejection reason');
+            return;
+        }
+        
+        loading = true;
+        try {
+            const response = await fetch(`/api/papers/${selectedPaper._id}/reject`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ rejectionReason: rejectionReason.trim() })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                toaster.success('Paper rejected successfully. Author has been notified.');
+                openRejectModal = false;
+                rejectionReason = '';
+                // Refresh the page to show updated status
+                window.location.reload();
+            } else {
+                toaster.error(data.error || 'Failed to reject paper');
+            }
+        } catch (error) {
+            console.error(error);
+            toaster.error('An error occurred while rejecting the paper');
+        } finally {
+            loading = false;
+        }
     }
     
     async function removeReviewer(reviewerId: string) {
@@ -240,12 +289,31 @@
                         class="border rounded-lg p-4 transition-colors"
                         class:bg-white={paper.status === 'published'}
                         class:border-gray-300={paper.status === 'published'}
-                        class:bg-yellow-50={paper.status !== 'published' && shouldHighlight(paper) && !isDesignatedReviewer(paper)}
-                        class:border-yellow-300={paper.status !== 'published' && shouldHighlight(paper) && !isDesignatedReviewer(paper)}
-                        class:bg-blue-50={paper.status !== 'published' && isDesignatedReviewer(paper)}
-                        class:border-blue-400={paper.status !== 'published' && isDesignatedReviewer(paper)}
+                        class:bg-red-50={paper.status === 'rejected'}
+                        class:border-red-300={paper.status === 'rejected'}
+                        class:bg-yellow-50={paper.status !== 'published' && paper.status !== 'rejected' && shouldHighlight(paper) && !isDesignatedReviewer(paper)}
+                        class:border-yellow-300={paper.status !== 'published' && paper.status !== 'rejected' && shouldHighlight(paper) && !isDesignatedReviewer(paper)}
+                        class:bg-blue-50={paper.status !== 'published' && paper.status !== 'rejected' && isDesignatedReviewer(paper)}
+                        class:border-blue-400={paper.status !== 'published' && paper.status !== 'rejected' && isDesignatedReviewer(paper)}
                     >
-                        {#if paper.status !== 'published'}
+                        {#if paper.status === 'rejected'}
+                            <div
+                                class="mb-3 p-3 bg-red-100 border border-red-400 rounded text-red-900 text-sm font-medium flex items-start gap-2"
+                            >
+                                <Icon icon="mdi:close-circle" width="24" height="24" class="text-red-600 flex-shrink-0 mt-0.5" />
+                                <div class="flex-1">
+                                    <span class="font-bold block mb-1">This paper has been rejected</span>
+                                    {#if paper.rejectionReason}
+                                        <span class="text-xs block">Reason: {paper.rejectionReason}</span>
+                                    {/if}
+                                    {#if paper.rejectedAt}
+                                        <span class="text-xs block mt-1 opacity-75">
+                                            Rejected on {new Date(paper.rejectedAt).toLocaleDateString()}
+                                        </span>
+                                    {/if}
+                                </div>
+                            </div>
+                        {:else if paper.status !== 'published'}
                             {#if isDesignatedReviewer(paper)}
                                 <div
                                     class="mb-3 p-3 bg-blue-100 border border-blue-400 rounded text-blue-900 text-sm font-medium flex items-center gap-2"
@@ -281,7 +349,11 @@
                                 </a>
                                 <h3 class="text-lg font-medium text-gray-900 mt-4">
                                     <a
-                                        href={`/publish/published/${paper._id}`}
+                                        href={paper.status === 'published' 
+                                            ? `/publish/published/${paper._id}` 
+                                            : (paper.status === 'rejected' || paper.rejectedByHub || paper.status === 'under negotiation') && isCreator
+                                                ? `/publish/view/${paper._id}`
+                                                : `/publish/published/${paper._id}`}
                                         class="hover:text-primary-600 transition-colors"
                                     >
                                         {@html paper.title}
@@ -374,7 +446,16 @@
                             <!-- Action buttons -->
                             <div class="flex items-center gap-2">
                                 {#if isCreator && paper.status !== 'published'}
-                                    {#if getAvailableReviewers(paper).length > 0}
+                                    {#if paper.status === 'under negotiation'}
+                                        <button
+                                            class="btn btn-sm preset-filled-error-500 text-white shadow-md hover:shadow-lg transition-all duration-200 flex items-center gap-1"
+                                            onclick={() => openRejectDialog(paper)}
+                                        >
+                                            <Icon icon="mdi:close-circle" width="20" height="20" />
+                                            Reject Paper
+                                        </button>
+                                    {/if}
+                                    {#if getAvailableReviewers(paper).length > 0 && !paper.rejectedByHub}
                                         <button
                                             class="btn btn-sm preset-filled-primary-500 text-white shadow-md hover:shadow-lg transition-all duration-200 flex items-center gap-1"
                                             onclick={() => openInviteDialog(paper)}
@@ -718,6 +799,84 @@
                         </p>
                     </div>
                 {/if}
+            </div>
+        {/if}
+    {/snippet}
+</Modal>
+
+<!-- Modal para rejeitar paper -->
+<Modal
+    open={openRejectModal}
+    onOpenChange={(e) => (openRejectModal = e.open)}
+    contentBase="card bg-white dark:bg-surface-800 p-6 space-y-6 shadow-2xl rounded-lg max-w-2xl w-full"
+>
+    {#snippet content()}
+        {#if selectedPaper}
+            <div class="space-y-4">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-xl font-bold text-error-600 dark:text-error-400">
+                        Reject Paper
+                    </h3>
+                    <button
+                        class="btn-icon btn-icon-sm"
+                        onclick={() => (openRejectModal = false)}
+                    >
+                        <Icon icon="mdi:close" class="text-gray-500" />
+                    </button>
+                </div>
+                
+                <div class="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg">
+                    <p class="text-sm text-yellow-800 dark:text-yellow-200">
+                        <Icon icon="mdi:alert" class="inline mr-1" width="20" height="20" />
+                        <strong>Warning:</strong> Rejecting this paper will notify the author and they will no longer be able to submit it to this hub. This action cannot be undone.
+                    </p>
+                </div>
+                
+                <div>
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                        Paper: <strong class="text-gray-900 dark:text-white">{@html selectedPaper.title}</strong>
+                    </p>
+                </div>
+                
+                <div class="space-y-2">
+                    <label for="rejection-reason" class="block font-medium text-gray-900 dark:text-white">
+                        Reason for Rejection <span class="text-error-600">*</span>
+                    </label>
+                    <textarea
+                        id="rejection-reason"
+                        bind:value={rejectionReason}
+                        rows="5"
+                        class="w-full p-3 border border-surface-300 dark:border-surface-600 rounded-lg bg-white dark:bg-surface-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-error-500 focus:border-error-500"
+                        placeholder="Please provide a clear reason for rejecting this paper. This will be sent to the author."
+                        required
+                    ></textarea>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                        The author will receive a notification with this message.
+                    </p>
+                </div>
+                
+                <div class="flex justify-end gap-3 pt-4 border-t border-surface-200 dark:border-surface-700">
+                    <button
+                        class="btn preset-tonal"
+                        onclick={() => (openRejectModal = false)}
+                        disabled={loading}
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        class="btn preset-filled-error-500 text-white"
+                        onclick={rejectPaper}
+                        disabled={loading || !rejectionReason.trim()}
+                    >
+                        {#if loading}
+                            <Icon icon="mdi:loading" class="animate-spin mr-2" width="20" height="20" />
+                            Rejecting...
+                        {:else}
+                            <Icon icon="mdi:close-circle" class="mr-2" width="20" height="20" />
+                            Reject Paper
+                        {/if}
+                    </button>
+                </div>
             </div>
         {/if}
     {/snippet}

@@ -68,6 +68,19 @@ export async function load({ locals, params }) {
 		throw error(404, 'Paper not found');
 	}
 
+	// Verificar se é autor do paper (main author ou co-author)
+	const isMainAuthor = paperDoc.mainAuthor?._id?.toString() === locals.user.id || 
+		paperDoc.mainAuthor?.id === locals.user.id;
+	const isCoAuthor = paperDoc.coAuthors && paperDoc.coAuthors.some((author: any) => 
+		author._id?.toString() === locals.user.id || author.id === locals.user.id
+	);
+	const isAuthor = isMainAuthor || isCoAuthor;
+
+	// Only authors can view/edit correction papers
+	if (!isAuthor) {
+		throw error(403, 'You do not have permission to view this paper');
+	}
+
 	// Normalizar peer_review
 	const peer_review = paperDoc.peer_review
 		? {
