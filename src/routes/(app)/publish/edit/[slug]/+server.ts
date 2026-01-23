@@ -48,6 +48,8 @@ export const POST: RequestHandler = async ({ request }) => {
             submittedBy: data.submittedBy,
             price: data.price || 0,
             peer_review: data.peer_review,
+            ...(data.scopusArea && { scopusArea: data.scopusArea }),
+            ...(data.scopusSubArea && { scopusSubArea: data.scopusSubArea }),
             updatedAt: new Date().toISOString()
         };
 
