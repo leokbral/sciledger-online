@@ -14,6 +14,7 @@ export type Paper = {
     keywords: string[];
     content: string;
     pdfUrl: string;
+    doi?: string;
     paperPictures: string[]; // Alterado de articlePictures para paperPictures
     citations: string[]; // Lista de citações como UUIDs
     likes: string[]; // Lista de usuários que curtiram como UUIDs

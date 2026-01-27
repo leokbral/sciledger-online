@@ -446,7 +446,7 @@
                             <!-- Action buttons -->
                             <div class="flex items-center gap-2">
                                 {#if isCreator && paper.status !== 'published'}
-                                    {#if paper.status === 'under negotiation'}
+                                    {#if paper.status === 'under negotiation' && !paper.rejectedByHub}
                                         <button
                                             class="btn btn-sm preset-filled-error-500 text-white shadow-md hover:shadow-lg transition-all duration-200 flex items-center gap-1"
                                             onclick={() => openRejectDialog(paper)}
@@ -454,6 +454,12 @@
                                             <Icon icon="mdi:close-circle" width="20" height="20" />
                                             Reject Paper
                                         </button>
+                                    {/if}
+                                    {#if paper.rejectedByHub}
+                                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-100 text-red-800 text-sm font-medium rounded-lg">
+                                            <Icon icon="mdi:close-circle" width="18" height="18" />
+                                            Rejected
+                                        </span>
                                     {/if}
                                     {#if getAvailableReviewers(paper).length > 0 && !paper.rejectedByHub}
                                         <button

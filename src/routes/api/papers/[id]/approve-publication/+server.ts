@@ -5,7 +5,7 @@ import Hubs from '$lib/db/models/Hub';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import { NotificationService } from '$lib/services/NotificationService';
 
-export const POST: RequestHandler = async ({ params, locals }) => {
+export const POST: RequestHandler = async ({ params, locals, request }) => {
 	try {
 		await start_mongo();
 
@@ -46,7 +46,13 @@ export const POST: RequestHandler = async ({ params, locals }) => {
 			return json({ error: 'Paper is not pending publication approval' }, { status: 400 });
 		}
 
+		const body = await request.json().catch(() => ({}));
+		const doi = typeof body?.doi === 'string' ? body.doi.trim() : undefined;
+
 		paperDoc.status = 'published';
+		if (doi) {
+			paperDoc.doi = doi;
+		}
 		paperDoc.updatedAt = new Date().toISOString();
 		await paperDoc.save();
 

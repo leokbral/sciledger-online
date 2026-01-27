@@ -62,7 +62,13 @@
 			{/if}
 
 			<!-- Título do Paper -->
-			<h2 class="text-3xl font-semibold text-gray-800 mb-4">{@html paper.title}</h2>
+			<h2 class="text-3xl font-semibold text-gray-800 mb-2">{@html paper.title}</h2>
+			{#if paper.doi}
+				<div class="text-sm text-primary-700 font-medium mb-3">
+					<span class="uppercase text-xs tracking-wide text-primary-500 mr-2">DOI</span>
+					<a class="hover:underline break-words" href={`https://doi.org/${paper.doi}`} target="_blank" rel="noreferrer">{paper.doi}</a>
+				</div>
+			{/if}
 
 			<!-- Autores -->
 			<div class="flex gap-3 items-center mb-4">
