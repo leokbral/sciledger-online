@@ -13,6 +13,7 @@ export const PaperSchema: Schema = new Schema({
     keywords: [{ type: String, required: true }],
     content: { type: String },
     pdfUrl: { type: String, required: true },
+    doi: { type: String, unique: true, sparse: true },
     paperPictures: [{ type: String }], // Alterado de articlePictures para paperPictures
     citations: [{ type: String }], // Lista de citações como UUIDs
     likes: [{ type: String }], // Lista de usuários que curtiram como UUIDs

@@ -81,6 +81,11 @@
 		return recommendations[recommendation] || recommendation;
 	}
 
+	// Function to clean title from <p> tags
+	function cleanTitle(title: string): string {
+		return title.replace(/<\/?p>/gi, '');
+	}
+
 	// Function to get recommendation badge class
 	function getRecommendationClass(recommendation: string): string {
 		const classes: Record<string, string> = {
@@ -442,7 +447,7 @@
 		
 		<div class="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
 			<h3 class="font-semibold text-blue-800 mb-2">📋 Article Information</h3>
-			<p><strong>Title:</strong> {(paper as Paper).title}</p>
+			<div><strong>Title:</strong> {@html cleanTitle((paper as Paper).title)}</div>
 			<p><strong>Status:</strong> <span class="capitalize">{(paper as Paper).status}</span></p>
 			<p><strong>Submitted:</strong> {new Date((paper as Paper).createdAt).toLocaleDateString()}</p>
 		</div>
