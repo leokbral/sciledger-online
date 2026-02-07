@@ -74,33 +74,88 @@
 
 	export const store = writable<PaperPublishStoreData>(inicialValue);
 
-	// Scopus classification variables (after inicialValue is declared)
-	let selectedScopusArea = $state(inicialValue.scopusArea || '');
-	let selectedScopusSubArea = $state(inicialValue.scopusSubArea || '');
+	// Scopus classification variables - now supporting multiple classifications
+	interface ScopusClassification {
+		area: string;
+		subArea: string;
+	}
+	
+	let scopusClassifications = $state<ScopusClassification[]>(
+		inicialValue.scopusArea && inicialValue.scopusSubArea
+			? [{ area: inicialValue.scopusArea, subArea: inicialValue.scopusSubArea }]
+			: []
+	);
+	
+	// Temporary variables for adding new classification
+	let newScopusArea = $state('');
+	let newScopusSubArea = $state('');
 	
 	// Derive sub-areas based on selected area
 	let availableScopusSubAreas = $derived(
-		selectedScopusArea ? getSubAreasForArea(selectedScopusArea) : []
+		newScopusArea ? getSubAreasForArea(newScopusArea) : []
 	);
 
-	// Handler to update store and reset sub-area when area changes
+	// Handler to update available sub-areas when area changes
 	function handleScopusAreaChange() {
-		// Check if current sub-area is valid for new area
-		if (selectedScopusArea) {
-			const subAreas = getSubAreasForArea(selectedScopusArea);
-			if (!subAreas.find((sub) => sub.name === selectedScopusSubArea)) {
-				selectedScopusSubArea = '';
+		// Reset sub-area when area changes
+		if (newScopusArea) {
+			const subAreas = getSubAreasForArea(newScopusArea);
+			if (!subAreas.find((sub) => sub.name === newScopusSubArea)) {
+				newScopusSubArea = '';
 			}
 		} else {
-			selectedScopusSubArea = '';
+			newScopusSubArea = '';
 		}
-		// Update store
-		$store.scopusArea = selectedScopusArea;
-		$store.scopusSubArea = selectedScopusSubArea;
 	}
 
-	function handleScopusSubAreaChange() {
-		$store.scopusSubArea = selectedScopusSubArea;
+	// Add new classification
+	function addScopusClassification() {
+		if (newScopusArea && newScopusSubArea) {
+			// Check if this combination already exists
+			const exists = scopusClassifications.some(
+				(c) => c.area === newScopusArea && c.subArea === newScopusSubArea
+			);
+			
+			if (!exists) {
+				scopusClassifications = [
+					...scopusClassifications,
+					{ area: newScopusArea, subArea: newScopusSubArea }
+				];
+				
+				// Update store (keep backward compatibility by storing first classification)
+				if (scopusClassifications.length > 0) {
+					$store.scopusArea = scopusClassifications[0].area;
+					$store.scopusSubArea = scopusClassifications[0].subArea;
+				}
+				
+				// Store all classifications (if your data model supports it)
+				// @ts-ignore
+				$store.scopusClassifications = scopusClassifications;
+				
+				// Reset form
+				newScopusArea = '';
+				newScopusSubArea = '';
+			} else {
+				alert('This classification has already been added.');
+			}
+		}
+	}
+	
+	// Remove classification
+	function removeScopusClassification(index: number) {
+		scopusClassifications = scopusClassifications.filter((_, i) => i !== index);
+		
+		// Update store
+		if (scopusClassifications.length > 0) {
+			$store.scopusArea = scopusClassifications[0].area;
+			$store.scopusSubArea = scopusClassifications[0].subArea;
+		} else {
+			$store.scopusArea = '';
+			$store.scopusSubArea = '';
+		}
+		
+		// @ts-ignore
+		$store.scopusClassifications = scopusClassifications;
 	}
 
 	// let files: FileList = $state();
@@ -494,22 +549,15 @@
 </script>
 
 <main class="grid p-5">
-	<div class="grid grid-cols-[1fr_1fr_1fr]">
-		<div></div>
-		<div class="flex justify-between gap-3">
-			<button class="bg-primary-500 text-white rounded-lg px-4 py-2" onclick={hdlSaveDraft}>
-				Save Draft
-			</button>
-			{#if page.url.pathname.includes('edit')}
-				<button class="bg-primary-500 text-white rounded-lg px-4 py-2" onclick={hdlSubmit}>
-					Submit Article
-				</button>
-			{/if}
-		</div>
-		<div></div>
-	</div>
 	<fieldset class="py-4 md:py-6">
 		<section id="article-basic-info" class="flex flex-col items-center max-w-[700px] m-auto">
+			<div class="mb-6 w-full bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800 rounded-lg p-4">
+				<h2 class="text-xl font-bold text-primary-900 dark:text-primary-100 mb-2">Submit Your Paper</h2>
+				<p class="text-sm text-primary-800 dark:text-primary-200">
+					Fill out the form below to submit your paper for peer review. All fields marked with * are required.
+					You can save your progress as a draft at any time using the "Save Draft" button at the bottom of the page.
+				</p>
+			</div>
 			<section class="mb-4 w-full">
 				<!-- <input
 					name="title"
@@ -517,7 +565,10 @@
 					placeholder="Article Title"
 					bind:value={$store.title}
 				/> -->
-				<label for="title" class="block mb-1">Title</label>
+				<label for="title" class="block mb-1 font-semibold">Title *</label>
+				<p class="text-xs text-surface-600 dark:text-surface-400 mb-2">
+					Enter the full title of your paper. Be clear and descriptive.
+				</p>
 				<RichTextEditor
 					id="title"
 					bind:content={$store.title}
@@ -526,6 +577,10 @@
 				/>
 			</section>
 			<section id="authors" class="w-full flex flex-col gap-2">
+				<label class="block mb-1 font-semibold">Authors *</label>
+				<p class="text-xs text-surface-600 dark:text-surface-400 mb-2">
+					Add all authors of this paper. Type the username and select from the dropdown, or use the ORCID search below to find and add co-authors.
+				</p>
 				<TagsInput
 					base="grid !h-auto "
 					value={inputAuthorList}
@@ -567,6 +622,9 @@
 					<h3 class="text-lg font-semibold mb-3 text-surface-900 dark:text-surface-100">
 						ORCID Profile Search & Add Co-authors
 					</h3>
+					<p class="text-xs text-surface-600 dark:text-surface-400 mb-3">
+						Search for co-authors by their ORCID iD (e.g., 0000-0000-0000-0000). If they're not registered in the system, they'll be added automatically.
+					</p>
 
 					<div class="flex gap-2 mb-4">
 						<div class="flex-1">
@@ -642,7 +700,10 @@
 			</section>
 
 			<section class="mb-4 w-full">
-				<label for="abstract" class="block mb-1">Abstract</label>
+				<label for="abstract" class="block mb-1 font-semibold">Abstract *</label>
+				<p class="text-xs text-surface-600 dark:text-surface-400 mb-2">
+					Provide a concise summary of your paper, including the main objectives, methods, results, and conclusions (typically 150-300 words).
+				</p>
 				<RichTextEditor
 					id="abstract"
 					bind:content={$store.abstract}
@@ -667,6 +728,10 @@
 
 			<!-- {$store.content} -->
 			<section class="mb-4 w-full">
+				<label class="block mb-1 font-semibold">Keywords *</label>
+				<p class="text-xs text-surface-600 dark:text-surface-400 mb-2">
+					Add 3-6 keywords that describe your paper. Press Enter after each keyword to add it.
+				</p>
 				<TagsInput
 					value={$store.keywords}
 					name="chips"
@@ -676,56 +741,109 @@
 				/>
 			</section>
 
-			<!-- Scopus Classification Section -->
+			<!-- Scopus Classification Section - Multiple Classifications -->
 			<section class="mb-6 w-full">
 				<div class="bg-surface-50 dark:bg-surface-800 rounded-lg p-4 border">
 					<h3 class="text-lg font-semibold mb-3 text-surface-900 dark:text-surface-100">
-						Scopus Subject Classification
+						Scopus Subject Classification *
 					</h3>
+					<p class="text-xs text-surface-600 dark:text-surface-400 mb-3">
+						Add one or more subject classifications that best match your paper's content. You can add multiple areas if your paper is interdisciplinary.
+					</p>
 					
-					<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-						<!-- Scopus Area -->
-						<div>
-							<label for="scopus-area" class="block mb-1 text-sm font-medium">
-								Subject Area
+					<!-- Display added classifications -->
+					{#if scopusClassifications.length > 0}
+						<div class="mb-4 space-y-2">
+							<label class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+								Added Classifications:
 							</label>
-							<select
-								id="scopus-area"
-								bind:value={selectedScopusArea}
-								onchange={handleScopusAreaChange}
-								class="w-full p-2 border border-surface-300 rounded-lg text-sm bg-white dark:bg-surface-700"
-							>
-								<option value="">Select a subject area...</option>
-								{#each getAllAreaNames() as areaName}
-									<option value={areaName}>{areaName}</option>
+							<div class="flex flex-wrap gap-2">
+								{#each scopusClassifications as classification, index}
+									<div class="flex items-center gap-2 bg-primary-100 dark:bg-primary-900/30 border border-primary-300 dark:border-primary-700 rounded-lg px-3 py-2 group hover:bg-primary-200 dark:hover:bg-primary-900/50 transition-colors">
+										<div class="flex flex-col">
+											<span class="text-sm font-semibold text-primary-900 dark:text-primary-100">
+												{classification.area}
+											</span>
+											<span class="text-xs text-primary-700 dark:text-primary-300">
+												{classification.subArea}
+											</span>
+										</div>
+										<button
+											type="button"
+											onclick={() => removeScopusClassification(index)}
+											class="ml-2 text-error-600 hover:text-error-800 dark:text-error-400 dark:hover:text-error-300 transition-colors"
+											title="Remove classification"
+										>
+											<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+												<path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+											</svg>
+										</button>
+									</div>
 								{/each}
-							</select>
+							</div>
 						</div>
+					{/if}
+					
+					<!-- Form to add new classification -->
+					<div class="bg-white dark:bg-surface-900 rounded-lg p-3 border border-surface-300 dark:border-surface-700">
+						<label class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+							Add New Classification:
+						</label>
+						<div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+							<!-- Scopus Area -->
+							<div>
+								<label for="new-scopus-area" class="block mb-1 text-xs font-medium text-surface-600 dark:text-surface-400">
+									Subject Area
+								</label>
+								<select
+									id="new-scopus-area"
+									bind:value={newScopusArea}
+									onchange={handleScopusAreaChange}
+									class="w-full p-2 border border-surface-300 dark:border-surface-600 rounded-lg text-sm bg-white dark:bg-surface-800 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+								>
+									<option value="">Select a subject area...</option>
+									{#each getAllAreaNames() as areaName}
+										<option value={areaName}>{areaName}</option>
+									{/each}
+								</select>
+							</div>
 
-						<!-- Scopus Sub-Area -->
-						<div>
-							<label for="scopus-subarea" class="block mb-1 text-sm font-medium">
-								Subject Sub-Area
-							</label>
-							<select
-								id="scopus-subarea"
-								bind:value={selectedScopusSubArea}
-								onchange={handleScopusSubAreaChange}
-								disabled={!selectedScopusArea}
-								class="w-full p-2 border border-surface-300 rounded-lg text-sm bg-white dark:bg-surface-700 disabled:bg-surface-200 disabled:cursor-not-allowed"
-							>
-								<option value="">
-									{selectedScopusArea ? 'Select a sub-area...' : 'First select an area'}
-								</option>
-								{#each availableScopusSubAreas as subArea}
-									<option value={subArea.name}>{subArea.name}</option>
-								{/each}
-							</select>
+							<!-- Scopus Sub-Area -->
+							<div>
+								<label for="new-scopus-subarea" class="block mb-1 text-xs font-medium text-surface-600 dark:text-surface-400">
+									Subject Sub-Area
+								</label>
+								<select
+									id="new-scopus-subarea"
+									bind:value={newScopusSubArea}
+									disabled={!newScopusArea}
+									class="w-full p-2 border border-surface-300 dark:border-surface-600 rounded-lg text-sm bg-white dark:bg-surface-800 disabled:bg-surface-200 dark:disabled:bg-surface-700 disabled:cursor-not-allowed focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+								>
+									<option value="">
+										{newScopusArea ? 'Select a sub-area...' : 'First select an area'}
+									</option>
+									{#each availableScopusSubAreas as subArea}
+										<option value={subArea.name}>{subArea.name}</option>
+									{/each}
+								</select>
+							</div>
 						</div>
+						
+						<button
+							type="button"
+							onclick={addScopusClassification}
+							disabled={!newScopusArea || !newScopusSubArea}
+							class="w-full bg-primary-500 hover:bg-primary-600 disabled:bg-surface-300 dark:disabled:bg-surface-700 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+						>
+							<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+								<path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
+							</svg>
+							Add Classification
+						</button>
 					</div>
 
-					<p class="mt-2 text-xs text-surface-600 dark:text-surface-400">
-						Select the Scopus subject classification that best describes your paper. This helps with categorization and indexing.
+					<p class="mt-3 text-xs text-surface-600 dark:text-surface-400">
+						💡 Tip: You can add multiple classifications if your paper spans different subject areas.
 					</p>
 				</div>
 			</section>
@@ -737,7 +855,10 @@
 			</section>
 
 			<div class="mt-4">
-				<h5 class="text-lg font-semibold mb-2">Paper Images</h5>
+				<h5 class="text-lg font-semibold mb-1">Paper Images</h5>
+				<p class="text-xs text-surface-600 dark:text-surface-400 mb-3">
+					Upload images, figures, or diagrams that support your paper (optional). These will be displayed alongside your paper.
+				</p>
 				<div class="grid grid-cols-2 gap-4">
 					<div class="border-2 border-dashed border-surface-300 rounded-lg p-4">
 						<FileUpload
@@ -829,6 +950,10 @@
 					</FileUpload> -->
 
 					<!-- DOCX -->
+					<h5 class="text-lg font-semibold mb-1 mt-4">Upload Paper Document *</h5>
+					<p class="text-xs text-surface-600 dark:text-surface-400 mb-3">
+						Upload your paper in DOCX format. The document should contain the full text of your paper including all sections, references, and figures.
+					</p>
 					<FileUpload
 						name="docx-files"
 						accept=".docx,.doc"
@@ -899,4 +1024,15 @@
 			</div>
 		</div>
 	</fieldset>
+	
+	<div class="flex justify-end gap-3 mt-6 pr-5">
+		<button class="bg-primary-500 text-white rounded-lg px-4 py-2" onclick={hdlSaveDraft}>
+			Save Draft
+		</button>
+		{#if page.url.pathname.includes('edit')}
+			<button class="bg-primary-500 text-white rounded-lg px-4 py-2" onclick={hdlSubmit}>
+				Submit Article
+			</button>
+		{/if}
+	</div>
 </main>

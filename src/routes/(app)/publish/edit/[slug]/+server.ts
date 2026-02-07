@@ -50,6 +50,7 @@ export const POST: RequestHandler = async ({ request }) => {
             peer_review: data.peer_review,
             ...(data.scopusArea && { scopusArea: data.scopusArea }),
             ...(data.scopusSubArea && { scopusSubArea: data.scopusSubArea }),
+            ...(data.scopusClassifications && data.scopusClassifications.length > 0 && { scopusClassifications: data.scopusClassifications }),
             updatedAt: new Date().toISOString()
         };
 

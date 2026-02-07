@@ -3,11 +3,17 @@
 # Navigate to project directory
 cd /var/www/sciledger
 
-# Stash any local changes
-git stash
+# # Stash any local changes
+# git stash
 
-# Pull latest changes
-git pull origin main
+# # Pull latest changes
+# git pull origin main
+
+# Fetch latest changes
+git fetch origin main
+
+# Force reset to match remote (discards local changes)
+git reset --hard origin/main
 
 # Install dependencies and build
 npm ci
