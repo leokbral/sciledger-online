@@ -214,6 +214,7 @@
 	let isSubmitting = false;
 	let submitError = '';
 	let submitSuccess = false;
+	let isCollapsed = false;
 	
 	// Draft saving state
 	let isSavingDraft = false;
@@ -223,6 +224,11 @@
 	let isDraftLoaded = false;
 
 	const dispatch = createEventDispatcher();
+
+	function toggleCollapse() {
+		isCollapsed = !isCollapsed;
+		dispatch('collapseToggle', { collapsed: isCollapsed });
+	}
 
 	// Load existing draft on component mount
 	onMount(async () => {
@@ -530,11 +536,23 @@
 	}
 </script>
 
-<div class="w-full bg-white shadow-lg rounded-lg overflow-hidden">
-	<!-- Header -->
-	<div class="bg-blue-600 text-white p-6">
-		<h1 class="text-2xl font-bold">Scientific Article Review Form</h1>
-		<h2 class="text-lg mt-2 opacity-90">{@html paperTitle}</h2>
+<div class="w-full md:sticky md:top-4 md:self-start md:max-h-[calc(100vh-2rem)]">
+	<div class="w-full bg-white shadow-lg rounded-lg overflow-hidden border border-gray-100 flex flex-col md:max-h-[calc(100vh-2rem)]">
+		<!-- Header -->
+		<div class="bg-blue-600 text-white p-6">
+			<div class="flex items-start justify-between gap-4">
+				<div class="min-w-0">
+					<h1 class="text-2xl font-bold">Scientific Article Review Form</h1>
+					<h2 class="text-lg mt-2 opacity-90 truncate">{@html paperTitle}</h2>
+				</div>
+				<button
+					class="shrink-0 rounded-md border border-white/30 px-3 py-1 text-sm font-medium text-white/95 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/40"
+					aria-expanded={!isCollapsed}
+					onclick={toggleCollapse}
+				>
+					{isCollapsed ? 'Expand' : 'Minimize'}
+				</button>
+			</div>
 		
 		<!-- Review Round Indicator -->
 		<div class="mt-3 flex items-center gap-2 flex-wrap">
@@ -583,7 +601,22 @@
 				<p class="text-sm font-medium">{@html `You have already submitted a review for round ${currentRound}. You can only submit another review in the next round.`}</p>
 			</div>
 		{/if}
+
+		{#if isCollapsed}
+			<div class="mt-4 flex items-center gap-3 text-xs text-blue-100">
+				<span>Step {currentStep + 1} of {totalSteps}</span>
+				<div class="flex-1 h-1 rounded-full bg-blue-400/40">
+					<div
+						class="h-1 rounded-full bg-white/90"
+						style="width: {((currentStep + 1) / totalSteps) * 100}%"
+					></div>
+				</div>
+			</div>
+		{/if}
 	</div>
+
+	{#if !isCollapsed}
+		<div class="flex-1 overflow-y-auto">
 
 	<!-- View Previous Review Section (Round 2 only) -->
 	{#if currentRound === 2 && viewingPreviousReview && previousReview}
@@ -1018,6 +1051,9 @@
 			</button>
 		{/if}
 	</div>
-{/if}
+	{/if}
+	</div>
+	{/if}
+	</div>
 </div>
 

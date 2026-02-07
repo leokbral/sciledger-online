@@ -105,8 +105,12 @@ export const PaperSchema: Schema = new Schema({
     },
     
     // Scopus subject classification
-    scopusArea: { type: String },
-    scopusSubArea: { type: String },
+    scopusArea: { type: String }, // Deprecated - kept for backward compatibility
+    scopusSubArea: { type: String }, // Deprecated - kept for backward compatibility
+    scopusClassifications: [{
+        area: { type: String, required: true },
+        subArea: { type: String, required: true }
+    }], // Multiple Scopus classifications for interdisciplinary papers
     
     // Hub rejection fields
     rejectedByHub: { type: Boolean, default: false },
