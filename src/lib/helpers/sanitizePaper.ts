@@ -43,11 +43,18 @@ export function sanitizePaper(paper: any): any {
 	// Sanitizar reviewSlots
 	const reviewSlots = sanitizeReviewSlots(paper.reviewSlots);
 
+	// Sanitizar scopusClassifications (remover _id dos subdocuments)
+	const scopusClassifications = paper.scopusClassifications?.map((classification: any) => ({
+		area: classification.area,
+		subArea: classification.subArea
+	})) ?? undefined;
+
 	return {
 		...paper,
 		peer_review,
 		reviewSlots,
 		maxReviewSlots: paper.maxReviewSlots || 3,
-		availableSlots: paper.availableSlots ?? 3
+		availableSlots: paper.availableSlots ?? 3,
+		scopusClassifications
 	};
 }
