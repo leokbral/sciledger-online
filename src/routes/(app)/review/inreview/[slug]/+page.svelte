@@ -18,6 +18,8 @@
 	let paper = data.paper as Paper;
 	let currentUser = data.user as User;
 	let messageFeed = data.messageFeed as MessageFeed;
+	let reviewAssignments = data.reviewAssignments;
+	let isHubOwner = data.isHubOwner || false;
 	//console.log("www",paper?.authors)
 
 	async function handleSavePaper(event: { detail: { store: Paper } }) {
@@ -102,4 +104,6 @@
 	{paper}
 	{currentUser}
 	{messageFeed}
+	{reviewAssignments}
+	isHubAdmin={isHubOwner}
 />

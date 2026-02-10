@@ -26,6 +26,8 @@
 	let searchTerm = $state('');
 	let filteredUsers = $state<typeof users>([]);
 	let pendingInvites = $state<ReviewQueue[]>([]);
+	let activeTab = $state(0);
+	let emailInvite = $state('');
 
 	// Load reviewers do hub
 	async function loadReviewers() {
@@ -134,6 +136,47 @@
 			}
 		}
 	}
+
+	async function sendEmailInvitation() {
+		if (!emailInvite.trim()) {
+			toaster.warning({ title: 'Please enter an email address' });
+			return;
+		}
+
+		// Validate email format
+		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+		if (!emailRegex.test(emailInvite)) {
+			toaster.error({ title: 'Invalid email', description: 'Please enter a valid email address' });
+			return;
+		}
+
+		loading = true;
+		try {
+			const response = await fetch('/api/email-reviewer-invitation', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					email: emailInvite,
+					hubId
+				})
+			});
+
+			const data = await response.json();
+
+			if (response.ok) {
+				toaster.success({ title: 'Invitation sent!', description: 'The reviewer will receive an email with registration instructions.' });
+				emailInvite = '';
+				openModal = false;
+			} else {
+				toaster.error({ title: 'Error', description: data.error || 'Failed to send invitation' });
+			}
+		} catch (error) {
+			console.error('Error sending email invitation:', error);
+			toaster.error({ title: 'Error', description: 'An error occurred while sending the invitation' });
+		} finally {
+			loading = false;
+		}
+	}
 </script>
 
 {#if isCreator}
@@ -155,81 +198,161 @@
 				<h2 class="text-2xl font-semibold">Manage Reviewers</h2>
 			</header>
 
-			<!-- Search -->
-			<div class="relative">
-				<input
-					type="text"
-					bind:value={searchTerm}
-					placeholder="Search users..."
-					class="w-full p-3 pl-10 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-surface-700 dark:text-white"
-				/>
-				<Icon
-					icon="mdi:magnify"
-					class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-				/>
+			<!-- Tab Navigation -->
+			<div class="flex gap-2 mb-4">
+				<button
+					class="btn {activeTab === 0 ? 'preset-filled' : 'preset-outlined'}"
+					onclick={() => (activeTab = 0)}
+				>
+					<Icon icon="mdi:account-multiple" class="size-5" />
+					Registered Users
+				</button>
+				<button
+					class="btn {activeTab === 1 ? 'preset-filled' : 'preset-outlined'}"
+					onclick={() => (activeTab = 1)}
+				>
+					<Icon icon="mdi:email-plus" class="size-5" />
+					Invite by Email
+				</button>
 			</div>
 
-			<!-- Lista de usuários filtrados -->
-			{#if filteredUsers.length > 0}
-				<div class="max-h-64 overflow-y-auto space-y-3">
-					{#each filteredUsers as user}
-						<label
-							class="flex items-center justify-between gap-4 p-3 bg-gray-50 dark:bg-surface-700 hover:bg-gray-100 dark:hover:bg-surface-600 rounded-lg cursor-pointer transition-colors"
-						>
-							<div class="flex items-center gap-4">
-								<div
-									class="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-gray-200 dark:bg-surface-500"
-								>
-									{#if user.profilePicture}
-										<img
-											src={user.profilePicture}
-											alt={`${user.firstName}'s profile`}
-											class="w-full h-full object-cover"
-										/>
-									{:else}
-										<div class="w-full h-full flex items-center justify-center">
-											<Icon icon="mdi:account" class="text-2xl text-gray-500" />
+			<!-- Tab Content -->
+			{#if activeTab === 0}
+						<!-- Registered Users Tab -->
+						<!-- Search -->
+						<div class="relative">
+							<input
+								type="text"
+								bind:value={searchTerm}
+								placeholder="Search users..."
+								class="w-full p-3 pl-10 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-surface-700 dark:text-white"
+							/>
+							<Icon
+								icon="mdi:magnify"
+								class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+							/>
+						</div>
+
+						<!-- Selected counter -->
+						<div class="flex items-center justify-between mt-3 mb-1 text-sm text-gray-600 dark:text-gray-300">
+							<span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-200 font-semibold">
+								<Icon icon="mdi:account-multiple" class="size-4" />
+								Selected: {selectedUsers.length}
+							</span>
+							<span class="text-xs text-gray-500 dark:text-gray-400">Invite selected users to become hub reviewers.</span>
+						</div>
+
+						<!-- Lista de usuários filtrados -->
+						{#if filteredUsers.length > 0}
+							<div class="max-h-64 overflow-y-auto space-y-3">
+								{#each filteredUsers as user}
+									<label
+										class="flex items-center justify-between gap-4 p-3 bg-gray-50 dark:bg-surface-700 hover:bg-gray-100 dark:hover:bg-surface-600 rounded-lg cursor-pointer transition-colors"
+									>
+										<div class="flex items-center gap-4">
+											<div
+												class="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-gray-200 dark:bg-surface-500"
+											>
+												{#if user.profilePicture}
+													<img
+														src={user.profilePicture}
+														alt={`${user.firstName}'s profile`}
+														class="w-full h-full object-cover"
+													/>
+												{:else}
+													<div class="w-full h-full flex items-center justify-center">
+														<Icon icon="mdi:account" class="text-2xl text-gray-500" />
+													</div>
+												{/if}
+											</div>
+											<div>
+												<div class="font-medium text-gray-900 dark:text-white">
+													{user.firstName}
+													{user.lastName}
+												</div>
+												<div class="text-sm text-gray-500">{user.email}</div>
+											</div>
 										</div>
-									{/if}
-								</div>
-								<div>
-									<div class="font-medium text-gray-900 dark:text-white">
-										{user.firstName}
-										{user.lastName}
+										<input
+											type="checkbox"
+											class="form-checkbox h-5 w-5 text-primary-600"
+											checked={selectedUsers.includes(user._id)}
+											onchange={() => {
+												if (selectedUsers.includes(user._id)) {
+													selectedUsers = selectedUsers.filter((id) => id !== user._id);
+												} else {
+													selectedUsers = [...selectedUsers, user._id];
+												}
+											}}
+										/>
+									</label>
+								{/each}
+							</div>
+
+							<!-- Botão de adicionar -->
+							<div class="flex justify-end mt-4">
+								<button
+									class="btn preset-filled"
+									onclick={() => manageReviewers('invite', selectedUsers)}
+									disabled={selectedUsers.length === 0 || loading}
+								>
+									<Icon icon="mdi:email-send" class="mr-2" />
+									Send Invitations ({selectedUsers.length})
+								</button>
+							</div>
+						{:else}
+							<p class="text-center text-gray-500 dark:text-gray-400">No users found</p>
+						{/if}
+
+					{:else}
+						<!-- Email Invite Tab -->
+						<div class="space-y-4 mt-4">
+							<div class="bg-primary-50 dark:bg-primary-900/20 border-l-4 border-primary-500 p-4 rounded">
+								<div class="flex items-start gap-3">
+									<Icon icon="mdi:information" class="size-6 text-primary-500 flex-shrink-0 mt-0.5" />
+									<div>
+										<p class="font-semibold text-primary-900 dark:text-primary-100 mb-1">Invite a Reviewer by Email</p>
+										<p class="text-sm text-primary-700 dark:text-primary-300">
+											Send an invitation to someone who doesn't have an account yet. They will receive an email with a registration link to join the platform as a reviewer for this hub.
+										</p>
 									</div>
-									<div class="text-sm text-gray-500">{user.email}</div>
 								</div>
 							</div>
-							<input
-								type="checkbox"
-								class="form-checkbox h-5 w-5 text-primary-600"
-								checked={selectedUsers.includes(user._id)}
-								onchange={() => {
-									if (selectedUsers.includes(user._id)) {
-										selectedUsers = selectedUsers.filter((id) => id !== user._id);
-									} else {
-										selectedUsers = [...selectedUsers, user._id];
-									}
-								}}
-							/>
-						</label>
-					{/each}
-				</div>
 
-				<!-- Botão de adicionar -->
-				<div class="flex justify-end mt-4">
-					<button
-						class="btn preset-filled"
-						onclick={() => manageReviewers('invite', selectedUsers)}
-						disabled={selectedUsers.length === 0 || loading}
-					>
-						<Icon icon="mdi:email-send" class="mr-2" />
-						Send Invitations
-					</button>
-				</div>
-			{:else}
-				<p class="text-center text-gray-500 dark:text-gray-400">No users found</p>
-			{/if}
+							<div>
+								<label for="email-invite" class="label mb-2">
+									<span class="text-gray-700 dark:text-gray-300">Email Address <span class="text-error-500">*</span></span>
+								</label>
+								<input
+									type="email"
+									id="email-invite"
+									bind:value={emailInvite}
+									placeholder="reviewer@university.edu"
+									class="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-surface-700 dark:text-white dark:border-surface-600"
+									disabled={loading}
+								/>
+								<p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+									The reviewer will receive an invitation email with a registration link
+								</p>
+							</div>
+
+							<div class="flex justify-end">
+								<button
+									class="btn preset-filled"
+									onclick={sendEmailInvitation}
+									disabled={loading || !emailInvite.trim()}
+								>
+									{#if loading}
+										<Icon icon="eos-icons:loading" class="size-5" />
+										Sending...
+									{:else}
+										<Icon icon="mdi:email-send" class="mr-2" />
+										Send Email Invitation
+									{/if}
+								</button>
+							</div>
+						</div>
+					{/if}
 
 			<!-- Revisores atuais -->
 			<div class="pt-4 border-t mt-4 space-y-2">

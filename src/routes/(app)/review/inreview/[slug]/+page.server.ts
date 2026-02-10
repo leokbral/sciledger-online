@@ -126,13 +126,38 @@ export async function load({ locals, params }) {
 
 	const users = await Users.find({}, {}).lean().exec();
 
+	// Buscar ReviewAssignments do revisor para obter deadlines customizados
+	const ReviewAssignment = (await import('$lib/db/models/ReviewAssignment')).default;
+	const reviewAssignments = await ReviewAssignment.find({
+		reviewerId: userId,
+		status: { $in: ['accepted', 'pending'] }
+	}).lean().exec();
+	
+	console.log(`📋 [InReview Page] Found ${reviewAssignments.length} ReviewAssignments for reviewer ${userId}`);
+	
+	// Converter para formato serializável
+	const serializedAssignments = reviewAssignments.map(a => ({
+		_id: a._id,
+		id: a.id,
+		paperId: a.paperId,
+		reviewerId: a.reviewerId,
+		status: a.status,
+		deadline: a.deadline,
+		hubId: a.hubId,
+		assignedAt: a.assignedAt,
+		acceptedAt: a.acceptedAt,
+		updatedAt: a.updatedAt
+	}));
+
 	// ✅ Sanitize os dados antes de retornar
 	return {
 		id,
 		user: sanitize(locals.user),
 		paper: sanitize(paper),
 		users: sanitize(users),
-		messageFeed: sanitize(messageFeed)
+		messageFeed: sanitize(messageFeed),
+		reviewAssignments: sanitize(serializedAssignments),
+		isHubOwner: isHubOwner
 	};
 }
 

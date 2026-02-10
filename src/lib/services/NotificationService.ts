@@ -321,7 +321,7 @@ export class NotificationService {
                 relatedReviewId: data.reviewId,
                 relatedUser: data.reviewerId,
                 relatedHubId: data.hubId,
-                actionUrl: `/papers/${data.paperId}/reviews/${data.reviewId}`,
+                actionUrl: `/review/inreview/${data.paperId}`,
                 priority: 'high',
                 metadata: {
                     paperTitle: data.paperTitle,
@@ -343,7 +343,7 @@ export class NotificationService {
                     relatedPaperId: data.paperId,
                     relatedReviewId: data.reviewId,
                     relatedHubId: data.hubId,
-                    actionUrl: `/papers/${data.paperId}/reviews`,
+                    actionUrl: `/publish/corrections/${data.paperId}`,
                     priority: 'high',
                     metadata: {
                         paperTitle: data.paperTitle,

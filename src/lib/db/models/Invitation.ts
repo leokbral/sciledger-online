@@ -5,5 +5,5 @@ import { InvitationSchema } from '../schemas/Invitation';
 
 export interface IInvitation extends Invitation, mongoose.Document {}
 
-const InvitationModel = mongoose.model<IInvitation>('Invitation', InvitationSchema);
+const InvitationModel = mongoose.models.Invitation || mongoose.model<IInvitation>('Invitation', InvitationSchema);
 export default InvitationModel;

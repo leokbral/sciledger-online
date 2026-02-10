@@ -7,9 +7,15 @@ import { getCurrentPhase, getPhaseInfo, type ReviewPhase } from '$lib/types/Revi
  * @param paper - The Paper object
  * @param userRole - The role of the current user ('author' | 'reviewer')
  * @param userId - The ID of the current user (to check reviewer-specific deadlines)
+ * @param reviewAssignments - Optional array of ReviewAssignment objects to use custom deadlines
  * @returns Object with information about the remaining time
  */
-export function getCorrectionTimeRemaining(paper: Paper, userRole?: 'author' | 'reviewer', userId?: string) {
+export function getCorrectionTimeRemaining(
+    paper: Paper, 
+    userRole?: 'author' | 'reviewer', 
+    userId?: string,
+    reviewAssignments?: any[]
+) {
     const CORRECTION_DEADLINE_DAYS = 15;
     
     console.log('=== getCorrectionTimeRemaining DEBUG ===');
@@ -19,6 +25,74 @@ export function getCorrectionTimeRemaining(paper: Paper, userRole?: 'author' | '
     console.log('userId:', userId);
     console.log('paper.status:', paper.status);
     console.log('paper.peer_review?.responses:', paper.peer_review?.responses);
+    console.log('reviewAssignments:', reviewAssignments);
+    
+    // Se temos um ReviewAssignment customizado para este revisor/paper, usar o deadline dele
+    if (userRole === 'reviewer' && userId && reviewAssignments) {
+        console.log('🔍 Procurando ReviewAssignment customizado...');
+        console.log('  - userId:', userId);
+        console.log('  - paper.id:', paper.id);
+        console.log('  - reviewAssignments:', reviewAssignments);
+        
+        const assignment = reviewAssignments.find(a => {
+            const aPaperId = typeof a.paperId === 'object' ? (a.paperId._id || a.paperId.id) : a.paperId;
+            const aReviewerId = typeof a.reviewerId === 'object' ? (a.reviewerId._id || a.reviewerId.id) : a.reviewerId;
+            
+            console.log('  - Comparing assignment:', {
+                aPaperId,
+                aReviewerId,
+                paperIdMatch: aPaperId?.toString() === paper.id?.toString(),
+                reviewerIdMatch: aReviewerId?.toString() === userId,
+                deadline: a.deadline
+            });
+            
+            return aPaperId?.toString() === paper.id?.toString() && aReviewerId?.toString() === userId;
+        });
+        
+        console.log('  - Assignment encontrado:', assignment);
+        
+        if (assignment?.deadline) {
+            console.log('🎯 Using custom deadline from ReviewAssignment:', assignment.deadline);
+            const deadlineDate = new Date(assignment.deadline);
+            const now = new Date();
+            const timeDifference = deadlineDate.getTime() - now.getTime();
+            const daysRemaining = Math.ceil(timeDifference / (1000 * 60 * 60 * 24));
+            const hoursRemaining = Math.ceil(timeDifference / (1000 * 60 * 60));
+            const isOverdue = timeDifference < 0;
+
+            // Calcular a data de início REAL (aceitação do revisor)
+            let correctionStartDate = assignment.acceptedAt ? new Date(assignment.acceptedAt) : undefined;
+            // Se não houver acceptedAt, estimar pelo deadline menos o intervalo
+            let totalDays = 15;
+            if (correctionStartDate) {
+                totalDays = Math.round((deadlineDate.getTime() - correctionStartDate.getTime()) / (1000 * 60 * 60 * 24));
+            } else {
+                // fallback: tentar usar o valor salvo no assignment, ou default 15
+                correctionStartDate = new Date(deadlineDate);
+                correctionStartDate.setDate(correctionStartDate.getDate() - totalDays);
+            }
+
+            console.log('✅ Retornando deadline customizado:', {
+                deadlineDate,
+                daysRemaining,
+                isOverdue,
+                correctionStartDate,
+                totalDays
+            });
+
+            return {
+                hasDeadline: true,
+                daysRemaining: isOverdue ? Math.abs(daysRemaining) : daysRemaining,
+                hoursRemaining: isOverdue ? Math.abs(hoursRemaining) : hoursRemaining,
+                isOverdue,
+                deadlineDate,
+                correctionStartDate,
+                totalDays,
+                correctionType: 'reviewer' as const,
+                isCustomDeadline: true
+            };
+        }
+    }
     
     let correctionStartDate: Date | null = null;
     let correctionType: 'author' | 'reviewer' = 'author';
@@ -138,121 +212,52 @@ export function getCorrectionTimeRemaining(paper: Paper, userRole?: 'author' | '
  * Simplified version that automatically detects correction context
  * @param paper - The Paper object
  * @param currentUser - The current user object (optional)
+ * @param reviewAssignments - Optional array of ReviewAssignment objects to use custom deadlines
  * @returns Object with information about the remaining time
  */
-export function getCorrectionTimeRemainingAuto(paper: Paper, currentUser?: User) {
-    // Try to determine user role and ID
-    let userRole: 'author' | 'reviewer' | undefined;
+export function getCorrectionTimeRemainingAuto(paper: Paper, currentUser?: User, reviewAssignments?: any[]) {
+    // Sempre priorizar o deadline do ReviewAssignment se existir para o usuário logado
     let userId: string | undefined;
-    
-    // console.log('=== getCorrectionTimeRemainingAuto DEBUG ===');
-    // console.log('paper.id:', paper.id);
-    // console.log('paper.title:', paper.title);
-    // console.log('paper.status:', paper.status);
-    // console.log('paper.updatedAt:', paper.updatedAt);
-    // console.log('paper.correctionAcceptedAt:', paper.correctionAcceptedAt);
-    // console.log('currentUser:', currentUser);
-    // console.log('Called from:', new Error().stack?.split('\n')[2]?.trim());
-    
     if (currentUser) {
         userId = currentUser._id || currentUser.id;
         console.log('userId extracted:', userId);
-        
-        // Check if user is the main author or co-author
+        // Se existe ReviewAssignment para esse paper e user, forçar userRole = 'reviewer'
+        if (reviewAssignments && userId) {
+            const assignment = reviewAssignments.find(a => {
+                const aReviewerId = typeof a.reviewerId === 'object' ? (a.reviewerId._id || a.reviewerId.id) : a.reviewerId;
+                const aPaperId = typeof a.paperId === 'object' ? (a.paperId._id || a.paperId.id) : a.paperId;
+                return aReviewerId?.toString() === userId && aPaperId?.toString() === paper.id?.toString();
+            });
+            if (assignment) {
+                // Força userRole = 'reviewer' para garantir uso do deadline customizado
+                return getCorrectionTimeRemaining(paper, 'reviewer', userId, reviewAssignments);
+            }
+        }
+        // ...código antigo para detectar papel...
         const isMainAuthor = paper.mainAuthor && (paper.mainAuthor._id === userId || paper.mainAuthor.id === userId);
         const isCoAuthor = paper.coAuthors?.some(author => author._id === userId || author.id === userId);
         const isAuthor = isMainAuthor || isCoAuthor;
-        
-        // console.log('isMainAuthor:', isMainAuthor);
-        // console.log('isCoAuthor:', isCoAuthor);
-        // console.log('paper.mainAuthor:', paper.mainAuthor);
-        // console.log('paper.coAuthors:', paper.coAuthors);
-        
-        // Check if user is a reviewer
         const isReviewerInReviewers = paper.reviewers?.some(reviewer => reviewer._id === userId || reviewer.id === userId);
         const isReviewerInResponses = paper.peer_review?.responses?.some(response => 
             response.reviewerId._id === userId || response.reviewerId.id === userId
         );
         const isReviewer = isReviewerInReviewers || isReviewerInResponses;
-        
-        // console.log('isReviewerInReviewers:', isReviewerInReviewers);
-        // console.log('isReviewerInResponses:', isReviewerInResponses);
-        // console.log('paper.reviewers:', paper.reviewers);
-        // console.log('paper.peer_review?.responses:', paper.peer_review?.responses);
-        
+        let userRole: 'author' | 'reviewer' | undefined;
         if (isAuthor) {
             userRole = 'author';
         } else if (isReviewer) {
             userRole = 'reviewer';
         }
-        
-        // console.log('Final userRole determined:', userRole);
-    }
-    
-    // Use the main function with proper user context
-    if (paper.status === 'needing corrections' || paper.status === 'in review' || paper.status === 'under correction') {
-        // Call the main function with user context for proper individual calculation
-        return getCorrectionTimeRemaining(paper, userRole, userId);
-    }
-    
-    // Fallback for demonstration - this should rarely be used now
-    if (paper.status === 'needing corrections' || paper.status === 'in review' || paper.status === 'under correction') {
-        const CORRECTION_DEADLINE_DAYS = 15;
-        let correctionStartDate: Date;
-        
-        if (paper.status === 'needing corrections') {
-            // For authors: use the fixed date when status changed to needing corrections
-            if (paper.statusChangedToCorrectionsAt) {
-                correctionStartDate = new Date(paper.statusChangedToCorrectionsAt);
-            } else {
-                // Fallback to updatedAt if the new field is not yet populated
-                correctionStartDate = new Date(paper.updatedAt);
-            }
-        } else {
-            // For reviewers: use updatedAt as fallback
-            correctionStartDate = new Date(paper.updatedAt);
+        if (paper.status === 'needing corrections' || paper.status === 'in review' || paper.status === 'under correction') {
+            return getCorrectionTimeRemaining(paper, userRole, userId, reviewAssignments);
         }
-        
-        console.log('Using correction start date:', correctionStartDate);
-        
-        // Calculate deadline date (15 days after start date)
-        const deadlineDate = new Date(correctionStartDate);
-        deadlineDate.setDate(deadlineDate.getDate() + CORRECTION_DEADLINE_DAYS);
-        
-        // Calculate difference
-        const now = new Date();
-        const timeDifference = deadlineDate.getTime() - now.getTime();
-        
-        // Calculate remaining days and hours
-        const daysRemaining = Math.ceil(timeDifference / (1000 * 60 * 60 * 24));
-        const hoursRemaining = Math.ceil(timeDifference / (1000 * 60 * 60));
-        
-        const isOverdue = timeDifference < 0;
-        
-        console.log('Direct calculation results:');
-        console.log('deadlineDate:', deadlineDate);
-        console.log('now:', now);
-        console.log('timeDifference:', timeDifference);
-        console.log('daysRemaining:', daysRemaining);
-        console.log('hoursRemaining:', hoursRemaining);
-        console.log('isOverdue:', isOverdue);
-        console.log('==========================================');
-        
-        return {
-            hasDeadline: true,
-            daysRemaining: isOverdue ? Math.abs(daysRemaining) : daysRemaining,
-            hoursRemaining: isOverdue ? Math.abs(hoursRemaining) : hoursRemaining,
-            isOverdue,
-            deadlineDate,
-            correctionStartDate,
-            totalDays: CORRECTION_DEADLINE_DAYS,
-            correctionType: userRole || 'author'
-        };
     }
     
-    console.log('==========================================');
-    
-    return getCorrectionTimeRemaining(paper, userRole, userId);
+    // Fallback para casos raros
+    if (paper.status === 'needing corrections' || paper.status === 'in review' || paper.status === 'under correction') {
+        return getCorrectionTimeRemaining(paper, undefined, undefined, reviewAssignments);
+    }
+    return getCorrectionTimeRemaining(paper, undefined, undefined, reviewAssignments);
 }
 
 /**
@@ -329,9 +334,10 @@ export function getCorrectionProgressPercentage(timeInfo: ReturnType<typeof getC
  * Calcula informações de prazo baseado no sistema de 4 fases
  * @param paper - O objeto Paper
  * @param currentUser - O usuário atual (opcional)
+ * @param reviewAssignments - Optional array of ReviewAssignment objects to use custom deadlines
  * @returns Informações sobre o prazo da fase atual
  */
-export function getPhaseBasedTimeRemaining(paper: Paper, currentUser?: User) {
+export function getPhaseBasedTimeRemaining(paper: Paper, currentUser?: User, reviewAssignments?: any[]) {
     const currentPhase = getCurrentPhase(paper.status);
     
     if (!currentPhase) {
@@ -354,7 +360,7 @@ export function getPhaseBasedTimeRemaining(paper: Paper, currentUser?: User) {
     
     if (!phaseStartDate) {
         // Fallback para compatibilidade com sistema antigo
-        return getCorrectionTimeRemainingAuto(paper, currentUser);
+        return getCorrectionTimeRemainingAuto(paper, currentUser, reviewAssignments);
     }
     
     // Calcular deadline baseado na duração da fase

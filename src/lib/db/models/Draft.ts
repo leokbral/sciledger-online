@@ -8,5 +8,5 @@ export interface IDraft extends mongoose.Document {
   // content: string;
 }
 
-const DraftModel = mongoose.model<IDraft>('Draft', DraftSchema);
+const DraftModel = mongoose.models.Draft || mongoose.model<IDraft>('Draft', DraftSchema);
 export default DraftModel;

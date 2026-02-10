@@ -6,9 +6,10 @@
 		papersData: Paper[];
 		rota?: string;
 		currentUser?: any;
+		reviewAssignments?: any[];
 	}
 
-	let { papersData, rota = '/articles', currentUser }: Props = $props();
+	let { papersData, rota = '/articles', currentUser, reviewAssignments }: Props = $props();
 	// let user; // Selecionar o primeiro usuário na lista para demonstração
 </script>
 
@@ -36,7 +37,8 @@
 								{paper} 
 								{currentUser} 
 								showDetails={true} 
-								size="md" 
+								size="md"
+								{reviewAssignments}
 							/>
 						</div>
 					{/if}

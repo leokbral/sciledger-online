@@ -7,12 +7,123 @@ import { NotificationService } from '$lib/services/NotificationService';
 import * as crypto from 'crypto';
 import { start_mongo } from '$lib/db/mongooseConnection';
 
+/**
+ * Verifica se todos os revisores completaram a rodada de revisão e atualiza o status do paper
+ * Se todos completaram a rodada 1, muda para 'needing corrections'
+ * Se todos completaram a rodada 2, muda para 'needing corrections'
+ */
+async function checkAndUpdatePaperStatusIfAllReviewsComplete(paperId: string, reviewRound: number) {
+	try {
+		const ReviewAssignment = (await import('$lib/db/models/ReviewAssignment')).default;
+		
+		// Buscar todos os ReviewAssignments para este paper.
+		// Importante: manter 'completed' aqui para que a 2ª rodada funcione mesmo que
+		// o assignment já tenha sido marcado como completed na 1ª rodada.
+		const assignedReviewers = await ReviewAssignment.find({
+			paperId,
+			status: { $in: ['accepted', 'pending', 'completed', 'overdue'] }
+		});
+
+		if (assignedReviewers.length === 0) {
+			console.log(`📋 No assigned reviewers found for paper ${paperId}`);
+			return;
+		}
+
+		// Buscar todas as revisões submetidas nesta rodada
+		const submittedReviews = await Reviews.find({
+			paperId,
+			reviewRound,
+			status: 'submitted'
+		});
+
+		console.log(`📋 [Review Check] Paper ${paperId}: ${submittedReviews.length}/${assignedReviewers.length} reviewers completed round ${reviewRound}`);
+
+		// Se o número de revisões submetidas = número de revisores atribuídos
+		if (submittedReviews.length === assignedReviewers.length) {
+			const paper = await Papers.findOne({ id: paperId });
+			if (!paper) return;
+
+			let newStatus = '';
+			if (reviewRound === 1 && paper.status === 'in review') {
+				newStatus = 'needing corrections';
+			} else if (reviewRound === 2 && paper.status === 'in review') {
+				newStatus = 'needing corrections';
+			} else if (reviewRound === 3 && paper.status === 'under final review') {
+				newStatus = 'awaiting final decision';
+			}
+
+			if (newStatus) {
+				paper.status = newStatus;
+				await paper.save();
+				console.log(`✅ [Status Update] Paper ${paperId} status changed to: ${newStatus}`);
+			}
+		}
+	} catch (error) {
+		console.error('Error checking review completion status:', error);
+	}
+}
+
+export const GET: RequestHandler = async ({ url }) => {
+	try {
+		await start_mongo();
+		
+		const paperId = url.searchParams.get('paperId');
+		const reviewerId = url.searchParams.get('reviewerId');
+		const reviewRound = url.searchParams.get('reviewRound');
+		
+		if (!paperId || !reviewerId || !reviewRound) {
+			return json({ error: 'Missing required parameters' }, { status: 400 });
+		}
+		
+		// Buscar revisão enviada nesta rodada
+		const review = await Reviews.findOne({
+			paperId,
+			reviewerId,
+			reviewRound: parseInt(reviewRound),
+			status: 'submitted'
+		});
+		
+		if (review) {
+			return json({
+				hasSubmitted: true,
+				review: {
+					form: {
+						originality: review.quantitativeEvaluation.originality,
+						clarity: review.quantitativeEvaluation.clarity,
+						literatureReview: review.quantitativeEvaluation.literatureReview,
+						theoreticalFoundation: review.quantitativeEvaluation.theoreticalFoundation,
+						methodology: review.quantitativeEvaluation.methodology,
+						reproducibility: review.quantitativeEvaluation.reproducibility,
+						results: review.quantitativeEvaluation.results,
+						figures: review.quantitativeEvaluation.figures,
+						limitations: review.quantitativeEvaluation.limitations,
+						language: review.quantitativeEvaluation.language,
+						impact: review.quantitativeEvaluation.impact,
+						strengths: review.qualitativeEvaluation.strengths,
+						weaknesses: review.qualitativeEvaluation.weaknesses,
+						involvesHumanResearch: review.ethics.involvesHumanResearch,
+						ethicsApproval: review.ethics.ethicsApproval,
+						recommendation: review.recommendation
+					},
+					submissionDate: review.submissionDate,
+					weightedScore: review.weightedScore
+				}
+			});
+		}
+		
+		return json({ hasSubmitted: false });
+	} catch (error) {
+		console.error('Error checking review:', error);
+		return json({ error: 'Internal server error' }, { status: 500 });
+	}
+};
+
 export const POST: RequestHandler = async ({ request }) => {
 	try {
 		await start_mongo();
 
 		const reviewData = await request.json();
-		const { paperId, reviewerId, paperTitle, form } = reviewData;
+		const { paperId, reviewerId, paperTitle, form, reviewRound } = reviewData;
 
 		// Validar dados obrigatórios
 		if (!paperId || !reviewerId || !paperTitle || !form) {
@@ -24,6 +135,21 @@ export const POST: RequestHandler = async ({ request }) => {
 		if (!paper) {
             console.log('Paper not found:', paperId);
 			return json({ error: 'Paper not found' }, { status: 404 });
+		}
+
+		// Determinar a rodada baseada no paper.reviewRound ou no reviewRound enviado
+		let actualRound = reviewRound || paper.reviewRound || 1;
+
+		// Verificar se já existe uma revisão submetida nesta rodada
+		const existingReview = await Reviews.findOne({
+			paperId,
+			reviewerId,
+			reviewRound: actualRound,
+			status: 'submitted'
+		});
+
+		if (existingReview) {
+			return json({ error: `You have already submitted a review for this round (Round ${actualRound})` }, { status: 400 });
 		}
 
 		// Calcular weighted score
@@ -63,6 +189,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			paperId,
 			reviewerId,
 			paperTitle,
+			reviewRound: actualRound,
 			quantitativeEvaluation: {
 				originality: form.originality || 0,
 				clarity: form.clarity || 0,
@@ -156,6 +283,9 @@ export const POST: RequestHandler = async ({ request }) => {
 			console.error('Error creating review notifications:', notificationError);
 			// Não falhar a operação principal por causa das notificações
 		}
+
+		// Verificar se todos os revisores completaram a rodada e atualizar status se necessário
+		await checkAndUpdatePaperStatusIfAllReviewsComplete(paperId, actualRound);
 
 		return json(
 			{

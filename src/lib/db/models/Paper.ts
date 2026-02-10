@@ -6,5 +6,5 @@ export interface IPaper extends Omit<Paper, '_id' | 'id'>, Document {
     pdfId?: ObjectId;
 }
 
-const Papers = mongoose.model<IPaper>('Paper', PaperSchema);
+const Papers = mongoose.models.Paper || mongoose.model<IPaper>('Paper', PaperSchema);
 export default Papers;

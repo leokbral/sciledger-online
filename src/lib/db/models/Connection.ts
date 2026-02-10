@@ -17,5 +17,5 @@ const ConnectionSchema: Schema = new Schema({
     updatedAt: { type: Date, default: Date.now }
 });
 
-const Connection = mongoose.model<IConnection>('Connection', ConnectionSchema);
+const Connection = mongoose.models.Connection || mongoose.model<IConnection>('Connection', ConnectionSchema);
 export default Connection;

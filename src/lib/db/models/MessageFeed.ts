@@ -32,5 +32,5 @@ import { messageFeedSchema } from "../schemas/MessageFeedSchema";
 
 export interface IMessageFeed extends Omit<MessageFeed, 'id'>, Document {} // Omit para evitar conflito
 
-const MessageFeeds = mongoose.model<IMessageFeed>('MessageFeed', messageFeedSchema);
+const MessageFeeds = mongoose.models.MessageFeed || mongoose.model<IMessageFeed>('MessageFeed', messageFeedSchema);
 export default MessageFeeds;

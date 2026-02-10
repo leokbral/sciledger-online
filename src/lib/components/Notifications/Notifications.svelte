@@ -348,15 +348,28 @@
 									{/if}
 								</div>
 
-								<p class="text-sm text-gray-600 mb-2">{notification.content}</p>
+								<p class="text-sm text-gray-600 mb-2">{@html notification.content}</p>
 
-								<div class="flex items-center gap-4 text-xs text-gray-500">
-									<span>{getTimeAgo(notification.createdAt)}</span>
-									<span class="capitalize">{notification.type.replace(/_/g, ' ')}</span>
-									{#if notification.expiresAt}
-										<span>Expires: {new Date(notification.expiresAt).toLocaleDateString()}</span>
-									{/if}
-								</div>
+                                <div class="flex items-center gap-4 text-xs text-gray-500">
+                                    <span>{getTimeAgo(notification.createdAt)}</span>
+                                    <span class="capitalize">{notification.type.replace(/_/g, ' ')}</span>
+                                    {#if notification.expiresAt}
+                                        <span>Expires: {new Date(notification.expiresAt).toLocaleDateString()}</span>
+                                    {/if}
+                                    {#if notification.relatedPaperId && (
+                                        notification.type.includes('review') || notification.type.includes('paper') || notification.type.includes('reviewer')
+                                    )}
+                                        <button
+                                            class="btn btn-xs preset-filled-primary-500 ml-2"
+                                            onclick={(e) => {
+                                                e.stopPropagation();
+                                                window.location.href = `/notifications`;
+                                            }}
+                                        >
+                                            Read more
+                                        </button>
+                                    {/if}
+                                </div>
 							</div>
 						</div>
 

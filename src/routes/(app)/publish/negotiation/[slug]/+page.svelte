@@ -13,6 +13,7 @@
 	import type { Hub } from '$lib/types/Hub';
 	import ReviewerModal from '$lib/components/ReviewerModal/ReviewerModal.svelte';
 	import PaperReviewerInvite from '$lib/components/PaperReviewerInvite/PaperReviewerInvite.svelte';
+	import ManageReviewerDeadline from '$lib/components/ReviewerManagement/ManageReviewerDeadline.svelte';
 
 	interface Props {
 		data: PageData;
@@ -22,6 +23,9 @@
 	let reviewers = data.users.filter((u: User) => u.roles.reviewer === true);
 	let peer_review: string = $state('');
 	let paper: Paper | null = $state(data.paper);
+	let isHubOwner: boolean = $state(!!(data as any).isHubOwner);
+	let isApprovingPublication = $state(false);
+	let approvePublicationError = $state('');
 
 	interface ImageItem {
 		id?: string;
@@ -292,19 +296,44 @@
 			alert('An error occurred while linking the hub.');
 		}
 	}
+
+	async function approvePublication() {
+		if (!paper?.id) return;
+		isApprovingPublication = true;
+		approvePublicationError = '';
+		try {
+			const resp = await fetch(`/api/papers/${paper.id}/approve-publication`, { method: 'POST' });
+			const result = await resp.json();
+			if (!resp.ok) {
+				approvePublicationError = result.error || 'Failed to approve publication';
+				return;
+			}
+			paper = { ...paper, status: result.status || 'published' } as Paper;
+			await goto(`/publish/published/${paper.id}`);
+		} catch (error) {
+			console.error('Error approving publication:', error);
+			approvePublicationError = 'Network error. Please try again.';
+		} finally {
+			isApprovingPublication = false;
+		}
+	}
 </script>
 
 <!-- UI HTML -->
 <div class="grid grid-cols-[1fr_1fr_1fr] p-5">
 	<div></div>
 	<div class="flex justify-between gap-3">
-		<button class="bg-primary-500 text-white rounded-lg px-4 py-2" onclick={hdlSaveDraft}>
+		<button
+			class="bg-primary-500 text-white rounded-lg px-4 py-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
+			onclick={hdlSaveDraft}
+			disabled={!!paper?.hubId}
+		>
 			Save Draft
 		</button>
 		<button 
 			class="bg-primary-500 text-white rounded-lg px-4 py-2 disabled:bg-gray-400 disabled:cursor-not-allowed" 
 			onclick={handleSavePaper}
-			disabled={!paper?.peer_review?.responses || paper.peer_review.responses.filter(r => r.status === 'accepted').length < 3}
+			disabled={!!paper?.hubId || !paper?.peer_review?.responses || paper.peer_review.responses.filter(r => r.status === 'accepted').length < 3}
 		>
 			Submit to Review
 		</button>
@@ -316,13 +345,55 @@
 	<div class="container page max-w-[700px] p-4 m-auto">
 		<h4 class="h4 px-4 text-primary-500 font font-semibold">Under Negotiation</h4>
 		<hr class="mt-2 mb-4 border-t-2!" />
+		{#if paper.hubId}
+			<div class="mb-4 rounded-lg border-l-4 border-blue-500 bg-blue-50 p-4">
+				<div class="flex gap-3">
+					<Icon icon="mdi:information" class="h-5 w-5 flex-shrink-0 text-blue-600" />
+					<div class="text-sm text-blue-900">
+						<strong>Status: Under Negotiation (Hub)</strong>
+						<p class="mt-1">
+							Este paper já foi submetido a um Hub e está em negociação. Enquanto estiver neste status,
+							ele não pode ser editado.
+						</p>
+					</div>
+				</div>
+			</div>
+
+			{#if isHubOwner && (paper as any)?.reviewRound === 2}
+				<div class="mb-4 rounded-lg border-l-4 border-green-500 bg-green-50 p-4">
+					<div class="text-sm text-green-900">
+						<strong>Publication approval</strong>
+						<p class="mt-1">
+							The author requested permission to publish this paper. Approving will set the status to
+							<b>published</b>.
+						</p>
+						<div class="mt-3 flex items-center gap-3">
+							<button
+								class="btn preset-filled-primary-500"
+								disabled={isApprovingPublication}
+								onclick={approvePublication}
+							>
+								{#if isApprovingPublication}
+									Approving...
+								{:else}
+									Approve publication
+								{/if}
+							</button>
+							{#if approvePublicationError}
+								<span class="text-red-600 text-sm">{approvePublicationError}</span>
+							{/if}
+						</div>
+					</div>
+				</div>
+			{/if}
+		{/if}
 		<PaperPreview {paper} user={$page.data.user} />
 
 		<!-- Hub Selection Section -->
 		<div class="mt-6 space-y-4">
 			<div class="flex items-center gap-2">
 				<label class="relative inline-flex items-center cursor-pointer">
-					<input type="checkbox" bind:checked={isLinkedToHub} class="sr-only peer" />
+					<input type="checkbox" bind:checked={isLinkedToHub} class="sr-only peer" disabled={!!paper?.hubId} />
 					<div
 						class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"
 					></div>
@@ -514,6 +585,10 @@
 						hubId={typeof paper.hubId === 'object' ? paper.hubId._id || paper.hubId.id : paper.hubId}
 						hubReviewers={paper.hubId.reviewers}
 						currentAssignedReviewers={paper.peer_review?.assignedReviewers?.map(r => typeof r === 'object' ? r._id || r.id : r) || []}
+						reviewSlots={paper.reviewSlots || []}
+						mainAuthorId={typeof paper.mainAuthor === 'object' ? paper.mainAuthor._id || paper.mainAuthor.id : paper.mainAuthor}
+						coAuthorIds={paper.coAuthors?.map(a => typeof a === 'object' ? a._id || a.id : a) || []}
+						submittedById={typeof paper.submittedBy === 'object' ? paper.submittedBy._id || paper.submittedBy.id : paper.submittedBy}
 					/>
 				</div>
 			{/if}
@@ -551,6 +626,102 @@
 						</div>
 					{/if}
 				</div>
+
+				<!-- DEBUG: Verificar dados -->
+				<div class="mt-4 p-3 bg-gray-100 dark:bg-gray-800 rounded text-xs">
+					<p><strong>Debug Info:</strong></p>
+					<p>isHubOwner: {data.isHubOwner}</p>
+					<p>Has reviewers: {paper.reviewers ? 'Yes' : 'No'}</p>
+					<p>Reviewers count: {paper.reviewers?.length || 0}</p>
+					<p>ReviewAssignments count: {data.reviewAssignments?.length || 0}</p>
+				</div>
+
+				<!-- Lista de Revisores Aceitos com Gerenciamento de Deadline -->
+				{#if data.isHubOwner && paper.reviewers && paper.reviewers.length > 0}
+					<div class="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border-2 border-blue-500">
+						<h6 class="text-lg font-semibold mb-3 flex items-center gap-2">
+							<Icon icon="mdi:account-check" class="size-5" />
+							🎯 Manage Reviewer Deadlines (Admin Only)
+						</h6>
+						<p class="text-sm text-gray-600 dark:text-gray-400 mb-3">
+							Set or update review deadlines for each accepted reviewer
+						</p>
+						<div class="space-y-3">
+							{#each paper.reviewers as reviewer}
+								{@const reviewerData = typeof reviewer === 'object' ? reviewer : data.users?.find(u => u.id === reviewer || u._id === reviewer)}
+								{@const reviewerId = typeof reviewer === 'object' ? (reviewer._id || reviewer.id) : reviewer}
+								{@const assignment = data.reviewAssignments?.find(a => {
+									const aReviewerId = typeof a.reviewerId === 'object' ? (a.reviewerId._id || a.reviewerId.id) : a.reviewerId;
+									return aReviewerId === reviewerId;
+								})}
+								
+								{#if reviewerData}
+									<div class="flex items-center justify-between p-3 bg-white dark:bg-surface-800 rounded border border-surface-200 dark:border-surface-700">
+										<div class="flex items-center gap-3">
+											{#if reviewerData.profilePictureUrl}
+												<img
+													src={reviewerData.profilePictureUrl}
+													alt={reviewerData.firstName}
+													class="w-10 h-10 rounded-full"
+												/>
+											{:else}
+												<div class="w-10 h-10 rounded-full bg-primary-500 flex items-center justify-center text-white font-bold">
+													{reviewerData.firstName?.[0]}{reviewerData.lastName?.[0]}
+												</div>
+											{/if}
+											<div>
+												<p class="font-semibold">
+													{reviewerData.firstName} {reviewerData.lastName}
+												</p>
+												<p class="text-xs text-surface-600 dark:text-surface-400">
+													{reviewerData.email}
+												</p>
+												{#if assignment?.deadline}
+													{@const deadline = new Date(assignment.deadline)}
+													{@const now = new Date()}
+													{@const daysRemaining = Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))}
+													<p class="text-xs mt-1 {daysRemaining > 0 ? 'text-green-600' : 'text-red-600'}">
+														<Icon icon="mdi:calendar-clock" class="inline size-3" />
+														Deadline: {deadline.toLocaleDateString()} 
+														{daysRemaining > 0 ? `(${daysRemaining} days left)` : `(${Math.abs(daysRemaining)} days overdue)`}
+													</p>
+												{:else}
+													<p class="text-xs mt-1 text-gray-500">
+														No deadline set yet
+													</p>
+												{/if}
+											</div>
+										</div>
+										<ManageReviewerDeadline
+											paperId={paper.id}
+											reviewer={reviewerData}
+											currentDeadline={assignment?.deadline}
+											reviewAssignmentId={assignment?._id || assignment?.id}
+										/>
+									</div>
+								{/if}
+							{/each}
+						</div>
+					</div>
+				{:else}
+					<div class="mt-4 p-3 bg-red-50 dark:bg-red-900/20 rounded border border-red-300 text-sm">
+						<p><strong>Section not showing because:</strong></p>
+						<ul class="list-disc ml-5">
+							{#if !data.isHubOwner}
+								<li>❌ You are not the hub owner</li>
+							{:else}
+								<li>✅ You are the hub owner</li>
+							{/if}
+							{#if !paper.reviewers}
+								<li>❌ No reviewers array in paper</li>
+							{:else if paper.reviewers.length === 0}
+								<li>❌ Reviewers array is empty (count: {paper.reviewers.length})</li>
+							{:else}
+								<li>✅ Has reviewers (count: {paper.reviewers.length})</li>
+							{/if}
+						</ul>
+					</div>
+				{/if}
 			{/if}
 		{/if}
 	</div>

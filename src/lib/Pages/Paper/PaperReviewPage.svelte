@@ -127,14 +127,24 @@
 		paper: any;
 		editable?: boolean;
 		currentUser?: User;
+		reviewAssignments?: any[];
+		isHubAdmin?: boolean;
 	}
 
 	let {
 		messageFeed,
 		paper,
 		editable = false,
-		currentUser
+		currentUser,
+		reviewAssignments,
+		isHubAdmin = false
 	}: Props = $props();
+
+	let isReviewCollapsed = $state(false);
+
+	function handleReviewCollapse(event: CustomEvent<{ collapsed: boolean }>) {
+		isReviewCollapsed = event.detail?.collapsed ?? false;
+	}
 	// console.log('current', currentUser);
 	// console.log('Reviewers', paper.reviewers);
 
@@ -193,7 +203,8 @@
 					{paper} 
 					{currentUser} 
 					showDetails={true} 
-					size="lg" 
+					size="lg"
+					{reviewAssignments}
 				/>
 			</div>
 		{/if}
@@ -210,9 +221,15 @@
 		{/if}
 
 		<!-- Nova seção com Paper completo e ReviewForms lado a lado -->
-		<div class="mb-8 flex gap-4 w-full">
+		<div class="mb-8 {isHubAdmin ? 'w-full' : 'flex flex-col gap-4 w-full lg:flex-row'}">
 			<!-- Paper completo à esquerda -->
-			<section class="flex-1 min-w-0">
+			<section
+				class={isHubAdmin
+					? 'w-full'
+					: isReviewCollapsed
+						? 'w-full min-w-0 lg:flex-[3_1_0%]'
+						: 'w-full min-w-0 lg:flex-1'}
+			>
 				<div class="p-4 md:p-6 bg-white rounded-lg shadow-lg">
 					<!-- Título do Paper -->
 					<h2 class="text-3xl font-semibold text-gray-800 mb-4">{@html paper.title}</h2>
@@ -312,19 +329,25 @@
 				</div>
 			</section>
 
-			<!-- ReviewForms à direita -->
-			<section class="w-96 flex-shrink-0">
-				{#if page.url.pathname.startsWith('/review/inreview/')}
-					<div class="card p-4 h-full">
+			<!-- ReviewForms à direita (apenas para revisores, não para admin do hub) -->
+			{#if !isHubAdmin}
+				<section
+					class={isReviewCollapsed
+						? 'w-full lg:w-[300px] flex-none min-w-0'
+						: 'w-full lg:w-[520px] flex-none min-w-0'}
+				>
+					{#if page.url.pathname.startsWith('/review/inreview/') || page.url.pathname.startsWith('/review/correction/')}
 						<ReviewForms
 							paperTitle={paper.title}
 							paperId={paper.id}
 							reviewerId={currentUser?.id || ''}
+							paper={paper}
+							on:collapseToggle={handleReviewCollapse}
 							on:reviewSubmitted={handleReviewSubmitted}
 						/>
-					</div>
-				{/if}
-			</section>
+					{/if}
+				</section>
+			{/if}
 		</div>
 
 		<hr class="my-4" />

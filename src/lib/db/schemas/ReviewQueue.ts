@@ -14,4 +14,4 @@ export const ReviewQueueSchema: Schema = new Schema({
     createdAt: { type: Date, default: Date.now }, // Data de criação
     updatedAt: { type: Date, default: Date.now }, // Data de atualização
 },
-    { collection: 'reviewqueue' });
+    { collection: 'reviewqueues' });

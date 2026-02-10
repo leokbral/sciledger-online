@@ -28,5 +28,5 @@ const CommentSchema: Schema = new Schema({
 });
 
 // Exportando o modelo
-const Comment = mongoose.model<IComment>('Comment', CommentSchema);
+const Comment = mongoose.models.Comment || mongoose.model<IComment>('Comment', CommentSchema);
 export default Comment;

@@ -49,6 +49,7 @@ export const ReviewSchema: Schema = new Schema({
 
 	// Status and metadata
 	status: { type: String, enum: ['draft', 'submitted', 'completed'], default: 'draft' },
+	reviewRound: { type: Number, enum: [1, 2], default: 1 }, // 1 = primeira rodada, 2 = segunda rodada
 	submissionDate: { type: Date },
 	completionDate: { type: Date },
 	createdAt: { type: Date, default: () => new Date() },

@@ -4,5 +4,5 @@ import { ReviewAssignmentSchema } from '../schemas/ReviewAssignmentSchema';
 
 export type IReviewAssignment = ReviewAssignment & mongoose.Document;
 
-const ReviewAssignment = mongoose.model<IReviewAssignment>('ReviewAssignment', ReviewAssignmentSchema);
+const ReviewAssignment = mongoose.models.ReviewAssignment || mongoose.model<IReviewAssignment>('ReviewAssignment', ReviewAssignmentSchema);
 export default ReviewAssignment;

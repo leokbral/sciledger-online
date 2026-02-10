@@ -13,12 +13,13 @@ export const PaperSchema: Schema = new Schema({
     keywords: [{ type: String, required: true }],
     content: { type: String },
     pdfUrl: { type: String, required: true },
+    doi: { type: String, unique: true, sparse: true },
     paperPictures: [{ type: String }], // Alterado de articlePictures para paperPictures
     citations: [{ type: String }], // Lista de citações como UUIDs
     likes: [{ type: String }], // Lista de usuários que curtiram como UUIDs
     comments: [{ type: String }], // Lista de comentários como UUIDs
     tags: [{ type: String }],
-    status: { type: String, required: true, enum: ['draft', 'under negotiation', 'in review', 'needing corrections', 'published'], default: 'draft' },
+    status: { type: String, required: true, enum: ['draft', 'under negotiation', 'in review', 'needing corrections', 'published', 'rejected'], default: 'draft' },
     price: { type: Number, required: true }, // Campo para o preço da publicação
     score: { type: Number, default: 0, min: 0, max: 5 }, // Campo para a pontuação da publicação, com um valor padrão de 0 e limite de 0 a 5
     authors: [{ type: String, ref: 'User' }],
@@ -27,7 +28,7 @@ export const PaperSchema: Schema = new Schema({
             reviewType: { type: String, enum: ['open', 'selected'], required: true },
             assignedReviewers: [{ type: String, ref: 'User' }],
             responses: [{
-                _id: { type: String, default: () => crypto.randomUUID() },
+                _id: false, // Desabilitar _id automático do Mongoose
                 reviewerId: { type: String, ref: 'User' },
                 status: {
                     type: String,
@@ -71,7 +72,51 @@ export const PaperSchema: Schema = new Schema({
         type: Map,
         of: Boolean,
         default: new Map()
-    }
+    },
+    
+    // Sistema de Slots de Revisão (máximo 3 revisores)
+    reviewSlots: [{
+        _id: false, // Desabilitar _id automático do Mongoose
+        slotNumber: { type: Number, required: true }, // 1, 2, ou 3
+        reviewerId: { type: String, ref: 'User', default: null }, // ID do revisor (null se vazio)
+        status: { 
+            type: String, 
+            enum: ['available', 'pending', 'occupied', 'declined'], 
+            default: 'available' 
+        },
+        invitedAt: { type: Date }, // Quando o convite foi enviado
+        acceptedAt: { type: Date }, // Quando o revisor aceitou
+        declinedAt: { type: Date } // Quando o revisor recusou
+    }],
+    maxReviewSlots: { type: Number, default: 3 }, // Número máximo de slots
+    availableSlots: { type: Number, default: 3 }, // Slots disponíveis
+    
+    // Track which review round this paper is in (1 = first review, 2 = review after corrections)
+    reviewRound: { type: Number, default: 1 },
+    
+    // Track phase timestamps for each round
+    phaseTimestamps: {
+        round1Start: { type: Date },
+        round1End: { type: Date },
+        correctionStart: { type: Date },
+        correctionEnd: { type: Date },
+        round2Start: { type: Date },
+        round2End: { type: Date }
+    },
+    
+    // Scopus subject classification
+    scopusArea: { type: String }, // Deprecated - kept for backward compatibility
+    scopusSubArea: { type: String }, // Deprecated - kept for backward compatibility
+    scopusClassifications: [{
+        area: { type: String, required: true },
+        subArea: { type: String, required: true }
+    }], // Multiple Scopus classifications for interdisciplinary papers
+    
+    // Hub rejection fields
+    rejectedByHub: { type: Boolean, default: false },
+    rejectionReason: { type: String },
+    rejectedAt: { type: Date },
+    rejectedBy: { type: String, ref: 'User' }
 
 }, { collection: 'papers' });
 

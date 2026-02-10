@@ -14,6 +14,7 @@ export type Paper = {
     keywords: string[];
     content: string;
     pdfUrl: string;
+    doi?: string;
     paperPictures: string[]; // Alterado de articlePictures para paperPictures
     citations: string[]; // Lista de citações como UUIDs
     likes: string[]; // Lista de usuários que curtiram como UUIDs
@@ -58,4 +59,35 @@ export type Paper = {
     hubId?: string | Hub| null;
     isLinkedToHub?: boolean;
     correctionProgress?: Record<string, boolean>; // Progresso das correções (checklist)
+    
+    // Sistema de Slots de Revisão (máximo 3 revisores)
+    reviewSlots?: Array<{
+        slotNumber: number; // 1, 2, ou 3
+        reviewerId: string | User | null; // ID do revisor que ocupa o slot (null se vazio)
+        status: 'available' | 'pending' | 'occupied' | 'declined'; // Status do slot
+        invitedAt?: Date; // Quando o convite foi enviado
+        acceptedAt?: Date; // Quando o revisor aceitou
+        declinedAt?: Date; // Quando o revisor recusou
+    }>;
+    maxReviewSlots?: number; // Número máximo de slots (padrão: 3)
+    availableSlots?: number; // Slots disponíveis (calculado)
+    reviewRound?: number; // Track which review round (1 = first, 2 = after corrections)
+    phaseTimestamps?: {
+        round1Start?: Date;
+        round1End?: Date;
+        correctionStart?: Date;
+        correctionEnd?: Date;
+        round2Start?: Date;
+        round2End?: Date;
+    };
+    scopusArea?: string; // Scopus subject area (deprecated - use scopusClassifications)
+    scopusSubArea?: string; // Scopus subject sub-area (deprecated - use scopusClassifications)
+    scopusClassifications?: Array<{
+        area: string; // Scopus subject area
+        subArea: string; // Scopus subject sub-area
+    }>; // Multiple Scopus classifications for interdisciplinary papers
+    rejectedByHub?: boolean; // Paper rejected by hub admin
+    rejectionReason?: string; // Reason for rejection
+    rejectedAt?: Date; // When it was rejected
+    rejectedBy?: User | string; // Who rejected it
 }

@@ -17,12 +17,20 @@ export default defineConfig({
         },
         fs: {
             strict: false
-        }
+        },
+        middlewareMode: false
     },
     preview: {
         allowedHosts: [
             'localhost',
             'scideep.imd.ufrn.br'
         ]
+    },
+    ssr: {
+        external: ['entities', 'htmlparser2', 'domutils', 'cheerio', 'jsdom'],
+        noExternal: []
+    },
+    optimizeDeps: {
+        exclude: ['entities', 'htmlparser2', 'domutils', 'cheerio', 'jsdom']
     }
 });

@@ -3,6 +3,7 @@ import Users from '$lib/db/models/User';
 import Reviews from '$lib/db/models/Review';
 import { start_mongo } from '$lib/db/mongo';
 import { redirect } from '@sveltejs/kit';
+import { sanitizePaper } from '$lib/helpers/sanitizePaper';
 
 export async function load({ locals }) {
 	const user = locals.user;
@@ -20,37 +21,7 @@ export async function load({ locals }) {
 			.lean()
 			.exec();
 
-		const normalizedPapers = papersRaw.map((paper) => {
-			const peer_review = paper.peer_review
-				? {
-						reviewType: paper.peer_review.reviewType,
-						assignedReviewers: paper.peer_review.assignedReviewers ?? [],
-						responses: (paper.peer_review.responses ?? []).map((r: any) => ({
-							reviewerId: r.reviewerId,
-							status: r.status,
-							responseDate: r.responseDate,
-							_id: r._id?.toString?.()
-						})),
-						reviews: paper.peer_review.reviews ?? [],
-						averageScore: paper.peer_review.averageScore ?? 0,
-						reviewCount: paper.peer_review.reviewCount ?? 0,
-						reviewStatus: paper.peer_review.reviewStatus ?? 'not_started'
-				  }
-				: {
-						reviewType: 'open',
-						assignedReviewers: [],
-						responses: [],
-						reviews: [],
-						averageScore: 0,
-						reviewCount: 0,
-						reviewStatus: 'not_started'
-				  };
-
-			return {
-				...paper,
-				peer_review
-			};
-		});
+		const normalizedPapers = papersRaw.map(sanitizePaper);
 
 		return normalizedPapers;
 	};

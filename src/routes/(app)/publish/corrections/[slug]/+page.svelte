@@ -81,6 +81,11 @@
 		return recommendations[recommendation] || recommendation;
 	}
 
+	// Function to clean title from <p> tags
+	function cleanTitle(title: string): string {
+		return title.replace(/<\/?p>/gi, '');
+	}
+
 	// Function to get recommendation badge class
 	function getRecommendationClass(recommendation: string): string {
 		const classes: Record<string, string> = {
@@ -114,6 +119,16 @@
 	let isSaving = $state(false);
 	let lastSaved = $state<Date | null>(null);
 
+	// Track final review submission state
+	let isSubmittingFinal = $state(false);
+	let submitFinalError = $state('');
+
+	// Track publication request state (after round 2)
+	let isRequestingPublication = $state(false);
+	let requestPublicationError = $state('');
+	let isWithdrawingPublication = $state(false);
+	let withdrawPublicationError = $state('');
+
 	// Debounce function to avoid too many API calls
 	let saveTimeout: NodeJS.Timeout | null = null;
 	
@@ -129,6 +144,83 @@
 			}, 1000); // Debounce for 1 second
 		}
 	});
+
+	async function submitForFinalReview() {
+		if (!paper?.id) return;
+		isSubmittingFinal = true;
+		submitFinalError = '';
+		try {
+			const resp = await fetch(`/api/papers/${paper.id}/submit-final-review`, {
+				method: 'POST'
+			});
+			const result = await resp.json();
+			if (!resp.ok) {
+				submitFinalError = result.error || 'Failed to submit for final review';
+				return;
+			}
+			// Update local status and move user to the review page
+			paper = { ...paper, status: result.status || 'in review' } as Paper;
+			await goto(`/publish/inreview/${paper.id}`);
+		} catch (error) {
+			console.error('Error submitting for final review', error);
+			submitFinalError = 'Network error. Please try again.';
+		} finally {
+			isSubmittingFinal = false;
+		}
+	}
+
+	async function submitForPublication() {
+		if (!paper?.id) return;
+		isRequestingPublication = true;
+		requestPublicationError = '';
+		try {
+			const resp = await fetch(`/api/papers/${paper.id}/request-publication`, {
+				method: 'POST'
+			});
+			const result = await resp.json();
+			if (!resp.ok) {
+				requestPublicationError = result.error || 'Failed to request publication';
+				return;
+			}
+			paper = { ...paper, status: result.status || paper.status } as Paper;
+			// If published immediately (no hub), go to published view; otherwise go back to dashboard
+			if ((paper as any).status === 'published') {
+				await goto(`/publish/published/${paper.id}`);
+			} else {
+				await goto(`/publish/`);
+			}
+		} catch (error) {
+			console.error('Error requesting publication', error);
+			requestPublicationError = 'Network error. Please try again.';
+		} finally {
+			isRequestingPublication = false;
+		}
+	}
+
+	async function withdrawFromPublication() {
+		if (!paper?.id) return;
+		withdrawPublicationError = '';
+		const ok = confirm('Are you sure you want to withdraw this paper from publication?');
+		if (!ok) return;
+		isWithdrawingPublication = true;
+		try {
+			const resp = await fetch(`/api/papers/${paper.id}/withdraw-publication`, {
+				method: 'POST'
+			});
+			const result = await resp.json();
+			if (!resp.ok) {
+				withdrawPublicationError = result.error || 'Failed to withdraw from publication';
+				return;
+			}
+			paper = { ...paper, status: result.status || 'draft' } as Paper;
+			await goto(`/publish/`);
+		} catch (error) {
+			console.error('Error withdrawing from publication', error);
+			withdrawPublicationError = 'Network error. Please try again.';
+		} finally {
+			isWithdrawingPublication = false;
+		}
+	}
 
 	// Function to save correction progress to database
 	async function saveCorrectionProgress() {
@@ -355,7 +447,7 @@
 		
 		<div class="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
 			<h3 class="font-semibold text-blue-800 mb-2">📋 Article Information</h3>
-			<p><strong>Title:</strong> {(paper as Paper).title}</p>
+			<div><strong>Title:</strong> {@html cleanTitle((paper as Paper).title)}</div>
 			<p><strong>Status:</strong> <span class="capitalize">{(paper as Paper).status}</span></p>
 			<p><strong>Submitted:</strong> {new Date((paper as Paper).createdAt).toLocaleDateString()}</p>
 		</div>
@@ -368,8 +460,66 @@
 				<li>Click the "✏️ Edit Article" button in the article section to enter edit mode</li>
 				<li>Make the necessary changes to address reviewer concerns</li>
 				<li>Save your changes - they will be automatically applied to your article</li>
-				<li>When ready, contact the editorial team to resubmit for review</li>
+				<li>
+					{#if (paper as any)?.reviewRound === 2}
+						When ready, submit for publication or withdraw from publication
+					{:else}
+						When ready, submit for the second review round
+					{/if}
+				</li>
 			</ol>
+
+			{#if paper && ((paper as Paper).status === 'needing corrections' || (paper as Paper).status === 'under correction')}
+				{#if (paper as any)?.reviewRound === 2}
+					<div class="mt-4 flex flex-col md:flex-row md:items-center gap-3">
+						<button
+							class="btn preset-filled-primary-500"
+							disabled={isRequestingPublication}
+							onclick={submitForPublication}
+						>
+							{#if isRequestingPublication}
+								Submitting...
+							{:else}
+								Submit for Publication
+							{/if}
+						</button>
+						<button
+							class="btn preset-filled-surface-200"
+							disabled={isWithdrawingPublication}
+							onclick={withdrawFromPublication}
+						>
+							{#if isWithdrawingPublication}
+								Withdrawing...
+							{:else}
+								Withdraw from Publication
+							{/if}
+						</button>
+						{#if requestPublicationError}
+							<span class="text-red-600 text-sm">{requestPublicationError}</span>
+						{/if}
+						{#if withdrawPublicationError}
+							<span class="text-red-600 text-sm">{withdrawPublicationError}</span>
+						{/if}
+					</div>
+				{:else}
+					<div class="mt-4 flex items-center gap-3">
+						<button
+							class="btn preset-filled-primary-500"
+							disabled={isSubmittingFinal}
+							onclick={submitForFinalReview}
+						>
+							{#if isSubmittingFinal}
+								Submitting...
+							{:else}
+								Submit for Final Review
+							{/if}
+						</button>
+						{#if submitFinalError}
+							<span class="text-red-600 text-sm">{submitFinalError}</span>
+						{/if}
+					</div>
+				{/if}
+			{/if}
 		</div>
 	</div>
 

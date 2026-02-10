@@ -6,6 +6,7 @@
 	import ReviewerManagement from '$lib/components/ReviewerManagement/ReviewerManagement.svelte';
 	import type { Paper } from '$lib/types/Paper.js';
 	import PapersSection from '$lib/components/PapersSection/PapersSection.svelte';
+	import ManageReviewerDeadline from '$lib/components/ReviewerManagement/ManageReviewerDeadline.svelte';
 
 	let { data } = $props();
 	const hub = data.hub;
@@ -23,26 +24,79 @@
 	const isCreator = data.hub.createdBy._id === data.user.id;
 	const isReviewer = hub.reviewers?.includes(data.user.id);
 
+	let expandedPapers = $state<string[]>([]);
+
+	let creatingAssignments = $state(false);
+
+	async function createMissingAssignments() {
+		creatingAssignments = true;
+		try {
+			const response = await fetch(`/api/hubs/${hub._id}/create-review-assignments`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' }
+			});
+
+			const result = await response.json();
+
+			if (response.ok) {
+				alert(`✅ Created ${result.created} review assignments!`);
+				window.location.reload();
+			} else {
+				alert(`❌ Error: ${result.error}`);
+			}
+		} catch (error) {
+			console.error('Error creating assignments:', error);
+			alert('❌ Failed to create assignments');
+		} finally {
+			creatingAssignments = false;
+		}
+	}
+
 	const filteredPapers = data.papers?.filter((paper) => {
+		console.log(`🔍 Filtering paper: ${paper.title}`);
+		console.log(`   - status: ${paper.status}`);
+		console.log(`   - isCreator: ${isCreator}`);
+		console.log(`   - isReviewer (hub): ${isReviewer}`);
+		console.log(`   - isAcceptedForReview: ${paper.isAcceptedForReview}`);
+		
 		// Se for published, todos podem ver
-		if (paper.status === 'published') return true;
+		if (paper.status === 'published') {
+			console.log(`   ✅ Showing (published)`);
+			return true;
+		}
 
-		// Se for criador ou revisor do hub, pode ver todos os papers do hub
-		if (isCreator || isReviewer) return true;
+		// Se for criador do hub, pode ver todos os papers do hub (exceto drafts que já são filtrados no servidor)
+		if (isCreator) {
+			console.log(`   ✅ Showing (creator)`);
+			return true;
+		}
 
-		// Verificar se o usuário aceitou revisar este paper específico
-		// Os papers já vêm filtrados do servidor, então se chegou até aqui
-		// e tem peer_review, pode ser que seja um paper aceito para revisão
+		// Se for revisor do hub, pode ver todos os papers do hub
+		if (isReviewer) {
+			console.log(`   ✅ Showing (hub reviewer)`);
+			return true;
+		}
+
+		// Verificar se o usuário é revisor deste paper específico
 		const hasAcceptedReview = paper.isAcceptedForReview || false;
-		if (hasAcceptedReview) return true;
+		if (hasAcceptedReview) {
+			console.log(`   ✅ Showing (paper reviewer)`);
+			return true;
+		}
 
-		// Caso contrário, só vê se estiver envolvido no paper
+		// Caso contrário, só vê se estiver envolvido no paper como autor
 		const isMainAuthor = paper.mainAuthor?.id === userId;
 		const isCoAuthor = paper.coAuthors?.some((ca) => ca.id === userId);
 		const isCorresponding = paper.correspondingAuthor?.id === userId;
 		const isSubmittedBy = paper.submittedBy?.id === userId;
 
-		return isMainAuthor || isCoAuthor || isCorresponding || isSubmittedBy;
+		if (isMainAuthor || isCoAuthor || isCorresponding || isSubmittedBy) {
+			console.log(`   ✅ Showing (author)`);
+			return true;
+		}
+
+		console.log(`   ❌ Hidden`);
+		return false;
 	});
 
 	console.log('Papers after filtering:', filteredPapers);
@@ -392,7 +446,14 @@
 {/if}
 
 <!-- Papers Section -->
-<PapersSection papers={filteredPapers} {hub} {isCreator} userId={data.user.id} {shouldHighlight} />
+<PapersSection 
+	papers={filteredPapers} 
+	{hub} 
+	{isCreator} 
+	userId={data.user.id} 
+	{shouldHighlight} 
+	reviewAssignments={data.reviewAssignments}
+/>
 
 <!-- Informações Gerais -->
 <!-- <div class="mt-6 bg-white shadow rounded-xl p-4 space-y-2">
