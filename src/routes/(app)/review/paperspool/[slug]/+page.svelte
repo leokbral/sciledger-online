@@ -91,7 +91,20 @@
 </script>
 
 {#if paper}
-    <div class="container page max-w-[900px] p-4 m-auto">
+    <div class="container max-w-5xl mx-auto px-4 py-8">
+        <!-- Header Section -->
+        <div class="mb-8">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg">
+                    <Icon icon="mdi:file-document-edit" class="w-8 h-8 text-white" />
+                </div>
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Review Request</h1>
+                    <p class="text-gray-600 dark:text-gray-400 mt-1">You've been invited to review this paper</p>
+                </div>
+            </div>
+        </div>
+
         <!-- Barra de Progresso do Tempo de Revisão -->
         {#if paper.status === 'in review' || paper.status === 'needing corrections'}
             <div class="mb-6">
@@ -103,33 +116,38 @@
                 />
             </div>
         {/if}
-        
-        <div class="mb-6">
-            <h2 class="text-2xl font-bold text-primary-500 mb-2">Review Request</h2>
-            <p class="text-surface-600">Please review the paper details below and decide if you would like to accept this review assignment.</p>
-            <hr class="mt-4 mb-6 border-t-2 border-surface-200" />
+
+        <!-- Paper Content Card -->
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden mb-8 border border-gray-100 dark:border-gray-700">
+            <div class="p-8">
+                <PaperPreview {paper} user={$page.data.user} showReadMore={false} />
+            </div>
         </div>
 
-        <div class="card p-6 bg-surface-100 rounded-lg shadow-sm mb-6">
-            <PaperPreview {paper} user={$page.data.user} />
-        </div>
-
-        <div class="flex justify-center gap-4 mt-8">
+        <!-- Action Buttons -->
+        <div class="flex flex-col sm:flex-row justify-center gap-4">
             <button
-                class="btn variant-filled-error px-8 py-3 rounded-lg flex items-center gap-2"
+                class="group relative px-8 py-4 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-3"
                 onclick={() => goto('/review/')}
             >
-                <Icon icon="fluent-mdl2:cancel" class="size-5" />
-                Decline Review
+                <Icon icon="mdi:close-circle" class="w-6 h-6" />
+                <span>Decline Review</span>
             </button>
             
             <button
-                class="btn variant-filled-success px-8 py-3 rounded-lg flex items-center gap-2"
+                class="group relative px-8 py-4 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-3"
                 onclick={handleAcceptReview}
             >
-                <Icon icon="fluent-mdl2:accept" class="size-5" />
-                Accept Review
+                <Icon icon="mdi:check-circle" class="w-6 h-6" />
+                <span>Accept Review</span>
             </button>
+        </div>
+
+        <!-- Info Footer -->
+        <div class="mt-8 text-center">
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+                By accepting this review, you commit to providing constructive feedback within the specified deadline.
+            </p>
         </div>
     </div>
 {/if}

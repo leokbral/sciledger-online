@@ -5,7 +5,7 @@
 	import { Avatar, Rating } from '@skeletonlabs/skeleton-svelte';
 	import CorrectionProgressBar from '$lib/components/CorrectionProgressBar/CorrectionProgressBar.svelte';
 
-	let { paper, user } = $props();
+	let { paper, user, showReadMore = true } = $props();
 	let starValue = $state(2);
 	// export let paper: Paper;
 	// export let user;
@@ -133,11 +133,15 @@
 	<h4 class="h4 font-bold">{@html paper.title}</h4>
 	<p>{@html paper.abstract}</p>
 	<div class="flex justify-between my-3">
-		<span class="text-xs"
-			><a data-sveltekit-reload href="/articles/{paper.id}" class="flex flex-col gap-2"
-				>Read more...</a
-			></span
-		>
+		{#if showReadMore}
+			<span class="text-xs"
+				><a data-sveltekit-reload href="/articles/{paper.id}" class="flex flex-col gap-2"
+					>Read more...</a
+				></span
+			>
+		{:else}
+			<div></div>
+		{/if}
 		<div class="tag-list flex gap-1">
 			{#each paper.keywords as tag}
 				<span class="badge preset-outlined-primary-500 text-primary-500"
