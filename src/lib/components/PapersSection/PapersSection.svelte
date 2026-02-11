@@ -272,14 +272,28 @@
     <div class="mt-6 bg-white shadow-md rounded-xl p-6">
         <div class="flex justify-between items-center mb-4">
             <h2 class="text-xl font-semibold text-gray-800">Submitted Articles</h2>
-            <a
-                data-sveltekit-reload
-                href="/publish/new?hubId={hubId}"
-                class="btn preset-filled-primary-500 text-white"
-                data-sveltekit-preload-data="hover"
-            >
-                Submit a New Article
-            </a>
+            <div class="flex flex-col gap-2 w-fit">
+                <!-- Download Template Button -->
+                <a
+                    href="/paper-template.docx"
+                    download="SciLedger_Paper_Template.docx"
+                    class="btn preset-outlined-primary-500 text-primary-500 border-2 flex items-center justify-center gap-2 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors text-sm px-4 py-2 whitespace-nowrap w-full"
+                >
+                    <Icon icon="mdi:download" style="font-size: 1.25rem;" />
+                    <span>Download Paper Template</span>
+                </a>
+                
+                <!-- Submit New Article Button -->
+                <a
+                    data-sveltekit-reload
+                    href="/publish/new?hubId={hubId}"
+                    class="btn preset-filled-primary-500 text-white flex items-center justify-center gap-2 text-sm px-4 py-2 whitespace-nowrap w-full"
+                    data-sveltekit-preload-data="hover"
+                >
+                    <Icon icon="mdi:file-document-plus" style="font-size: 1.25rem;" />
+                    <span>Submit a New Article</span>
+                </a>
+            </div>
         </div>
 
         {#if papers && papers.length > 0}
