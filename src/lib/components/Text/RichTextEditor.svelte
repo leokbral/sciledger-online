@@ -4,6 +4,7 @@
 	import sanitizeHtml from 'sanitize-html';
 
 	let editor: any = $state();
+	let previousContent = $state('');
 
 	interface Props {
 		id: string;
@@ -171,6 +172,16 @@
 		// Se houver conteúdo inicial, insere no editor
 		if (content) {
 			editor.root.innerHTML = content;
+			previousContent = content;
+		}
+	});
+
+	// Sincroniza mudanças externas do content com o editor
+	$effect(() => {
+		if (editor && content && content !== previousContent) {
+			console.log('🔄 Atualizando editor com novo conteúdo');
+			editor.root.innerHTML = content;
+			previousContent = content;
 		}
 	});
 </script>

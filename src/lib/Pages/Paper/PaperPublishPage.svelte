@@ -243,6 +243,133 @@
 	// 	return;
 	// }
 
+	// Function to extract abstract from HTML content using regex
+	function extractAbstractFromHtml(html: string): string {
+		if (!html) return '';
+
+		let abstractContent = '';
+
+		// First try: Look for content after "Abstract" heading
+		const abstractHeadingRegex = /<h[1-6][^>]*>\s*(?:Abstract|ABSTRACT|abstract|Resumo|RESUMO|resumo)\s*<\/h[1-6]>/i;
+		const abstractHeadingMatch = abstractHeadingRegex.exec(html);
+
+		if (abstractHeadingMatch) {
+			// Get everything after the abstract heading
+			const startIndex = abstractHeadingMatch.index + abstractHeadingMatch[0].length;
+			const afterHeading = html.substring(startIndex);
+
+			// Extract content until next heading or a certain length
+			const contentRegex = /<p[^>]*>([^<]*)<\/p>/gi;
+			const paragraphs: string[] = [];
+			let match;
+			let wordCount = 0;
+
+			while ((match = contentRegex.exec(afterHeading)) !== null && wordCount < 350) {
+				const text = match[1].trim().replace(/<[^>]*>/g, '').trim();
+				if (text && text.length > 20) {
+					paragraphs.push(text);
+					wordCount += text.split(/\s+/).length;
+				}
+				// Stop if we hit another heading
+				if (afterHeading.substring(match.index).match(/<h[1-6]/i)) {
+					break;
+				}
+			}
+
+			if (paragraphs.length > 0) {
+				abstractContent = paragraphs.join('\n\n');
+			}
+		}
+
+		// Fallback: Extract first few paragraphs if abstract not found
+		if (!abstractContent) {
+			const paragraphRegex = /<p[^>]*>([^<]*)<\/p>/gi;
+			const firstParagraphs: string[] = [];
+			let match;
+			let wordCount = 0;
+
+			while ((match = paragraphRegex.exec(html)) !== null) {
+				const text = match[1].trim().replace(/<[^>]*>/g, '').trim();
+				if (text && text.length > 30) {
+					firstParagraphs.push(text);
+					wordCount += text.split(/\s+/).length;
+					// Stop after collecting 100-150 words
+					if (wordCount > 100) {
+						break;
+					}
+				}
+			}
+
+			// Only use if we got reasonable amount of text
+			if (firstParagraphs.length > 0 && wordCount > 50 && wordCount < 400) {
+				abstractContent = firstParagraphs.join('\n\n');
+			}
+		}
+
+		console.log('Extracted abstract:', abstractContent.substring(0, 100) + '...');
+		return abstractContent;
+	}
+
+	function extractKeywordsFromHtml(html: string): string[] {
+		if (!html) return [];
+
+		const cleanText = (input: string) =>
+			input
+				.replace(/<[^>]*>/g, '')
+				.replace(/&nbsp;/g, ' ')
+				.replace(/\s+/g, ' ')
+				.trim();
+
+		const abstractHeadingRegex =
+			/<h[1-6][^>]*>\s*(?:Abstract|ABSTRACT|abstract|Resumo|RESUMO|resumo)\s*<\/h[1-6]>/i;
+		const mainHeadingRegex = /<h[1-6][^>]*>\s*(?:Main|MAIN|main)\s*<\/h[1-6]>/i;
+		const paragraphRegex = /<p[^>]*>([\s\S]*?)<\/p>/gi;
+
+		const abstractMatch = abstractHeadingRegex.exec(html);
+		if (!abstractMatch) {
+			console.log('Keywords: abstract heading not found');
+			return [];
+		}
+
+		const afterAbstract = html.substring(abstractMatch.index + abstractMatch[0].length);
+		const mainMatch = mainHeadingRegex.exec(afterAbstract);
+		const sectionBetweenAbstractAndMain = mainMatch
+			? afterAbstract.substring(0, mainMatch.index)
+			: afterAbstract;
+
+		const paragraphs: string[] = [];
+		let match: RegExpExecArray | null;
+		while ((match = paragraphRegex.exec(sectionBetweenAbstractAndMain)) !== null) {
+			const text = cleanText(match[1]);
+			if (text.length > 0) paragraphs.push(text);
+		}
+
+		if (paragraphs.length < 2) {
+			console.log('Keywords: not enough paragraphs between abstract and main');
+			return [];
+		}
+
+		let keywordsParagraph = paragraphs[1];
+
+		if (!keywordsParagraph.includes(',') && paragraphs.length > 2) {
+			const withCommas = paragraphs.slice(1).find((p) => p.includes(','));
+			if (withCommas) keywordsParagraph = withCommas;
+		}
+
+		keywordsParagraph = keywordsParagraph
+			.replace(/^\s*(keywords?|palavras-chave)\s*[:\-]?\s*/i, '')
+			.trim();
+
+		const keywords = keywordsParagraph
+			.split(',')
+			.map((k) => k.trim())
+			.filter((k) => k.length > 0);
+
+		const uniqueKeywords = [...new Set(keywords)];
+		console.log('Extracted keywords:', uniqueKeywords);
+		return uniqueKeywords;
+	}
+
 	async function convertDocument(file: any) {
 		if (!file) {
 			console.error('No file provided');
@@ -272,6 +399,38 @@
 
 			const data = await response.json();
 			content = data.html;
+			console.log('HTML conversion successful');
+
+			// Automatically extract and fill abstract
+			if (data.html) {
+				const extractedAbstract = extractAbstractFromHtml(data.html);
+				console.log('Checking if should fill abstract... Current:', $store.abstract ? 'has value' : 'empty');
+				
+				if (extractedAbstract && !$store.abstract) {
+					$store.abstract = extractedAbstract;
+					console.log('✅ Abstract automatically filled from DOCX');
+					console.log('Abstract content:', $store.abstract.substring(0, 150) + '...');
+				} else if (extractedAbstract && $store.abstract) {
+					console.log('⚠️ Abstract field already has content, not overwriting');
+				} else {
+					console.log('❌ Could not extract abstract from document');
+				}
+
+				const extractedKeywords = extractKeywordsFromHtml(data.html);
+				console.log(
+					'Checking if should fill keywords... Current:',
+					$store.keywords?.length ? 'has value' : 'empty'
+				);
+
+				if (extractedKeywords.length > 0 && (!$store.keywords || $store.keywords.length === 0)) {
+					$store.keywords = extractedKeywords;
+					console.log('✅ Keywords automatically filled from DOCX:', $store.keywords);
+				} else if (extractedKeywords.length > 0 && $store.keywords?.length) {
+					console.log('⚠️ Keywords field already has content, not overwriting');
+				} else {
+					console.log('❌ Could not extract keywords from document');
+				}
+			}
 
 			// with open(filename, "w", encoding="utf-8") as f:
 			// f.write(content)
