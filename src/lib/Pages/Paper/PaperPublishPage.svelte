@@ -161,10 +161,22 @@
 	// let files: FileList = $state();
 
 	let inputAuthor = $state('');
-	let inputAuthorList = $state(inicialValue.authors.map((a) => a.username) || []);
+	let inputAuthorList = $state(
+		inicialValue.authors?.length > 0
+			? inicialValue.authors.map((a) => a.username)
+			: author?.username
+				? [author.username]
+				: []
+	);
 	let selected = $state({ value: '' });
 	let content = $state(inicialValue.content || '');
 	// let inputComponent: TagsInput = $state();
+
+	$effect(() => {
+		if (author?.username && inputAuthorList.length === 0) {
+			inputAuthorList = [author.username];
+		}
+	});
 
 	authorsOptions = authorsOptions.map((a: User) => {
 		return { ...a, label: a.username };
@@ -244,6 +256,56 @@
 	// }
 
 	// Function to extract abstract from HTML content using regex
+	function cleanHtmlText(input: string): string {
+		return input
+			.replace(/<[^>]*>/g, '')
+			.replace(/&nbsp;/g, ' ')
+			.replace(/\s+/g, ' ')
+			.trim();
+	}
+
+	function extractTitleFromHtml(html: string): string {
+		if (!html) return '';
+
+		const titleHeadingRegex = /<h[1-6][^>]*>\s*(?:Title|TITLE|title|T[ií]tulo|T[IÍ]TULO)\s*<\/h[1-6]>/i;
+		const abstractHeadingRegex =
+			/<h[1-6][^>]*>\s*(?:Abstract|ABSTRACT|abstract|Resumo|RESUMO|resumo)\s*<\/h[1-6]>/i;
+		const paragraphRegex = /<p[^>]*>([\s\S]*?)<\/p>/gi;
+
+		const titleHeadingMatch = titleHeadingRegex.exec(html);
+		const abstractHeadingMatch = abstractHeadingRegex.exec(html);
+
+		if (titleHeadingMatch) {
+			const startIndex = titleHeadingMatch.index + titleHeadingMatch[0].length;
+			const endIndex = abstractHeadingMatch ? abstractHeadingMatch.index : html.length;
+			const betweenTitleAndAbstract = html.substring(startIndex, endIndex);
+
+			let match: RegExpExecArray | null;
+			while ((match = paragraphRegex.exec(betweenTitleAndAbstract)) !== null) {
+				const paragraphText = cleanHtmlText(match[1]);
+				if (paragraphText.length > 0) {
+					console.log('Extracted title:', paragraphText);
+					return paragraphText;
+				}
+			}
+		}
+
+		if (abstractHeadingMatch) {
+			const beforeAbstract = html.substring(0, abstractHeadingMatch.index);
+			const allParagraphs = [...beforeAbstract.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)];
+			if (allParagraphs.length > 0) {
+				const lastParagraph = cleanHtmlText(allParagraphs[allParagraphs.length - 1][1]);
+				if (lastParagraph.length > 0) {
+					console.log('Extracted title (fallback):', lastParagraph);
+					return lastParagraph;
+				}
+			}
+		}
+
+		console.log('Could not extract title from document');
+		return '';
+	}
+
 	function extractAbstractFromHtml(html: string): string {
 		if (!html) return '';
 
@@ -313,13 +375,6 @@
 	function extractKeywordsFromHtml(html: string): string[] {
 		if (!html) return [];
 
-		const cleanText = (input: string) =>
-			input
-				.replace(/<[^>]*>/g, '')
-				.replace(/&nbsp;/g, ' ')
-				.replace(/\s+/g, ' ')
-				.trim();
-
 		const abstractHeadingRegex =
 			/<h[1-6][^>]*>\s*(?:Abstract|ABSTRACT|abstract|Resumo|RESUMO|resumo)\s*<\/h[1-6]>/i;
 		const mainHeadingRegex = /<h[1-6][^>]*>\s*(?:Main|MAIN|main)\s*<\/h[1-6]>/i;
@@ -340,7 +395,7 @@
 		const paragraphs: string[] = [];
 		let match: RegExpExecArray | null;
 		while ((match = paragraphRegex.exec(sectionBetweenAbstractAndMain)) !== null) {
-			const text = cleanText(match[1]);
+			const text = cleanHtmlText(match[1]);
 			if (text.length > 0) paragraphs.push(text);
 		}
 
@@ -403,6 +458,18 @@
 
 			// Automatically extract and fill abstract
 			if (data.html) {
+				const extractedTitle = extractTitleFromHtml(data.html);
+				console.log('Checking if should fill title... Current:', $store.title ? 'has value' : 'empty');
+
+				if (extractedTitle && !$store.title) {
+					$store.title = extractedTitle;
+					console.log('✅ Title automatically filled from DOCX');
+				} else if (extractedTitle && $store.title) {
+					console.log('⚠️ Title field already has content, not overwriting');
+				} else {
+					console.log('❌ Could not extract title from document');
+				}
+
 				const extractedAbstract = extractAbstractFromHtml(data.html);
 				console.log('Checking if should fill abstract... Current:', $store.abstract ? 'has value' : 'empty');
 				
@@ -717,6 +784,27 @@
 					You can save your progress as a draft at any time using the "Save Draft" button at the bottom of the page.
 				</p>
 			</div>
+
+			<div class="mb-6 w-full bg-surface-50 dark:bg-surface-800 border border-surface-300 dark:border-surface-700 rounded-lg p-4">
+				<h5 class="text-lg font-semibold mb-1">Upload Paper Document *</h5>
+				<p class="text-xs text-surface-600 dark:text-surface-400 mb-3">
+					Upload your paper in DOCX format first. Title, abstract, and keywords will be auto-filled when available.
+				</p>
+				<FileUpload
+					name="docx-files"
+					accept=".docx,.doc"
+					maxFiles={1}
+					subtext="Attach only 1 DOCX file."
+					onFileChange={generateDocxPreview}
+					onFileReject={console.error}
+					classes="w-full"
+					allowDrop
+				>
+					{#snippet iconInterface()}<IconDropzone class="size-8" />{/snippet}
+					{#snippet iconFile()}<IconFile class="size-4" />{/snippet}
+					{#snippet iconFileRemove()}<IconRemove class="size-4" />{/snippet}
+				</FileUpload>
+			</div>
 			<section class="mb-4 w-full">
 				<!-- <input
 					name="title"
@@ -913,9 +1001,9 @@
 					<!-- Display added classifications -->
 					{#if scopusClassifications.length > 0}
 						<div class="mb-4 space-y-2">
-							<label class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+							<div class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
 								Added Classifications:
-							</label>
+							</div>
 							<div class="flex flex-wrap gap-2">
 								{#each scopusClassifications as classification, index}
 									<div class="flex items-center gap-2 bg-primary-100 dark:bg-primary-900/30 border border-primary-300 dark:border-primary-700 rounded-lg px-3 py-2 group hover:bg-primary-200 dark:hover:bg-primary-900/50 transition-colors">
@@ -932,6 +1020,7 @@
 											onclick={() => removeScopusClassification(index)}
 											class="ml-2 text-error-600 hover:text-error-800 dark:text-error-400 dark:hover:text-error-300 transition-colors"
 											title="Remove classification"
+											aria-label="Remove classification"
 										>
 											<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
 												<path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
@@ -945,9 +1034,9 @@
 					
 					<!-- Form to add new classification -->
 					<div class="bg-white dark:bg-surface-900 rounded-lg p-3 border border-surface-300 dark:border-surface-700">
-						<label class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+						<div class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
 							Add New Classification:
-						</label>
+						</div>
 						<div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
 							<!-- Scopus Area -->
 							<div>
@@ -1108,25 +1197,6 @@
 						{#snippet iconFileRemove()}<IconRemove class="size-4" />{/snippet}
 					</FileUpload> -->
 
-					<!-- DOCX -->
-					<h5 class="text-lg font-semibold mb-1 mt-4">Upload Paper Document *</h5>
-					<p class="text-xs text-surface-600 dark:text-surface-400 mb-3">
-						Upload your paper in DOCX format. The document should contain the full text of your paper including all sections, references, and figures.
-					</p>
-					<FileUpload
-						name="docx-files"
-						accept=".docx,.doc"
-						maxFiles={1}
-						subtext="Attach only 1 DOCX file."
-						onFileChange={generateDocxPreview}
-						onFileReject={console.error}
-						classes="w-full"
-						allowDrop
-					>
-						{#snippet iconInterface()}<IconDropzone class="size-8" />{/snippet}
-						{#snippet iconFile()}<IconFile class="size-4" />{/snippet}
-						{#snippet iconFileRemove()}<IconRemove class="size-4" />{/snippet}
-					</FileUpload>
 				</div>
 			</div>
 		</section>
