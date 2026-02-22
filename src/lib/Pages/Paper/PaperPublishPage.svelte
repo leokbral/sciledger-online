@@ -65,7 +65,11 @@
 			peer_review: {
 				reviewType: 'open',
 				assignedReviewers: [],
-				responses: []
+				responses: [],
+				reviews: [],
+				averageScore: 0,
+				reviewCount: 0,
+				reviewStatus: 'completed'
 			},
 			_id: ''
 		},
