@@ -1312,7 +1312,7 @@
 					<p class="text-gray-700 mb-3 font-semibold">Please verify the following before submitting:</p>
 					<ul class="list-disc list-inside space-y-1 text-gray-700 text-sm ml-2">
 						<li>All required information is complete and accurate</li>
-						<li>PDF and DOCX files are uploaded correctly</li>
+						<li>DOCX files are uploaded correctly</li>
 						<li>All authors and affiliations are correct</li>
 						<li>Keywords and subject areas are appropriate</li>
 						<li>Abstract accurately represents your work</li>
