@@ -31,6 +31,11 @@
 	let isAddingOrcidUser = $state(false);
 	let selectedOrcidProfile = $state(false);
 
+	// Submission confirmation modal
+	let showSubmitModal = $state(false);
+	let confirmInformationAccurate = $state(false);
+	let confirmPoliciesAgreed = $state(false);
+
 	interface Props {
 		authorsOptions: any;
 		author: User;
@@ -557,11 +562,34 @@
 	}
 
 	function hdlSubmit(event: MouseEvent & { currentTarget: EventTarget & HTMLButtonElement }) {
+		// Show confirmation modal instead of directly submitting
+		showSubmitModal = true;
+	}
+
+	function confirmSubmit() {
+		if (!confirmInformationAccurate) {
+			alert('Please confirm that the information submitted is accurate.');
+			return;
+		}
+
+		if (!confirmPoliciesAgreed) {
+			alert('Please confirm that you have read and agree to the platform policies.');
+			return;
+		}
+
 		$store.status = 'under negotiation';
 		console.log($store);
 
-		hdlSaveDraft(event);
-		//savePaper($store);
+		showSubmitModal = false;
+		confirmInformationAccurate = false;
+		confirmPoliciesAgreed = false;
+		hdlSaveDraft(event as any);
+	}
+
+	function cancelSubmit() {
+		showSubmitModal = false;
+		confirmInformationAccurate = false;
+		confirmPoliciesAgreed = false;
 	}
 
 	// function save() {
@@ -1268,4 +1296,71 @@
 			</button>
 		{/if}
 	</div>
+
+	<!-- Submission Confirmation Modal -->
+	{#if showSubmitModal}
+		<div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onclick={cancelSubmit}>
+			<div class="bg-white rounded-lg p-6 max-w-md w-full mx-4" onclick={(e) => e.stopPropagation()}>
+				<h2 class="text-2xl font-bold text-gray-900 mb-4">⚠️ Confirm Submission</h2>
+				
+				<div class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+					<p class="text-yellow-800 font-semibold mb-2">Important: This action cannot be undone!</p>
+					<p class="text-gray-700">Once you submit your article for review, you will not be able to edit it until the review process is complete.</p>
+				</div>
+
+				<div class="mb-6">
+					<p class="text-gray-700 mb-3 font-semibold">Please verify the following before submitting:</p>
+					<ul class="list-disc list-inside space-y-1 text-gray-700 text-sm ml-2">
+						<li>All required information is complete and accurate</li>
+						<li>PDF and DOCX files are uploaded correctly</li>
+						<li>All authors and affiliations are correct</li>
+						<li>Keywords and subject areas are appropriate</li>
+						<li>Abstract accurately represents your work</li>
+					</ul>
+				</div>
+
+				<div class="mb-4">
+					<label class="flex items-start gap-2 cursor-pointer">
+						<input 
+							type="checkbox" 
+							bind:checked={confirmInformationAccurate}
+							class="mt-1 w-4 h-4 text-primary-500 rounded"
+						/>
+						<span class="text-sm text-gray-700">
+							I confirm that all information submitted in this article is accurate and truthful. I understand that submitting false or misleading information may result in rejection or retraction of the article.
+						</span>
+					</label>
+				</div>
+
+				<div class="mb-6">
+					<label class="flex items-start gap-2 cursor-pointer">
+						<input 
+							type="checkbox" 
+							bind:checked={confirmPoliciesAgreed}
+							class="mt-1 w-4 h-4 text-primary-500 rounded"
+						/>
+						<span class="text-sm text-gray-700">
+							I have read and agree to the <a href="/policies" target="_blank" class="text-primary-500 hover:text-primary-600 underline font-semibold">platform policies</a>, including publishing ethics, data sharing, and conflict of interest guidelines.
+						</span>
+					</label>
+				</div>
+
+				<div class="flex gap-3 justify-end">
+					<button 
+						class="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300"
+						onclick={cancelSubmit}
+					>
+						Cancel
+					</button>
+					<button 
+						class="px-4 py-2 text-white rounded-lg {(confirmInformationAccurate && confirmPoliciesAgreed) ? 'bg-primary-500 hover:bg-primary-600' : 'bg-gray-400 cursor-not-allowed'}"
+						onclick={confirmSubmit}
+						disabled={!confirmInformationAccurate || !confirmPoliciesAgreed}
+					>
+						Confirm & Submit
+					</button>
+				</div>
+			</div>
+		</div>
+	{/if}
 </main>

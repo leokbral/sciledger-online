@@ -5,6 +5,7 @@
 
 	let editor: any = $state();
 	let previousContent = $state('');
+	let isInternalChange = false;
 
 	interface Props {
 		id: string;
@@ -15,7 +16,6 @@
 
 	let { id, content = $bindable(''), placeholder = 'Enter text...', minHeight = '200px' }: Props = $props();
 
-	// Insere estrutura inicial do artigo
 	function insertArticleTemplate() {
 		const templateHTML = `
 			<h2><strong>Main</strong></h2>
@@ -42,19 +42,16 @@
 		}
 	}
 
-	// Adiciona referência no texto e lista
 	function addReference() {
 		const contentHTML = editor.root.innerHTML;
 		const refMatches = contentHTML.match(/\[\d+\]/g) || [];
 		const nextRefNumber = refMatches.length + 1;
 
-		// Insere [n] no local do cursor
 		const range = editor.getSelection();
 		if (range) {
 			editor.insertText(range.index, `[${nextRefNumber}]`);
 		}
 
-		// Tenta localizar <ol> de referências
 		const refContainer = editor.root.querySelector('ol');
 		if (refContainer) {
 			const newRef = document.createElement('li');
@@ -71,7 +68,6 @@
 		}
 	}
 
-	// Função opcional: transforma [n] em links clicáveis no HTML exportado
 	function processReferences(html: string): string {
 		return html.replace(/\[(\d+)\]/g, (_match, num) => {
 			return `<a href="#ref-${num}">[${num}]</a>`;
@@ -81,7 +77,6 @@
 	onMount(async () => {
 		const Quill = (await import('quill')).default;
 
-		// Define toolbar baseada no id - título tem opções limitadas
 		const toolbarConfig = id === 'title' 
 			? [
 				['bold', 'italic', 'underline'],
@@ -104,11 +99,7 @@
 			placeholder,
 			modules: {
 				toolbar: {
-					container: toolbarConfig,
-					// handlers: {
-					// 	template: insertArticleTemplate,
-					// 	addRef: addReference
-					// }
+					container: toolbarConfig
 				}
 			}
 		});
@@ -129,8 +120,9 @@
 				addRefButton.style.minWidth = '2.5rem';
 			}
 		}
-		// Atualiza conteúdo com HTML sanitizado
 		editor.on('text-change', () => {
+			isInternalChange = true;
+			
 			const rawHTML = editor.root.innerHTML;
 
 			const safeHTML = sanitizeHtml(rawHTML, {
@@ -165,23 +157,32 @@
 				allowedSchemes: ['http', 'https', 'mailto']
 			});
 
-			// Processa para transformar [n] em links
 			content = processReferences(safeHTML);
+			previousContent = content;
+			
+			setTimeout(() => {
+				isInternalChange = false;
+			}, 0);
 		});
 
-		// Se houver conteúdo inicial, insere no editor
 		if (content) {
 			editor.root.innerHTML = content;
 			previousContent = content;
 		}
 	});
 
-	// Sincroniza mudanças externas do content com o editor
 	$effect(() => {
-		if (editor && content && content !== previousContent) {
-			console.log('🔄 Atualizando editor com novo conteúdo');
+		if (editor && content !== previousContent && !isInternalChange) {
+			const selection = editor.getSelection();
+			
 			editor.root.innerHTML = content;
 			previousContent = content;
+			
+			if (selection) {
+				const newLength = editor.getLength();
+				const safeIndex = Math.min(selection.index, newLength - 1);
+				editor.setSelection(safeIndex, 0);
+			}
 		}
 	});
 </script>

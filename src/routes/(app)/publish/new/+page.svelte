@@ -28,7 +28,7 @@
 			const response = await post(`/publish/new`, paper);
 
 			if (response.paper) {
-				goto(`/publish/new/${response.paper.id}`);
+				goto(`/publish/edit/${response.paper.id}`);
 			} else {
 				console.log(paper);
 				alert(`Issue! ${JSON.stringify(response)}`);
