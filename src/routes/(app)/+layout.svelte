@@ -141,7 +141,14 @@
 		</aside>
 	</div>
 	<!-- Footer -->
-	<footer class="bg-blue-500 p-4">(footer)</footer>
+	<footer class="mt-8 border-t border-primary-700 bg-primary-500 p-4 text-primary-contrast-500">
+		<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+			<div class="flex flex-col items-center justify-between gap-2 text-center sm:flex-row sm:text-left">
+				<p class="text-sm font-semibold">SciLedger</p>
+				<p class="text-xs opacity-90">© 2026 • All rights reserved.</p>
+			</div>
+		</div>
+	</footer>
 </div>
 <Toaster {toaster} />
 

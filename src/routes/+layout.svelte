@@ -27,5 +27,8 @@
 	//storePopup.set({ computePosition, autoUpdate, flip, shift, offset, arrow });
 </script>
 
-
-{@render children?.()}
+<div class="min-h-screen flex flex-col">
+	<main class="flex-1">
+		{@render children?.()}
+	</main>
+</div>
