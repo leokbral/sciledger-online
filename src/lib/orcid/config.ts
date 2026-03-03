@@ -8,7 +8,20 @@ export type OrcidConfig = {
 
 function isPlaceholder(value?: string): boolean {
 	if (!value) return true;
-	return value.includes('YOUR_') || value.includes('your-');
+	// Trim whitespace and check for placeholders
+	const trimmed = value.trim();
+	return trimmed.includes('YOUR_') || trimmed.includes('your-');
+}
+
+/**
+ * Trim whitespace from environment variables
+ * Prevents issues like "ORCID_REDIRECT_URI= https://..." (with leading space)
+ */
+function safeEnv(value?: string): string | undefined {
+	if (!value) return undefined;
+	const trimmed = value.trim();
+	if (!trimmed) return undefined;
+	return trimmed;
 }
 
 /**
@@ -22,16 +35,17 @@ function isPlaceholder(value?: string): boolean {
 export function getOrcidConfig(): OrcidConfig | null {
 	console.log('[OrcidConfig] Loading configuration...');
 	
-	const ORCID_CLIENT_ID = env.ORCID_CLIENT_ID;
-	const ORCID_CLIENT_SECRET = env.ORCID_CLIENT_SECRET;
-	const ORCID_REDIRECT_URI = env.ORCID_REDIRECT_URI;
-	const ORCID_PROD_CLIENT_ID = env.ORCID_PROD_CLIENT_ID;
-	const ORCID_PROD_CLIENT_SECRET = env.ORCID_PROD_CLIENT_SECRET;
-	const ORCID_PROD_REDIRECT_URI = env.ORCID_PROD_REDIRECT_URI;
-	const ORCID_SANDBOX_CLIENT_ID = env.ORCID_SANDBOX_CLIENT_ID;
-	const ORCID_SANDBOX_CLIENT_SECRET = env.ORCID_SANDBOX_CLIENT_SECRET;
-	const ORCID_SANDBOX_REDIRECT_URI = env.ORCID_SANDBOX_REDIRECT_URI;
-	const NODE_ENV = env.NODE_ENV;
+	// Trim all environment variables to handle leading/trailing spaces
+	const ORCID_CLIENT_ID = safeEnv(env.ORCID_CLIENT_ID);
+	const ORCID_CLIENT_SECRET = safeEnv(env.ORCID_CLIENT_SECRET);
+	const ORCID_REDIRECT_URI = safeEnv(env.ORCID_REDIRECT_URI);
+	const ORCID_PROD_CLIENT_ID = safeEnv(env.ORCID_PROD_CLIENT_ID);
+	const ORCID_PROD_CLIENT_SECRET = safeEnv(env.ORCID_PROD_CLIENT_SECRET);
+	const ORCID_PROD_REDIRECT_URI = safeEnv(env.ORCID_PROD_REDIRECT_URI);
+	const ORCID_SANDBOX_CLIENT_ID = safeEnv(env.ORCID_SANDBOX_CLIENT_ID);
+	const ORCID_SANDBOX_CLIENT_SECRET = safeEnv(env.ORCID_SANDBOX_CLIENT_SECRET);
+	const ORCID_SANDBOX_REDIRECT_URI = safeEnv(env.ORCID_SANDBOX_REDIRECT_URI);
+	const NODE_ENV = safeEnv(env.NODE_ENV);
 
 	console.log('[OrcidConfig] NODE_ENV:', NODE_ENV);
 	console.log('[OrcidConfig] Available variables:');
