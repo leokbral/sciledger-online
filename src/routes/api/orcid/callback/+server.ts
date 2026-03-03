@@ -37,17 +37,27 @@ function buildSessionCookie(user: SessionUser): string {
  */
 export const GET: RequestHandler = async ({ url, request }) => {
 	try {
+		console.log('[ORCID Callback] === STARTING ORCID CALLBACK ===');
+		
 		// Inicia conexão com MongoDB
+		console.log('[ORCID Callback] Connecting to MongoDB...');
 		await start_mongo();
+		console.log('[ORCID Callback] MongoDB connected');
 
 		// Obtém os parâmetros da URL
 		const authorizationCode = url.searchParams.get('code');
 		const errorParam = url.searchParams.get('error');
 		const state = url.searchParams.get('state');
 
+		console.log('[ORCID Callback] URL params:', { 
+			authorizationCode: authorizationCode ? 'received' : 'MISSING',
+			errorParam: errorParam || 'none',
+			state: state ? state.substring(0, 8) + '...' : 'MISSING'
+		});
+
 		// Se o usuário negar a autorização no ORCID, a plataforma retorna `error`.
 		if (errorParam) {
-			console.warn('ORCID authorization error:', errorParam);
+			console.error('[ORCID Callback] ORCID authorization error:', errorParam);
 			return redirect(302, `/login?error=${errorParam}`);
 		}
 
@@ -63,49 +73,79 @@ export const GET: RequestHandler = async ({ url, request }) => {
 			}
 		}
 
+		console.log('[ORCID Callback] State validation:', { 
+			stateFromUrl: state ? state.substring(0, 8) + '...' : 'MISSING',
+			stateFromCookie: expectedState ? expectedState.substring(0, 8) + '...' : 'MISSING',
+			match: state === expectedState
+		});
+
 		if (!state || !expectedState || state !== expectedState) {
-			console.error('Invalid ORCID OAuth state');
+			console.error('[ORCID Callback] Invalid ORCID OAuth state - CSRF protection triggered');
 			return redirect(302, '/login?error=invalid_orcid_state');
 		}
 
 		// Valida se recebemos o código
 		if (!authorizationCode) {
-			console.error('No authorization code received from ORCID');
+			console.error('[ORCID Callback] No authorization code received from ORCID');
 			return redirect(302, '/login?error=no_authorization_code');
 		}
 
 		// PASSO 1: Troca o authorization_code por access_token
-		console.log('Exchanging ORCID authorization code...');
-		const tokenResponse = await exchangeOrcidCode(authorizationCode);
+		console.log('[ORCID Callback] PASSO 1: Exchanging authorization code for access token...');
+		let tokenResponse;
+		try {
+			tokenResponse = await exchangeOrcidCode(authorizationCode);
+			console.log('[ORCID Callback] Token exchange success:', { orcid: tokenResponse.orcid });
+		} catch (err) {
+			console.error('[ORCID Callback] Token exchange failed:', err instanceof Error ? err.message : err);
+			return redirect(302, '/login?error=token_exchange_failed');
+		}
 		
 		if (!tokenResponse.access_token || !tokenResponse.orcid) {
-			console.error('Failed to get access token from ORCID');
+			console.error('[ORCID Callback] Invalid token response:', { 
+				hasAccessToken: !!tokenResponse.access_token,
+				hasOrcid: !!tokenResponse.orcid,
+				keys: Object.keys(tokenResponse)
+			});
 			return redirect(302, '/login?error=token_exchange_failed');
 		}
 
-		console.log(`Successfully obtained ORCID access token for ORCID: ${tokenResponse.orcid}`);
+		console.log(`[ORCID Callback] ✓ Successfully obtained access token for ORCID: ${tokenResponse.orcid}`);
 
 		// PASSO 2: Busca dados do usuário no ORCID
-		const userData: OrcidUserData = await fetchOrcidUserData(tokenResponse.orcid, tokenResponse.access_token);
-		userData.orcid = tokenResponse.orcid;
-		userData.name = userData.name || tokenResponse.name || '';
+		console.log('[ORCID Callback] PASSO 2: Fetching user data from ORCID...');
+		let userData: OrcidUserData;
+		try {
+			userData = await fetchOrcidUserData(tokenResponse.orcid, tokenResponse.access_token);
+			userData.orcid = tokenResponse.orcid;
+			userData.name = userData.name || tokenResponse.name || '';
 
-		// Se não tem firstName/lastName separados, tenta dividir o name
-		if (!userData.firstName && userData.name) {
-			const nameParts = userData.name.split(' ');
-			userData.firstName = nameParts[0];
-			userData.lastName = nameParts.slice(1).join(' ') || '';
+			// Se não tem firstName/lastName separados, tenta dividir o name
+			if (!userData.firstName && userData.name) {
+				const nameParts = userData.name.split(' ');
+				userData.firstName = nameParts[0];
+				userData.lastName = nameParts.slice(1).join(' ') || '';
+			}
+
+			console.log('[ORCID Callback] ✓ User data fetched:', { 
+				orcid: userData.orcid, 
+				email: userData.email || 'NO EMAIL',
+				firstName: userData.firstName,
+				lastName: userData.lastName
+			});
+		} catch (err) {
+			console.error('[ORCID Callback] Failed to fetch user data:', err instanceof Error ? err.message : err);
+			return redirect(302, '/login?error=fetch_user_data_failed');
 		}
-
-		console.log('Extracted ORCID user data:', { orcid: userData.orcid, email: userData.email });
 
 		// PASSO 3: Verifica se usuário já existe
 		// Busca por ORCID primeiro
+		console.log('[ORCID Callback] PASSO 3: Checking if user exists...');
 		let existingUser = await Users.findOne({ orcid: userData.orcid });
 
 		if (existingUser) {
 			// Usuário já existe e já foi conectado ao ORCID antes
-			console.log('User already exists with this ORCID. Logging in...');
+			console.log('[ORCID Callback] ✓ User already exists with this ORCID. Logging in...', { userId: existingUser._id });
 			
 			// Atualiza tokens ORCID (no caso de refresh)
 			existingUser.orcidAccessToken = tokenResponse.access_token;
@@ -113,7 +153,14 @@ export const GET: RequestHandler = async ({ url, request }) => {
 				existingUser.orcidRefreshToken = tokenResponse.refresh_token;
 			}
 			existingUser.updatedAt = new Date().toISOString();
-			await existingUser.save();
+			
+			try {
+				await existingUser.save();
+				console.log('[ORCID Callback] ✓ Tokens updated for existing user');
+			} catch (err) {
+				console.error('[ORCID Callback] ✗ Failed to update tokens:', err);
+				throw err;
+			}
 
 			const sessionUser: SessionUser = {
 				id: existingUser.id || existingUser._id?.toString(),
@@ -133,6 +180,7 @@ export const GET: RequestHandler = async ({ url, request }) => {
 			headers.append('set-cookie', 'orcid_oauth_state=deleted; Path=/; HttpOnly; SameSite=Lax; Max-Age=0');
 			headers.append('set-cookie', 'orcid_oauth_return_to=deleted; Path=/; HttpOnly; SameSite=Lax; Max-Age=0');
 
+			console.log('[ORCID Callback] ✓ Session cookie set. Redirecting to:', returnTo);
 			return new Response(null, {
 				status: 302,
 				headers
@@ -142,13 +190,16 @@ export const GET: RequestHandler = async ({ url, request }) => {
 		// Se não existe por ORCID, busca por email (para associação)
 		if (userData.email) {
 			existingUser = await Users.findOne({ email: userData.email });
+			if (existingUser) {
+				console.log('[ORCID Callback] Found user by email:', existingUser._id);
+			}
 		}
 
 		// PASSO 4: Lógica de criar novo usuário ou associar ORCID
 		if (!existingUser) {
 			// Não existe usuário com esse ORCID nem com esse email
 			// Cria novo usuário
-			console.log('Creating new user with ORCID...');
+			console.log('[ORCID Callback] PASSO 4: Creating new user with ORCID...');
 
 			// Gera ID e username único
 			const userId = crypto.randomUUID();
@@ -163,6 +214,8 @@ export const GET: RequestHandler = async ({ url, request }) => {
 				username = `@${baseUsername}${counter}`;
 				counter++;
 			}
+
+			console.log('[ORCID Callback] Generated username:', username);
 
 			// Cria novo usuário com senha aleatória em hash (fluxo principal é OAuth)
 			const generatedPassword = crypto.randomUUID();
@@ -192,20 +245,37 @@ export const GET: RequestHandler = async ({ url, request }) => {
 				updatedAt: new Date().toISOString()
 			};
 
-			console.log('New user data prepared:', { userId, username, email: newUserData.email, orcid: userData.orcid });
+			console.log('[ORCID Callback] New user data prepared:', { 
+				userId, 
+				username, 
+				email: newUserData.email, 
+				orcid: userData.orcid,
+				firstName: userData.firstName,
+				lastName: userData.lastName
+			});
 
 			existingUser = new Users(newUserData);
 			
 			try {
-				await existingUser.save();
-				console.log(`✓ New user successfully saved with ID ${userId} and ORCID ${userData.orcid}`);
+				const savedUser = await existingUser.save();
+				console.log(`[ORCID Callback] ✓ New user successfully saved:`);
+				console.log(`  - User ID: ${userId}`);
+				console.log(`  - Username: ${username}`);
+				console.log(`  - Email: ${newUserData.email}`);
+				console.log(`  - ORCID: ${userData.orcid}`);
+				console.log(`  - Saved Document ID: ${savedUser._id}`);
 			} catch (saveError) {
-				console.error('✗ Failed to save new user:', saveError);
+				console.error('[ORCID Callback] ✗ Failed to save new user');
+				console.error('  Error:', saveError);
+				if (saveError instanceof Error) {
+					console.error('  Message:', saveError.message);
+					console.error('  Stack:', saveError.stack);
+				}
 				throw saveError;
 			}
 		} else {
 			// Usuário existe com esse email, associa ORCID
-			console.log(`User exists with email ${userData.email}. Associating ORCID...`);
+			console.log(`[ORCID Callback] PASSO 4: User exists with email ${userData.email}. Associating ORCID...`);
 
 			existingUser.orcid = userData.orcid;
 			existingUser.orcidAccessToken = tokenResponse.access_token;
@@ -214,12 +284,19 @@ export const GET: RequestHandler = async ({ url, request }) => {
 			}
 			existingUser.emailVerified = true; // Marca como verificado via ORCID
 			existingUser.updatedAt = new Date().toISOString();
-			await existingUser.save();
-
-			console.log(`ORCID ${userData.orcid} associated with existing user ${existingUser._id}`);
+			
+			try {
+				await existingUser.save();
+				console.log(`[ORCID Callback] ✓ ORCID ${userData.orcid} associated with existing user ${existingUser._id}`);
+			} catch (err) {
+				console.error('[ORCID Callback] ✗ Failed to associate ORCID:', err);
+				throw err;
+			}
 		}
 
 		// PASSO 5: Login usando o mesmo cookie do fluxo atual e redireciona para app.
+		console.log('[ORCID Callback] PASSO 5: Creating session and logging in...');
+		
 		const sessionUser: SessionUser = {
 			id: existingUser.id || existingUser._id?.toString(),
 			email: existingUser.email,
@@ -232,21 +309,35 @@ export const GET: RequestHandler = async ({ url, request }) => {
 			orcid: existingUser.orcid
 		};
 
+		console.log('[ORCID Callback] Session user:', { 
+			id: sessionUser.id,
+			email: sessionUser.email,
+			username: sessionUser.username,
+			orcid: sessionUser.orcid
+		});
+
 		const headers = new Headers();
 		headers.set('location', returnTo || '/');
 		headers.append('set-cookie', buildSessionCookie(sessionUser));
 		headers.append('set-cookie', 'orcid_oauth_state=deleted; Path=/; HttpOnly; SameSite=Lax; Max-Age=0');
 		headers.append('set-cookie', 'orcid_oauth_return_to=deleted; Path=/; HttpOnly; SameSite=Lax; Max-Age=0');
 
+		console.log('[ORCID Callback] ✓✓✓ SUCCESS! Redirecting to:', returnTo || '/');
 		return new Response(null, {
 			status: 302,
 			headers
 		});
 	} catch (error) {
-		console.error('ORCID callback error:', error);
+		console.error('[ORCID Callback] === FINAL ERROR ===');
+		console.error('Error:', error);
+		if (error instanceof Error) {
+			console.error('Message:', error.message);
+			console.error('Stack:', error.stack);
+		}
 		
 		// Tenta retornar erro detalhado em modo de desenvolvimento
 		const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+		console.error('[ORCID Callback] Redirecting to error page with message:', errorMessage);
 		return redirect(302, `/login?error=orcid_callback_error&details=${encodeURIComponent(errorMessage)}`);
 	}
 };

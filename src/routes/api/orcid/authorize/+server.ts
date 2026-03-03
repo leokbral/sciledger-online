@@ -14,10 +14,22 @@ import { getOrcidConfig } from '$lib/orcid/config';
 export const GET: RequestHandler = async ({ url }) => {
 	try {
 		const orcidConfig = getOrcidConfig();
+		
+		console.log('[ORCID Authorize] Starting authorization flow');
+		console.log('[ORCID Authorize] NODE_ENV:', process.env.NODE_ENV);
+		console.log('[ORCID Authorize] Config resolved:', orcidConfig ? 'YES' : 'NO');
+		
 		if (!orcidConfig) {
-			console.error('ORCID configuration missing');
+			console.error('[ORCID Authorize] ORCID configuration missing');
+			console.error('[ORCID Authorize] Available env vars:');
+			console.error('  ORCID_CLIENT_ID:', process.env.ORCID_CLIENT_ID ? '***set***' : 'MISSING');
+			console.error('  ORCID_PROD_CLIENT_ID:', process.env.ORCID_PROD_CLIENT_ID ? '***set***' : 'MISSING');
+			console.error('  ORCID_SANDBOX_CLIENT_ID:', process.env.ORCID_SANDBOX_CLIENT_ID ? '***set***' : 'MISSING');
 			throw new Error('ORCID OAuth is not properly configured');
 		}
+
+		console.log('[ORCID Authorize] Config found - ClientID starts with:', orcidConfig.clientId.substring(0, 5));
+		console.log('[ORCID Authorize] Redirect URI:', orcidConfig.redirectUri);
 
 		// `returnTo` permite voltar para uma rota específica após autenticação.
 		// Exemplo: /api/orcid/authorize?returnTo=/dashboard
@@ -38,6 +50,8 @@ export const GET: RequestHandler = async ({ url }) => {
 		// Produção por padrão.
 		const orcidAuthUrl = `https://orcid.org/oauth/authorize?${params.toString()}`;
 
+		console.log('[ORCID Authorize] Redirecting to ORCID:', orcidAuthUrl.substring(0, 80) + '...');
+
 		// Salva estado e destino em cookies HttpOnly temporários.
 		const headers = new Headers();
 		headers.set('location', orcidAuthUrl);
@@ -49,7 +63,8 @@ export const GET: RequestHandler = async ({ url }) => {
 			headers
 		});
 	} catch (err) {
-		console.error('OAuth authorize error:', err);
+		console.error('[ORCID Authorize] ERROR:', err);
+		console.error('[ORCID Authorize] Stack:', err instanceof Error ? err.stack : 'No stack');
 		redirect(302, '/login?error=orcid_auth_failed');
 	}
 };

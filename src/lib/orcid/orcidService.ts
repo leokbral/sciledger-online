@@ -47,10 +47,15 @@ const ORCID_API_BASE = 'https://pub.orcid.org/v3.0';
  */
 export async function exchangeOrcidCode(authorizationCode: string): Promise<OrcidTokenResponse> {
 	try {
+		console.log('[OrcidService] Exchanging authorization code for access token...');
+		
 		const orcidConfig = getOrcidConfig();
 		if (!orcidConfig) {
+			console.error('[OrcidService] ORCID configuration is missing');
 			throw new Error('ORCID configuration is missing');
 		}
+
+		console.log('[OrcidService] Config loaded - ClientID:', orcidConfig.clientId.substring(0, 5) + '...');
 
 		// Corpo da requisição para trocar o code por token
 		const tokenParams = new URLSearchParams({
@@ -60,6 +65,9 @@ export async function exchangeOrcidCode(authorizationCode: string): Promise<Orci
 			grant_type: 'authorization_code',
 			redirect_uri: orcidConfig.redirectUri
 		});
+
+		console.log('[OrcidService] POST to:', `${ORCID_OAUTH_BASE}/oauth/token`);
+		console.log('[OrcidService] Redirect URI:', orcidConfig.redirectUri);
 
 		// Faz a requisição POST ao ORCID
 		const response = await fetch(`${ORCID_OAUTH_BASE}/oauth/token`, {
@@ -71,11 +79,13 @@ export async function exchangeOrcidCode(authorizationCode: string): Promise<Orci
 			body: tokenParams.toString()
 		});
 
+		console.log('[OrcidService] Token response status:', response.status, response.statusText);
+
 		// Verifica se a requisição foi bem-sucedida
 		if (!response.ok) {
 			const errorData = await response.text();
-			console.error('ORCID token exchange failed:', errorData);
-			throw new Error(`Failed to exchange authorization code: ${response.statusText}`);
+			console.error('[OrcidService] Token exchange failed. Response:', errorData);
+			throw new Error(`Failed to exchange authorization code: ${response.statusText} - ${errorData}`);
 		}
 
 		// Extrai e retorna o token
@@ -97,7 +107,10 @@ export async function exchangeOrcidCode(authorizationCode: string): Promise<Orci
  */
 export async function fetchOrcidUserData(orcidId: string, accessToken: string): Promise<OrcidUserData> {
 	try {
+		console.log('[OrcidService] Fetching user data for ORCID:', orcidId);
+		
 		// Busca dados pessoais
+		console.log('[OrcidService] Fetching person data from:', `${ORCID_API_BASE}/${orcidId}/person`);
 		const personResponse = await fetch(`${ORCID_API_BASE}/${orcidId}/person`, {
 			method: 'GET',
 			headers: {
@@ -106,14 +119,22 @@ export async function fetchOrcidUserData(orcidId: string, accessToken: string): 
 			}
 		});
 
+		console.log('[OrcidService] Person response status:', personResponse.status, personResponse.statusText);
+
 		if (!personResponse.ok) {
-			console.error('Failed to fetch ORCID person data:', personResponse.statusText);
+			const errorText = await personResponse.text();
+			console.error('[OrcidService] Failed to fetch ORCID person data:', personResponse.statusText, errorText);
 			throw new Error('Failed to fetch user data from ORCID');
 		}
 
 		const personData = (await personResponse.json()) as OrcidPersonResponse;
+		console.log('[OrcidService] Person data received:', { 
+			givenNames: personData.name?.['given-names']?.value,
+			familyName: personData.name?.['family-name']?.value
+		});
 
 		// Busca email em endpoint específico (pode retornar vazio dependendo de permissões/privacidade)
+		console.log('[OrcidService] Fetching email data from:', `${ORCID_API_BASE}/${orcidId}/email`);
 		const emailResponse = await fetch(`${ORCID_API_BASE}/${orcidId}/email`, {
 			method: 'GET',
 			headers: {
@@ -122,17 +143,31 @@ export async function fetchOrcidUserData(orcidId: string, accessToken: string): 
 			}
 		});
 
+		console.log('[OrcidService] Email response status:', emailResponse.status, emailResponse.statusText);
+
 		let email: string | undefined;
 		if (emailResponse.ok) {
 			const emailData = (await emailResponse.json()) as OrcidEmailsResponse;
 			if (Array.isArray(emailData.email) && emailData.email.length > 0) {
 				const primary = emailData.email.find((e) => e.primary && e.verified);
 				email = primary?.email || emailData.email[0]?.email;
+				console.log('[OrcidService] Email found:', email);
+			} else {
+				console.log('[OrcidService] No email found in response');
 			}
+		} else {
+			console.log('[OrcidService] Email endpoint not OK, email will be empty');
 		}
 
 		const firstName = personData.name?.['given-names']?.value || '';
 		const lastName = personData.name?.['family-name']?.value || '';
+
+		console.log('[OrcidService] User data prepared:', { 
+			orcid: orcidId, 
+			email: email || 'MISSING',
+			firstName,
+			lastName
+		});
 
 		return {
 			orcid: orcidId,
@@ -142,7 +177,11 @@ export async function fetchOrcidUserData(orcidId: string, accessToken: string): 
 			name: `${firstName} ${lastName}`.trim()
 		};
 	} catch (error) {
-		console.error('Error fetching ORCID user data:', error);
+		console.error('[OrcidService] Error fetching ORCID user data:', error);
+		if (error instanceof Error) {
+			console.error('[OrcidService] Message:', error.message);
+			console.error('[OrcidService] Stack:', error.stack);
+		}
 		throw error;
 	}
 }
