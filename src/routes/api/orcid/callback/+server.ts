@@ -192,10 +192,17 @@ export const GET: RequestHandler = async ({ url, request }) => {
 				updatedAt: new Date().toISOString()
 			};
 
-			existingUser = new Users(newUserData);
-			await existingUser.save();
+			console.log('New user data prepared:', { userId, username, email: newUserData.email, orcid: userData.orcid });
 
-			console.log(`New user created with ID ${userId} and ORCID ${userData.orcid}`);
+			existingUser = new Users(newUserData);
+			
+			try {
+				await existingUser.save();
+				console.log(`✓ New user successfully saved with ID ${userId} and ORCID ${userData.orcid}`);
+			} catch (saveError) {
+				console.error('✗ Failed to save new user:', saveError);
+				throw saveError;
+			}
 		} else {
 			// Usuário existe com esse email, associa ORCID
 			console.log(`User exists with email ${userData.email}. Associating ORCID...`);

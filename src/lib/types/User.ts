@@ -35,6 +35,10 @@ export type User = {
     following: User[]; // IDs dos usuários seguidos
     papers: Paper[]; // IDs das publicações do usuário
     hubs?: string[]; // IDs dos hubs associados ao usuário
+    // OAuth ORCID Integration
+    orcid?: string; // ORCID iD do usuário (ex: 0000-0001-2345-6789)
+    orcidAccessToken?: string; // Token de acesso ORCID para APIs
+    orcidRefreshToken?: string; // Token de refresh ORCID para renovação
     createdAt: Date; // Data de criação
     updatedAt: Date; // Data de atualização
 };
