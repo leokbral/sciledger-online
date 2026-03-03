@@ -90,6 +90,14 @@
 						class="ml-2 inline [filter:invert(36%)_sepia(93%)_saturate(1826%)_hue-rotate(202deg)_brightness(97%)_contrast(92%)] group-hover:[filter:brightness(0)_invert(1)]"
 					/>
 				</button>
+				<a
+					href="/api/orcid/authorize?returnTo=/"
+					rel="external"
+					data-sveltekit-preload-data="off"
+					class="mt-4 inline-flex items-center justify-center gap-2 rounded-md border border-emerald-600 px-4 py-2 font-semibold text-emerald-700 hover:bg-emerald-50"
+				>
+					Sign in with ORCID
+				</a>
 				<div class="flex flex-col">
 					<a href="/recovery" class="text-center text-primary-500 mt-4">Forgotten your password?</a>
 					<a href="/register" class="text-center text-primary-500 mt-4">Sign up</a>

@@ -245,6 +245,15 @@
 				<p class="text-purple-600">Processing...</p>
 			{/if}
 
+			<a
+				href="/api/orcid/authorize?returnTo=/"
+				rel="external"
+				data-sveltekit-preload-data="off"
+				class="w-full inline-flex items-center justify-center gap-2 rounded-md border border-emerald-600 px-4 py-2 font-semibold text-emerald-700 hover:bg-emerald-50"
+			>
+				Register with ORCID
+			</a>
+
 			<div class="flex items-center justify-between mt-6">
 				<a href="/login" class="text-sm text-primary-600 hover:underline"
 					>Already have an account?</a

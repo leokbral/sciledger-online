@@ -35,6 +35,10 @@ export const UserSchema: Schema = new Schema({
     following: [{ type: String, ref: 'User' }], // IDs dos usuários seguidos
     papers: [{ type: String, ref: 'Paper' }], // IDs das publicações do usuário
     hubs: [{ type: String, ref: 'Hub', default: [] }], // IDs dos hubs do usuário
+    // OAuth ORCID Integration
+    orcid: { type: String, unique: true, sparse: true }, // ORCID iD do usuário (ex: 0000-0001-2345-6789)
+    orcidAccessToken: { type: String }, // Token de acesso ORCID para APIs
+    orcidRefreshToken: { type: String }, // Token de refresh ORCID para renovação
     createdAt: { type: String, default: () => new Date().toISOString() },
     updatedAt: { type: String, default: () => new Date().toISOString() }
 });
