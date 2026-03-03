@@ -10,11 +10,16 @@ export const UserSchema: Schema = new Schema({
     dob: { type: String, required: true, unique: false }, // Date of Birth
     username: { type: String, required: true, unique: true }, // Handle do usuário, único e obrigatório
     email: { type: String, required: true, unique: true }, // Email do usuário
-    password: { type: String, required: true }, // Senha do usuário
+    password: { type: String, required: false }, // Senha do usuário (opcional para login via ORCID)
     refreshToken: { type: String }, // Token para gerenciar sessões de login
     resetPasswordToken: { type: String },
     resetPasswordExpiry: { type: String }, // Expiração do token de recuperação de senha
     emailVerified: { type: Boolean, default: false }, // Verificação de email
+    // Campos ORCID OAuth
+    orcid: { type: String, unique: true, sparse: true }, // ORCID iD do usuário
+    orcidAccessToken: { type: String }, // Access token do ORCID
+    orcidRefreshToken: { type: String }, // Refresh token do ORCID
+    orcidTokenExpiry: { type: Date }, // Data de expiração do token ORCID
     darkMode: { type: Boolean, default: false }, // Tema escuro
     roles: { // Definição de roles do usuário
         author: { type: Boolean, default: true },
@@ -35,10 +40,6 @@ export const UserSchema: Schema = new Schema({
     following: [{ type: String, ref: 'User' }], // IDs dos usuários seguidos
     papers: [{ type: String, ref: 'Paper' }], // IDs das publicações do usuário
     hubs: [{ type: String, ref: 'Hub', default: [] }], // IDs dos hubs do usuário
-    // OAuth ORCID Integration
-    orcid: { type: String, unique: true, sparse: true }, // ORCID iD do usuário (ex: 0000-0001-2345-6789)
-    orcidAccessToken: { type: String }, // Token de acesso ORCID para APIs
-    orcidRefreshToken: { type: String }, // Token de refresh ORCID para renovação
     createdAt: { type: String, default: () => new Date().toISOString() },
     updatedAt: { type: String, default: () => new Date().toISOString() }
 });

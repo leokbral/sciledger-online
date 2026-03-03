@@ -1,3 +1,5 @@
+import { error } from '@sveltejs/kit';
+
 export async function load({ params }) {
     const orcidId = params.id;
     
@@ -13,7 +15,7 @@ export async function load({ params }) {
         });
         
         if (!response.ok) {
-            throw new Error('ORCID profile not found');
+            throw error(404, 'ORCID profile not found');
         }
         
         const profile = await response.json();
@@ -21,7 +23,7 @@ export async function load({ params }) {
         return {
             profile
         };
-    } catch (error) {
+    } catch (err) {
         throw error(404, 'ORCID profile not found');
     }
 }
