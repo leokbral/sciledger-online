@@ -1,12 +1,30 @@
-import { start_mongo } from "$lib/db/mongo";
 import type { Handle } from '@sveltejs/kit';
 import * as cookie from 'cookie';
 
-start_mongo().then(() => {
-	console.log('Mongo started');
-}).catch(e => { console.error(e) })
+// Lazy load MongoDB to avoid connection during build
+let mongoStarted = false;
+const initMongo = async () => {
+	if (mongoStarted) return;
+	mongoStarted = true;
+	try {
+		const { start_mongo } = await import("$lib/db/mongo");
+		await start_mongo();
+		console.log('Mongo started');
+	} catch (e) {
+		console.error('Failed to start MongoDB:', e);
+	}
+};
+
+// Start MongoDB when first request comes in
+let mongoInitPromise: Promise<void> | null = null;
 
 export const handle: Handle = async ({ event, resolve }) => {
+	// Initialize MongoDB on first request
+	if (!mongoInitPromise) {
+		mongoInitPromise = initMongo();
+	}
+	await mongoInitPromise;
+
 	const cookies = cookie.parse(event.request.headers.get('cookie') || '');
 	const jwt = cookies.jwt && Buffer.from(cookies.jwt, 'base64').toString('utf-8');
 

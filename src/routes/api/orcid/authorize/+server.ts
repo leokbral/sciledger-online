@@ -63,8 +63,13 @@ export const GET: RequestHandler = async ({ url }) => {
 			headers
 		});
 	} catch (err) {
-		console.error('[ORCID Authorize] ERROR:', err);
-		console.error('[ORCID Authorize] Stack:', err instanceof Error ? err.stack : 'No stack');
+		console.error('[ORCID Authorize] === ERROR CAUGHT ===');
+		console.error('[ORCID Authorize] Error type:', typeof err);
+		console.error('[ORCID Authorize] Error value:', err);
+		if (err instanceof Error) {
+			console.error('[ORCID Authorize] Message:', err.message);
+			console.error('[ORCID Authorize] Stack:', err.stack);
+		}
 		redirect(302, '/login?error=orcid_auth_failed');
 	}
 };
