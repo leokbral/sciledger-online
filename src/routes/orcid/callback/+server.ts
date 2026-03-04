@@ -138,7 +138,6 @@ export const GET: RequestHandler = async ({ url }) => {
 			} else {
 				console.log('⚠️ No emails found in ORCID profile (may be private)');
 			}
-			}
 		}
 
 		// Fallback: se não conseguiu extrair nome da API, usa o 'name' do token
