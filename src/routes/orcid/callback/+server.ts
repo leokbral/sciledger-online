@@ -104,6 +104,8 @@ export const GET: RequestHandler = async ({ url }) => {
 		// Busca dados públicos do perfil ORCID - PRODUÇÃO
 		const ORCID_API_URL = `https://pub.orcid.org/v3.0/${orcid}/person`;
 		
+		console.log('📡 Fetching ORCID profile:', ORCID_API_URL);
+		
 		const personResponse = await fetch(ORCID_API_URL, {
 			headers: {
 				'Accept': 'application/json',
@@ -117,18 +119,25 @@ export const GET: RequestHandler = async ({ url }) => {
 
 		if (personResponse.ok) {
 			const personData = await personResponse.json();
+			console.log('✅ ORCID profile fetched');
 			
 			// Extrai nome
 			if (personData.name) {
 				firstName = personData.name['given-names']?.value || '';
 				lastName = personData.name['family-name']?.value || '';
+				console.log('Name from ORCID API:', firstName, lastName);
 			}
 
 			// Extrai email (se disponível e público)
 			if (personData.emails?.email && personData.emails.email.length > 0) {
+				console.log('Emails found:', personData.emails.email.length);
 				// Busca o email primário ou o primeiro disponível
 				const primaryEmail = personData.emails.email.find((e: any) => e.primary === true);
 				email = primaryEmail?.email || personData.emails.email[0]?.email || '';
+				console.log('Email extracted:', email);
+			} else {
+				console.log('⚠️ No emails found in ORCID profile (may be private)');
+			}
 			}
 		}
 
@@ -161,10 +170,16 @@ export const GET: RequestHandler = async ({ url }) => {
 			user.orcidTokenExpiry = new Date(Date.now() + expires_in * 1000);
 			await user.save();
 			
-			console.log('✅ Tokens updated, redirecting to respond');
+			console.log('✅ Tokens updated, logging in and redirecting');
 
-			// Faz login usando sistema atual
-			return respond({ user });
+			// Faz login usando sistema atual (define cookie) e redireciona
+			const response = respond({ user });
+			response.headers.set('Location', '/');
+			
+			return new Response(null, {
+				status: 302,
+				headers: response.headers
+			});
 		}
 
 		// 3.2: Se tem email, buscar por email
@@ -184,10 +199,16 @@ export const GET: RequestHandler = async ({ url }) => {
 				user.emailVerified = true; // ORCID já verificou o email
 				await user.save();
 				
-				console.log('✅ ORCID associated, redirecting to respond');
+				console.log('✅ ORCID associated, logging in and redirecting');
 
-				// Faz login usando sistema atual
-				return respond({ user });
+				// Faz login usando sistema atual (define cookie) e redireciona
+				const response = respond({ user });
+				response.headers.set('Location', '/');
+				
+				return new Response(null, {
+					status: 302,
+					headers: response.headers
+				});
 			}
 		}
 
@@ -245,10 +266,18 @@ export const GET: RequestHandler = async ({ url }) => {
 		await newUser.save();
 
 		console.log('✅ New user created successfully:', newUser.id);
-		console.log('✅ Redirecting to respond for login');
+		console.log('✅ User logged in via respond, redirecting to home');
 
-		// Faz login usando sistema atual
-		return respond({ user: newUser });
+		// Faz login usando sistema atual (define cookie)
+		const response = respond({ user: newUser });
+		
+		// Adiciona header de redirect
+		response.headers.set('Location', '/');
+		
+		return new Response(null, {
+			status: 302,
+			headers: response.headers
+		});
 
 	} catch (error) {
 		console.error('❌ ORCID callback error:', error);
