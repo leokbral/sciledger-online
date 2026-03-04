@@ -6,8 +6,8 @@ export const UserSchema: Schema = new Schema({
     id: { type: String, default: () => crypto.randomUUID(), unique: true }, // Gerando um UUID por padrão para o userId
     firstName: { type: String, required: true, unique: false }, // Nome de usuário
     lastName: { type: String, required: true, unique: false }, // Nome de usuário
-    country: { type: String, required: true, unique: false }, // Nome de usuário
-    dob: { type: String, required: true, unique: false }, // Date of Birth
+    country: { type: String, required: false, unique: false, default: '' }, // País (opcional para ORCID)
+    dob: { type: String, required: false, unique: false, default: '' }, // Date of Birth (opcional para ORCID)
     username: { type: String, required: true, unique: true }, // Handle do usuário, único e obrigatório
     email: { type: String, required: true, unique: true }, // Email do usuário
     password: { type: String, required: false }, // Senha do usuário (opcional para login via ORCID)
