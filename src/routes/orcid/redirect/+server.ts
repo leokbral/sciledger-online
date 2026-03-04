@@ -16,30 +16,30 @@ import { ORCID_CLIENT_ID, ORCID_REDIRECT_URI } from '$env/static/private';
  * 5. ORCID redireciona para /orcid/callback com authorization_code
  */
 export const GET: RequestHandler = async () => {
-	try {
-		// Valida que as variáveis de ambiente estão configuradas
-		if (!ORCID_CLIENT_ID || !ORCID_REDIRECT_URI) {
-			throw new Error('ORCID credentials not configured');
-		}
-
-		// URL de autorização do ORCID - PRODUÇÃO
-		const ORCID_AUTH_URL = 'https://orcid.org/oauth/authorize';
-
-		// Parâmetros necessários para OAuth 2.0
-		const params = new URLSearchParams({
-			client_id: ORCID_CLIENT_ID,
-			response_type: 'code', // Authorization Code Flow
-			scope: '/authenticate', // Permissão para autenticar e obter ORCID iD
-			redirect_uri: ORCID_REDIRECT_URI
-		});
-
-		// Redireciona para página de autorização do ORCID
-		const authUrl = `${ORCID_AUTH_URL}?${params.toString()}`;
-		
-		throw redirect(302, authUrl);
-	} catch (error) {
-		console.error('Error redirecting to ORCID:', error);
-		// Em caso de erro, redireciona para login com mensagem de erro
+	console.log('🔵 ORCID Redirect - Starting...');
+	console.log('CLIENT_ID:', ORCID_CLIENT_ID);
+	console.log('REDIRECT_URI:', ORCID_REDIRECT_URI);
+	
+	// Valida que as variáveis de ambiente estão configuradas
+	if (!ORCID_CLIENT_ID || !ORCID_REDIRECT_URI) {
+		console.error('❌ ORCID credentials not configured');
 		throw redirect(302, '/login?error=orcid_config_error');
 	}
+
+	// URL de autorização do ORCID - PRODUÇÃO
+	const ORCID_AUTH_URL = 'https://orcid.org/oauth/authorize';
+
+	// Parâmetros necessários para OAuth 2.0
+	const params = new URLSearchParams({
+		client_id: ORCID_CLIENT_ID,
+		response_type: 'code', // Authorization Code Flow
+		scope: '/authenticate', // Permissão para autenticar e obter ORCID iD
+		redirect_uri: ORCID_REDIRECT_URI
+	});
+
+	// Redireciona para página de autorização do ORCID
+	const authUrl = `${ORCID_AUTH_URL}?${params.toString()}`;
+	console.log('✅ Redirecting to:', authUrl);
+	
+	throw redirect(302, authUrl);
 };
