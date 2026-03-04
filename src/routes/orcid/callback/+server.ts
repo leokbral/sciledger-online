@@ -19,28 +19,39 @@ import * as crypto from 'crypto';
  * 5. Faz login usando o sistema atual
  */
 export const GET: RequestHandler = async ({ url }) => {
+	console.log('🟢 ORCID Callback - Started');
+	console.log('Full URL:', url.href);
+	
 	try {
 		await start_mongo();
+		console.log('✅ MongoDB connected');
 
 		// Extrai o authorization_code da URL
 		const code = url.searchParams.get('code');
 		const error = url.searchParams.get('error');
+		
+		console.log('Code:', code ? code.substring(0, 10) + '...' : 'null');
+		console.log('Error:', error);
 
 		// Verifica se houve erro na autorização
 		if (error) {
-			console.error('ORCID authorization error:', error);
+			console.error('❌ ORCID authorization error:', error);
 			throw redirect(302, '/login?error=orcid_authorization_denied');
 		}
 
 		// Verifica se o code foi fornecido
 		if (!code) {
+			console.error('❌ Missing authorization code');
 			throw redirect(302, '/login?error=missing_authorization_code');
 		}
 
 		// Valida configuração
 		if (!ORCID_CLIENT_ID || !ORCID_CLIENT_SECRET || !ORCID_REDIRECT_URI) {
+			console.error('❌ ORCID credentials not configured');
 			throw new Error('ORCID credentials not configured');
 		}
+		
+		console.log('✅ All validations passed, exchanging code for token...');
 
 		// ====================================================================
 		// ETAPA 1: Trocar authorization_code por access_token
@@ -65,13 +76,17 @@ export const GET: RequestHandler = async ({ url }) => {
 			body: tokenParams.toString()
 		});
 
+		console.log('Token response status:', tokenResponse.status);
+
 		if (!tokenResponse.ok) {
 			const errorData = await tokenResponse.text();
-			console.error('Failed to exchange code for token:', errorData);
+			console.error('❌ Failed to exchange code for token:', errorData);
 			throw redirect(302, '/login?error=token_exchange_failed');
 		}
 
 		const tokenData = await tokenResponse.json();
+		console.log('✅ Token obtained successfully');
+		console.log('ORCID iD:', tokenData.orcid);
 		
 		// Dados retornados pelo ORCID
 		const {
@@ -134,16 +149,19 @@ export const GET: RequestHandler = async ({ url }) => {
 
 		// 3.1: Buscar por ORCID iD
 		let user = await Users.findOne({ orcid: orcid });
+		console.log('User found by ORCID:', user ? user.email : 'not found');
 
 		if (user) {
 			// Usuário já existe com este ORCID - Fazer login
-			console.log('User found by ORCID, logging in');
+			console.log('✅ User found by ORCID, logging in');
 
 			// Atualiza tokens ORCID
 			user.orcidAccessToken = access_token;
 			user.orcidRefreshToken = refresh_token || user.orcidRefreshToken;
 			user.orcidTokenExpiry = new Date(Date.now() + expires_in * 1000);
 			await user.save();
+			
+			console.log('✅ Tokens updated, redirecting to respond');
 
 			// Faz login usando sistema atual
 			return respond({ user });
@@ -152,10 +170,11 @@ export const GET: RequestHandler = async ({ url }) => {
 		// 3.2: Se tem email, buscar por email
 		if (email) {
 			user = await Users.findOne({ email: email });
+			console.log('User found by email:', user ? user.username : 'not found');
 
 			if (user) {
 				// Usuário já existe com este email - Associar ORCID
-				console.log('User found by email, associating ORCID');
+				console.log('✅ User found by email, associating ORCID');
 
 				// Associa ORCID ao usuário existente
 				user.orcid = orcid;
@@ -164,6 +183,8 @@ export const GET: RequestHandler = async ({ url }) => {
 				user.orcidTokenExpiry = new Date(Date.now() + expires_in * 1000);
 				user.emailVerified = true; // ORCID já verificou o email
 				await user.save();
+				
+				console.log('✅ ORCID associated, redirecting to respond');
 
 				// Faz login usando sistema atual
 				return respond({ user });
@@ -174,7 +195,9 @@ export const GET: RequestHandler = async ({ url }) => {
 		// ETAPA 4: Criar novo usuário
 		// ====================================================================
 
-		console.log('Creating new user from ORCID');
+		console.log('🆕 Creating new user from ORCID');
+		console.log('Email:', userEmail);
+		console.log('Name:', firstName, lastName);
 
 		// Se não tem email do ORCID, usa email placeholder (usuário pode atualizar depois)
 		const userEmail = email || `${orcid}@orcid.placeholder`;
@@ -220,13 +243,14 @@ export const GET: RequestHandler = async ({ url }) => {
 
 		await newUser.save();
 
-		console.log('New user created successfully:', newUser.id);
+		console.log('✅ New user created successfully:', newUser.id);
+		console.log('✅ Redirecting to respond for login');
 
 		// Faz login usando sistema atual
 		return respond({ user: newUser });
 
 	} catch (error) {
-		console.error('ORCID callback error:', error);
+		console.error('❌ ORCID callback error:', error);
 		
 		// Se for um redirect, propaga
 		if (error instanceof Response) {
@@ -234,6 +258,7 @@ export const GET: RequestHandler = async ({ url }) => {
 		}
 		
 		// Senão, redireciona para login com erro
+		console.error('❌ Redirecting to login with error');
 		throw redirect(302, '/login?error=orcid_callback_failed');
 	}
 };
