@@ -196,11 +196,12 @@ export const GET: RequestHandler = async ({ url }) => {
 		// ====================================================================
 
 		console.log('🆕 Creating new user from ORCID');
-		console.log('Email:', userEmail);
-		console.log('Name:', firstName, lastName);
 
 		// Se não tem email do ORCID, usa email placeholder (usuário pode atualizar depois)
 		const userEmail = email || `${orcid}@orcid.placeholder`;
+
+		console.log('Email:', userEmail);
+		console.log('Name:', firstName, lastName);
 
 		// Gera username único baseado no ORCID
 		const baseUsername = `@${firstName.toLowerCase()}_${orcid.split('-').pop()}`;
