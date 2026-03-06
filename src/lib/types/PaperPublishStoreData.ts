@@ -15,8 +15,19 @@ export interface Block {
 // 	blocks: Block[];
 // }
 
+export interface SupplementaryMaterial {
+	id: string; // ID único para este item
+	title: string; // Título/descrição do material
+	url: string; // URL do repositório
+	type: 'github' | 'figshare' | 'zenodo' | 'osf' | 'dataverse' | 'other'; // Tipo de repositório
+	description?: string; // Descrição detalhada
+	createdAt?: Date; // Quando foi adicionado
+	updatedAt?: Date; // Última atualização
+}
+
 export interface PaperPublishStoreData extends Omit<Paper, 'mainAuthor' | 'createdAt' | 'updatedAt'> {
 	// authors: User[],
 	// peer_review?: string,
-	mainAuthor: User | null
+	mainAuthor: User | null,
+	supplementaryMaterials?: SupplementaryMaterial[]
 }

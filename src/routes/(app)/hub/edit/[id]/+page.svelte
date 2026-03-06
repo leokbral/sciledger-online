@@ -11,6 +11,10 @@
 	let user = data.user;
 	let hub = data.hub;
 
+	// Notificação de sucesso/erro
+	let notification = $state<{ type: 'success' | 'error'; message: string } | null>(null);
+	let showNotification = $state(false);
+
 	let form = {
 		title: hub.title || '',
 		type: hub.type || 'Conference',
@@ -194,13 +198,44 @@
 			const data = await response.json();
 
 			if (data.hub) {
-				goto(`/hub/view/${hub._id}`);
+				// Mostrar notificação de sucesso
+				notification = {
+					type: 'success',
+					message: '✅ Hub alterado com sucesso!'
+				};
+				showNotification = true;
+				
+				// Fechar notificação após 3 segundos
+				setTimeout(() => {
+					showNotification = false;
+				}, 3000);
+				
+				// Redirecionar após 1 segundo
+				setTimeout(() => {
+					goto(`/hub/view/${hub._id}`);
+				}, 1000);
 			} else {
-				alert(`Issue! ${JSON.stringify(data)}`);
+				notification = {
+					type: 'error',
+					message: `❌ Erro ao alterar hub: ${data.error || 'Erro desconhecido'}`
+				};
+				showNotification = true;
+				
+				setTimeout(() => {
+					showNotification = false;
+				}, 5000);
 			}
 		} catch (error) {
 			console.error(error);
-			alert('An error occurred. Please try again.');
+			notification = {
+				type: 'error',
+				message: '❌ Erro ao processar a alteração. Tente novamente.'
+			};
+			showNotification = true;
+			
+			setTimeout(() => {
+				showNotification = false;
+			}, 5000);
 		}
 	}
 </script>
@@ -397,8 +432,7 @@
 			<label for="identity-visibility" class="block mb-1">Identity visibility</label>
 			<select id="identity-visibility" bind:value={form.identityVisibility} class="w-full p-2 border rounded">
 				<option>Everyone</option>
-				<option>Only author and editors</option>
-				<option>Only editors</option>
+				<option>Reviewers Only</option>
 				<option>Hidden</option>
 			</select>
 		</div>
@@ -406,8 +440,8 @@
 			<label for="review-visibility" class="block mb-1">Who can see the review?</label>
 			<select id="review-visibility" bind:value={form.reviewVisibility} class="w-full p-2 border rounded">
 				<option>Everyone</option>
-				<option>Only author and editors</option>
-				<option>Only editors</option>
+				<option>Authors Only</option>
+				<option>Hidden</option>
 			</select>
 		</div>
 	</div>
@@ -577,4 +611,36 @@
 			Cancel
 		</a>
 	</div>
+
+	<!-- Notification Toast -->
+	{#if showNotification && notification}
+		<div
+			class={`fixed bottom-4 right-4 p-4 rounded-lg shadow-lg flex items-center gap-3 max-w-md z-50 transition-all duration-300 ${
+				notification.type === 'success'
+					? 'bg-green-100 border-l-4 border-green-600 text-green-900'
+					: 'bg-red-100 border-l-4 border-red-600 text-red-900'
+			}`}
+		>
+			{#if notification.type === 'success'}
+				<svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+					/>
+				</svg>
+			{:else}
+				<svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M12 8v4m0 4v.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+					/>
+				</svg>
+			{/if}
+			<span class="font-medium">{notification.message}</span>
+		</div>
+	{/if}
 </div>

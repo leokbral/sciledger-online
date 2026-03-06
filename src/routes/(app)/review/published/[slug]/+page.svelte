@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Avatar } from '@skeletonlabs/skeleton-svelte';
+	import SupplementaryMaterials from '$lib/components/SupplementaryMaterials.svelte';
 	import type { PageData } from './$types';
 	import { onMount } from 'svelte';
 
@@ -156,6 +157,13 @@
 			>
 				{@html reviewedPublishedPaper.content}
 			</div>
+
+			<!-- Supplementary Materials Section -->
+			{#if reviewedPublishedPaper.supplementaryMaterials && reviewedPublishedPaper.supplementaryMaterials.length > 0}
+				<div class="mt-6">
+					<SupplementaryMaterials materials={reviewedPublishedPaper.supplementaryMaterials} />
+				</div>
+			{/if}
 
 			<!-- Tags/Keywords -->
 			{#if reviewedPublishedPaper.keywords && reviewedPublishedPaper.keywords.length > 0}

@@ -13,6 +13,7 @@
 	import IconDropzone from '@lucide/svelte/icons/image-plus';
 	import IconFile from '@lucide/svelte/icons/paperclip';
 	import IconRemove from '@lucide/svelte/icons/circle-x';
+	import Icon from '@iconify/svelte';
 	import OrcidProfile from '$lib/components/OrcidProfile/OrcidProfile.svelte';
 	import { SCOPUS_AREAS, getSubAreasForArea, getAllAreaNames } from '$lib/constants/scopusAreas';
 
@@ -165,6 +166,75 @@
 		
 		// @ts-ignore
 		$store.scopusClassifications = scopusClassifications;
+	}
+
+	// ========== Material Suplementar ========== //
+	interface SupplementaryMaterialForm {
+		title: string;
+		url: string;
+		type: 'github' | 'figshare' | 'zenodo' | 'osf' | 'dataverse' | 'other';
+		description: string;
+	}
+	
+	let supplementaryMaterials = $state<any[]>(
+		inicialValue.supplementaryMaterials ? [...inicialValue.supplementaryMaterials] : []
+	);
+	
+	let newSupplementaryMaterial = $state<SupplementaryMaterialForm>({
+		title: '',
+		url: '',
+		type: 'github',
+		description: ''
+	});
+
+	const supplementaryRepositoryIcons: Record<string, string> = {
+		github: 'mdi:github',
+		figshare: 'simple-icons:figshare',
+		zenodo: 'simple-icons:zenodo',
+		osf: 'simple-icons:openscienceframework',
+		dataverse: 'mdi:database-outline',
+		other: 'mdi:link-variant'
+	};
+	
+	function addSupplementaryMaterial() {
+		if (!newSupplementaryMaterial.title.trim() || !newSupplementaryMaterial.url.trim()) {
+			alert('Por favor preencha o título e a URL do material suplementar.');
+			return;
+		}
+		
+		// Validar URL
+		try {
+			new URL(newSupplementaryMaterial.url);
+		} catch {
+			alert('Por favor insira uma URL válida.');
+			return;
+		}
+		
+		const material = {
+			id: crypto.randomUUID(),
+			title: newSupplementaryMaterial.title,
+			url: newSupplementaryMaterial.url,
+			type: newSupplementaryMaterial.type,
+			description: newSupplementaryMaterial.description,
+			createdAt: new Date(),
+			updatedAt: new Date()
+		};
+		
+		supplementaryMaterials = [...supplementaryMaterials, material];
+		$store.supplementaryMaterials = supplementaryMaterials;
+		
+		// Reset form
+		newSupplementaryMaterial = {
+			title: '',
+			url: '',
+			type: 'github',
+			description: ''
+		};
+	}
+	
+	function removeSupplementaryMaterial(index: number) {
+		supplementaryMaterials = supplementaryMaterials.filter((_, i) => i !== index);
+		$store.supplementaryMaterials = supplementaryMaterials;
 	}
 
 	// let files: FileList = $state();
@@ -1126,6 +1196,156 @@
 						💡 Tip: You can add multiple classifications if your paper spans different subject areas.
 					</p>
 				</div>
+			</section>
+
+			<!-- Material Suplementar Section -->
+			<section class="w-full bg-white/95 dark:bg-surface-900/95 backdrop-blur-sm border border-surface-200/80 dark:border-surface-700 rounded-2xl p-5 mb-6 shadow-[0_10px_35px_-20px_rgba(0,0,0,0.45)]">
+				<div class="mb-4 pb-4 border-b border-surface-200 dark:border-surface-700">
+					<h3 class="text-xl font-semibold text-surface-900 dark:text-surface-100 tracking-tight">
+						Supplementary Materials
+					</h3>
+					<p class="text-sm text-surface-600 dark:text-surface-400 mt-1">
+						Add links to public repositories (GitHub, Figshare, Zenodo, OSF, etc.) with complementary data, code, and extra files.
+					</p>
+				</div>
+
+				<!-- Display added materials -->
+				{#if supplementaryMaterials.length > 0}
+					<div class="mb-5 space-y-2">
+						<div class="block text-sm font-semibold text-surface-700 dark:text-surface-300 mb-2">
+							Added Materials:
+						</div>
+						<div class="space-y-3">
+							{#each supplementaryMaterials as material, index}
+								<div class="bg-gradient-to-r from-surface-50 to-white dark:from-surface-800 dark:to-surface-800/80 border border-surface-200 dark:border-surface-700 rounded-xl p-4 group hover:border-primary-300 dark:hover:border-primary-600 hover:shadow-md transition-all duration-200">
+									<div class="flex justify-between items-start mb-2">
+										<div class="flex-1">
+											<div class="flex items-center gap-2 mb-1">
+												<div class="w-6 h-6 rounded-md border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-900 text-surface-700 dark:text-surface-300 flex items-center justify-center">
+													<Icon icon={supplementaryRepositoryIcons[material.type] || supplementaryRepositoryIcons.other} class="w-3.5 h-3.5" />
+												</div>
+												<span class="inline-block px-2.5 py-1 text-xs font-medium rounded-full bg-primary-100 dark:bg-primary-900/40 text-primary-800 dark:text-primary-200 border border-primary-200 dark:border-primary-800">
+													{material.type.toUpperCase()}
+												</span>
+												<h4 class="font-semibold text-surface-900 dark:text-surface-100 tracking-tight">
+													{material.title}
+												</h4>
+											</div>
+											<a
+												href={material.url}
+												target="_blank"
+												rel="noopener noreferrer"
+												class="text-primary-600 dark:text-primary-400 hover:underline text-sm break-all font-mono"
+											>
+												{material.url}
+											</a>
+											{#if material.description}
+												<p class="text-sm text-surface-600 dark:text-surface-400 mt-2 leading-relaxed">
+													{material.description}
+												</p>
+											{/if}
+										</div>
+										<button
+											type="button"
+											onclick={() => removeSupplementaryMaterial(index)}
+											class="ml-2 text-error-600 hover:text-error-800 dark:text-error-400 dark:hover:text-error-300 transition-colors flex-shrink-0 p-1 rounded-md hover:bg-error-50 dark:hover:bg-error-900/20"
+											title="Remove material"
+											aria-label="Remove material"
+										>
+											<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+												<path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+											</svg>
+										</button>
+									</div>
+								</div>
+							{/each}
+						</div>
+					</div>
+				{/if}
+
+				<!-- Form to add new material -->
+				<div class="bg-gradient-to-b from-surface-50 to-white dark:from-surface-800 dark:to-surface-900 rounded-xl p-4 border border-surface-200 dark:border-surface-700">
+					<div class="block text-sm font-semibold text-surface-700 dark:text-surface-300 mb-3">
+						Add New Material:
+					</div>
+					<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+						<!-- Title -->
+						<div class="md:col-span-2">
+							<label for="material-title" class="block mb-1 text-xs font-medium text-surface-600 dark:text-surface-400">
+								Title/Description *
+							</label>
+							<input
+								id="material-title"
+								type="text"
+								bind:value={newSupplementaryMaterial.title}
+								placeholder="e.g., Source Code Repository, Dataset, Supplementary Figures"
+								class="w-full p-2.5 border border-surface-300 dark:border-surface-600 rounded-lg text-sm bg-white dark:bg-surface-800 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+							/>
+						</div>
+
+						<!-- Repository Type -->
+						<div>
+							<label for="material-type" class="block mb-1 text-xs font-medium text-surface-600 dark:text-surface-400">
+								Repository Type *
+							</label>
+							<select
+								id="material-type"
+								bind:value={newSupplementaryMaterial.type}
+								class="w-full p-2.5 border border-surface-300 dark:border-surface-600 rounded-lg text-sm bg-white dark:bg-surface-800 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+							>
+								<option value="github">GitHub</option>
+								<option value="figshare">Figshare</option>
+								<option value="zenodo">Zenodo</option>
+								<option value="osf">Open Science Framework (OSF)</option>
+								<option value="dataverse">Dataverse</option>
+								<option value="other">Other</option>
+							</select>
+						</div>
+
+						<!-- URL -->
+						<div class="md:col-span-2">
+							<label for="material-url" class="block mb-1 text-xs font-medium text-surface-600 dark:text-surface-400">
+								URL *
+							</label>
+							<input
+								id="material-url"
+								type="url"
+								bind:value={newSupplementaryMaterial.url}
+								placeholder="https://github.com/username/repo or https://figshare.com/..."
+								class="w-full p-2.5 border border-surface-300 dark:border-surface-600 rounded-lg text-sm bg-white dark:bg-surface-800 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+							/>
+						</div>
+
+						<!-- Description -->
+						<div class="md:col-span-2">
+							<label for="material-desc" class="block mb-1 text-xs font-medium text-surface-600 dark:text-surface-400">
+								Description (optional)
+							</label>
+							<textarea
+								id="material-desc"
+								bind:value={newSupplementaryMaterial.description}
+								placeholder="Describe what this material contains..."
+								rows="3"
+								class="w-full p-2.5 border border-surface-300 dark:border-surface-600 rounded-lg text-sm bg-white dark:bg-surface-800 focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
+							></textarea>
+						</div>
+
+						<button
+							type="button"
+							onclick={addSupplementaryMaterial}
+							class="md:col-span-2 w-full bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
+						>
+							<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+								<path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
+							</svg>
+							Add Material
+						</button>
+					</div>
+				</div>
+
+				<p class="mt-4 text-xs text-surface-500 dark:text-surface-400">
+					💡 Tip: Providing supplementary materials increases the transparency and reproducibility of your research.
+				</p>
 			</section>
 
 			<section>

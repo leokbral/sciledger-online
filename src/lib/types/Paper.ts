@@ -90,4 +90,13 @@ export type Paper = {
     rejectionReason?: string; // Reason for rejection
     rejectedAt?: Date; // When it was rejected
     rejectedBy?: User | string; // Who rejected it
+    supplementaryMaterials?: Array<{
+        id: string; // ID único para este item
+        title: string; // Título/descrição do material
+        url: string; // URL do repositório
+        type: 'github' | 'figshare' | 'zenodo' | 'osf' | 'dataverse' | 'other'; // Tipo de repositório
+        description?: string; // Descrição detalhada
+        createdAt?: Date; // Quando foi adicionado
+        updatedAt?: Date; // Última atualização
+    }>;
 }

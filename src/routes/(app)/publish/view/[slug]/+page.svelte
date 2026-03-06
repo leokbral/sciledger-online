@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Avatar } from '@skeletonlabs/skeleton-svelte';
+	import SupplementaryMaterials from '$lib/components/SupplementaryMaterials.svelte';
 	import type { PageData } from './$types';
 	import { onMount } from 'svelte';
 
@@ -180,6 +181,13 @@
 			>
 				{@html paper.content}
 			</div>
+
+			<!-- Supplementary Materials Section -->
+			{#if paper.supplementaryMaterials && paper.supplementaryMaterials.length > 0}
+				<div class="mt-6">
+					<SupplementaryMaterials materials={paper.supplementaryMaterials} />
+				</div>
+			{/if}
 
 			<!-- Tags/Keywords -->
 			{#if paper.keywords && paper.keywords.length > 0}

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import PaperMeta from './PaperMeta.svelte';
 	import CommentContainer from './CommentContainer.svelte';
+	import SupplementaryMaterials from '$lib/components/SupplementaryMaterials.svelte';
 	//import TaskRegisterPage from '$lib/Pages/article/ArticlePublishPage.svelte';
 
 	interface Props {
@@ -41,6 +42,15 @@
 				</ul>
 			</div>
 		</div>
+
+		<!-- Supplementary Materials Section -->
+		{#if data.paper?.supplementaryMaterials && data.paper.supplementaryMaterials.length > 0}
+			<div class="row article-supplementary">
+				<div class="col-xs-12">
+					<SupplementaryMaterials materials={data.paper.supplementaryMaterials} />
+				</div>
+			</div>
+		{/if}
 
 		<hr />
 

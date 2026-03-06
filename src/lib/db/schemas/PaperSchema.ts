@@ -116,7 +116,23 @@ export const PaperSchema: Schema = new Schema({
     rejectedByHub: { type: Boolean, default: false },
     rejectionReason: { type: String },
     rejectedAt: { type: Date },
-    rejectedBy: { type: String, ref: 'User' }
+    rejectedBy: { type: String, ref: 'User' },
+    
+    // Material Suplementar - Links para repositórios públicos
+    supplementaryMaterials: [{
+        _id: false, // Desabilitar _id automático do Mongoose
+        id: { type: String, required: true }, // ID único para este item
+        title: { type: String, required: true }, // Título/descrição do material
+        url: { type: String, required: true }, // URL do repositório
+        type: { 
+            type: String, 
+            enum: ['github', 'figshare', 'zenodo', 'osf', 'dataverse', 'other'],
+            required: true 
+        }, // Tipo de repositório
+        description: { type: String }, // Descrição detalhada
+        createdAt: { type: Date, default: () => new Date() }, // Quando foi adicionado
+        updatedAt: { type: Date, default: () => new Date() } // Última atualização
+    }]
 
 }, { collection: 'papers' });
 

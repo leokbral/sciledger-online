@@ -10,6 +10,10 @@
 
 	let user = data.user;
 
+	// Notificação de sucesso/erro
+	let notification = $state<{ type: 'success' | 'error'; message: string } | null>(null);
+	let showNotification = $state(false);
+
 	let form = {
 		createdBy: user,
 		title: '',
@@ -354,13 +358,44 @@
 			console.log('Response:', data);
 
 			if (data.hub) {
-				goto('/hub');
+				// Mostrar notificação de sucesso
+				notification = {
+					type: 'success',
+					message: '✅ Hub criado com sucesso!'
+				};
+				showNotification = true;
+				
+				// Fechar notificação após 3 segundos
+				setTimeout(() => {
+					showNotification = false;
+				}, 3000);
+				
+				// Redirecionar após 1 segundo
+				setTimeout(() => {
+					goto('/hub');
+				}, 1000);
 			} else {
-				alert(`Issue! ${JSON.stringify(data)}`);
+				notification = {
+					type: 'error',
+					message: `❌ Erro ao criar hub: ${data.error || 'Erro desconhecido'}`
+				};
+				showNotification = true;
+				
+				setTimeout(() => {
+					showNotification = false;
+				}, 5000);
 			}
 		} catch (error) {
 			console.error(error);
-			alert('An error occurred. Please try again.');
+			notification = {
+				type: 'error',
+				message: '❌ Erro ao processar a criação. Tente novamente.'
+			};
+			showNotification = true;
+			
+			setTimeout(() => {
+				showNotification = false;
+			}, 5000);
 		}
 	}
 </script>
@@ -526,14 +561,14 @@
 		Who can see the reviewer identity?
 		<select bind:value={form.identityVisibility} class="w-full p-2 border rounded">
 			<option>Everyone</option>
-			<option>Only author</option>
-			<option>No one</option>
+			<option>Reviewers Only</option>
+			<option>Hidden</option>
 		</select>
 		Who can see the review?
 		<select bind:value={form.reviewVisibility} class="w-full p-2 border rounded">
 			<option>Everyone</option>
-			<option>Only author and editors</option>
-			<option>Only editors</option>
+			<option>Authors Only</option>
+			<option>Hidden</option>
 		</select>
 	</div>
 
@@ -808,4 +843,36 @@
 	>
 		Save
 	</button>
+
+	<!-- Notification Toast -->
+	{#if showNotification && notification}
+		<div
+			class={`fixed bottom-4 right-4 p-4 rounded-lg shadow-lg flex items-center gap-3 max-w-md z-50 transition-all duration-300 ${
+				notification.type === 'success'
+					? 'bg-green-100 border-l-4 border-green-600 text-green-900'
+					: 'bg-red-100 border-l-4 border-red-600 text-red-900'
+			}`}
+		>
+			{#if notification.type === 'success'}
+				<svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+					/>
+				</svg>
+			{:else}
+				<svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M12 8v4m0 4v.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+					/>
+				</svg>
+			{/if}
+			<span class="font-medium">{notification.message}</span>
+		</div>
+	{/if}
 </div>
