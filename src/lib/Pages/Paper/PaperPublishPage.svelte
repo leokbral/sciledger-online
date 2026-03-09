@@ -339,8 +339,38 @@
 		return input
 			.replace(/<[^>]*>/g, '')
 			.replace(/&nbsp;/g, ' ')
+			.replace(/&amp;/g, '&')
+			.replace(/&quot;/g, '"')
+			.replace(/&#39;/g, "'")
 			.replace(/\s+/g, ' ')
 			.trim();
+	}
+
+	function isEffectivelyEmptyText(value: unknown): boolean {
+		if (value === null || value === undefined) return true;
+		const text = String(value)
+			.replace(/<[^>]*>/g, '')
+			.replace(/&nbsp;/g, ' ')
+			.trim();
+		return text.length === 0;
+	}
+
+	function parseKeywordsText(text: string): string[] {
+		const cleaned = text
+			.replace(/^\s*(keywords?|palavras[-\s]?chave)\s*[:\-]?\s*/i, '')
+			.trim();
+
+		if (!cleaned) return [];
+
+		const parts = cleaned
+			.split(/[,;|\u2022\u00b7]/)
+			.map((k) => k.trim().replace(/[\.;:]$/, ''))
+			.filter((k) => k.length > 1 && k.length < 80);
+
+		if (parts.length < 2) return [];
+
+		const unique = [...new Set(parts.map((k) => k.toLowerCase()))];
+		return unique.map((lower) => parts.find((p) => p.toLowerCase() === lower) || lower);
 	}
 
 	function extractTitleFromHtml(html: string): string {
@@ -353,6 +383,17 @@
 
 		const titleHeadingMatch = titleHeadingRegex.exec(html);
 		const abstractHeadingMatch = abstractHeadingRegex.exec(html);
+
+		const labeledTitleMatch = html.match(
+			/<(?:h[1-6]|p|div|span)[^>]*>\s*(?:Title|T[ií]tulo)\s*[:\-]\s*([\s\S]*?)<\/(?:h[1-6]|p|div|span)>/i
+		);
+		if (labeledTitleMatch) {
+			const labeledTitle = cleanHtmlText(labeledTitleMatch[1]);
+			if (labeledTitle.length >= 3) {
+				console.log('Extracted title (labeled line):', labeledTitle);
+				return labeledTitle;
+			}
+		}
 
 		if (titleHeadingMatch) {
 			const startIndex = titleHeadingMatch.index + titleHeadingMatch[0].length;
@@ -369,16 +410,94 @@
 			}
 		}
 
+		const allHeadings = [...html.matchAll(/<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/gi)];
+		const abstractIndex = abstractHeadingMatch ? abstractHeadingMatch.index : html.length;
+		const disallowedHeadings = new Set([
+			'abstract',
+			'resumo',
+			'keywords',
+			'palavras-chave',
+			'introduction',
+			'introducao',
+			'introdução',
+			'main'
+		]);
+
+		for (const heading of allHeadings) {
+			const headingIndex = heading.index ?? 0;
+			if (headingIndex >= abstractIndex) continue;
+
+			const text = cleanHtmlText(heading[1]);
+			const normalized = text.toLowerCase();
+			if (text.length < 3 || disallowedHeadings.has(normalized)) continue;
+
+			console.log('Extracted title (heading):', text);
+			return text;
+		}
+
 		if (abstractHeadingMatch) {
 			const beforeAbstract = html.substring(0, abstractHeadingMatch.index);
-			const allParagraphs = [...beforeAbstract.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)];
-			if (allParagraphs.length > 0) {
-				const lastParagraph = cleanHtmlText(allParagraphs[allParagraphs.length - 1][1]);
-				if (lastParagraph.length > 0) {
-					console.log('Extracted title (fallback):', lastParagraph);
-					return lastParagraph;
-				}
+			const blocks = [
+				...beforeAbstract.matchAll(/<(?:h[1-6]|p)[^>]*>([\s\S]*?)<\/(?:h[1-6]|p)>/gi)
+			]
+				.map((m) => cleanHtmlText(m[1]))
+				.filter((t) => t.length >= 3 && t.length <= 240)
+				.filter((t) => !/@/.test(t));
+
+			if (blocks.length > 0) {
+				const best = blocks.reduce((acc, cur) => (cur.length > acc.length ? cur : acc));
+				console.log('Extracted title (fallback):', best);
+				return best;
 			}
+		}
+
+		const firstParagraphs = [...html.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)]
+			.map((m) => cleanHtmlText(m[1]))
+			.filter((t) => t.length >= 3 && t.length <= 240)
+			.filter(
+				(t) =>
+					!/^(abstract|resumo|keywords?|palavras[-\s]?chave|introduction|introdu[cç][aã]o)$/i.test(
+						t
+					)
+			);
+
+		if (firstParagraphs.length > 0) {
+			console.log('Extracted title (first paragraph fallback):', firstParagraphs[0]);
+			return firstParagraphs[0];
+		}
+
+		const genericBlocks = [...html.matchAll(/<(?:h[1-6]|p|div|span)[^>]*>([\s\S]*?)<\/(?:h[1-6]|p|div|span)>/gi)]
+			.map((m) => cleanHtmlText(m[1]))
+			.filter((t) => t.length >= 3 && t.length <= 240)
+			.filter((t) => !/@/.test(t))
+			.filter(
+				(t) =>
+					!/^(abstract|resumo|keywords?|palavras[-\s]?chave|introduction|introdu[cç][aã]o|main)$/i.test(
+						t
+					)
+			);
+
+		if (genericBlocks.length > 0) {
+			console.log('Extracted title (generic fallback):', genericBlocks[0]);
+			return genericBlocks[0];
+		}
+
+		const plainText = cleanHtmlText(html);
+		const candidateFromPlain = plainText
+			.split(/(?<=[\.\?!])\s+|\n+/)
+			.map((t) => t.trim())
+			.find(
+				(t) =>
+					t.length >= 3 &&
+					t.length <= 220 &&
+					!/^(abstract|resumo|keywords?|palavras[-\s]?chave|introduction|introdu[cç][aã]o|main)$/i.test(
+						t
+					)
+			);
+
+		if (candidateFromPlain) {
+			console.log('Extracted title (plain text fallback):', candidateFromPlain);
+			return candidateFromPlain;
 		}
 
 		console.log('Could not extract title from document');
@@ -454,6 +573,20 @@
 	function extractKeywordsFromHtml(html: string): string[] {
 		if (!html) return [];
 
+		const genericTextBlocks = [...html.matchAll(/<(?:p|div|li|span)[^>]*>([\s\S]*?)<\/(?:p|div|li|span)>/gi)]
+			.map((m) => cleanHtmlText(m[1]))
+			.filter((t) => t.length > 0);
+
+		for (const block of genericTextBlocks) {
+			if (/(^|\b)(keywords?|palavras[-\s]?chave)\b/i.test(block)) {
+				const parsed = parseKeywordsText(block);
+				if (parsed.length > 0) {
+					console.log('Extracted keywords (labeled line):', parsed);
+					return parsed;
+				}
+			}
+		}
+
 		const abstractHeadingRegex =
 			/<h[1-6][^>]*>\s*(?:Abstract|ABSTRACT|abstract|Resumo|RESUMO|resumo)\s*<\/h[1-6]>/i;
 		const mainHeadingRegex = /<h[1-6][^>]*>\s*(?:Main|MAIN|main)\s*<\/h[1-6]>/i;
@@ -478,12 +611,19 @@
 			if (text.length > 0) paragraphs.push(text);
 		}
 
-		if (paragraphs.length < 2) {
+		if (paragraphs.length < 1) {
 			console.log('Keywords: not enough paragraphs between abstract and main');
-			return [];
+		} else {
+			for (let i = 0; i < Math.min(paragraphs.length, 5); i++) {
+				const parsed = parseKeywordsText(paragraphs[i]);
+				if (parsed.length > 0) {
+					console.log('Extracted keywords (near abstract):', parsed);
+					return parsed;
+				}
+			}
 		}
 
-		let keywordsParagraph = paragraphs[1];
+		let keywordsParagraph = paragraphs[1] || paragraphs[0] || '';
 
 		if (!keywordsParagraph.includes(',') && paragraphs.length > 2) {
 			const withCommas = paragraphs.slice(1).find((p) => p.includes(','));
@@ -494,10 +634,7 @@
 			.replace(/^\s*(keywords?|palavras-chave)\s*[:\-]?\s*/i, '')
 			.trim();
 
-		const keywords = keywordsParagraph
-			.split(',')
-			.map((k) => k.trim())
-			.filter((k) => k.length > 0);
+		const keywords = parseKeywordsText(keywordsParagraph);
 
 		const uniqueKeywords = [...new Set(keywords)];
 		console.log('Extracted keywords:', uniqueKeywords);
@@ -540,7 +677,7 @@
 				const extractedTitle = extractTitleFromHtml(data.html);
 				console.log('Checking if should fill title... Current:', $store.title ? 'has value' : 'empty');
 
-				if (extractedTitle && !$store.title) {
+				if (extractedTitle && isEffectivelyEmptyText($store.title)) {
 					$store.title = extractedTitle;
 					console.log('✅ Title automatically filled from DOCX');
 				} else if (extractedTitle && $store.title) {
@@ -926,7 +1063,7 @@
 				/>
 			</section>
 			<section id="authors" class="w-full flex flex-col gap-2">
-				<label class="block mb-1 font-semibold">Authors *</label>
+				<p class="block mb-1 font-semibold">Authors *</p>
 				<p class="text-xs text-surface-600 dark:text-surface-400 mb-2">
 					Add all authors of this paper. Type the username and select from the dropdown, or use the ORCID search below to find and add co-authors.
 				</p>
@@ -1077,7 +1214,7 @@
 
 			<!-- {$store.content} -->
 			<section class="mb-4 w-full">
-				<label class="block mb-1 font-semibold">Keywords *</label>
+				<p class="block mb-1 font-semibold">Keywords *</p>
 				<p class="text-xs text-surface-600 dark:text-surface-400 mb-2">
 					Add 3-6 keywords that describe your paper. Press Enter after each keyword to add it.
 				</p>
@@ -1519,9 +1656,16 @@
 
 	<!-- Submission Confirmation Modal -->
 	{#if showSubmitModal}
-		<div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onclick={cancelSubmit}>
-			<div class="bg-white rounded-lg p-6 max-w-md w-full mx-4" onclick={(e) => e.stopPropagation()}>
-				<h2 class="text-2xl font-bold text-gray-900 mb-4">⚠️ Confirm Submission</h2>
+		<div class="fixed inset-0 z-50">
+			<button
+				type="button"
+				class="absolute inset-0 w-full h-full bg-black bg-opacity-50"
+				onclick={cancelSubmit}
+				aria-label="Close confirmation modal"
+			></button>
+			<div class="relative z-10 flex min-h-full items-center justify-center p-4">
+				<div class="bg-white rounded-lg p-6 max-w-md w-full mx-4" role="dialog" aria-modal="true" aria-labelledby="submit-confirmation-title">
+				<h2 id="submit-confirmation-title" class="text-2xl font-bold text-gray-900 mb-4">⚠️ Confirm Submission</h2>
 				
 				<div class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
 					<p class="text-yellow-800 font-semibold mb-2">Important: This action cannot be undone!</p>
@@ -1579,6 +1723,7 @@
 					>
 						Confirm & Submit
 					</button>
+				</div>
 				</div>
 			</div>
 		</div>

@@ -1,5 +1,20 @@
 <script lang="ts">
-	import type { AnyNaptrRecord } from 'node:dns';
+	type Props = {
+		inputList: unknown[];
+		input: unknown;
+		options: any[];
+		denylist: unknown[];
+		emptyState: string;
+		regionEmpty: string;
+		limit?: number;
+		allowlist?: unknown[];
+		regionNav?: string;
+		regionList?: string;
+		regionItem?: string;
+		regionButton?: string;
+		filter?: () => any[];
+		onSelect?: (option: any) => void;
+	};
 
 	let {
 		inputList,
@@ -16,22 +31,7 @@
 		regionEmpty = '',
 		filter = filterOptions,
 		onSelect = (option: any) => {}
-	} = $props<{
-		inputList: unknown[];
-		input: unknown;
-		options: any[];
-		denylist: unknown[];
-		emptyState: string;
-		regionEmpty: string;
-		limit?: number;
-		allowlist?: unknown[];
-		regionNav?: string;
-		regionList?: string;
-		regionItem?: string;
-		regionButton?: string;
-		filter?: () => any[];
-		onSelect?: (option: any) => void;
-	}>();
+	}: Props = $props();
 
 	let listedOptions = $state(options);
 
@@ -51,15 +51,24 @@
 	}
 
 	function filterOptions(): any[] {
-		let _options = [...listedOptions];
-		return _options.filter((option) => {
-			const inputFormatted = String(input).toLowerCase().trim();
-			let optionFormatted = JSON.stringify([
+		const inputFormatted = String(input ?? '').toLowerCase().trim();
+		if (!inputFormatted) return [...listedOptions];
+
+		return [...listedOptions].filter((option) => {
+			const fieldValues = [
 				option.label,
+				option.title,
+				option.name,
 				option.username,
-				option.keywords
-			]).toLowerCase();
-			if (optionFormatted.includes(inputFormatted)) return option;
+				option.keywords,
+				option.tags,
+				option.abstract
+			]
+				.flatMap((value) => (Array.isArray(value) ? value : [value]))
+				.filter((value) => value !== undefined && value !== null)
+				.map((value) => String(value).toLowerCase());
+
+			return fieldValues.some((value) => value.includes(inputFormatted));
 		});
 	}
 
