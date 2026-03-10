@@ -507,67 +507,54 @@
 	function extractAbstractFromHtml(html: string): string {
 		if (!html) return '';
 
-		let abstractContent = '';
-
-		// First try: Look for content after "Abstract" heading
+		// First try: use only the first paragraph after "Abstract/Resumo" heading.
 		const abstractHeadingRegex = /<h[1-6][^>]*>\s*(?:Abstract|ABSTRACT|abstract|Resumo|RESUMO|resumo)\s*<\/h[1-6]>/i;
 		const abstractHeadingMatch = abstractHeadingRegex.exec(html);
 
 		if (abstractHeadingMatch) {
-			// Get everything after the abstract heading
 			const startIndex = abstractHeadingMatch.index + abstractHeadingMatch[0].length;
 			const afterHeading = html.substring(startIndex);
+			const nextHeadingMatch = /<h[1-6][^>]*>/i.exec(afterHeading);
+			const sectionUntilNextHeading = nextHeadingMatch
+				? afterHeading.substring(0, nextHeadingMatch.index)
+				: afterHeading;
 
-			// Extract content until next heading or a certain length
-			const contentRegex = /<p[^>]*>([^<]*)<\/p>/gi;
-			const paragraphs: string[] = [];
-			let match;
-			let wordCount = 0;
-
-			while ((match = contentRegex.exec(afterHeading)) !== null && wordCount < 350) {
-				const text = match[1].trim().replace(/<[^>]*>/g, '').trim();
-				if (text && text.length > 20) {
-					paragraphs.push(text);
-					wordCount += text.split(/\s+/).length;
+			const paragraphRegex = /<p[^>]*>([\s\S]*?)<\/p>/gi;
+			let paragraphMatch: RegExpExecArray | null;
+			while ((paragraphMatch = paragraphRegex.exec(sectionUntilNextHeading)) !== null) {
+				const text = cleanHtmlText(paragraphMatch[1]);
+				if (text.length > 20) {
+					console.log('Extracted abstract (after heading):', text.substring(0, 100) + '...');
+					return text;
 				}
-				// Stop if we hit another heading
-				if (afterHeading.substring(match.index).match(/<h[1-6]/i)) {
-					break;
-				}
-			}
-
-			if (paragraphs.length > 0) {
-				abstractContent = paragraphs.join('\n\n');
 			}
 		}
 
-		// Fallback: Extract first few paragraphs if abstract not found
-		if (!abstractContent) {
-			const paragraphRegex = /<p[^>]*>([^<]*)<\/p>/gi;
-			const firstParagraphs: string[] = [];
-			let match;
-			let wordCount = 0;
+		// Fallback: use only the first valid paragraph after the detected title paragraph.
+		const extractedTitle = extractTitleFromHtml(html).trim().toLowerCase();
+		const paragraphRegex = /<p[^>]*>([\s\S]*?)<\/p>/gi;
+		const paragraphs = [...html.matchAll(paragraphRegex)].map((m) => cleanHtmlText(m[1]));
 
-			while ((match = paragraphRegex.exec(html)) !== null) {
-				const text = match[1].trim().replace(/<[^>]*>/g, '').trim();
-				if (text && text.length > 30) {
-					firstParagraphs.push(text);
-					wordCount += text.split(/\s+/).length;
-					// Stop after collecting 100-150 words
-					if (wordCount > 100) {
-						break;
-					}
-				}
-			}
+		const titleParagraphIndex = extractedTitle
+			? paragraphs.findIndex((p) => p.trim().toLowerCase() === extractedTitle)
+			: -1;
 
-			// Only use if we got reasonable amount of text
-			if (firstParagraphs.length > 0 && wordCount > 50 && wordCount < 400) {
-				abstractContent = firstParagraphs.join('\n\n');
-			}
+		const startIndex = titleParagraphIndex >= 0 ? titleParagraphIndex + 1 : 0;
+
+		for (let i = startIndex; i < paragraphs.length; i++) {
+			const text = paragraphs[i].trim();
+			const normalized = text.toLowerCase();
+
+			if (text.length <= 20) continue;
+			if (normalized === extractedTitle) continue;
+			if (/^(abstract|resumo|keywords?|palavras[-\s]?chave)\s*:?$/i.test(text)) continue;
+
+			console.log('Extracted abstract (fallback first paragraph):', text.substring(0, 100) + '...');
+			return text;
 		}
 
-		console.log('Extracted abstract:', abstractContent.substring(0, 100) + '...');
-		return abstractContent;
+		console.log('Could not extract abstract from document');
+		return '';
 	}
 
 	function extractKeywordsFromHtml(html: string): string[] {
