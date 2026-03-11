@@ -373,6 +373,239 @@
 		return unique.map((lower) => parts.find((p) => p.toLowerCase() === lower) || lower);
 	}
 
+	function normalizeToInlineHtml(html: string): string {
+		if (!html) return '';
+		if (typeof DOMParser === 'undefined') {
+			const fallback = html
+				.replace(/<\/?(?:p|div|h[1-6]|ul|ol|li|blockquote)[^>]*>/gi, ' ')
+				.replace(/<br\s*\/?\s*>/gi, ' ')
+				.replace(/\s+/g, ' ')
+				.replace(/>\s+</g, '><')
+				.trim();
+
+			return fallback ? `<p>${fallback}</p>` : '';
+		}
+
+		const parser = new DOMParser();
+		const doc = parser.parseFromString(`<div>${html}</div>`, 'text/html');
+		const root = doc.body.firstElementChild;
+		if (!root) return '';
+
+		type Segment = { text: string; bold: boolean; italic: boolean };
+		const segments: Segment[] = [];
+		const blockTags = new Set([
+			'p',
+			'div',
+			'h1',
+			'h2',
+			'h3',
+			'h4',
+			'h5',
+			'h6',
+			'ul',
+			'ol',
+			'li',
+			'blockquote',
+			'table',
+			'tr',
+			'td',
+			'th'
+		]);
+
+		const hasBoldStyle = (el: Element): boolean => {
+			const style = (el.getAttribute('style') || '').toLowerCase();
+			return /font-weight\s*:\s*(bold|[6-9]00)/.test(style);
+		};
+
+		const hasItalicStyle = (el: Element): boolean => {
+			const style = (el.getAttribute('style') || '').toLowerCase();
+			return /font-style\s*:\s*italic/.test(style);
+		};
+
+		const walk = (node: Node, bold: boolean, italic: boolean) => {
+			if (node.nodeType === Node.TEXT_NODE) {
+				const text = (node.textContent || '').replace(/\s+/g, ' ');
+				if (!text) return;
+				segments.push({ text, bold, italic });
+				return;
+			}
+
+			if (node.nodeType !== Node.ELEMENT_NODE) return;
+
+			const el = node as Element;
+			const tag = el.tagName.toLowerCase();
+			const nextBold = bold || tag === 'strong' || tag === 'b' || hasBoldStyle(el);
+			const nextItalic = italic || tag === 'em' || tag === 'i' || hasItalicStyle(el);
+
+			if (tag === 'br') {
+				segments.push({ text: ' ', bold: nextBold, italic: nextItalic });
+				return;
+			}
+
+			for (const child of Array.from(el.childNodes)) {
+				walk(child, nextBold, nextItalic);
+			}
+
+			if (blockTags.has(tag)) {
+				segments.push({ text: ' ', bold: false, italic: false });
+			}
+		};
+
+		for (const child of Array.from(root.childNodes)) {
+			walk(child, false, false);
+		}
+
+		const merged: Segment[] = [];
+		for (const seg of segments) {
+			if (!seg.text) continue;
+			const last = merged[merged.length - 1];
+			if (last && last.bold === seg.bold && last.italic === seg.italic) {
+				last.text += seg.text;
+			} else {
+				merged.push({ ...seg });
+			}
+		}
+
+		const escapeHtml = (text: string): string =>
+			text
+				.replace(/&/g, '&amp;')
+				.replace(/</g, '&lt;')
+				.replace(/>/g, '&gt;');
+
+		const rendered = merged
+			.map((seg) => {
+				const cleaned = seg.text.replace(/\s+/g, ' ');
+				if (!cleaned.trim()) return cleaned;
+				let value = escapeHtml(cleaned);
+				if (seg.italic) value = `<em>${value}</em>`;
+				if (seg.bold) value = `<strong>${value}</strong>`;
+				return value;
+			})
+			.join('')
+			.replace(/\s+/g, ' ')
+			.replace(/\s*<\/em>\s*<em>\s*/g, ' ')
+			.replace(/\s*<\/strong>\s*<strong>\s*/g, ' ')
+			.replace(/([A-Za-zÀ-ÿ])\s*-\s*([A-Za-zÀ-ÿ])/g, '$1-$2')
+			.trim();
+
+		return rendered ? `<p>${rendered}</p>` : '';
+	}
+
+	function extractFirstSentenceSplitFromHtml(html: string): { title: string; abstract: string } {
+		if (!html || typeof DOMParser === 'undefined') return { title: '', abstract: '' };
+
+		const parser = new DOMParser();
+		const doc = parser.parseFromString(html, 'text/html');
+		const blockedLabels = /^(abstract|resumo|keywords?|palavras[-\s]?chave|introduction|introdu[cç][aã]o|main)\s*:?$/i;
+
+		const candidates = Array.from(doc.body.querySelectorAll('h1,h2,h3,h4,h5,h6,p,div,span'))
+			.map((el) => {
+				const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
+				return {
+					element: el,
+					text,
+					html: (el.innerHTML || '').trim()
+				};
+			})
+			.map((item) => ({
+				...item,
+				text: item.text.replace(/^\s*(title|t[ií]tulo)\s*[:\-]\s*/i, '').trim(),
+				html: item.html.replace(/^\s*(?:<[^>]+>\s*)*(title|t[ií]tulo)\s*[:\-]\s*/i, '').trim()
+			}))
+			.filter((item) => item.text.length > 0)
+			.filter((item) => !blockedLabels.test(item.text));
+
+		if (candidates.length === 0) return { title: '', abstract: '' };
+
+		const first = candidates[0];
+		const walker = doc.createTreeWalker(first.element, NodeFilter.SHOW_TEXT);
+		const segments: Array<{ node: Text; start: number; end: number; text: string }> = [];
+		let totalLength = 0;
+		let current: Node | null;
+
+		while ((current = walker.nextNode())) {
+			const node = current as Text;
+			const text = node.data;
+			if (!text) continue;
+			segments.push({ node, start: totalLength, end: totalLength + text.length, text });
+			totalLength += text.length;
+		}
+
+		if (segments.length === 0) return { title: '', abstract: '' };
+
+		const fullText = segments.map((s) => s.text).join('');
+		const sentenceBoundary = fullText.search(/[.!?](?=\s|$)/);
+
+		const locate = (index: number) => {
+			const clamped = Math.max(0, Math.min(index, totalLength));
+			for (const segment of segments) {
+				if (clamped <= segment.end) {
+					return { node: segment.node, offset: Math.max(0, clamped - segment.start) };
+				}
+			}
+			const last = segments[segments.length - 1];
+			return { node: last.node, offset: last.text.length };
+		};
+
+		let title = '';
+		let abstract = '';
+
+		if (sentenceBoundary >= 0) {
+			const titleEnd = sentenceBoundary + 1;
+			const afterBoundary = fullText.slice(titleEnd);
+			const leadingSpaces = (afterBoundary.match(/^\s+/)?.[0].length || 0);
+			const abstractStart = titleEnd + leadingSpaces;
+
+			const titleStartLoc = locate(0);
+			const titleEndLoc = locate(titleEnd);
+			const abstractStartLoc = locate(abstractStart);
+			const abstractEndLoc = locate(totalLength);
+
+			const titleRange = doc.createRange();
+			titleRange.setStart(titleStartLoc.node, titleStartLoc.offset);
+			titleRange.setEnd(titleEndLoc.node, titleEndLoc.offset);
+			const titleContainer = doc.createElement('div');
+			titleContainer.appendChild(titleRange.cloneContents());
+			title = normalizeToInlineHtml(titleContainer.innerHTML);
+
+			if (abstractStart < totalLength) {
+				const abstractRange = doc.createRange();
+				abstractRange.setStart(abstractStartLoc.node, abstractStartLoc.offset);
+				abstractRange.setEnd(abstractEndLoc.node, abstractEndLoc.offset);
+				const abstractContainer = doc.createElement('div');
+				abstractContainer.appendChild(abstractRange.cloneContents());
+				abstract = normalizeToInlineHtml(abstractContainer.innerHTML);
+			}
+		} else {
+			title = normalizeToInlineHtml(first.html);
+		}
+
+		const titleText = cleanHtmlText(title);
+		if (titleText.length > 240) {
+			title = titleText.slice(0, 240).trim();
+		}
+
+		if (!abstract) {
+			const fallbackAbstract = candidates
+				.slice(1)
+				.find(
+					(item) =>
+						item.text.length > 20 &&
+						!/^(keywords?|palavras[-\s]?chave)\s*:?/i.test(item.text) &&
+						item.text.toLowerCase() !== titleText.toLowerCase()
+				);
+
+			if (fallbackAbstract) {
+				abstract = normalizeToInlineHtml(fallbackAbstract.html);
+			}
+		}
+
+		return {
+			title: title.trim(),
+			abstract: abstract.trim()
+		};
+	}
+
 	function extractTitleFromHtml(html: string): string {
 		if (!html) return '';
 
@@ -639,8 +872,8 @@
 		console.log('File:', file);
 
 		try {
-			// const response = await fetch('http://127.0.0.1:8000/api/convert', {
-			const response = await fetch('https://scideep.imd.ufrn.br/dth/api/convert', {
+			const response = await fetch('http://127.0.0.1:8000/api/convert', {
+			// const response = await fetch('https://scideep.imd.ufrn.br/dth/api/convert', {
 				//modify this to the server in VM
 				method: 'POST',
 				body: formData,
@@ -661,7 +894,8 @@
 
 			// Automatically extract and fill abstract
 			if (data.html) {
-				const extractedTitle = extractTitleFromHtml(data.html);
+				const firstSentenceSplit = extractFirstSentenceSplitFromHtml(data.html);
+				const extractedTitle = firstSentenceSplit.title || extractTitleFromHtml(data.html);
 				console.log('Checking if should fill title... Current:', $store.title ? 'has value' : 'empty');
 
 				if (extractedTitle && isEffectivelyEmptyText($store.title)) {
@@ -673,10 +907,10 @@
 					console.log('❌ Could not extract title from document');
 				}
 
-				const extractedAbstract = extractAbstractFromHtml(data.html);
+				const extractedAbstract = firstSentenceSplit.abstract || extractAbstractFromHtml(data.html);
 				console.log('Checking if should fill abstract... Current:', $store.abstract ? 'has value' : 'empty');
 				
-				if (extractedAbstract && !$store.abstract) {
+				if (extractedAbstract && isEffectivelyEmptyText($store.abstract)) {
 					$store.abstract = extractedAbstract;
 					console.log('✅ Abstract automatically filled from DOCX');
 					console.log('Abstract content:', $store.abstract.substring(0, 150) + '...');
