@@ -1,14 +1,27 @@
 import Papers from '$lib/db/models/Paper';
-import { redirect } from '@sveltejs/kit';
+import { error } from '@sveltejs/kit';
+import { start_mongo } from '$lib/db/mongooseConnection';
+import { sanitize } from '$lib/utils/sanitize';
+import '$lib/db/models/User';
+import '$lib/db/models/Hub';
 
 
-export async function load({ locals, params }) {
+export async function load({ params }) {
+	await start_mongo();
 
-	const user = locals.user;
-	if (!user) { redirect(302, '/login') }
-	//console.log('vamo q vamo', params)
+	const paper = await Papers.findOne({
+		id: params.slug,
+		status: 'published'
+	}, { _id: 0 })
+		.populate('mainAuthor')
+		.populate('coAuthors')
+		.populate('hubId')
+		.lean()
+		.exec();
 
-	const paper = await Papers.findOne({id:params.slug}, { _id: 0 }).lean().exec();
+	if (!paper) {
+		throw error(404, 'Published article not found');
+	}
 	// const fetchArticles = async () => {
 	// 	const articlesRes = await fetch(`https://api.realworld.io/api/articles/${params.slug}`);
 	// 	const articlesData = await articlesRes.json();
@@ -30,5 +43,5 @@ export async function load({ locals, params }) {
 	article.body = sanitizeHtml(dirty); */
 
 	// return { article: await fetchArticles(), comments: await fetchComments() };
-	return { paper};
+	return { paper: sanitize(paper) };
 }
