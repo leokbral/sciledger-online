@@ -3,43 +3,43 @@ import * as crypto from 'crypto';
 
 export const UserSchema: Schema = new Schema({
     _id: { type: String, required: true },
-    id: { type: String, default: () => crypto.randomUUID(), unique: true }, // Gerando um UUID por padrão para o userId
-    firstName: { type: String, required: true, unique: false }, // Nome de usuário
-    lastName: { type: String, required: true, unique: false }, // Nome de usuário
-    country: { type: String, required: false, unique: false, default: '' }, // País (opcional para ORCID)
-    dob: { type: String, required: false, unique: false, default: '' }, // Date of Birth (opcional para ORCID)
-    username: { type: String, required: true, unique: true }, // Handle do usuário, único e obrigatório
-    email: { type: String, required: true, unique: true }, // Email do usuário
-    password: { type: String, required: false }, // Senha do usuário (opcional para login via ORCID)
-    refreshToken: { type: String }, // Token para gerenciar sessões de login
+    id: { type: String, default: () => crypto.randomUUID(), unique: true }, // Generating a UUID as default for userId
+    firstName: { type: String, required: true, unique: false }, // First name
+    lastName: { type: String, required: true, unique: false }, // Last name
+    country: { type: String, required: false, unique: false, default: '' }, // Country (optional for ORCID)
+    dob: { type: String, required: false, unique: false, default: '' }, // Date of Birth (optional for ORCID)
+    username: { type: String, required: true, unique: true }, // User handle, unique and required
+    email: { type: String, required: true, unique: true }, // User email
+    password: { type: String, required: false }, // User password (optional for ORCID login)
+    refreshToken: { type: String }, // Token for managing login sessions
     resetPasswordToken: { type: String },
-    resetPasswordExpiry: { type: String }, // Expiração do token de recuperação de senha
-    emailVerified: { type: Boolean, default: false }, // Verificação de email
-    // Campos ORCID OAuth
-    orcid: { type: String, unique: true, sparse: true }, // ORCID iD do usuário
-    orcidAccessToken: { type: String }, // Access token do ORCID
-    orcidRefreshToken: { type: String }, // Refresh token do ORCID
-    orcidTokenExpiry: { type: Date }, // Data de expiração do token ORCID
-    darkMode: { type: Boolean, default: false }, // Tema escuro
-    roles: { // Definição de roles do usuário
+    resetPasswordExpiry: { type: String }, // Password reset token expiry
+    emailVerified: { type: Boolean, default: false }, // Email verification
+    // ORCID OAuth fields
+    orcid: { type: String, unique: true, sparse: true }, // User's ORCID iD
+    orcidAccessToken: { type: String }, // ORCID access token
+    orcidRefreshToken: { type: String }, // ORCID refresh token
+    orcidTokenExpiry: { type: Date }, // ORCID token expiry date
+    darkMode: { type: Boolean, default: false }, // Dark mode
+    roles: { // User roles definition
         author: { type: Boolean, default: true },
         reviewer: { type: Boolean, default: false }
     },
-    bio: { type: String, default: '' }, // Biografia do usuário com valor padrão
-    profilePictureUrl: { type: String, default: '' }, // URL da foto de perfil com valor padrão
-    institution: { type: String, default: '' }, // Instituição de ensino com valor padrão
-    position: { type: String, default: '' }, // Cargo do usuário com valor padrão
-    performanceReviews: { // Informações sobre a performance do usuário
-        averageReviewDays: { type: Number, default: 0 }, // Média de dias de revisão com valor padrão
-        recommendations: [{ type: String, default: '' }], // Recomendações recebidas
-        responseTime: { type: Number, default: 0 }, // Tempo médio de resposta com valor padrão
-        expertise: [{ type: String, default: '' }] // Áreas de expertise com valor padrão
+    bio: { type: String, default: '' }, // User biography with default value
+    profilePictureUrl: { type: String, default: '' }, // Profile picture URL with default value
+    institution: { type: String, default: '' }, // Institution with default value
+    position: { type: String, default: '' }, // User's position with default value
+    performanceReviews: { // User performance information
+        averageReviewDays: { type: Number, default: 0 }, // Average review days with default value
+        recommendations: [{ type: String, default: '' }], // Received recommendations
+        responseTime: { type: Number, default: 0 }, // Average response time with default value
+        expertise: [{ type: String, default: '' }] // Areas of expertise with default value
     },
-    connections: [{ type: String, ref: 'User' }], // IDs dos usuários conectados
-    followers: [{ type: String, ref: 'User' }], // IDs dos seguidores
-    following: [{ type: String, ref: 'User' }], // IDs dos usuários seguidos
-    papers: [{ type: String, ref: 'Paper' }], // IDs das publicações do usuário
-    hubs: [{ type: String, ref: 'Hub', default: [] }], // IDs dos hubs do usuário
+    connections: [{ type: String, ref: 'User' }], // IDs of connected users
+    followers: [{ type: String, ref: 'User' }], // IDs of followers
+    following: [{ type: String, ref: 'User' }], // IDs of followed users
+    papers: [{ type: String, ref: 'Paper' }], // IDs of the user's publications
+    hubs: [{ type: String, ref: 'Hub', default: [] }], // IDs of the user's hubs
     createdAt: { type: String, default: () => new Date().toISOString() },
     updatedAt: { type: String, default: () => new Date().toISOString() }
 });

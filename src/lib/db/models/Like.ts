@@ -1,26 +1,26 @@
 // src/models/Like.ts
 import mongoose, { Schema, Document } from 'mongoose';
-//import { v4 as uuidv4 } from 'uuid'; // Importando a função para gerar UUID
+//import { v4 as uuidv4 } from 'uuid'; // Import function to generate UUID
 import * as crypto from 'crypto';
 
-// Definindo a interface para tipagem
+// Interface definition for typing
 interface ILike extends Document {
-    likeId: string; // ID único gerado para o like
-    user: string; // UUID do usuário que curtiu
-    publication?: string; // UUID da publicação que foi curtida (opcional)
-    comment?: string; // UUID do comentário que foi curtido (opcional)
-    createdAt: Date; // Data de criação
+    likeId: string; // Unique ID generated for the like
+    user: string; // UUID of the user who liked
+    publication?: string; // UUID of the liked publication (optional)
+    comment?: string; // UUID of the liked comment (optional)
+    createdAt: Date; // Creation date
 }
 
-// Definindo o schema
+// Schema definition
 const LikeSchema: Schema = new Schema({
-    likeId: { type: String, default: () => crypto.randomUUID(), unique: true }, // Gerando um UUID por padrão para o likeId
-    user: { type: String, ref: 'User', required: true }, // UUID do usuário que curtiu
-    publication: { type: String, ref: 'Publication' }, // UUID da publicação que foi curtida
-    comment: { type: String, ref: 'Comment' }, // UUID do comentário que foi curtido
-    createdAt: { type: Date, default: Date.now } // Data e hora de criação
+    likeId: { type: String, default: () => crypto.randomUUID(), unique: true }, // Generating a UUID as default for likeId
+    user: { type: String, ref: 'User', required: true }, // UUID of the user who liked
+    publication: { type: String, ref: 'Publication' }, // UUID of the liked publication
+    comment: { type: String, ref: 'Comment' }, // UUID of the liked comment
+    createdAt: { type: Date, default: Date.now } // Creation date and time
 });
 
-// Exportando o modelo
+// Exporting the model
 const Like = mongoose.models.Like || mongoose.model<ILike>('Like', LikeSchema);
 export default Like;

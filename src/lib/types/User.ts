@@ -1,44 +1,44 @@
 import type { Paper } from "./Paper";
 
 export type User = {
-	_id: string; // ID interno do MongoDB
-	id: string; // ID único gerado para o usuário
-    //name: string; // Nome do usuário
+	_id: string; // Internal MongoDB ID
+	id: string; // Unique generated user ID
+    //name: string; // User name
     firstName: string; 
     lastName: string; 
     country: string; 
     dob: string;
-    username: string; // Handle do usuário, similar ao @username do Twitter
-    email: string; // Email do usuário
-    password: string; // Senha do usuário
-    refreshToken?: string; // Token para gerenciar sessões de login
+    username: string; // User handle, similar to Twitter's @username
+    email: string; // User email
+    password: string; // User password
+    refreshToken?: string; // Token for managing login sessions
     resetPasswordToken: string;
-    resetPasswordExpiry: string; // Expiração do token de recuperação de senha
-    emailVerified: boolean; // Verificação de email
-    darkMode: boolean; // Tema escuro
+    resetPasswordExpiry: string; // Password reset token expiry
+    emailVerified: boolean; // Email verification
+    darkMode: boolean; // Dark mode
     roles: {
-        author: boolean; // Se o usuário é um autor
-        reviewer: boolean; // Se o usuário é um revisor
+        author: boolean; // Whether the user is an author
+        reviewer: boolean; // Whether the user is a reviewer
     };
-    bio?: string; // Biografia do usuário
-    profilePictureUrl?: string; // URL da foto de perfil
-    institution?: string; // Instituição de ensino associada ao usuário
-    position?: string; // Cargo do usuário
+    bio?: string; // User biography
+    profilePictureUrl?: string; // Profile picture URL
+    institution?: string; // User's associated institution
+    position?: string; // User's position
     performanceReviews?: {
-        averageReviewDays?: number; // Média de dias de revisão
-        recommendations?: string[]; // Recomendações recebidas
-        responseTime?: number; // Tempo médio de resposta (em horas, por exemplo)
-        expertise?: string[]; // Áreas de expertise do usuário
+        averageReviewDays?: number; // Average review days
+        recommendations?: string[]; // Received recommendations
+        responseTime?: number; // Average response time (in hours)
+        expertise?: string[]; // User's areas of expertise
     };
-    connections: string[]; // IDs dos usuários conectados
-    followers: User[]; // IDs dos seguidores
-    following: User[]; // IDs dos usuários seguidos
-    papers: Paper[]; // IDs das publicações do usuário
-    hubs?: string[]; // IDs dos hubs associados ao usuário
+    connections: string[]; // IDs of connected users
+    followers: User[]; // IDs of followers
+    following: User[]; // IDs of followed users
+    papers: Paper[]; // IDs of the user's publications
+    hubs?: string[]; // IDs of the user's associated hubs
     // OAuth ORCID Integration
-    orcid?: string; // ORCID iD do usuário (ex: 0000-0001-2345-6789)
-    orcidAccessToken?: string; // Token de acesso ORCID para APIs
-    orcidRefreshToken?: string; // Token de refresh ORCID para renovação
-    createdAt: Date; // Data de criação
-    updatedAt: Date; // Data de atualização
+    orcid?: string; // User's ORCID iD (e.g. 0000-0001-2345-6789)
+    orcidAccessToken?: string; // ORCID access token for APIs
+    orcidRefreshToken?: string; // ORCID refresh token for renewal
+    createdAt: Date; // Creation date
+    updatedAt: Date; // Last update date
 };

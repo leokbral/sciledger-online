@@ -74,7 +74,7 @@
     
     // Filtrar revisores disponíveis que ainda não foram convidados
     // Excluir também autores, co-autores e submitter
-    function getAvailableReviewers(paper: Paper) {
+    function getAvailableReviewers(paper: Paper): Array<User | string> {
         if (!hub.reviewers || !Array.isArray(hub.reviewers)) return [];
         
         const assignedIds = paper.peer_review?.assignedReviewers?.map((r: any) => 
@@ -125,7 +125,7 @@
     }
     
     // Filtrar revisores com base na busca
-    function getFilteredReviewers(paper: Paper) {
+    function getFilteredReviewers(paper: Paper): Array<User | string> {
         const available = getAvailableReviewers(paper);
         if (!searchTerm) return available;
         
@@ -165,7 +165,7 @@
     
     async function rejectPaper() {
         if (!selectedPaper || !rejectionReason.trim()) {
-            toaster.error('Please provide a rejection reason');
+            toaster.error({ title: 'Validation Error', description: 'Please provide a rejection reason' });
             return;
         }
         
@@ -180,17 +180,20 @@
             const data = await response.json();
             
             if (response.ok) {
-                toaster.success('Paper rejected successfully. Author has been notified.');
+                toaster.success({
+                    title: 'Success',
+                    description: 'Paper rejected successfully. Author has been notified.'
+                });
                 openRejectModal = false;
                 rejectionReason = '';
                 // Refresh the page to show updated status
                 window.location.reload();
             } else {
-                toaster.error(data.error || 'Failed to reject paper');
+                toaster.error({ title: 'Error', description: data.error || 'Failed to reject paper' });
             }
         } catch (error) {
             console.error(error);
-            toaster.error('An error occurred while rejecting the paper');
+            toaster.error({ title: 'Error', description: 'An error occurred while rejecting the paper' });
         } finally {
             loading = false;
         }
@@ -253,15 +256,18 @@
             const data = await response.json();
             
             if (response.ok) {
-                toaster.success(`Invited ${selectedReviewers.length} reviewer(s) successfully!`);
+                toaster.success({
+                    title: 'Success',
+                    description: `Invited ${selectedReviewers.length} reviewer(s) successfully!`
+                });
                 openInviteModal = false;
                 selectedReviewers = [];
             } else {
-                toaster.error(data.error || 'Failed to send invitations');
+                toaster.error({ title: 'Error', description: data.error || 'Failed to send invitations' });
             }
         } catch (error) {
             console.error(error);
-            toaster.error('An error occurred');
+            toaster.error({ title: 'Error', description: 'An error occurred' });
         } finally {
             loading = false;
         }
@@ -742,16 +748,16 @@
                                     reviewerId,
                                     match: aReviewerId === reviewerId,
                                     aPaperId,
-                                    selectedPaperId: selectedPaper.id,
-                                    paperMatch: aPaperId === selectedPaper.id,
+                                    selectedPaperId: selectedPaper?.id,
+                                    paperMatch: aPaperId === selectedPaper?.id,
                                     assignment: a
                                 });
-                                return aReviewerId === reviewerId && aPaperId === selectedPaper.id;
+                                return aReviewerId === reviewerId && aPaperId === selectedPaper?.id;
                             })}
                             {#if idx === 0}
                                 {console.log('📊 Modal Debug:', {
                                     reviewAssignmentsLength: reviewAssignments?.length,
-                                    selectedPaperId: selectedPaper.id,
+                                    selectedPaperId: selectedPaper?.id,
                                     reviewerId,
                                     foundAssignment: !!assignment,
                                     assignmentDeadline: assignment?.deadline,

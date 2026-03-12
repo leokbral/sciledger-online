@@ -11,13 +11,13 @@ import './models/Hub';
 import './models/Draft';
 
 export async function start_mongo() {
-    if (mongoose.connection.readyState === 0) { // Verifica se já existe uma conexão ativa
+    if (mongoose.connection.readyState === 0) { // Check if a connection already exists
         try {
             mongoose.connect(MONGO_URL, {});
-            console.log('Conectado ao MongoDB via Mongoose');
+            console.log('Connected to MongoDB via Mongoose');
         } catch (error) {
-            console.error('Erro ao conectar ao MongoDB:', error);
-            throw error; // Lança o erro para ser tratado em outros lugares
+            console.error('Error connecting to MongoDB:', error);
+            throw error; // Throw the error to be handled elsewhere
         }
     }
 }

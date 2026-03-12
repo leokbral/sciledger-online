@@ -3,60 +3,60 @@ import type { Paper } from "./Paper";
 
 // ReviewType.ts
 export type Review = {
-    _id: string; // ID interno do MongoDB
-	id: string; // UUID gerado para identificação única da revisão
+    _id: string; // Internal MongoDB ID
+	id: string; // Generated UUID for unique review identification
 
-	paperId: Paper | string; // ID do artigo sendo avaliado
-	reviewerId: User | string; // ID do revisor responsável pela avaliação
-	paperTitle: string; // Título do artigo
+	paperId: Paper | string; // ID of the paper being evaluated
+	reviewerId: User | string; // ID of the reviewer responsible for the evaluation
+	paperTitle: string; // Paper title
 
-	// Parte I – Avaliação Quantitativa (notas de 1 a 5)
+	// Part I – Quantitative Evaluation (scores from 1 to 5)
 	quantitativeEvaluation: {
-		originality: number; // Originalidade
-		clarity: number; // Clareza
-		literatureReview: number; // Revisão da literatura
-		theoreticalFoundation: number; // Fundamentação teórica
-		methodology: number; // Metodologia
-		reproducibility: number; // Reproduzibilidade
-		results: number; // Resultados
-		figures: number; // Figuras
-		limitations: number; // Limitações
-		language: number; // Linguagem
-		impact: number; // Impacto
+		originality: number; // Originality
+		clarity: number; // Clarity
+		literatureReview: number; // Literature review
+		theoreticalFoundation: number; // Theoretical foundation
+		methodology: number; // Methodology
+		reproducibility: number; // Reproducibility
+		results: number; // Results
+		figures: number; // Figures
+		limitations: number; // Limitations
+		language: number; // Language
+		impact: number; // Impact
 	};
 
-	// Parte II – Avaliação Qualitativa
+	// Part II – Qualitative Evaluation
 	qualitativeEvaluation: {
-		strengths: string; // Pontos fortes
-		weaknesses: string; // Pontos fracos
+		strengths: string; // Strengths
+		weaknesses: string; // Weaknesses
 	};
 
-	// Parte III – Ética
+	// Part III – Ethics
 	ethics: {
-		involvesHumanResearch: 'yes' | 'no' | ''; // Envolve pesquisa com humanos?
-		ethicsApproval?: 'adequate' | 'justified' | 'absent' | ''; // Aprovação ética
+		involvesHumanResearch: 'yes' | 'no' | ''; // Involves human research?
+		ethicsApproval?: 'adequate' | 'justified' | 'absent' | ''; // Ethics approval
 	};
 
-	// Parte IV – Recomendação
+	// Part IV – Recommendation
 	recommendation: 'accept_without_changes' | 'accept_with_minor_revisions' | 'major_revision' | 'reject' | '';
 
-	// Campos calculados
-	averageScore: number; // Pontuação média
-	weightedScore: number; // Pontuação ponderada
+	// Calculated fields
+	averageScore: number; // Average score
+	weightedScore: number; // Weighted score
 
-	// Status e metadados
-	status: 'draft' | 'submitted' | 'completed'; // Estado da revisão
-	reviewRound: 1 | 3; // 1 = primeira rodada (phase 1), 3 = segunda rodada (phase 3)
-	submissionDate?: Date; // Data de submissão
-	completionDate?: Date; // Data de conclusão
-	createdAt: Date; // Data de criação do registro
-	updatedAt: Date; // Data da última atualização do registro
+	// Status and metadata
+	status: 'draft' | 'submitted' | 'completed'; // Review state
+	reviewRound: 1 | 3; // 1 = first round (phase 1), 3 = second round (phase 3)
+	submissionDate?: Date; // Submission date
+	completionDate?: Date; // Completion date
+	createdAt: Date; // Record creation date
+	updatedAt: Date; // Record last update date
 };
 
 export type ReviewCriteria = {
-	name: keyof Review['quantitativeEvaluation']; // Nome do critério
-	title: string; // Título do critério
-	description: string; // Descrição do critério
-	options: string[]; // Opções disponíveis para o critério
-	weight: string; // Peso do critério na avaliação
+	name: keyof Review['quantitativeEvaluation']; // Criterion name
+	title: string; // Criterion title
+	description: string; // Criterion description
+	options: string[]; // Available options for the criterion
+	weight: string; // Criterion weight in the evaluation
 };

@@ -12,18 +12,18 @@ export const ReviewAssignmentSchema: Schema = new Schema({
         default: 'pending' 
     },
     assignedAt: { type: Date, required: true, default: Date.now },
-    acceptedAt: { type: Date }, // Quando o revisor aceitou
-    completedAt: { type: Date }, // Quando a revisão foi completada
-    deadline: { type: Date }, // 15 dias após aceitar
-    respondedAt: { type: Date }, // Quando respondeu (aceitar/recusar)
+    acceptedAt: { type: Date }, // When the reviewer accepted
+    completedAt: { type: Date }, // When the review was completed
+    deadline: { type: Date }, // 15 days after acceptance
+    respondedAt: { type: Date }, // When responded (accept/decline)
     hubId: { type: String, ref: 'Hub' },
     isLinkedToHub: { type: Boolean, default: false },
     remindersSent: { 
         type: Number, 
         default: 0 
-    }, // Quantos lembretes foram enviados
-    lastReminderAt: { type: Date }, // Último lembrete enviado
-    notes: { type: String }, // Notas adicionais
+    }, // How many reminders were sent
+    lastReminderAt: { type: Date }, // Last reminder sent
+    notes: { type: String }, // Additional notes
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 }, { 
@@ -31,17 +31,17 @@ export const ReviewAssignmentSchema: Schema = new Schema({
     timestamps: true 
 });
 
-// Índices para performance
+// Indexes for performance
 ReviewAssignmentSchema.index({ paperId: 1, reviewerId: 1 }, { unique: true });
 ReviewAssignmentSchema.index({ reviewerId: 1, status: 1 });
 ReviewAssignmentSchema.index({ deadline: 1, status: 1 });
 ReviewAssignmentSchema.index({ status: 1, assignedAt: -1 });
 
-// Middleware para calcular deadline quando aceita
+// Middleware to calculate deadline when accepted
 ReviewAssignmentSchema.pre('save', function(next) {
     if (this.isModified('status') && this.status === 'accepted' && !this.deadline) {
         this.acceptedAt = new Date();
-        this.deadline = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000); // 15 dias
+        this.deadline = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000); // 15 days
     }
     
     if (this.isModified()) {
