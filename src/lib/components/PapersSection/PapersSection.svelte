@@ -271,7 +271,7 @@
 <section>
     <div class="mt-6 bg-white shadow-md rounded-xl p-6">
         <div class="flex justify-between items-center mb-4">
-            <h2 class="text-xl font-semibold text-gray-800">Submitted Articles</h2>
+            <h2 class="text-xl font-semibold text-gray-800">Published Article</h2>
             <div class="flex flex-col gap-2 w-fit">
                 <!-- Download Template Button -->
                 <a
