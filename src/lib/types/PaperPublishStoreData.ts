@@ -6,7 +6,7 @@ export interface Block {
 	type: string;
 	data: {
 		text: string;
-		// Outros campos de dados podem ser adicionados conforme necessário
+		// Other data fields can be added as needed
 	};
 }
 
@@ -16,13 +16,13 @@ export interface Block {
 // }
 
 export interface SupplementaryMaterial {
-	id: string; // ID único para este item
-	title: string; // Título/descrição do material
-	url: string; // URL do repositório
-	type: 'github' | 'figshare' | 'zenodo' | 'osf' | 'dataverse' | 'other'; // Tipo de repositório
-	description?: string; // Descrição detalhada
-	createdAt?: Date; // Quando foi adicionado
-	updatedAt?: Date; // Última atualização
+	id: string; // Unique ID for this item
+	title: string; // Title/description of the material
+	url: string; // Repository URL
+	type: 'github' | 'figshare' | 'zenodo' | 'osf' | 'dataverse' | 'other'; // Repository type
+	description?: string; // Detailed description
+	createdAt?: Date; // When it was added
+	updatedAt?: Date; // Last update
 }
 
 export interface PaperPublishStoreData extends Omit<Paper, 'mainAuthor' | 'createdAt' | 'updatedAt'> {

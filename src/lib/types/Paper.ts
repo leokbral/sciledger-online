@@ -3,22 +3,22 @@ import type { User } from "./User";
 import type { Review } from "./Review";
 
 export type Paper = {
-    _id: string; // ID interno do MongoDB
-    id: string; // ID único gerado para o paper
-    mainAuthor: User; // Autor principal como UUID
-    correspondingAuthor: User; // Autor correspondente como UUID
-    coAuthors: User[]; // Lista de coautores como UUIDs
-    reviewers: User[]; // Lista de revisores como UUIDs
+    _id: string; // Internal MongoDB ID
+    id: string; // Unique paper ID
+    mainAuthor: User; // Main author as UUID
+    correspondingAuthor: User; // Corresponding author as UUID
+    coAuthors: User[]; // List of co-authors as UUIDs
+    reviewers: Array<User | string>; // List of reviewers as User objects or UUIDs
     title: string;
     abstract: string;
     keywords: string[];
     content: string;
     pdfUrl: string;
     doi?: string;
-    paperPictures: string[]; // Alterado de articlePictures para paperPictures
-    citations: string[]; // Lista de citações como UUIDs
-    likes: string[]; // Lista de usuários que curtiram como UUIDs
-    comments: string[]; // Lista de comentários como UUIDs
+    paperPictures: string[]; // Paper images
+    citations: string[]; // List of citation UUIDs
+    likes: string[]; // List of users who liked as UUIDs
+    comments: string[]; // List of comments as UUIDs
     tags: string[];
     status: string;
     price: number;
@@ -26,7 +26,7 @@ export type Paper = {
     authors: User[],
     peer_review?: {
         reviewType: 'open' | 'selected';
-        assignedReviewers: User[];
+        assignedReviewers: Array<User | string>;
         responses: Array<{
 			_id: string;
             reviewerId: User;
@@ -36,41 +36,41 @@ export type Paper = {
             completedAt?: Date;
             reviewId?: string;
         }>;
-        // Adicionar campos relacionados às reviews
-        reviews: Review[]; // Lista de reviews associadas
-        averageScore: number; // Média das avaliações
-        reviewCount: number; // Número de reviews completadas
+        // Review-related fields
+        reviews: Review[]; // List of associated reviews
+        averageScore: number; // Average review score
+        reviewCount: number; // Number of completed reviews
         reviewStatus: 'not_started' | 'in_progress' | 'completed';
     };
 
     /*  peer_review: {
-         reviewType: 'open' | 'selected'; // Tipo de revisão: 'open' para qualquer revisor, 'selected' para revisores específicos
-         assignedReviewers: User[]; // Lista de revisores específicos se 'selected'
+         reviewType: 'open' | 'selected'; // Review type: 'open' for any reviewer, 'selected' for specific reviewers
+         assignedReviewers: User[]; // List of specific reviewers if 'selected'
          reviewerResponses: {
-             reviewerId: User; // UUID do revisor
-             counterProposal?: string; // Proposta de contraproposta do revisor (opcional)
-             responseStatus: 'accepted' | 'declined' | 'counter-proposal' | 'pending'; // Status geral da resposta do revisor
-             reviewerComments: string[]; // Comentários do revisor
+             reviewerId: User; // Reviewer UUID
+             counterProposal?: string; // Reviewer counter-proposal (optional)
+             responseStatus: 'accepted' | 'declined' | 'counter-proposal' | 'pending'; // Overall reviewer response status
+             reviewerComments: string[]; // Reviewer comments
          }[];
      }; */
     createdAt: Date;
     updatedAt: Date;
-    submittedBy: User; // Campo adicionado para quem submeteu o paper
+    submittedBy: User; // User who submitted the paper
     hubId?: string | Hub| null;
     isLinkedToHub?: boolean;
-    correctionProgress?: Record<string, boolean>; // Progresso das correções (checklist)
+    correctionProgress?: Record<string, boolean>; // Corrections progress (checklist)
     
-    // Sistema de Slots de Revisão (máximo 3 revisores)
+    // Review Slot System (max 3 reviewers)
     reviewSlots?: Array<{
-        slotNumber: number; // 1, 2, ou 3
-        reviewerId: string | User | null; // ID do revisor que ocupa o slot (null se vazio)
-        status: 'available' | 'pending' | 'occupied' | 'declined'; // Status do slot
-        invitedAt?: Date; // Quando o convite foi enviado
-        acceptedAt?: Date; // Quando o revisor aceitou
-        declinedAt?: Date; // Quando o revisor recusou
+        slotNumber: number; // 1, 2, or 3
+        reviewerId: string | User | null; // Reviewer ID occupying the slot (null if empty)
+        status: 'available' | 'pending' | 'occupied' | 'declined'; // Slot status
+        invitedAt?: Date; // When invitation was sent
+        acceptedAt?: Date; // When reviewer accepted
+        declinedAt?: Date; // When reviewer declined
     }>;
-    maxReviewSlots?: number; // Número máximo de slots (padrão: 3)
-    availableSlots?: number; // Slots disponíveis (calculado)
+    maxReviewSlots?: number; // Maximum number of slots (default: 3)
+    availableSlots?: number; // Available slots (calculated)
     reviewRound?: number; // Track which review round (1 = first, 2 = after corrections)
     phaseTimestamps?: {
         round1Start?: Date;
@@ -87,16 +87,17 @@ export type Paper = {
         subArea: string; // Scopus subject sub-area
     }>; // Multiple Scopus classifications for interdisciplinary papers
     rejectedByHub?: boolean; // Paper rejected by hub admin
+    isAcceptedForReview?: boolean; // Indicates whether current user accepted designated review
     rejectionReason?: string; // Reason for rejection
     rejectedAt?: Date; // When it was rejected
     rejectedBy?: User | string; // Who rejected it
     supplementaryMaterials?: Array<{
-        id: string; // ID único para este item
-        title: string; // Título/descrição do material
-        url: string; // URL do repositório
-        type: 'github' | 'figshare' | 'zenodo' | 'osf' | 'dataverse' | 'other'; // Tipo de repositório
-        description?: string; // Descrição detalhada
-        createdAt?: Date; // Quando foi adicionado
-        updatedAt?: Date; // Última atualização
+        id: string; // Unique ID for this item
+        title: string; // Title/description of the material
+        url: string; // Repository URL
+        type: 'github' | 'figshare' | 'zenodo' | 'osf' | 'dataverse' | 'other'; // Repository type
+        description?: string; // Detailed description
+        createdAt?: Date; // When it was added
+        updatedAt?: Date; // Last update
     }>;
 }

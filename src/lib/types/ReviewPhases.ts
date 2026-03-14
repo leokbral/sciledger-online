@@ -1,15 +1,15 @@
 /**
- * Enumeração das 4 fases do processo de revisão
+ * Enum for the 4 phases of the review process
  */
 export enum ReviewPhase {
-    PHASE_1_INITIAL_REVIEW = 'phase1_initial_review',           // Primeira revisão pelos revisores
-    PHASE_2_AUTHOR_CORRECTIONS = 'phase2_author_corrections',   // Correções pelo autor
-    PHASE_3_FINAL_REVIEW = 'phase3_final_review',              // Revisão final pelos revisores
-    PHASE_4_FINAL_DECISION = 'phase4_final_decision'           // Decisão final (publicar/rejeitar)
+    PHASE_1_INITIAL_REVIEW = 'phase1_initial_review',           // Initial review by reviewers
+    PHASE_2_AUTHOR_CORRECTIONS = 'phase2_author_corrections',   // Author corrections
+    PHASE_3_FINAL_REVIEW = 'phase3_final_review',              // Final review by reviewers
+    PHASE_4_FINAL_DECISION = 'phase4_final_decision'           // Final decision (publish/reject)
 }
 
 /**
- * Mapeamento de status do paper para fases
+ * Mapping of paper status to phases
  */
 export const STATUS_TO_PHASE_MAP: Record<string, ReviewPhase> = {
     'in review': ReviewPhase.PHASE_1_INITIAL_REVIEW,
@@ -21,37 +21,37 @@ export const STATUS_TO_PHASE_MAP: Record<string, ReviewPhase> = {
 };
 
 /**
- * Informações sobre cada fase
+ * Information about each phase
  */
 export const PHASE_INFO = {
     [ReviewPhase.PHASE_1_INITIAL_REVIEW]: {
         name: 'Initial Review by Peers',
         description: 'Reviewers analyze and provide feedback',
-        duration: 15, // dias
+        duration: 15, // days
         timestampKey: 'phase1_initial_review_started' as keyof NonNullable<import('$lib/types/Paper').Paper['phaseTimestamps']>
     },
     [ReviewPhase.PHASE_2_AUTHOR_CORRECTIONS]: {
         name: 'Author Corrections',
         description: 'Author implements reviewer feedback',
-        duration: 15, // dias
+        duration: 15, // days
         timestampKey: 'phase2_author_corrections_started' as keyof NonNullable<import('$lib/types/Paper').Paper['phaseTimestamps']>
     },
     [ReviewPhase.PHASE_3_FINAL_REVIEW]: {
         name: 'Final Review by Peers',
         description: 'Reviewers verify corrections',
-        duration: 10, // dias (menor prazo para revisão final)
+        duration: 10, // days (shorter deadline for final review)
         timestampKey: 'phase3_final_review_started' as keyof NonNullable<import('$lib/types/Paper').Paper['phaseTimestamps']>
     },
     [ReviewPhase.PHASE_4_FINAL_DECISION]: {
         name: 'Final Decision',
         description: 'Editorial decision for publication',
-        duration: 7, // dias (decisão editorial)
+        duration: 7, // days (editorial decision)
         timestampKey: 'phase4_final_decision_started' as keyof NonNullable<import('$lib/types/Paper').Paper['phaseTimestamps']>
     }
 };
 
 /**
- * Determina a fase atual baseada no status do paper
+ * Determines the current phase based on the paper status
  */
 export function getCurrentPhase(paperStatus: string): ReviewPhase | null {
     return STATUS_TO_PHASE_MAP[paperStatus] || null;

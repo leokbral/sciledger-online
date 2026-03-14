@@ -24,7 +24,7 @@ export const PaperReviewInvitationSchema: Schema = new Schema(
 	{ collection: 'paperreviewinvitations' }
 );
 
-// Index para queries frequentes
+// Index for frequent queries
 PaperReviewInvitationSchema.index({ paper: 1, reviewer: 1 });
 PaperReviewInvitationSchema.index({ reviewer: 1, status: 1 });
 PaperReviewInvitationSchema.index({ hubId: 1 });

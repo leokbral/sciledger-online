@@ -9,7 +9,7 @@ interface ITag extends Document {
 
 const TagSchema: Schema = new Schema({
     name: { type: String, required: true, unique: true },
-    publications: [{ type: mongoose.Types.ObjectId, ref: 'Publication' }], // Publicações associadas à tag
+    publications: [{ type: mongoose.Types.ObjectId, ref: 'Publication' }], // Publications associated with the tag
     createdAt: { type: Date, default: Date.now }
 });
 

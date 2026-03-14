@@ -43,7 +43,7 @@ export type Hub = {
         eventStart: { type: Date },
         eventEnd: { type: Date }
     },
-    reviewers?: string[];
+    reviewers?: Array<string | User>;
     submittedPapers?: string[];
     assignedReviews: Array<{
         paperId: string;

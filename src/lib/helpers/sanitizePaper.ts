@@ -1,5 +1,5 @@
 /**
- * Sanitiza dados de paper do Mongoose para remover campos não serializáveis
+ * Sanitizes Mongoose paper data to remove non-serializable fields
  */
 export function sanitizeReviewSlots(slots: any[]): any[] {
 	if (!slots || !Array.isArray(slots)) return [];
@@ -15,12 +15,12 @@ export function sanitizeReviewSlots(slots: any[]): any[] {
 }
 
 /**
- * Sanitiza um paper completo removendo _id dos subdocumentos
+ * Sanitizes a complete paper by removing _id from subdocuments
  */
 export function sanitizePaper(paper: any): any {
 	if (!paper) return paper;
 
-	// Sanitizar peer_review responses
+	// Sanitize peer_review responses
 	const peer_review = paper.peer_review
 		? {
 				reviewType: paper.peer_review.reviewType,
@@ -40,10 +40,10 @@ export function sanitizePaper(paper: any): any {
 		  }
 		: undefined;
 
-	// Sanitizar reviewSlots
+	// Sanitize reviewSlots
 	const reviewSlots = sanitizeReviewSlots(paper.reviewSlots);
 
-	// Sanitizar scopusClassifications (remover _id dos subdocuments)
+	// Sanitize scopusClassifications (remove _id from subdocuments)
 	const scopusClassifications = paper.scopusClassifications?.map((classification: any) => ({
 		area: classification.area,
 		subArea: classification.subArea

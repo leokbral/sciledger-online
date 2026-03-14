@@ -11,7 +11,7 @@ export interface ReviewDeadlineStatus {
 export async function checkReviewDeadlines(): Promise<ReviewDeadlineStatus[]> {
     const now = new Date();
     
-    // Buscar todas as revisões aceitas que ainda não foram completadas
+    // Fetch all accepted reviews not yet completed
     const activeAssignments = await db.collection('reviewAssignments').find({
         status: 'accepted',
         deadline: { $exists: true }
@@ -34,7 +34,7 @@ export async function checkReviewDeadlines(): Promise<ReviewDeadlineStatus[]> {
 
         deadlineStatuses.push(status);
 
-        // Atualizar status se vencido
+        // Update status if overdue
         if (timeDiff < 0 && assignment.status !== 'overdue') {
             await db.collection('reviewAssignments').updateOne(
                 { _id: assignment._id },
@@ -64,7 +64,7 @@ export async function sendReviewReminders(): Promise<void> {
         let shouldSendReminder = false;
         let reminderType = '';
 
-        // Lógica de lembretes
+        // Reminder logic
         if (isOverdue && daysSinceLastReminder >= 1) {
             shouldSendReminder = true;
             reminderType = 'overdue';

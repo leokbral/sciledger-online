@@ -42,8 +42,8 @@ export const NotificationSchema: Schema = new Schema({
     relatedCommentId: { type: String, },
     relatedHubId: { type: String, },
     relatedReviewId: { type: String, },
-    actionUrl: { type: String }, // URL para onde o usuário deve ser redirecionado
-    metadata: { type: Schema.Types.Mixed }, // Dados adicionais específicos do tipo
+    actionUrl: { type: String }, // URL to redirect the user to
+    metadata: { type: Schema.Types.Mixed }, // Additional type-specific data
     isRead: {
         type: Boolean,
         default: false,
@@ -53,7 +53,7 @@ export const NotificationSchema: Schema = new Schema({
         enum: ['low', 'medium', 'high', 'urgent'],
         default: 'medium'
     },
-    expiresAt: { type: Date }, // Para notificações temporárias
+    expiresAt: { type: Date }, // For temporary notifications
     createdAt: { type: Date, default: Date.now },
     readAt: { type: Date }
 },
@@ -62,7 +62,7 @@ export const NotificationSchema: Schema = new Schema({
         timestamps: true
     });
 
-// Índices para performance
+// Indexes for performance
 NotificationSchema.index({ user: 1, createdAt: -1 });
 NotificationSchema.index({ user: 1, isRead: 1 });
 NotificationSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });

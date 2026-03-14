@@ -27,9 +27,9 @@ export function getCorrectionTimeRemaining(
     console.log('paper.peer_review?.responses:', paper.peer_review?.responses);
     console.log('reviewAssignments:', reviewAssignments);
     
-    // Se temos um ReviewAssignment customizado para este revisor/paper, usar o deadline dele
+    // If we have a custom ReviewAssignment for this reviewer/paper, use its deadline
     if (userRole === 'reviewer' && userId && reviewAssignments) {
-        console.log('🔍 Procurando ReviewAssignment customizado...');
+        console.log('🔍 Looking for custom ReviewAssignment...');
         console.log('  - userId:', userId);
         console.log('  - paper.id:', paper.id);
         console.log('  - reviewAssignments:', reviewAssignments);
@@ -60,19 +60,19 @@ export function getCorrectionTimeRemaining(
             const hoursRemaining = Math.ceil(timeDifference / (1000 * 60 * 60));
             const isOverdue = timeDifference < 0;
 
-            // Calcular a data de início REAL (aceitação do revisor)
+            // Calculate the REAL start date (reviewer acceptance)
             let correctionStartDate = assignment.acceptedAt ? new Date(assignment.acceptedAt) : undefined;
-            // Se não houver acceptedAt, estimar pelo deadline menos o intervalo
+            // If no acceptedAt, estimate from deadline minus interval
             let totalDays = 15;
             if (correctionStartDate) {
                 totalDays = Math.round((deadlineDate.getTime() - correctionStartDate.getTime()) / (1000 * 60 * 60 * 24));
             } else {
-                // fallback: tentar usar o valor salvo no assignment, ou default 15
+                // fallback: try to use the value saved in the assignment, or default 15
                 correctionStartDate = new Date(deadlineDate);
                 correctionStartDate.setDate(correctionStartDate.getDate() - totalDays);
             }
 
-            console.log('✅ Retornando deadline customizado:', {
+            console.log('✅ Returning custom deadline:', {
                 deadlineDate,
                 daysRemaining,
                 isOverdue,
