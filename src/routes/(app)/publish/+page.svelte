@@ -2,10 +2,11 @@
 	import PublishPage from '$lib/Pages/Publish/PublishPage.svelte';
 	import type { Paper } from '$lib/types/Paper';
 
-	import type { PageData } from './$types';
-
 	interface Props {
-		data: PageData;
+		data: {
+			papers: Paper[];
+			user: unknown;
+		};
 	}
 
 	let { data }: Props = $props();
@@ -21,9 +22,9 @@
 			rota: '/publish/edit'
 		},
 		{
-			name: 'Under Negotiation',
+			name: 'Reviewer Assignment',
 			icon: 'hugeicons:conversation',
-			rota: '/publish/negotiation'
+			rota: '/publish/reviewer-assignment'
 		},
 		{
 			name: 'In Review',
@@ -43,7 +44,7 @@
 	];
 
 	let drafts = papers.filter((p: Paper) => p.status === 'draft');
-	let underNegotiation = papers.filter((p: Paper) => p.status === 'under negotiation');
+	let underNegotiation = papers.filter((p: Paper) => p.status === 'reviewer assignment');
 	let inReview = papers.filter((p: Paper) => p.status === 'in review');
 	let needingCorrections = papers.filter((p: Paper) => p.status === 'needing corrections');
 	let published = papers.filter((p: Paper) => p.status === 'published');

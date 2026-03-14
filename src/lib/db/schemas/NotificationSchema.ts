@@ -1,7 +1,7 @@
 import { Schema } from "mongoose";
 
 export const NotificationSchema: Schema = new Schema({
-    _id: { type: String, required: true, unique: true, },
+    _id: { type: String, required: true },
     id: { type: String, default: () => crypto.randomUUID(), unique: true },
     user: { type: String, required: true, ref: 'User' },
     type: {

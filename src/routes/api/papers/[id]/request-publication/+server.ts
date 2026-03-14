@@ -75,7 +75,7 @@ export const POST: RequestHandler = async ({ params, locals }) => {
 		}
 
 		// Hub paper: request approval from hub admin (hub owner)
-		paperDoc.status = 'under negotiation';
+		paperDoc.status = 'reviewer assignment';
 		paperDoc.updatedAt = new Date().toISOString();
 		await paperDoc.save();
 

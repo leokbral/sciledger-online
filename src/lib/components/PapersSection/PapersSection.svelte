@@ -30,7 +30,7 @@
         if (!slug) return '#';
 
         // Hub admin: publication approval requested after round 2
-        if (isCreator && paper?.status === 'under negotiation' && paper?.reviewRound === 2) {
+        if (isCreator && paper?.status === 'reviewer assignment' && paper?.reviewRound === 2) {
             return `/publish/publication-approval/${slug}`;
         }
 
@@ -41,10 +41,10 @@
         }
 
         // Default routing by status (for authors/creators)
-        if (paper?.status === 'under negotiation') {
+        if (paper?.status === 'reviewer assignment') {
             // Se for creator (hub owner), mostra na rota view
             if (isCreator) return `/publish/view/${slug}`;
-            return `/publish/negotiation/${slug}`;
+            return `/publish/reviewer-assignment/${slug}`;
         }
         if (paper?.status === 'in review') return `/publish/inreview/${slug}`;
         if (paper?.status === 'needing corrections' || paper?.status === 'under correction') {
@@ -371,7 +371,7 @@
                                     <a
                                         href={paper.status === 'published' 
                                             ? `/publish/published/${paper._id}` 
-                                            : (paper.status === 'rejected' || paper.rejectedByHub || paper.status === 'under negotiation') && isCreator
+                                            : (paper.status === 'rejected' || paper.rejectedByHub || paper.status === 'reviewer assignment') && isCreator
                                                 ? `/publish/view/${paper._id}`
                                                 : `/publish/published/${paper._id}`}
                                         class="hover:text-primary-600 transition-colors"
@@ -466,7 +466,7 @@
                             <!-- Action buttons -->
                             <div class="flex items-center gap-2">
                                 {#if isCreator && paper.status !== 'published'}
-                                    {#if paper.status === 'under negotiation' && !paper.rejectedByHub}
+                                    {#if paper.status === 'reviewer assignment' && !paper.rejectedByHub}
                                         <button
                                             class="btn btn-sm preset-filled-error-500 text-white shadow-md hover:shadow-lg transition-all duration-200 flex items-center gap-1"
                                             onclick={() => openRejectDialog(paper)}

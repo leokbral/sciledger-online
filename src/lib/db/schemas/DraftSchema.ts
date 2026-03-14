@@ -1,7 +1,7 @@
 import mongoose, { Schema } from "mongoose";
 
 export const DraftSchema: Schema = new Schema({
-    _id: { type: String, required: true, unique: true, },
+    _id: { type: String, required: true },
     id: { type: String, default: () => crypto.randomUUID(), unique: true },
     paperId: {
         type: String,

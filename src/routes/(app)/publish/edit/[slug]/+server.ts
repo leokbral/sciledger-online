@@ -39,7 +39,7 @@ export const POST: RequestHandler = async ({ request }) => {
             paperPictures: data.paperPictures,
             correspondingAuthor: data.correspondingAuthor,
             coAuthors: _coAuthors,
-            status: data.status,//'draft', //'under negotiation'
+            status: data.status,//'draft', //'reviewer assignment'
             content: data.content,
             title: data.title,
             abstract: data.abstract,

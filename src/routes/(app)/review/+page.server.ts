@@ -184,8 +184,8 @@ export async function load({ locals }) {
 					return hasCompleted;
 				}
 
-			// Para papers "under negotiation": mostra se ainda não tem 3 revisores, se já é revisor, se é revisor do hub ou aceitou via ReviewQueue
-			if (paper.status === 'under negotiation') {
+			// Para papers "reviewer assignment": mostra se ainda não tem 3 revisores, se já é revisor, se é revisor do hub ou aceitou via ReviewQueue
+			if (paper.status === 'reviewer assignment') {
 				return acceptedOrCompleted.length < 3 || isReviewer || isHubReviewer || hasAcceptedReview;
 			}
 

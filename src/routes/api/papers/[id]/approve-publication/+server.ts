@@ -42,7 +42,7 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 			return json({ error: 'Publication approval is only valid after round 2' }, { status: 400 });
 		}
 
-		if (paperDoc.status !== 'under negotiation') {
+		if (paperDoc.status !== 'reviewer assignment') {
 			return json({ error: 'Paper is not pending publication approval' }, { status: 400 });
 		}
 

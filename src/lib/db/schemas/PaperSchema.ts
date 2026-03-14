@@ -19,7 +19,7 @@ export const PaperSchema: Schema = new Schema({
     likes: [{ type: String }], // List of users who liked as UUIDs
     comments: [{ type: String }], // List of comments as UUIDs
     tags: [{ type: String }],
-    status: { type: String, required: true, enum: ['draft', 'under negotiation', 'in review', 'needing corrections', 'published', 'rejected'], default: 'draft' },
+    status: { type: String, required: true, enum: ['draft', 'reviewer assignment', 'in review', 'needing corrections', 'published', 'rejected'], default: 'draft' },
     price: { type: Number, required: true }, // Publication price field
     score: { type: Number, default: 0, min: 0, max: 5 }, // Publication score field, default 0, range 0 to 5
     authors: [{ type: String, ref: 'User' }],

@@ -26,14 +26,26 @@
 
 	// let user = data.user;
 
-	let paper: Paper | null = data.paper as Paper;
+	const initialPaper = (data.paper as Paper) ?? null;
+	let paper: Paper | null = $state(initialPaper);
 	//console.log("www",paper?.authors)
 	let userProfiles = data.users; // Ajuste conforme necessário
-	let currentRound = paper?.reviewRound || 1;
-	let submittedReviewsThisRound =
-		paper?.peer_review?.reviews?.filter(
-			(r: any) => r?.status === 'submitted' && (r?.reviewRound || 1) === currentRound
-		) || [];
+	let currentRound = $state(initialPaper?.reviewRound || 1);
+	let submittedReviewsThisRound = $state<any[]>(
+		initialPaper?.peer_review?.reviews?.filter(
+			(r: any) => r?.status === 'submitted' && (r?.reviewRound || 1) === (initialPaper?.reviewRound || 1)
+		) || []
+	);
+
+	function syncRoundReviews(sourcePaper: Paper | null) {
+		const round = sourcePaper?.reviewRound || 1;
+		currentRound = round;
+		submittedReviewsThisRound =
+			sourcePaper?.peer_review?.reviews?.filter(
+				(r: any) => r?.status === 'submitted' && (r?.reviewRound || 1) === round
+			) || [];
+	}
+
 
 	// Last refresh timestamp for manual refresh button
 	let lastRefreshTime = $state<Date | null>(null);
@@ -58,7 +70,20 @@
 		}
 	};
 
-	const quantitativeFields = [
+	type QuantitativeFieldKey =
+		| 'originality'
+		| 'clarity'
+		| 'literatureReview'
+		| 'theoreticalFoundation'
+		| 'methodology'
+		| 'reproducibility'
+		| 'results'
+		| 'figures'
+		| 'limitations'
+		| 'language'
+		| 'impact';
+
+	const quantitativeFields: Array<{ key: QuantitativeFieldKey; label: string }> = [
 		{ key: 'originality', label: 'Originality' },
 		{ key: 'clarity', label: 'Clarity' },
 		{ key: 'literatureReview', label: 'Literature Review' },
@@ -92,15 +117,10 @@
 		'': '—'
 	};
 
-	let inicialValue: PaperPublishStoreData;
-
-	if (paper) {
-		inicialValue = {
-			...paper,
-			// authors: [paper.mainAuthor, ...paper.coAuthors],
-			mainAuthor: paper.mainAuthor
-		};
-	}
+	let inicialValue: PaperPublishStoreData = {
+		...((data.paper as Paper) ?? {}),
+		mainAuthor: (data.paper as Paper)?.mainAuthor
+	} as PaperPublishStoreData;
 
 	async function handleSavePaper(event: { detail: { store: Paper } }) {
 		console.log('Updated Paper Data:', event.detail.store);
@@ -109,7 +129,7 @@
 		console.log('Saving Updated Paper:', updatedPaper);
 
 		try {
-			const response = await post(`/publish/negotiation/${updatedPaper.id}`, updatedPaper); // Use id se for o campo correto
+			const response = await post(`/publish/reviewer-assignment/${updatedPaper.id}`, updatedPaper); // Use id se for o campo correto
 
 			if (response.paper) {
 				// Redireciona para a página de detalhes do artigo editado
@@ -151,13 +171,9 @@
 			
 			if (!response.ok) throw new Error('Failed to fetch paper');
 			
-			const updatedPaper = await response.json();
+			const updatedPaper = (await response.json()) as Paper;
 			paper = updatedPaper;
-			
-			// Atualizar submittedReviewsThisRound
-			submittedReviewsThisRound = (updatedPaper?.peer_review?.reviews || []).filter(
-				(r: any) => r?.status === 'submitted' && (r?.reviewRound || 1) === currentRound
-			);
+			syncRoundReviews(updatedPaper);
 			
 			lastRefreshTime = new Date();
 			console.log('✅ Reviews refreshed:', submittedReviewsThisRound.length, 'reviews received');
@@ -348,7 +364,7 @@
 												</div>
 												<div class="bg-white dark:bg-surface-800 p-2 rounded">
 													<span class="text-surface-600 dark:text-surface-400">Ethics approval:</span>
-													<span class="font-bold text-gray-900 dark:text-white ml-1">{ethicsApprovalLabel[review.ethics.ethicsApproval] || '—'}</span>
+													<span class="font-bold text-gray-900 dark:text-white ml-1">{ethicsApprovalLabel[review.ethics.ethicsApproval ?? ''] || '—'}</span>
 												</div>
 											</div>
 										</div>

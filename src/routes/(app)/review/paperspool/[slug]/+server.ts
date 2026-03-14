@@ -129,7 +129,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
         // Mudar status do paper para "in review" se tiver pelo menos 1 revisor aceito
         // (permite acesso individual imediato)
-        if (acceptedCount >= 1 && paper.status === 'under negotiation') {
+        if (acceptedCount >= 1 && paper.status === 'reviewer assignment') {
             paper.status = 'in review';
             paper.peer_review.reviewStatus = 'in_progress';
         }

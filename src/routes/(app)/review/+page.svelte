@@ -3,17 +3,16 @@
 	import ReviewPage from '$lib/Pages/Review/ReviewPage.svelte';
 	import PaperReviewInvitations from '$lib/components/PaperReviewInvitations/PaperReviewInvitations.svelte';
 	import type { Paper } from '$lib/types/Paper';
-	import type { PageData } from './$types';
 
 	interface Props {
-		data: PageData;
+		data: any;
 	}
 
 	let { data }: Props = $props();
 	// let papers = data.papers;
 	// let papers: Paper[] = data.papers; //VERIFICAR ISSO!!!!
 
-	let papers: Paper[] = data.papers.map((p: any) => ({
+	let papers: Paper[] = (data.papers as any[]).map((p: any) => ({
 		...p,
 		coAuthors:
 			p.coAuthors?.map((u: any) => ({
@@ -58,14 +57,14 @@
 
 	// let papersPool = papers.filter(
 	// 	(p: Paper) =>
-	// 		p.status === 'under negotiation' &&
+	// 		p.status === 'reviewer assignment' &&
 	// 		(p.reviewers.includes(data.user.id) || p.correspondingAuthor === data.user.id)
 	// );
 	// let papersPool = papers.filter(
-	// 		(p: Paper) => p.status === 'under negotiation'
+	// 		(p: Paper) => p.status === 'reviewer assignment'
 	// 	);
 
-	let user = data.user; //userProfiles[0];
+	let user: any = data.user; //userProfiles[0];
 	let reviewerInvitations = data.reviewerInvitations;
 
 	let papersPool = papers
@@ -88,7 +87,7 @@
 				(p.hubId?.createdBy?.id || p.hubId?.createdBy)?.toString() === userId;
 			const isPaperInHub = !!p.hubId;
 
-			const isUnderNegotiation = p.status === 'under negotiation';
+			const isUnderNegotiation = p.status === 'reviewer assignment';
 			const isInvolved = isAuthor || isCoAuthor || isMainAuthor;
 
 			const canSeeWithoutHub = !isPaperInHub && isUnderNegotiation && !isInvolved;

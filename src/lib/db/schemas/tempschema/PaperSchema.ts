@@ -21,7 +21,7 @@ export const PaperSchema: Schema = new Schema({
     status: {
         type: String,
         required: true,
-        enum: ['draft', 'under negotiation', 'in review', 'needing corrections', 'published'],
+        enum: ['draft', 'reviewer assignment', 'in review', 'needing corrections', 'published'],
         default: 'draft'
     },
     price: { type: Number, required: true },

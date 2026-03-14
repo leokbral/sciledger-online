@@ -96,7 +96,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 	}
 
 	// Verificar se o paper está aguardando aprovação de publicação
-	if (paperDoc.status !== 'under negotiation') {
+	if (paperDoc.status !== 'reviewer assignment') {
 		throw error(400, 'This paper is not awaiting publication approval');
 	}
 
