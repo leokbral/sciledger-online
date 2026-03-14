@@ -44,7 +44,7 @@
 		console.log('Saving Updated Paper:', updatedPaper);
 
 		try {
-			const response = await post(`/publish/negotiation/${updatedPaper.id}`, updatedPaper); // Use id se for o campo correto
+			const response = await post(`/publish/reviewer-assignment/${updatedPaper.id}`, updatedPaper); // Use id se for o campo correto
 
 			if (response.paper) {
 				// Redireciona para a página de detalhes do artigo editado

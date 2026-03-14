@@ -12,7 +12,7 @@
 
 	let { data }: Props = $props();
 
-	let paper: Paper | null = data.paper;
+	let paper: Paper | null = (data.paper as Paper) ?? null;
 	//console.log("www",paper?.authors)
 	let userProfiles = data.users; // Ajuste conforme necessário
 
@@ -51,7 +51,7 @@
 
 		// const updatedPaper = {
 		// 	...store,
-		// 	status: 'under negotiation'
+		// 	status: 'reviewer assignment'
 		// };
 
 		// console.log('Saving Updated Paper:', updatedPaper);

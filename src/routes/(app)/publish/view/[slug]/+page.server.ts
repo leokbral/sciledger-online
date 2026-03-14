@@ -113,8 +113,8 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		if (isPaperAuthor) {
 			if (paperStatus === 'draft') {
 				redirect(302, `/publish/edit/${paperDoc.id}`);
-			} else if (paperStatus === 'under negotiation') {
-				redirect(302, `/publish/negotiation/${paperDoc.id}`);
+			} else if (paperStatus === 'reviewer assignment') {
+				redirect(302, `/publish/reviewer-assignment/${paperDoc.id}`);
 			} else if (paperStatus === 'in review') {
 				redirect(302, `/publish/inreview/${paperDoc.id}`);
 			} else if (paperStatus === 'needing corrections') {

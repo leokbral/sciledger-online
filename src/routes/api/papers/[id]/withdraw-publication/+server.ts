@@ -41,7 +41,7 @@ export const POST: RequestHandler = async ({ params, locals }) => {
 			return json({ error: 'Withdraw is only available after round 2' }, { status: 400 });
 		}
 
-		if (!['needing corrections', 'under correction', 'under negotiation'].includes(paperDoc.status)) {
+		if (!['needing corrections', 'under correction', 'reviewer assignment'].includes(paperDoc.status)) {
 			return json({ error: 'Paper cannot be withdrawn in its current status' }, { status: 400 });
 		}
 

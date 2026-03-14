@@ -1,0 +1,100 @@
+import Papers from '$lib/db/models/Paper';
+import Users from '$lib/db/models/User';
+import { error, redirect } from '@sveltejs/kit';
+import { start_mongo } from '$lib/db/mongooseConnection';
+
+interface ObjectId {
+	toString(): string;
+	constructor: { name: string };
+}
+
+function sanitize(obj: unknown): unknown {
+	if (obj === null || obj === undefined) {
+		return obj;
+	}
+
+	if (Array.isArray(obj)) {
+		return obj.map(sanitize);
+	}
+
+	if (obj && typeof obj === 'object') {
+		if (obj.constructor?.name === 'ObjectId' && typeof (obj as ObjectId).toString === 'function') {
+			return (obj as ObjectId).toString();
+		}
+
+		if (obj instanceof Date) {
+			return obj.toISOString();
+		}
+
+		const clean: Record<string, unknown> = {};
+		for (const key in obj) {
+			if (Object.prototype.hasOwnProperty.call(obj, key)) {
+				const value = (obj as Record<string, unknown>)[key];
+				clean[key] = sanitize(value);
+			}
+		}
+		return clean;
+	}
+
+	return obj;
+}
+
+export async function load({ locals, params }) {
+	if (!locals.user) redirect(302, `/login`);
+
+	await start_mongo();
+
+	const paperDoc = await Papers.findOne({ id: params.slug }, {})
+		.populate("authors")
+		.populate("mainAuthor")
+		.populate("coAuthors")
+		.populate({
+			path: 'hubId',
+			populate: {
+				path: 'reviewers',
+				model: 'User'
+			}
+		})
+		.populate({
+			path: 'peer_review.reviews',
+			populate: {
+				path: 'reviewerId',
+				model: 'User'
+			}
+		})
+		.lean()
+		.exec();
+
+	if (!paperDoc) {
+		throw error(404, 'Paper not found');
+	}
+
+	const usersDoc = await Users.find({}, {}).lean().exec();
+
+	const isHubOwner = typeof paperDoc.hubId === 'object' && paperDoc.hubId 
+		? (paperDoc.hubId.createdBy?.toString() === locals.user.id || paperDoc.hubId.createdBy?._id?.toString() === locals.user.id)
+		: false;
+
+	let reviewAssignments: unknown[] = [];
+	if (isHubOwner) {
+		const ReviewAssignment = (await import('$lib/db/models/ReviewAssignment')).default;
+		reviewAssignments = await ReviewAssignment.find({ paperId: params.slug })
+			.populate('reviewerId')
+			.lean()
+			.exec();
+	}
+
+	return {
+		paper: sanitize(paperDoc),
+		users: sanitize(usersDoc),
+		isHubOwner,
+		reviewAssignments: sanitize(reviewAssignments)
+	};
+}
+
+export const actions = {
+	default: async ({ locals }) => {
+		if (!locals.user) error(401);
+		return { success: true };
+	}
+};

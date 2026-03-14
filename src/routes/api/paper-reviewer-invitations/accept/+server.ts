@@ -88,7 +88,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			(r: any) => r.status === 'accepted' || r.status === 'completed'
 		).length;
 
-		if (acceptedCount >= 3 && paper.status === 'under negotiation') {
+		if (acceptedCount >= 3 && paper.status === 'reviewer assignment') {
 			paper.status = 'in review';
 			paper.peer_review.reviewStatus = 'in_progress';
 		}

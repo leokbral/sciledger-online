@@ -106,9 +106,8 @@ export async function load({ locals, params }) {
 		if (isPaperAuthor) {
 			if (paperStatus === 'draft') {
 				redirect(302, `/publish/edit/${paperDoc.id}`);
-			} else if (paperStatus === 'under negotiation') {
-				// Paper submetido ao hub (under negotiation): usa a rota existente de negociação
-				redirect(302, `/publish/negotiation/${paperDoc.id}`);
+			} else if (paperStatus === 'reviewer assignment') {
+				redirect(302, `/publish/reviewer-assignment/${paperDoc.id}`);
 			} else if (paperStatus === 'in review') {
 				redirect(302, `/publish/inreview/${paperDoc.id}`);
 			} else if (paperStatus === 'needing corrections') {
@@ -120,7 +119,7 @@ export async function load({ locals, params }) {
 		
 		// Revisores (do paper ou do hub) e dono do hub vão para a rota de revisão apropriada
 		if (isReviewer || isHubReviewer || isHubOwner) {
-			if (paperStatus === 'under negotiation') {
+			if (paperStatus === 'reviewer assignment') {
 				redirect(302, `/review/paperspool/${paperDoc.id}`);
 			} else if (paperStatus === 'in review') {
 				redirect(302, `/review/inreview/${paperDoc.id}`);

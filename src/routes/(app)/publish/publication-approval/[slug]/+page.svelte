@@ -104,7 +104,7 @@
 				actionError = result.error || 'Failed to reject publication';
 				return;
 			}
-			await goto(`/publish/negotiation/${(paper as any).id}`);
+			await goto(`/publish/reviewer-assignment/${(paper as any).id}`);
 		} catch (e) {
 			console.error(e);
 			actionError = 'Network error. Please try again.';
@@ -125,8 +125,9 @@
 
 		<div class="flex flex-wrap items-center gap-2">
 			<div class="flex flex-col gap-1 text-sm">
-				<label class="text-slate-700 font-medium">DOI (opcional)</label>
+				<label for="doi-input" class="text-slate-700 font-medium">DOI (opcional)</label>
 				<input
+					id="doi-input"
 					type="text"
 					class="w-52 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
 					placeholder="10.xxxx/xxxxx"
@@ -135,7 +136,7 @@
 			</div>
 			<button
 				class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-				onclick={() => goto('/publish/negotiation/' + (paper as any).id)}
+				onclick={() => goto('/publish/reviewer-assignment/' + (paper as any).id)}
 			>
 				Back
 			</button>

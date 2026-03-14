@@ -264,7 +264,7 @@
 							color="currentColor"
 						/>
 					</svg>
-					Under Negotiation
+					Reviewer Assignment
 					<span
 						class="absolute top-0 left-1/4 -translate-x-8 -translate-y-1 bg-primary-500 text-white text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full"
 					>
@@ -489,7 +489,7 @@
 			<div class="w-full md:w-1/2">
 				<p class="font-bold">Ready for You to Proof: 4</p>
 				<p class="font-bold">Returned for Your Attention: 3</p>
-				<p class="font-bold">Under Negotiation/Conversion: 1</p>
+				<p class="font-bold">Reviewer Assignment/Conversion: 1</p>
 			</div>
 		</div>
 

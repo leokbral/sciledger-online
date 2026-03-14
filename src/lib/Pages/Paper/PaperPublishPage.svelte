@@ -1005,7 +1005,7 @@
 			return;
 		}
 
-		$store.status = 'under negotiation';
+		$store.status = 'reviewer assignment';
 		console.log($store);
 
 		showSubmitModal = false;

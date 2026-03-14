@@ -53,7 +53,7 @@ export async function load({ locals, params }) {
 			status: 'accepted'
 		}).lean();
 
-		// Para papers "under negotiation" sem hub, qualquer revisor pode ver
+		// Para papers "reviewer assignment" sem hub, qualquer revisor pode ver
 		const isOpenReviewer = !paperRaw.hubId && locals.user.roles?.reviewer === true;
 
 		console.log('[PapersPool] Permissions:', { isHubReviewer, isHubOwner, isOpenReviewer, hasAcceptedViaQueue: !!hasAcceptedViaQueue });

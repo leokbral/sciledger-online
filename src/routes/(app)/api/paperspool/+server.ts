@@ -37,7 +37,7 @@ export const GET: RequestHandler = async ({ url, locals }) => {
         // Buscar informações dos papers
         const papers = await db.collection('papers').find({
             _id: { $in: paperIds },
-            status: { $in: ['under negotiation', 'review_in_progress'] }
+            status: { $in: ['reviewer assignment', 'review_in_progress'] }
         }).toArray();
 
         // Enriquecer papers com informações do assignment

@@ -16,11 +16,11 @@
 	import ManageReviewerDeadline from '$lib/components/ReviewerManagement/ManageReviewerDeadline.svelte';
 
 	interface Props {
-		data: PageData;
+		data: any;
 	}
 
 	let { data }: Props = $props();
-	let reviewers = data.users.filter((u: User) => u.roles.reviewer === true);
+	let reviewers = (data.users ?? []).filter((u: User) => u.roles.reviewer === true);
 	let peer_review: string = $state('');
 	let paper: Paper | null = $state(data.paper);
 	let isHubOwner: boolean = $state(!!(data as any).isHubOwner);
@@ -96,7 +96,7 @@
 					alert('Failed to assign reviewer. Please try again.');
 				} else {
 					// Show success message
-					const reviewer = reviewers.find((r) => r.id === reviewerId);
+					const reviewer = reviewers.find((r: User) => r.id === reviewerId);
 					alert(
 						`Reviewer ${reviewer?.firstName} ${reviewer?.lastName} has been assigned successfully!`
 					);
@@ -149,7 +149,7 @@
 				paperPictures: allImageIds
 			};
 
-			const response = await post(`/publish/negotiation/${updatedPaper.id}`, updatedPaper);
+			const response = await post(`/publish/reviewer-assignment/${updatedPaper.id}`, updatedPaper);
 
 			if (response.paper) {
 				const [poolResponse, reviewAssignments] = await Promise.all([
@@ -203,11 +203,11 @@
 				...paper,
 				selectedReviewers,
 				peerReviewType: peer_review,
-				status: 'under negotiation',
+				status: 'reviewer assignment',
 				paperPictures: allImageIds
 			};
 
-			const response = await post(`/publish/negotiation/${draftPaper.id}`, draftPaper);
+			const response = await post(`/publish/reviewer-assignment/${draftPaper.id}`, draftPaper);
 
 			if (response.paper) {
 				alert('Draft saved successfully');
@@ -227,7 +227,7 @@
 
 	async function deleteImage(imageId: string) {
 		try {
-			const response = await fetch(`/publish/negotiation/${paper?.id}`, {
+			const response = await fetch(`/publish/reviewer-assignment/${paper?.id}`, {
 				method: 'DELETE',
 				headers: {
 					'Content-Type': 'application/json'
@@ -251,7 +251,7 @@
 		isLoadingHubs = true;
 		try {
 			// Change from '/hubs' to the current route which has the GET handler
-			const response = await fetch(`/publish/negotiation/${paper?.id}`);
+			const response = await fetch(`/publish/reviewer-assignment/${paper?.id}`);
 			const data = await response.json();
 
 			if (data.success) {
@@ -283,7 +283,7 @@
 				isLinkedToHub: true
 			};
 
-			const response = await post(`/publish/negotiation/${paper.id}`, updatedPaper);
+			const response = await post(`/publish/reviewer-assignment/${paper.id}`, updatedPaper);
 
 			if (response.paper) {
 				alert('Hub linked successfully!');
@@ -343,14 +343,14 @@
 
 {#if paper}
 	<div class="container page max-w-[700px] p-4 m-auto">
-		<h4 class="h4 px-4 text-primary-500 font font-semibold">Under Negotiation</h4>
+		<h4 class="h4 px-4 text-primary-500 font font-semibold">Reviewer Assignment</h4>
 		<hr class="mt-2 mb-4 border-t-2!" />
 		{#if paper.hubId}
 			<div class="mb-4 rounded-lg border-l-4 border-blue-500 bg-blue-50 p-4">
 				<div class="flex gap-3">
 					<Icon icon="mdi:information" class="h-5 w-5 flex-shrink-0 text-blue-600" />
 					<div class="text-sm text-blue-900">
-						<strong>Status: Under Negotiation (Hub)</strong>
+						<strong>Status: Reviewer Assignment (Hub)</strong>
 						<p class="mt-1">
 							Este paper já foi submetido a um Hub e está em negociação. Enquanto estiver neste status,
 							ele não pode ser editado.
@@ -583,9 +583,9 @@
 					<PaperReviewerInvite
 						paperId={paper.id}
 						hubId={typeof paper.hubId === 'object' ? paper.hubId._id || paper.hubId.id : paper.hubId}
-						hubReviewers={paper.hubId.reviewers}
+						hubReviewers={paper.hubId.reviewers as User[]}
 						currentAssignedReviewers={paper.peer_review?.assignedReviewers?.map(r => typeof r === 'object' ? r._id || r.id : r) || []}
-						reviewSlots={paper.reviewSlots || []}
+						reviewSlots={paper.reviewSlots as { slotNumber: number; reviewerId: string | null; status: 'pending' | 'declined' | 'available' | 'occupied'; }[] || []}
 						mainAuthorId={typeof paper.mainAuthor === 'object' ? paper.mainAuthor._id || paper.mainAuthor.id : paper.mainAuthor}
 						coAuthorIds={paper.coAuthors?.map(a => typeof a === 'object' ? a._id || a.id : a) || []}
 						submittedById={typeof paper.submittedBy === 'object' ? paper.submittedBy._id || paper.submittedBy.id : paper.submittedBy}
@@ -648,9 +648,9 @@
 						</p>
 						<div class="space-y-3">
 							{#each paper.reviewers as reviewer}
-								{@const reviewerData = typeof reviewer === 'object' ? reviewer : data.users?.find(u => u.id === reviewer || u._id === reviewer)}
+								{@const reviewerData = typeof reviewer === 'object' ? reviewer : data.users?.find((u: User) => u.id === reviewer || u._id === reviewer)}
 								{@const reviewerId = typeof reviewer === 'object' ? (reviewer._id || reviewer.id) : reviewer}
-								{@const assignment = data.reviewAssignments?.find(a => {
+								{@const assignment = data.reviewAssignments?.find((a: any) => {
 									const aReviewerId = typeof a.reviewerId === 'object' ? (a.reviewerId._id || a.reviewerId.id) : a.reviewerId;
 									return aReviewerId === reviewerId;
 								})}
