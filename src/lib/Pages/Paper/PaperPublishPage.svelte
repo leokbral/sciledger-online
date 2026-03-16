@@ -1,13 +1,10 @@
 <script lang="ts">
 	import { TagsInput, FileUpload } from '@skeletonlabs/skeleton-svelte';
-	import type { Author } from '../../types/Author';
 	import type { User } from '$lib/types/User';
 	import { writable } from 'svelte/store';
-	import type { Paper } from '$lib/types/Paper';
 	import type { PaperPublishStoreData } from '$lib/types/PaperPublishStoreData';
 	import { page } from '$app/state';
 	import RichTextEditor from '$lib/components/Text/RichTextEditor.svelte';
-	import PapersImages from '$lib/components/PapersImages.svelte';
 	import Autocomplete from '$lib/components/Autocomplete.svelte';
 
 	import IconDropzone from '@lucide/svelte/icons/image-plus';
@@ -15,11 +12,9 @@
 	import IconRemove from '@lucide/svelte/icons/circle-x';
 	import Icon from '@iconify/svelte';
 	import OrcidProfile from '$lib/components/OrcidProfile/OrcidProfile.svelte';
-	import { SCOPUS_AREAS, getSubAreasForArea, getAllAreaNames } from '$lib/constants/scopusAreas';
+	import { getSubAreasForArea, getAllAreaNames } from '$lib/constants/scopusAreas';
+	import PaperSubmissionGuide from '$lib/components/Paper/PaperSubmissionGuide.svelte';
 
-	let fileName = $state('');
-	let pdfPaperPreview = $state();
-	let pdfFile: File | null = $state(null);
 	// Add these new variables
 	let docxPreview = $state();
 	let docxFile: File | null = $state(null);
@@ -36,6 +31,9 @@
 	let showSubmitModal = $state(false);
 	let confirmInformationAccurate = $state(false);
 	let confirmPoliciesAgreed = $state(false);
+
+	// Instructions collapsible
+	let showInstructions = $state(false);
 
 	interface Props {
 		authorsOptions: any;
@@ -237,8 +235,6 @@
 		$store.supplementaryMaterials = supplementaryMaterials;
 	}
 
-	// let files: FileList = $state();
-
 	let inputAuthor = $state('');
 	let inputAuthorList = $state(
 		inicialValue.authors?.length > 0
@@ -282,28 +278,12 @@
 		// });
 	}
 
-	function onRemoveHandler(event: any): void {
-		$store.authors = authorsOptions.filter((a: Author) => inputAuthorList.includes(a.id));
-	}
 
-	interface ValidateArgs {
-		inputValue: string;
-		// value: string[];
-	}
 
 	function isValidAuthor(value: ValidateArgs): boolean {
 		return authorsOptions.some((option: User) => option.username === value.inputValue);
 	}
 
-	async function onChangeHandler(event: any): Promise<void> {
-		const file = event.target?.files[0];
-
-		if (file && file.type.startsWith('image/')) {
-			const reader = new FileReader();
-			reader.readAsDataURL(file);
-			fileName = file.name;
-		}
-	}
 
 	// async function uploadFile() {
 	// 	if (!pdfFile) {
@@ -872,8 +852,8 @@
 		console.log('File:', file);
 
 		try {
-			// const response = await fetch('http://127.0.0.1:8000/api/convert', {
-			const response = await fetch('https://scideep.imd.ufrn.br/dth/api/convert', {
+			const response = await fetch('http://127.0.0.1:8000/api/convert', {
+			// const response = await fetch('https://scideep.imd.ufrn.br/dth/api/convert', {
 				//modify this to the server in VM
 				method: 'POST',
 				body: formData,
@@ -1024,22 +1004,6 @@
 	// 	// dispatch('savePaper', { store: $store });
 	// }
 
-	function generatePreview(event: any) {
-		if (event.acceptedFiles.length === 0) {
-			pdfPaperPreview = null;
-			return;
-		}
-		const reader = new FileReader();
-		reader.onload = (event) => {
-			pdfPaperPreview = event.target?.result;
-			// set the pdfPaperPreview as the src of an pdfPaperPreview element
-			// console.log('event', pdfPaperPreview);
-		};
-
-		const _file = event.acceptedFiles[0];
-		pdfFile = _file;
-		reader.readAsDataURL(_file);
-	}
 
 	function generateDocxPreview(event: any) {
 		if (event.acceptedFiles.length === 0) {
@@ -1244,6 +1208,9 @@
 					You can save your progress as a draft at any time using the "Save Draft" button at the bottom of the page.
 				</p>
 			</div>
+
+			<!-- Paper Submission Instructions -->
+			<PaperSubmissionGuide bind:expanded={showInstructions} />
 
 			<div class="mb-6 w-full bg-surface-50 dark:bg-surface-800 border border-surface-300 dark:border-surface-700 rounded-lg p-4">
 				<h5 class="text-lg font-semibold mb-1">Upload Paper Document *</h5>
