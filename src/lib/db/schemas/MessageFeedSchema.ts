@@ -1,4 +1,5 @@
 import mongoose, { Schema } from 'mongoose';
+import * as crypto from 'crypto';
 // import { UserSchema } from './UserSchema'; // Adjust the path as needed
 
 export const messageFeedSchema: Schema = new Schema({

@@ -18,7 +18,7 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 	let notifications: Notification[] = [];
 
 	try {
-		const rawNotifications = await Notifications.find({ user: user._id })
+		const rawNotifications = await Notifications.find({ user: user.id })
 			.sort({ createdAt: -1 })
 			.lean<INotification>()
 			.exec();
@@ -50,7 +50,7 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 
 	return {
 		user: {
-			_id: user._id,
+			_id: user.id,
 			username: user.username,
 			email: user.email,
 			bio: user.bio,

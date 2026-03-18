@@ -10,7 +10,7 @@ export const POST: RequestHandler = async ({ locals }) => {
             return json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        await NotificationService.markAllAsRead(user._id);
+        await NotificationService.markAllAsRead(user.id);
 
         return json({
             success: true,

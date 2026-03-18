@@ -6,7 +6,7 @@ export const GET: RequestHandler = async ({ locals }) => {
     try {
         const user = locals.user;
 
-        if (!user || !user._id) {
+        if (!user || !user.id) {
             return json({
                 success: true,
                 count: 0,
@@ -15,7 +15,7 @@ export const GET: RequestHandler = async ({ locals }) => {
             });
         }
 
-        const unreadCount = await NotificationService.getUnreadCount(user._id);
+        const unreadCount = await NotificationService.getUnreadCount(user.id);
 
         return json({
             success: true,

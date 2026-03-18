@@ -1,4 +1,5 @@
 import { Schema } from 'mongoose';
+import * as crypto from 'crypto';
 
 export const PaperReviewInvitationSchema: Schema = new Schema(
 	{

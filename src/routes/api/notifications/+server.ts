@@ -6,7 +6,7 @@ export const GET: RequestHandler = async ({ url, locals }) => {
     try {
         const user = locals.user;
 
-        if (!user || !user._id) {
+        if (!user || !user.id) {
             return json({
                 success: true,
                 notifications: [],
@@ -25,7 +25,7 @@ export const GET: RequestHandler = async ({ url, locals }) => {
             type: type as import('$lib/types/Notification').NotificationType | undefined
         };
 
-        const notifications = await NotificationService.getUserNotifications(user._id, options);
+        const notifications = await NotificationService.getUserNotifications(user.id, options);
 
         return json({
             success: true,

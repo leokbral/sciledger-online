@@ -15,7 +15,7 @@ export const POST: RequestHandler = async ({ params, locals }) => {
             return json({ error: 'Notification ID is required' }, { status: 400 });
         }
 
-        const notification = await NotificationService.markAsRead(notificationId, user._id);
+        const notification = await NotificationService.markAsRead(notificationId, user.id);
 
         if (!notification) {
             return json({ error: 'Notification not found' }, { status: 404 });
