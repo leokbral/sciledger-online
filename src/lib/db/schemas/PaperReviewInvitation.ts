@@ -8,7 +8,7 @@ export const PaperReviewInvitationSchema: Schema = new Schema(
 		paper: { type: String, ref: 'Paper', required: true },
 		reviewer: { type: String, ref: 'User', required: true },
 		invitedBy: { type: String, ref: 'User', required: true },
-		hubId: { type: String, ref: 'Hub', required: true },
+		hubId: { type: String, ref: 'Hub', default: null }, // Optional for direct paper invites
 		status: {
 			type: String,
 			enum: ['pending', 'accepted', 'declined'],

@@ -1,8 +1,9 @@
 import { json } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import Papers from '$lib/db/models/Paper';
-import Invitations from '$lib/db/models/Invitation';
+import PaperReviewInvitation from '$lib/db/models/PaperReviewInvitation';
 import Users from '$lib/db/models/User';
+import { NotificationService } from '$lib/services/NotificationService';
 import type { RequestHandler } from './$types';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
@@ -64,34 +65,52 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		// Criar convites para cada revisor
 		const invitations = [];
 		for (const reviewerId of reviewerIds) {
+			// Verificar se o revisor existe
+			const reviewer = await Users.findOne({ $or: [{ id: reviewerId }, { _id: reviewerId }] });
+			if (!reviewer) {
+				console.warn(`Reviewer ${reviewerId} not found`);
+				continue;
+			}
+
 			// Verificar se já existe convite pendente
-			const existingInvite = await Invitations.findOne({
+			const existingInvite = await PaperReviewInvitation.findOne({
 				paper: paperId,
 				reviewer: reviewerId,
 				status: 'pending'
 			});
 
 			if (!existingInvite) {
-				const invitation = new Invitations({
+				const invitation = new PaperReviewInvitation({
+					_id: crypto.randomUUID(),
 					id: crypto.randomUUID(),
 					paper: paperId,
 					reviewer: reviewerId,
 					invitedBy: user.id,
 					status: 'pending',
 					invitedAt: new Date(),
-					type: 'paper_review'
+					hubId: paper.hubId || null
 				});
 
 				await invitation.save();
 				invitations.push(invitation);
+
+				// Criar notificação para o revisor
+				try {
+					await NotificationService.createPaperReviewRequest({
+						reviewerId: reviewer.id,
+						paperId: paper.id,
+						paperTitle: paper.title,
+						authorName: `${user.firstName} ${user.lastName}`
+					});
+				} catch (notifyError) {
+					console.error('Failed to create notification:', notifyError);
+					// Não falha se notificação não puder ser criada
+				}
 			}
 		}
 
 		paper.updatedAt = new Date();
 		await paper.save();
-
-		// TODO: Criar notificações para os revisores
-		// await NotificationService.createReviewerInvitationNotifications({...});
 
 		return json({
 			success: true,
@@ -101,7 +120,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	} catch (error) {
 		console.error('Error assigning reviewers:', error);
 		return json(
-			{ error: 'Failed to assign reviewers', success: false },
+			{ error: 'Failed to assign reviewers', details: (error as Error).message, success: false },
 			{ status: 500 }
 		);
 	}

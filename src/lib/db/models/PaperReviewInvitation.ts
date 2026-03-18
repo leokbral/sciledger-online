@@ -4,7 +4,12 @@ import { PaperReviewInvitationSchema } from '../schemas/PaperReviewInvitation';
 
 export interface IPaperReviewInvitation extends PaperReviewInvitation, mongoose.Document {}
 
-const PaperReviewInvitationModel = mongoose.models.PaperReviewInvitation || mongoose.model<IPaperReviewInvitation>(
+// Delete existing model to force reload with updated schema
+if (mongoose.models.PaperReviewInvitation) {
+	delete mongoose.models.PaperReviewInvitation;
+}
+
+const PaperReviewInvitationModel = mongoose.model<IPaperReviewInvitation>(
 	'PaperReviewInvitation',
 	PaperReviewInvitationSchema
 );

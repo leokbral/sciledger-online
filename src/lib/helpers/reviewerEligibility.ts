@@ -10,7 +10,7 @@ export type EligibilityResult = {
 /**
  * Checks reviewer eligibility based on common rules.
  * Rules:
- * - Must have role.reviewer = true
+ * - Must have role.reviewer = true (or no roles defined means allowed)
  * - Must not be main author, co-author, or submittedBy of the paper
  * - If paper is linked to a hub, reviewer must belong to that hub's reviewers list
  * - Must not already be assigned/occupying a slot on the paper
@@ -33,8 +33,8 @@ export function checkReviewerEligibility(
     const activeCount = opts?.activeAssignmentsCount ?? 0;
     const assignedIds = new Set((opts?.alreadyAssignedIds ?? []).map(String));
 
-    // Role check
-    if (!reviewer?.roles?.reviewer) {
+    // Role check - only fail if roles are defined AND reviewer role is explicitly false
+    if (reviewer?.roles && reviewer.roles.reviewer === false) {
         reasons.push('Reviewer role not enabled');
     }
 

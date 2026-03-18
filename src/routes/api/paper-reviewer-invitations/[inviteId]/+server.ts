@@ -55,15 +55,23 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 		if (action === 'accept') {
 			// Validar elegibilidade antes de aceitar
 			const hubReviewerIds: string[] = [];
-			try {
-				const hubDoc = await Hubs.findById(String(invitation.hubId)).lean();
-				if (hubDoc?.reviewers && Array.isArray(hubDoc.reviewers)) {
-					hubReviewerIds.push(...hubDoc.reviewers.map((r: any) => String(r)));
-				}
-			} catch (e) {}
+			const isHubPaper = !!invitation.hubId && !!paper.hubId;
+			
+			// Apenas validar hub reviewers se for um paper do hub
+			if (isHubPaper) {
+				try {
+					const hubDoc = await Hubs.findById(String(invitation.hubId)).lean();
+					if (hubDoc?.reviewers && Array.isArray(hubDoc.reviewers)) {
+						hubReviewerIds.push(...hubDoc.reviewers.map((r: any) => String(r)));
+					}
+				} catch (e) {}
+			}
 
 			const alreadyAssignedIds: string[] = (paper.peer_review?.assignedReviewers || []).map((r: any) => String(r));
 			const activeAssignmentsCount = await ReviewAssignment.countDocuments({ reviewerId: user.id, status: { $in: ['accepted', 'pending'] } });
+
+			// Para papers do hub, limite é 3. Para papers avulsos, permite mais uma (4)
+			const maxAssignments = isHubPaper ? 3 : 4;
 
 			const eligibility = checkReviewerEligibility(
 				paper as any,
@@ -72,10 +80,21 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 					hubReviewerIds,
 					alreadyAssignedIds,
 					activeAssignmentsCount,
-					maxActiveAssignments: 3,
+					maxActiveAssignments: maxAssignments,
 					requireExpertiseMatch: false
 				}
 			);
+
+			console.log('🔍 Reviewer Eligibility Check:', {
+				reviewerId: user.id,
+				eligible: eligibility.eligible,
+				reasons: eligibility.reasons,
+				isHubPaper,
+				hubReviewerIds,
+				alreadyAssignedIds,
+				activeAssignmentsCount,
+				reviewerRoles: user.roles
+			});
 
 			if (!eligibility.eligible) {
 				return json({ error: 'Not eligible to accept this review', reasons: eligibility.reasons }, { status: 403 });
@@ -131,7 +150,7 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 				reviewer: user.id,
 				peerReviewType: 'selected',
 				hubId: invitation.hubId,
-				isLinkedToHub: true,
+				isLinkedToHub: !!invitation.hubId && !!paper.hubId,
 				status: 'accepted',
 				assignedAt: new Date()
 			});
@@ -154,7 +173,7 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 				acceptedAt: acceptedAt,
 				deadline: deadline,
 				hubId: invitation.hubId,
-				isLinkedToHub: true
+				isLinkedToHub: !!invitation.hubId && !!paper.hubId
 			});
 
 			await reviewAssignment.save();
@@ -233,13 +252,12 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 
 			// Notificar o criador do hub que o revisor aceitou
 			if (invitedBy) {
-				await NotificationService.createNotification({
+				const notificationData: any = {
 					user: String(invitedBy._id || invitedBy.id),
 					type: 'reviewer_accepted_review',
 					title: 'Reviewer Accepted Paper Review',
 					content: `${user.firstName} ${user.lastName} accepted the invitation to review "${paper?.title}"`,
 					relatedPaperId: typeof paper === 'object' ? paper.id : paper,
-					relatedHubId: String(invitation.hubId),
 					actionUrl: `/notifications`,
 					priority: 'medium',
 					metadata: {
@@ -247,7 +265,14 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 						reviewerId: user.id,
 						paperTitle: paper?.title
 					}
-				});
+				};
+
+				// Adicionar hubId apenas se o paper for do hub
+				if (invitation.hubId && paper.hubId) {
+					notificationData.relatedHubId = String(invitation.hubId);
+				}
+
+				await NotificationService.createNotification(notificationData);
 			}
 		} else {
 			// Atualizar status do convite como declined
