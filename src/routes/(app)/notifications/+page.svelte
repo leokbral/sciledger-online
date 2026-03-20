@@ -83,9 +83,10 @@
                 // Reload page to update notifications
                 window.location.reload();
             } else {
+                const reasons = Array.isArray(result?.reasons) ? result.reasons.join(', ') : '';
                 toaster.error({
                     title: 'Error',
-                    description: result.error || `Failed to ${action} invitation`
+                    description: reasons ? `${result.error}: ${reasons}` : (result.error || `Failed to ${action} invitation`)
                 });
             }
         } catch (error) {

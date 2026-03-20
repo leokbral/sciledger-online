@@ -112,6 +112,12 @@
 		if (!paper) return;
 
 		try {
+			// Se o paper NÃO tem hub, exigir pagamento
+			if (!paper.hubId && !paper.paymentAuthorizationCode) {
+				goto(`/publish/payment-hold?paperId=${paper.id}`);
+				return;
+			}
+
 			// Check if at least 3 reviewers have accepted
 			const acceptedReviewers = paper.peer_review?.responses?.filter(
 				response => response.status === 'accepted'

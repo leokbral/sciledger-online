@@ -1,6 +1,7 @@
 import mongoose, { Document, type ObjectId } from "mongoose";
 import { PaperSchema } from "../schemas/PaperSchema";
 import type { Paper } from "$lib/types/Paper";
+import './Review';
 
 export interface IPaper extends Omit<Paper, '_id' | 'id'>, Document {
     pdfId?: ObjectId;

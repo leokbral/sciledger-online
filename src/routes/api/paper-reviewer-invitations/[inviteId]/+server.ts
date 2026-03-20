@@ -96,8 +96,20 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 				reviewerRoles: user.roles
 			});
 
-			if (!eligibility.eligible) {
-				return json({ error: 'Not eligible to accept this review', reasons: eligibility.reasons }, { status: 403 });
+			// Convite explícito: bloquear apenas razões críticas.
+			// Regras de capacidade/hub podem mudar entre convite e aceite e não devem impedir o aceite.
+			const hardStopReasons = (eligibility.reasons || []).filter((reason: string) =>
+				reason.includes('Conflict of interest') || reason.includes('already assigned')
+			);
+
+			if (hardStopReasons.length > 0) {
+				return json(
+					{
+						error: 'Not eligible to accept this review',
+						reasons: hardStopReasons
+					},
+					{ status: 403 }
+				);
 			}
 
 			// Atualizar status do convite

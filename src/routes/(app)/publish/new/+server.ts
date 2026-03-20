@@ -6,20 +6,56 @@ import { start_mongo } from '$lib/db/mongooseConnection';
 import Papers from '$lib/db/models/Paper';
 import Users from '$lib/db/models/User';
 import type { User } from '$lib/types/User';
+import Stripe from 'stripe';
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
+  apiVersion: '2026-02-25.preview'
+});
 
 export const POST: RequestHandler = async ({ request }) => {
 
     await start_mongo(); // Não necessário mais
 
     try {
-        const { paperPictures, content, mainAuthor, correspondingAuthor, title, abstract, keywords, pdfUrl, submittedBy, price, coAuthors, status, authors, hubId, isLinkedToHub, scopusArea, scopusSubArea, scopusClassifications, supplementaryMaterials } =
+        const { paperPictures, content, mainAuthor, correspondingAuthor, title, abstract, keywords, pdfUrl, submittedBy, price, coAuthors, status, authors, hubId, isLinkedToHub, scopusArea, scopusSubArea, scopusClassifications, supplementaryMaterials, paymentAuthorizationCode } =
             await request.json();
         console.log("chamou server")
         console.log(mainAuthor, correspondingAuthor, title, abstract, keywords, pdfUrl, submittedBy)
+        
         // Verifica se todas as informações necessárias foram enviadas
         if (!mainAuthor || !correspondingAuthor || !title || !abstract || !keywords || !pdfUrl || !submittedBy) {
             /* console.log(firstName, lastName, country, dob, email, password, confirmPassword) */
             return json({ error: `Todos os campos são obrigatórios. ${mainAuthor}, ${correspondingAuthor}, ${title}, ${abstract}, ${keywords}, ${pdfUrl}, ${submittedBy}` }, { status: 400 });
+        }
+
+        // Validar o código de autorização de pagamento
+        if (!paymentAuthorizationCode) {
+            return json({ error: 'Payment authorization required. Please complete the payment hold step.' }, { status: 403 });
+        }
+
+        // Verificar o status da autorização no Stripe
+        let paymentIntentData = null;
+        try {
+            const paymentIntent = await stripe.paymentIntents.retrieve(paymentAuthorizationCode);
+            
+            if (paymentIntent.status !== 'succeeded' && paymentIntent.status !== 'requires_capture') {
+                return json({ 
+                    error: `Invalid payment authorization status: ${paymentIntent.status}. Please complete the payment hold.`,
+                    currentStatus: paymentIntent.status
+                }, { status: 403 });
+            }
+
+            paymentIntentData = {
+                stripePaymentIntentId: paymentIntent.id,
+                status: paymentIntent.status === 'requires_capture' ? 'authorized' : 'authorized',
+                amount: paymentIntent.amount,
+                currency: paymentIntent.currency,
+                authorizedAt: new Date(paymentIntent.created * 1000),
+                receiptUrl: paymentIntent.charges.data[0]?.receipt_url || null
+            };
+        } catch (stripeError) {
+            console.error('Stripe verification error:', stripeError);
+            return json({ error: 'Failed to verify payment authorization' }, { status: 400 });
         }
 
         const _coAuthors = coAuthors.map((a: User) => a.id)
@@ -43,6 +79,8 @@ export const POST: RequestHandler = async ({ request }) => {
             ...(scopusSubArea && { scopusSubArea }),
             ...(scopusClassifications && scopusClassifications.length > 0 && { scopusClassifications }),
             ...(supplementaryMaterials && supplementaryMaterials.length > 0 && { supplementaryMaterials }),
+            // Adicionar dados de pagamento
+            ...(paymentIntentData && { paymentHold: paymentIntentData }),
             createdAt: new Date(),
             updatedAt: new Date()
         });
@@ -75,3 +113,4 @@ export const POST: RequestHandler = async ({ request }) => {
         return json({ error: 'Erro interno do servidor.' }, { status: 500 });
     }
 };
+

@@ -118,6 +118,23 @@ export const PaperSchema: Schema = new Schema({
     rejectedAt: { type: Date },
     rejectedBy: { type: String, ref: 'User' },
     
+    // Payment Hold System (autorização de fundos similar a aluguel de carro)
+    paymentHold: {
+        stripePaymentIntentId: { type: String }, // Stripe Payment Intent ID
+        status: { 
+            type: String, 
+            enum: ['pending', 'authorized', 'captured', 'released', 'failed'], 
+            default: 'pending' 
+        }, // Status do bloqueio
+        amount: { type: Number }, // Valor bloqueado em centavos
+        currency: { type: String, default: 'brl' }, // Moeda
+        authorizedAt: { type: Date }, // Data/hora de autorização
+        capturedAt: { type: Date }, // Data/hora de captura do valor
+        releasedAt: { type: Date }, // Data/hora de liberação (se não cobrado)
+        failureReason: { type: String }, // Motivo da falha se houver
+        receiptUrl: { type: String } // URL do recebimento do Stripe
+    },
+    
     // Supplementary Material - Links to public repositories
     supplementaryMaterials: [{
         _id: false, // Disable automatic Mongoose _id

@@ -1,5 +1,6 @@
 import Papers from '$lib/db/models/Paper';
 import Users from '$lib/db/models/User';
+import '$lib/db/models/Review';
 import { error, redirect } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongooseConnection';
 
