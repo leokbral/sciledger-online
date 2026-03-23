@@ -232,13 +232,27 @@
         }
     }
 
+    function getNotificationTargetUrl(notification: Notification): string | null {
+        if (
+            notification.relatedPaperId &&
+            (notification.type.includes('review') ||
+                notification.type.includes('paper') ||
+                notification.type.includes('reviewer'))
+        ) {
+            return '/notifications';
+        }
+
+        return notification.actionUrl || null;
+    }
+
     function handleNotificationClick(notification: Notification) {
         if (!notification.isRead) {
             markAsRead(notification._id);
         }
 
-        if (notification.actionUrl) {
-            window.location.href = notification.actionUrl;
+        const targetUrl = getNotificationTargetUrl(notification);
+        if (targetUrl) {
+            window.location.href = targetUrl;
         }
     }
 
@@ -319,10 +333,10 @@
 				<div
 					class="card p-4 border-l-4 {priorityColors[notification.priority]} 
 						   {!notification.isRead ? 'bg-blue-50/50' : ''} 
-						   {notification.actionUrl ? 'cursor-pointer hover:bg-gray-50' : ''}"
+                           {getNotificationTargetUrl(notification) ? 'cursor-pointer hover:bg-gray-50' : ''}"
 					onclick={() => handleNotificationClick(notification)}
-					role={notification.actionUrl ? 'button' : 'article'}
-					{...notification.actionUrl ? { tabindex: 0 } : {}}
+                    role={getNotificationTargetUrl(notification) ? 'button' : 'article'}
+                    {...getNotificationTargetUrl(notification) ? { tabindex: 0 } : {}}
 				>
 					<div class="flex items-start justify-between">
 						<div class="flex items-start gap-3 flex-1">
@@ -356,14 +370,15 @@
                                     {#if notification.expiresAt}
                                         <span>Expires: {new Date(notification.expiresAt).toLocaleDateString()}</span>
                                     {/if}
-                                    {#if notification.relatedPaperId && (
-                                        notification.type.includes('review') || notification.type.includes('paper') || notification.type.includes('reviewer')
-                                    )}
+                                    {#if getNotificationTargetUrl(notification)}
                                         <button
                                             class="btn btn-xs preset-filled-primary-500 ml-2"
                                             onclick={(e) => {
                                                 e.stopPropagation();
-                                                window.location.href = `/notifications`;
+                                                const targetUrl = getNotificationTargetUrl(notification);
+                                                if (targetUrl) {
+                                                    window.location.href = targetUrl;
+                                                }
                                             }}
                                         >
                                             Read more
