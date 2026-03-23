@@ -96,7 +96,7 @@
 			}}
 			positioning={{ placement: 'bottom-end' }}
 			triggerBase="relative"
-			contentBase="card bg-surface-950-50 card p-4 w-80 shadow-xl text-surface-50-950 max-h-96 overflow-y-auto"
+			contentBase="card p-4 shadow-2xl text-surface-50-950 w-[min(92vw,42rem)] max-h-[78vh] overflow-hidden rounded-2xl border border-surface-200 bg-white dark:bg-surface-900"
 			arrow
 			arrowBackground="!bg-surface-950 dark:!bg-surface-50"
 		>
@@ -105,7 +105,7 @@
 			{/snippet}
 
 			{#snippet content()}
-				<div class="max-h-80 overflow-y-auto">
+				<div class="max-h-[70vh] overflow-y-auto pr-1">
 					<Notifications
 						notifications={currentNotifications}
 						on:notificationChange={handleNotificationChange}
