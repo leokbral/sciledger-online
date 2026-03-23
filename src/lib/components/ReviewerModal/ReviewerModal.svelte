@@ -11,7 +11,7 @@
 	export let onReviewerChange: (newReviewers: string[]) => void;
 
 	let openModal = false;
-	let selectedUsers: string[] = [...assignedReviewers];
+	let selectedUsers: string[] = [];
 	let searchTerm = '';
 	let filteredUsers: User[] = [];
 
@@ -26,12 +26,14 @@
 
 	async function assignReviewers() {
 		try {
+			const uniqueSelection = [...new Set(selectedUsers)].filter(Boolean);
+
 			const response = await fetch('/api/review/assign', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					paperId,
-					reviewerIds: selectedUsers,
+					reviewerIds: uniqueSelection,
 					peerReviewType: 'selected'
 				})
 			});
@@ -39,7 +41,7 @@
 			const result = await response.json();
 
 			if (!response.ok || !result.success) {
-				throw new Error(result.message || 'Error assigning reviewers');
+				throw new Error(result.message || result.error || 'Error assigning reviewers');
 			}
 
 			toaster.success({
@@ -47,14 +49,14 @@
 				description: 'The reviewers have been successfully added to the paper.'
 			});
 
-			onReviewerChange([...assignedReviewers, ...selectedUsers]);
+			onReviewerChange([...new Set([...assignedReviewers, ...uniqueSelection])]);
 			selectedUsers = [];
 			openModal = false;
 		} catch (err) {
 			console.error(err);
 			toaster.error({
 				title: 'Error Assigning Reviewers',
-				description: 'Failed to add reviewers.'
+				description: err instanceof Error ? err.message : 'Failed to add reviewers.'
 			});
 		}
 	}

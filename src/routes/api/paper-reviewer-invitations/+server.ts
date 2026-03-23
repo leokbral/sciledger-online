@@ -33,6 +33,18 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			return json({ error: 'Paper not found' }, { status: 404 });
 		}
 
+		const isStandalonePaper = !paper.hubId;
+		const hasAuthorizedPaymentHold =
+			!!paper.paymentHold?.stripePaymentIntentId &&
+			(paper.paymentHold?.status === 'authorized' || paper.paymentHold?.status === 'captured');
+
+		if (isStandalonePaper && !hasAuthorizedPaymentHold) {
+			return json(
+				{ error: 'Payment authorization is required before inviting reviewers for standalone papers.' },
+				{ status: 403 }
+			);
+		}
+
 		const hubCreatorId = typeof paper.hubId === 'object'
 			? (paper.hubId?.createdBy?._id || paper.hubId?.createdBy?.id || paper.hubId?.createdBy)
 			: null;

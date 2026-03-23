@@ -220,7 +220,7 @@
       if (paymentIntent.status === 'succeeded' || paymentIntent.status === 'requires_capture') {
         success = true;
 
-        // Atualizar o paper com o código de autorização
+        // Atualizar o paper com o código de autorização quando já existe paper em edição
         if (paperId) {
           try {
             const updateRes = await fetch(`/api/papers/${paperId}/update-payment-auth`, {
@@ -244,9 +244,14 @@
           }
         }
 
-        // Redirecionar de volta para reviewer-assignment
+        // Redirecionar para o fluxo correto após autorização
         setTimeout(() => {
-          goto(`/publish/reviewer-assignment/${paperId}`);
+          if (paperId) {
+            goto(`/publish/reviewer-assignment/${paperId}`);
+            return;
+          }
+
+          goto(`/publish/new?authorizationCode=${encodeURIComponent(paymentIntentId)}`);
         }, 2000);
       } else {
         error = `Unexpected payment status: ${paymentIntent.status}. Please contact support.`;

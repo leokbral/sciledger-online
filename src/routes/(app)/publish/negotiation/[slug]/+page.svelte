@@ -26,6 +26,12 @@
 	let isHubOwner: boolean = $state(!!(data as any).isHubOwner);
 	let isApprovingPublication = $state(false);
 	let approvePublicationError = $state('');
+	let isStandalonePaper = $derived(!!paper && !paper.hubId);
+	let hasStandalonePaymentAuthorization = $derived(
+		!!paper?.paymentHold?.stripePaymentIntentId &&
+		(paper?.paymentHold?.status === 'authorized' || paper?.paymentHold?.status === 'captured')
+	);
+	let requiresPaymentBeforeInviting = $derived(isStandalonePaper && !hasStandalonePaymentAuthorization);
 
 	interface ImageItem {
 		id?: string;
@@ -113,7 +119,7 @@
 
 		try {
 			// Se o paper NÃO tem hub, exigir pagamento
-			if (!paper.hubId && !paper.paymentAuthorizationCode) {
+			if (!paper.hubId && !hasStandalonePaymentAuthorization) {
 				goto(`/publish/payment-hold?paperId=${paper.id}`);
 				return;
 			}
@@ -323,6 +329,11 @@
 			isApprovingPublication = false;
 		}
 	}
+
+	async function goToPaymentHold() {
+		if (!paper?.id) return;
+		await goto(`/publish/payment-hold?paperId=${paper.id}`);
+	}
 </script>
 
 <!-- UI HTML -->
@@ -351,6 +362,38 @@
 	<div class="container page max-w-[700px] p-4 m-auto">
 		<h4 class="h4 px-4 text-primary-500 font font-semibold">Reviewer Assignment</h4>
 		<hr class="mt-2 mb-4 border-t-2!" />
+		{#if requiresPaymentBeforeInviting}
+			<div class="mb-4 rounded-lg border-l-4 border-amber-500 bg-amber-50 p-4">
+				<div class="flex gap-3">
+					<Icon icon="mdi:credit-card-lock-outline" class="h-5 w-5 flex-shrink-0 text-amber-700" />
+					<div class="text-sm text-amber-900">
+						<strong>Payment required before reviewer invitations</strong>
+						<p class="mt-1">
+							For standalone papers, payment authorization is required before inviting reviewers.
+						</p>
+						<div class="mt-3">
+							<button class="btn preset-filled-primary-500" onclick={goToPaymentHold}>
+								<Icon icon="mdi:credit-card-fast-outline" class="size-5" />
+								Proceed to Payment
+							</button>
+						</div>
+					</div>
+				</div>
+			</div>
+		{/if}
+		{#if isStandalonePaper && hasStandalonePaymentAuthorization}
+			<div class="mb-4 rounded-lg border-l-4 border-green-500 bg-green-50 p-4">
+				<div class="flex gap-3">
+					<Icon icon="mdi:check-decagram-outline" class="h-5 w-5 flex-shrink-0 text-green-700" />
+					<div class="text-sm text-green-900">
+						<strong>Payment already confirmed</strong>
+						<p class="mt-1">
+							Your payment authorization is active. You can proceed to invite reviewers.
+						</p>
+					</div>
+				</div>
+			</div>
+		{/if}
 		{#if paper.hubId}
 			<div class="mb-4 rounded-lg border-l-4 border-blue-500 bg-blue-50 p-4">
 				<div class="flex gap-3">
@@ -358,8 +401,7 @@
 					<div class="text-sm text-blue-900">
 						<strong>Status: Reviewer Assignment (Hub)</strong>
 						<p class="mt-1">
-							Este paper já foi submetido a um Hub e está em negociação. Enquanto estiver neste status,
-							ele não pode ser editado.
+							This paper is linked to a hub and is currently under review.
 						</p>
 					</div>
 				</div>
@@ -568,6 +610,7 @@
 			name="peer_review"
 			class="w-full p-2 border border-surface-300 rounded-lg"
 			bind:value={peer_review}
+			disabled={requiresPaymentBeforeInviting}
 		>
 			<option value="" disabled selected>Select peer review option</option>
 			<option value="open">Open</option>
@@ -575,16 +618,23 @@
 		</select>
 
 		{#if peer_review === 'selected'}
+			{#if requiresPaymentBeforeInviting}
+				<div class="mt-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+					Invitations are locked until payment is confirmed for this paper.
+				</div>
+			{/if}
 			<!-- <AvailableReviewers {reviewers} {selectedReviewers} {toggleReviewerSelection} /> -->
-			<ReviewerModal
-				paperId={paper.id}
-				users={reviewers}
-				assignedReviewers={selectedReviewers}
-				onReviewerChange={(newList) => (selectedReviewers = newList)}
-			/>
+			{#if !requiresPaymentBeforeInviting}
+				<ReviewerModal
+					paperId={paper.id}
+					users={reviewers}
+					assignedReviewers={selectedReviewers}
+					onReviewerChange={(newList) => (selectedReviewers = newList)}
+				/>
+			{/if}
 			
 			<!-- Invite Hub Reviewers (Only for hub owners) -->
-			{#if data.isHubOwner && paper.hubId && typeof paper.hubId === 'object' && paper.hubId.reviewers}
+			{#if !requiresPaymentBeforeInviting && data.isHubOwner && paper.hubId && typeof paper.hubId === 'object' && paper.hubId.reviewers}
 				<div class="mt-4">
 					<PaperReviewerInvite
 						paperId={paper.id}

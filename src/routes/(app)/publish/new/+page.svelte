@@ -15,13 +15,20 @@
 	//let articleComponent: PaperPublishPage;
 	
 	let hubId = $derived($page.url.searchParams.get('hubId'));
+	let paymentAuthorizationCodeFromUrl = $derived($page.url.searchParams.get('authorizationCode'));
 
 	async function savePaper( store: any) {
 		console.log(store);
 
+		if (!hubId && !paymentAuthorizationCodeFromUrl) {
+			goto('/publish/payment-hold');
+			return;
+		}
+
 		const paper = {
 			...store,
-			...(hubId && { hubId, isLinkedToHub: true })
+			...(hubId && { hubId, isLinkedToHub: true }),
+			...(paymentAuthorizationCodeFromUrl && { paymentAuthorizationCode: paymentAuthorizationCodeFromUrl })
 		};
 		console.log(paper)
 		try {

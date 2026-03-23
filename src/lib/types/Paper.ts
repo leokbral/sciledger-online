@@ -91,6 +91,17 @@ export type Paper = {
     rejectionReason?: string; // Reason for rejection
     rejectedAt?: Date; // When it was rejected
     rejectedBy?: User | string; // Who rejected it
+    paymentHold?: {
+        stripePaymentIntentId?: string;
+        status?: 'pending' | 'authorized' | 'captured' | 'released' | 'failed';
+        amount?: number;
+        currency?: string;
+        authorizedAt?: Date;
+        capturedAt?: Date;
+        releasedAt?: Date;
+        failureReason?: string;
+        receiptUrl?: string;
+    };
     supplementaryMaterials?: Array<{
         id: string; // Unique ID for this item
         title: string; // Title/description of the material

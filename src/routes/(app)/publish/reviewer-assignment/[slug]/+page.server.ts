@@ -41,7 +41,7 @@ function sanitize(obj: unknown): unknown {
 }
 
 export async function load({ locals, params }) {
-	if (!locals.user) redirect(302, `/login`);
+	if (!locals.user) throw redirect(302, `/login`);
 
 	await start_mongo();
 

@@ -28,14 +28,20 @@ export const POST: RequestHandler = async ({ request }) => {
             return json({ error: `Todos os campos são obrigatórios. ${mainAuthor}, ${correspondingAuthor}, ${title}, ${abstract}, ${keywords}, ${pdfUrl}, ${submittedBy}` }, { status: 400 });
         }
 
-        // Validar o código de autorização de pagamento
-        if (!paymentAuthorizationCode) {
+        const isStandaloneSubmission = !hubId && !isLinkedToHub;
+
+        // Para paper avulso, o bloqueio de pagamento é obrigatório
+        if (isStandaloneSubmission && !paymentAuthorizationCode) {
             return json({ error: 'Payment authorization required. Please complete the payment hold step.' }, { status: 403 });
         }
 
         // Verificar o status da autorização no Stripe
         let paymentIntentData = null;
         try {
+            if (!paymentAuthorizationCode) {
+                throw new Error('No payment authorization code provided');
+            }
+
             const paymentIntent = await stripe.paymentIntents.retrieve(paymentAuthorizationCode);
             
             if (paymentIntent.status !== 'succeeded' && paymentIntent.status !== 'requires_capture') {
@@ -54,8 +60,10 @@ export const POST: RequestHandler = async ({ request }) => {
                 receiptUrl: paymentIntent.charges.data[0]?.receipt_url || null
             };
         } catch (stripeError) {
-            console.error('Stripe verification error:', stripeError);
-            return json({ error: 'Failed to verify payment authorization' }, { status: 400 });
+            if (isStandaloneSubmission) {
+                console.error('Stripe verification error:', stripeError);
+                return json({ error: 'Failed to verify payment authorization' }, { status: 400 });
+            }
         }
 
         const _coAuthors = coAuthors.map((a: User) => a.id)
