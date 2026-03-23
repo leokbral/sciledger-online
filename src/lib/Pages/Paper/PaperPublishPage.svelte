@@ -13,7 +13,6 @@
 	import Icon from '@iconify/svelte';
 	import OrcidProfile from '$lib/components/OrcidProfile/OrcidProfile.svelte';
 	import { getSubAreasForArea, getAllAreaNames } from '$lib/constants/scopusAreas';
-	import PaperSubmissionGuide from '$lib/components/Paper/PaperSubmissionGuide.svelte';
 
 	// Add these new variables
 	let docxPreview = $state();
@@ -31,9 +30,6 @@
 	let showSubmitModal = $state(false);
 	let confirmInformationAccurate = $state(false);
 	let confirmPoliciesAgreed = $state(false);
-
-	// Instructions collapsible
-	let showInstructions = $state(false);
 
 	interface Props {
 		authorsOptions: any;
@@ -277,6 +273,10 @@
 		// 	background: 'preset-filled-error-500'
 		// });
 	}
+
+	type ValidateArgs = {
+		inputValue: string;
+	};
 
 
 
@@ -1208,9 +1208,6 @@
 					You can save your progress as a draft at any time using the "Save Draft" button at the bottom of the page.
 				</p>
 			</div>
-
-			<!-- Paper Submission Instructions -->
-			<PaperSubmissionGuide bind:expanded={showInstructions} />
 
 			<div class="mb-6 w-full bg-surface-50 dark:bg-surface-800 border border-surface-300 dark:border-surface-700 rounded-lg p-4">
 				<h5 class="text-lg font-semibold mb-1">Upload Paper Document *</h5>

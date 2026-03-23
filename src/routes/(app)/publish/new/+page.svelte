@@ -89,5 +89,12 @@
 /> -->
 
 
+<div class="mb-4 rounded-lg border-l-4 border-blue-500 bg-blue-50 p-4">
+	<p class="text-sm text-blue-900">
+		Need help with submission?
+		<a class="font-semibold underline hover:opacity-80" href="/help/how-to-submit">Read the guide: How to Submit</a>
+	</p>
+</div>
+
 <PaperPublishPage  author={data.user} authorsOptions={userProfiles} {savePaper}/>
 <!-- <PaperPublishPage on:savePaper={hdlSavePaper} author={data.user} authorsOptions={userProfiles} /> -->

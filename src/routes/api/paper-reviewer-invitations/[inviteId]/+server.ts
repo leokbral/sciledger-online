@@ -9,6 +9,18 @@ import Hubs from '$lib/db/models/Hub';
 import { checkReviewerEligibility } from '$lib/helpers/reviewerEligibility';
 import { NotificationService } from '$lib/services/NotificationService';
 import type { RequestHandler } from './$types';
+import Stripe from 'stripe';
+import { env } from '$env/dynamic/private';
+
+const REQUIRED_REVIEWERS = 3;
+
+function getStripe() {
+	const stripeSecretKey = env.STRIPE_SECRET_KEY;
+	if (!stripeSecretKey) {
+		return null;
+	}
+	return new Stripe(stripeSecretKey);
+}
 
 export const POST: RequestHandler = async ({ params, request, locals }) => {
 	await start_mongo();
@@ -53,6 +65,8 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 		const invitedBy = typeof invitation.invitedBy === 'object' ? invitation.invitedBy : await Users.findOne({ id: invitation.invitedBy });
 
 		if (action === 'accept') {
+			let paymentCaptured = false;
+			let capturedPaymentIntentId: string | null = null;
 			// Validar elegibilidade antes de aceitar
 			const hubReviewerIds: string[] = [];
 			const isHubPaper = !!invitation.hubId && !!paper.hubId;
@@ -249,10 +263,39 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 					(r: any) => r.status === 'accepted' || r.status === 'completed'
 				).length;
 
-				// Mudar status para "in review" quando o primeiro revisor aceita
-				if (acceptedCount >= 1 && paperDoc.status === 'reviewer assignment') {
+				// Só muda para "in review" quando os 3 revisores aceitarem
+				if (acceptedCount >= REQUIRED_REVIEWERS && paperDoc.status === 'reviewer assignment') {
 					paperDoc.status = 'in review';
 					paperDoc.peer_review.reviewStatus = 'in_progress';
+				}
+
+				// Só libera/captura pagamento quando os 3 revisores aceitarem
+				if (
+					acceptedCount >= REQUIRED_REVIEWERS &&
+					paperDoc.paymentHold?.stripePaymentIntentId &&
+					paperDoc.paymentHold?.status === 'authorized'
+				) {
+					const stripe = getStripe();
+					if (stripe) {
+						try {
+							const paymentIntent = await stripe.paymentIntents.capture(
+								paperDoc.paymentHold.stripePaymentIntentId
+							);
+							paperDoc.paymentHold.status = 'captured';
+							paperDoc.paymentHold.capturedAt = new Date();
+							paperDoc.paymentHold.receiptUrl = null;
+							paymentCaptured = true;
+							capturedPaymentIntentId = paymentIntent.id;
+							console.log(
+								`✅ Payment captured after ${REQUIRED_REVIEWERS} reviewer acceptances:`,
+								paymentIntent.id
+							);
+						} catch (captureError) {
+							console.error('⚠️ Failed to capture payment after 3 acceptances:', captureError);
+						}
+					} else {
+						console.error('⚠️ STRIPE_SECRET_KEY not configured. Could not capture payment.');
+					}
 				}
 
 				await paperDoc.save();
@@ -285,6 +328,54 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 				}
 
 				await NotificationService.createNotification(notificationData);
+			}
+
+			if (paymentCaptured) {
+				const paperId = typeof paper === 'object' ? paper.id : String(paper);
+				const paperTitle = paper?.title || 'your paper';
+				const amountInBrl = paper?.paymentHold?.amount
+					? `R$${(Number(paper.paymentHold.amount) / 100).toFixed(2)} BRL`
+					: 'the authorized amount';
+				const authorId = typeof paper?.submittedBy === 'object'
+					? String((paper.submittedBy as any)?._id || (paper.submittedBy as any)?.id)
+					: (paper?.submittedBy ? String(paper.submittedBy) : null);
+				const editorId = invitedBy ? String(invitedBy._id || invitedBy.id) : null;
+
+				if (authorId) {
+					await NotificationService.createNotification({
+						user: authorId,
+						type: 'system',
+						title: 'Payment Captured',
+						content: `Payment for "${paperTitle}" was captured after ${REQUIRED_REVIEWERS} reviewers accepted. Amount: ${amountInBrl}.`,
+						relatedPaperId: paperId,
+						actionUrl: `/notifications`,
+						priority: 'high',
+						metadata: {
+							paymentIntentId: capturedPaymentIntentId,
+							reviewersAccepted: REQUIRED_REVIEWERS,
+							amount: paper?.paymentHold?.amount,
+							currency: paper?.paymentHold?.currency
+						}
+					});
+				}
+
+				if (editorId && editorId !== authorId) {
+					await NotificationService.createNotification({
+						user: editorId,
+						type: 'system',
+						title: 'Payment Captured After 3 Acceptances',
+						content: `Payment for "${paperTitle}" has been captured after all ${REQUIRED_REVIEWERS} reviewers accepted. Amount: ${amountInBrl}.`,
+						relatedPaperId: paperId,
+						actionUrl: `/notifications`,
+						priority: 'high',
+						metadata: {
+							paymentIntentId: capturedPaymentIntentId,
+							reviewersAccepted: REQUIRED_REVIEWERS,
+							amount: paper?.paymentHold?.amount,
+							currency: paper?.paymentHold?.currency
+						}
+					});
+				}
 			}
 		} else {
 			// Atualizar status do convite como declined
