@@ -102,12 +102,8 @@
 
     async function markAsRead(notificationId: string) {
         try {
-            const response = await fetch('/api/notifications/mark-read', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ notificationId })
+            const response = await fetch(`/api/notifications/${notificationId}/read`, {
+                method: 'POST'
             });
 
             if (response.ok) {
