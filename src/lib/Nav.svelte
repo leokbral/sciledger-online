@@ -138,10 +138,14 @@
 				<div class="space-y-4 flex flex-col">
 					<div class="flex gap-2">
 						{#if user.profilePictureUrl}
-							<Avatar src={user.profilePictureUrl} name={user.firstName} size="w-9" />
+							<img 
+								src={user.profilePictureUrl} 
+								alt={user.firstName}
+								class="w-16 h-16 rounded-full object-cover"
+							/>
 						{:else}
 							<div
-								class="w-9 h-9 flex items-center justify-center bg-gray-300 text-white rounded-full"
+								class="w-16 h-16 flex items-center justify-center bg-gray-300 text-white rounded-full"
 							>
 								<span class="text-xl font-bold">{getInitials(user.firstName, user.lastName)}</span>
 							</div>
