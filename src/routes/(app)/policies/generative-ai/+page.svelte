@@ -128,7 +128,7 @@
 			<h3 class="font-semibold text-gray-900 mb-2">Questions?</h3>
 			<p class="text-gray-700">
 				If you have questions about using AI tools in your research or manuscript, 
-				please contact us at <a href="mailto:editorial@sciledger.org" class="text-primary-500 hover:text-primary-600">editorial@sciledger.org</a>
+				please contact us at <a href="mailto:sciledger@imd.ufrn.br" class="text-primary-500 hover:text-primary-600">sciledger@imd.ufrn.br</a>
 			</p>
 		</div>
 	</article>
