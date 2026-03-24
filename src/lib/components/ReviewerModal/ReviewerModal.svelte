@@ -2,6 +2,7 @@
 	import { Modal } from '@skeletonlabs/skeleton-svelte';
 	import Icon from '@iconify/svelte';
 	import { toaster } from '$lib/toaster-svelte';
+	import { page } from '$app/stores';
 
 	import type { User } from '$lib/types/User';
 
@@ -18,9 +19,17 @@
 	$: filterUsers();
 
 	function filterUsers() {
+		const currentUserId = $page.data.user?.id || $page.data.user?._id;
+
 		filteredUsers = users.filter(user => {
 			const name = `${user.firstName} ${user.lastName}`.toLowerCase();
-			return name.includes(searchTerm.toLowerCase()) && !assignedReviewers.includes(user._id);
+			const reviewerId = user._id || user.id;
+			const isCurrentUser = !!currentUserId && reviewerId === currentUserId;
+			return (
+				name.includes(searchTerm.toLowerCase()) &&
+				!assignedReviewers.includes(reviewerId) &&
+				!isCurrentUser
+			);
 		});
 	}
 
