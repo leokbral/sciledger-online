@@ -1,7 +1,6 @@
 <script lang="ts">
 	import PaperPool from '$lib/Pages/Paper/PaperPool.svelte';
 	import ReviewPage from '$lib/Pages/Review/ReviewPage.svelte';
-	import PaperReviewInvitations from '$lib/components/PaperReviewInvitations/PaperReviewInvitations.svelte';
 	import type { Paper } from '$lib/types/Paper';
 
 	interface Props {
@@ -169,11 +168,6 @@
 </script>
 
 <div class="container page p-4 m-auto">
-	<!-- Paper Review Invitations -->
-	<div class="mb-6">
-		<PaperReviewInvitations />
-	</div>
-
 	<ReviewPage data={publishData}>
 		{#snippet requested()}
 			<div class="text-surface-900 w-full">
