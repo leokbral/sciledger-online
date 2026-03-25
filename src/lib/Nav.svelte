@@ -176,6 +176,13 @@
 					>
 						Profile
 					</a>
+					<a
+						data-sveltekit-reload
+						class="btn preset-tonal w-full"
+						href="/settings"
+					>
+						Settings
+					</a>
 					<button class="btn preset-filled justify-start" onclick={logout}>Sign out</button>
 				</div>
 			{/snippet}

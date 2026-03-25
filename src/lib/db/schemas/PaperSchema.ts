@@ -38,7 +38,16 @@ export const PaperSchema: Schema = new Schema({
                 responseDate: { type: Date },         // When accepted/declined
                 assignedAt: { type: Date },           // When officially assigned
                 completedAt: { type: Date },          // When the review was completed
-                reviewId: { type: String, ref: 'Review' }  // ID of the connected review
+                reviewId: { type: String, ref: 'Review' },  // ID of the connected review
+                payoutStatus: {
+                    type: String,
+                    enum: ['pending', 'pending_connect', 'paid', 'failed'],
+                    default: 'pending'
+                },
+                payoutAmount: { type: Number },
+                payoutTransferId: { type: String },
+                payoutAt: { type: Date },
+                payoutFailureReason: { type: String }
             }],
             // Add references to reviews
             reviews: [{ type: String, ref: 'Review' }], // List of associated reviews

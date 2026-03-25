@@ -30,6 +30,20 @@ export type User = {
         responseTime?: number; // Average response time (in hours)
         expertise?: string[]; // User's areas of expertise
     };
+    reviewerPayments?: {
+        stripeConnectAccountId?: string;
+        onboardingComplete?: boolean;
+        detailsSubmitted?: boolean;
+        chargesEnabled?: boolean;
+        payoutsEnabled?: boolean;
+        defaultCurrency?: string;
+        totalEarnedCents?: number;
+        totalPaidOutCents?: number;
+        pendingPayoutCents?: number;
+        onboardingStartedAt?: Date;
+        onboardingCompletedAt?: Date;
+        lastPayoutAt?: Date;
+    };
     connections: string[]; // IDs of connected users
     followers: User[]; // IDs of followers
     following: User[]; // IDs of followed users

@@ -4,6 +4,12 @@ import Reviews from '$lib/db/models/Review';
 import Papers from '$lib/db/models/Paper';
 import Users from '$lib/db/models/User';
 import { NotificationService } from '$lib/services/NotificationService';
+import {
+	createReviewerTransfer,
+	getConnectedAccountStatus,
+	getReviewerPayoutAmountCents,
+	getStripeClient
+} from '$lib/services/stripeConnect';
 import * as crypto from 'crypto';
 import { start_mongo } from '$lib/db/mongooseConnection';
 
@@ -60,6 +66,135 @@ async function checkAndUpdatePaperStatusIfAllReviewsComplete(paperId: string, re
 		}
 	} catch (error) {
 		console.error('Error checking review completion status:', error);
+	}
+}
+
+function normalizeReviewerPayments(input: any) {
+	return {
+		stripeConnectAccountId: input?.stripeConnectAccountId ?? '',
+		onboardingComplete: !!input?.onboardingComplete,
+		detailsSubmitted: !!input?.detailsSubmitted,
+		chargesEnabled: !!input?.chargesEnabled,
+		payoutsEnabled: !!input?.payoutsEnabled,
+		defaultCurrency: input?.defaultCurrency ?? 'brl',
+		totalEarnedCents: Number(input?.totalEarnedCents ?? 0),
+		totalPaidOutCents: Number(input?.totalPaidOutCents ?? 0),
+		pendingPayoutCents: Number(input?.pendingPayoutCents ?? 0),
+		onboardingStartedAt: input?.onboardingStartedAt,
+		onboardingCompletedAt: input?.onboardingCompletedAt,
+		lastPayoutAt: input?.lastPayoutAt
+	};
+}
+
+async function tryProcessReviewerPayout(
+	paper: any,
+	reviewerId: string,
+	reviewId: string,
+	reviewRound: number
+) {
+	if (reviewRound !== 2) {
+		return;
+	}
+
+	const reviewerResponse = paper.peer_review?.responses?.find(
+		(r: any) => String(r?.reviewerId) === reviewerId
+	);
+
+	if (!reviewerResponse) {
+		return;
+	}
+
+	if (reviewerResponse.payoutStatus === 'paid' && reviewerResponse.payoutTransferId) {
+		return;
+	}
+
+	const payoutAmount = getReviewerPayoutAmountCents();
+	const reviewerDoc: any = await Users.findOne({ id: reviewerId });
+	if (!reviewerDoc) {
+		reviewerResponse.payoutStatus = 'failed';
+		reviewerResponse.payoutFailureReason = 'Reviewer not found';
+		reviewerResponse.payoutAmount = payoutAmount;
+		await paper.save();
+		return;
+	}
+
+	const payments = normalizeReviewerPayments(reviewerDoc.reviewerPayments);
+	const stripe = getStripeClient();
+
+	if (!stripe) {
+		reviewerResponse.payoutStatus = 'failed';
+		reviewerResponse.payoutFailureReason = 'Stripe is not configured on the server';
+		reviewerResponse.payoutAmount = payoutAmount;
+		payments.pendingPayoutCents += payoutAmount;
+		reviewerDoc.reviewerPayments = payments;
+		await reviewerDoc.save();
+		await paper.save();
+		return;
+	}
+
+	if (!payments.stripeConnectAccountId) {
+		reviewerResponse.payoutStatus = 'pending_connect';
+		reviewerResponse.payoutFailureReason = 'Reviewer Stripe account is not connected';
+		reviewerResponse.payoutAmount = payoutAmount;
+		payments.pendingPayoutCents += payoutAmount;
+		reviewerDoc.reviewerPayments = payments;
+		await reviewerDoc.save();
+		await paper.save();
+		return;
+	}
+
+	const accountStatus = await getConnectedAccountStatus(stripe, payments.stripeConnectAccountId);
+	payments.detailsSubmitted = accountStatus.detailsSubmitted;
+	payments.chargesEnabled = accountStatus.chargesEnabled;
+	payments.payoutsEnabled = accountStatus.payoutsEnabled;
+	payments.onboardingComplete = accountStatus.onboardingComplete;
+	payments.defaultCurrency = accountStatus.defaultCurrency;
+
+	if (!accountStatus.onboardingComplete) {
+		reviewerResponse.payoutStatus = 'pending_connect';
+		reviewerResponse.payoutFailureReason = 'Stripe onboarding is incomplete';
+		reviewerResponse.payoutAmount = payoutAmount;
+		payments.pendingPayoutCents += payoutAmount;
+		reviewerDoc.reviewerPayments = payments;
+		await reviewerDoc.save();
+		await paper.save();
+		return;
+	}
+
+	try {
+		const transfer = await createReviewerTransfer(stripe, {
+			amount: payoutAmount,
+			currency: 'brl',
+			destinationAccountId: payments.stripeConnectAccountId,
+			paperId: paper.id,
+			reviewerId,
+			reviewId,
+			reviewRound
+		});
+
+		reviewerResponse.payoutStatus = 'paid';
+		reviewerResponse.payoutTransferId = transfer.id;
+		reviewerResponse.payoutAmount = payoutAmount;
+		reviewerResponse.payoutAt = new Date();
+		reviewerResponse.payoutFailureReason = null;
+
+		payments.totalEarnedCents += payoutAmount;
+		payments.totalPaidOutCents += payoutAmount;
+		payments.pendingPayoutCents = Math.max(0, payments.pendingPayoutCents - payoutAmount);
+		payments.lastPayoutAt = new Date();
+		reviewerDoc.reviewerPayments = payments;
+
+		await reviewerDoc.save();
+		await paper.save();
+	} catch (error: unknown) {
+		reviewerResponse.payoutStatus = 'failed';
+		reviewerResponse.payoutFailureReason =
+			error instanceof Error ? error.message : 'Failed to create transfer';
+		reviewerResponse.payoutAmount = payoutAmount;
+		payments.pendingPayoutCents += payoutAmount;
+		reviewerDoc.reviewerPayments = payments;
+		await reviewerDoc.save();
+		await paper.save();
 	}
 }
 
@@ -239,6 +374,15 @@ export const POST: RequestHandler = async ({ request }) => {
 		paper.peer_review.reviewCount = paper.peer_review.reviews.length;
 		paper.peer_review.reviewStatus = 'in_progress';
 
+		const reviewerResponse = paper.peer_review.responses?.find(
+			(r: any) => String(r?.reviewerId) === reviewerId
+		);
+		if (reviewerResponse) {
+			reviewerResponse.status = 'completed';
+			reviewerResponse.completedAt = new Date();
+			reviewerResponse.reviewId = reviewId;
+		}
+
 		// Recalcular a média das revisões submetidas
 		const allReviews = await Reviews.find({
 			paperId: paperId,
@@ -259,6 +403,8 @@ export const POST: RequestHandler = async ({ request }) => {
 		}
 
 		await paper.save();
+
+		await tryProcessReviewerPayout(paper, reviewerId, reviewId, actualRound);
 
 		// Buscar informações para as notificações
 		const reviewer = await Users.findOne({ id: reviewerId });

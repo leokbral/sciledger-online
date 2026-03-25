@@ -35,6 +35,20 @@ export const UserSchema: Schema = new Schema({
         responseTime: { type: Number, default: 0 }, // Average response time with default value
         expertise: [{ type: String, default: '' }] // Areas of expertise with default value
     },
+    reviewerPayments: {
+        stripeConnectAccountId: { type: String, default: '' },
+        onboardingComplete: { type: Boolean, default: false },
+        detailsSubmitted: { type: Boolean, default: false },
+        chargesEnabled: { type: Boolean, default: false },
+        payoutsEnabled: { type: Boolean, default: false },
+        defaultCurrency: { type: String, default: 'brl' },
+        totalEarnedCents: { type: Number, default: 0 },
+        totalPaidOutCents: { type: Number, default: 0 },
+        pendingPayoutCents: { type: Number, default: 0 },
+        onboardingStartedAt: { type: Date },
+        onboardingCompletedAt: { type: Date },
+        lastPayoutAt: { type: Date }
+    },
     connections: [{ type: String, ref: 'User' }], // IDs of connected users
     followers: [{ type: String, ref: 'User' }], // IDs of followers
     following: [{ type: String, ref: 'User' }], // IDs of followed users
