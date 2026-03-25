@@ -232,13 +232,27 @@
         }
     }
 
+    function getNotificationTargetUrl(notification: Notification): string | null {
+        if (
+            notification.relatedPaperId &&
+            (notification.type.includes('review') ||
+                notification.type.includes('paper') ||
+                notification.type.includes('reviewer'))
+        ) {
+            return '/notifications';
+        }
+
+        return notification.actionUrl || null;
+    }
+
     function handleNotificationClick(notification: Notification) {
         if (!notification.isRead) {
             markAsRead(notification._id);
         }
 
-        if (notification.actionUrl) {
-            window.location.href = notification.actionUrl;
+        const targetUrl = getNotificationTargetUrl(notification);
+        if (targetUrl) {
+            window.location.href = targetUrl;
         }
     }
 
@@ -258,45 +272,49 @@
     onMount(loadNotifications);
 </script>
 
-<div class="space-y-4">
-	<div class="flex items-center justify-between">
-		<h2 class="text-xl font-semibold">Notifications</h2>
-		<div class="flex gap-2">
-			<button
-				class="btn btn-sm px-2 py-1 text-xs preset-tonal-primary"
-				disabled={loading}
-				onclick={markAllAsRead}
-			>
-				<Icon icon="mdi:check-all" class="mr-1 w-4 h-4" />
-				Mark all
-			</button>
-		</div>
-	</div>
+<div class="space-y-5">
+    <div class="sticky top-0 z-10 -mx-1 bg-white/90 px-1 py-1 backdrop-blur-sm dark:bg-surface-900/90">
+        <div class="flex items-center justify-between">
+            <h2 class="text-xl font-semibold tracking-tight text-surface-900 dark:text-surface-50">Notifications</h2>
+            <div class="flex gap-2">
+                <button
+                    class="btn btn-sm px-3 py-1.5 text-sm font-semibold preset-tonal-primary"
+                    disabled={loading}
+                    onclick={markAllAsRead}
+                >
+                    <Icon icon="mdi:check-all" class="mr-1 w-4 h-4" />
+                    Mark all
+                </button>
+            </div>
+        </div>
+    </div>
 
 	<!-- Filters -->
-	<div class="flex gap-4 flex-wrap">
-		<div class="flex gap-2">
+    <div class="flex gap-3 flex-wrap items-center">
+        <span class="text-xs font-semibold uppercase tracking-wide text-surface-600 dark:text-surface-300">Status</span>
+        <div class="flex gap-2 rounded-xl border border-surface-300 bg-surface-50 p-1.5 dark:border-surface-600 dark:bg-surface-800">
 			<button
-				class="btn {filter === 'all' ? 'preset-filled-primary' : 'preset-tonal'}"
+                class="btn btn-sm text-sm font-semibold {filter === 'all' ? 'bg-primary-700 text-white hover:bg-primary-800 dark:bg-primary-600 dark:hover:bg-primary-500' : 'bg-white text-surface-800 hover:bg-surface-100 dark:bg-surface-700 dark:text-surface-100 dark:hover:bg-surface-600'}"
 				onclick={() => (filter = 'all')}
 			>
 				All
 			</button>
 			<button
-				class="btn {filter === 'unread' ? 'preset-filled-primary' : 'preset-tonal'}"
+                class="btn btn-sm text-sm font-semibold {filter === 'unread' ? 'bg-primary-700 text-white hover:bg-primary-800 dark:bg-primary-600 dark:hover:bg-primary-500' : 'bg-white text-surface-800 hover:bg-surface-100 dark:bg-surface-700 dark:text-surface-100 dark:hover:bg-surface-600'}"
 				onclick={() => (filter = 'unread')}
 			>
 				Unread ({notifications.filter((n) => !n.isRead).length})
 			</button>
 			<button
-				class="btn {filter === 'read' ? 'preset-filled-primary' : 'preset-tonal'}"
+                class="btn btn-sm text-sm font-semibold {filter === 'read' ? 'bg-primary-700 text-white hover:bg-primary-800 dark:bg-primary-600 dark:hover:bg-primary-500' : 'bg-white text-surface-800 hover:bg-surface-100 dark:bg-surface-700 dark:text-surface-100 dark:hover:bg-surface-600'}"
 				onclick={() => (filter = 'read')}
 			>
 				Read
 			</button>
 		</div>
 
-		<select class="select preset-tonal" bind:value={typeFilter}>
+        <span class="text-xs font-semibold uppercase tracking-wide text-surface-600 dark:text-surface-300">Type</span>
+        <select class="select h-10 rounded-xl border border-surface-300 bg-white px-3 text-sm font-medium text-surface-900 dark:border-surface-600 dark:bg-surface-700 dark:text-surface-100" bind:value={typeFilter}>
 			<option value="all">All types</option>
 			{#each availableTypes() as type}
 				<option value={type as string}
@@ -307,37 +325,39 @@
 	</div>
 
 	<!-- Notifications List -->
-	<div class="space-y-2">
+    <div class="space-y-3">
 		{#if loading}
-			<div class="card p-4">
+            <div class="card rounded-xl border border-surface-200 bg-surface-50 p-4 dark:border-surface-700 dark:bg-surface-800">
 				<p class="text-sm text-gray-500">Loading notifications...</p>
 			</div>
 		{:else if filteredNotifications().length === 0}
-			<p class="text-sm text-gray-400">No notifications to show.</p>
+            <div class="rounded-xl border border-dashed border-surface-300 bg-surface-50 p-6 text-center text-sm text-surface-500 dark:border-surface-700 dark:bg-surface-800">
+                No notifications to show.
+            </div>
 		{:else}
 			{#each filteredNotifications() as notification (notification._id)}
 				<div
-					class="card p-4 border-l-4 {priorityColors[notification.priority]} 
-						   {!notification.isRead ? 'bg-blue-50/50' : ''} 
-						   {notification.actionUrl ? 'cursor-pointer hover:bg-gray-50' : ''}"
+                    class="card rounded-2xl border border-surface-200 p-4 shadow-sm transition-all {priorityColors[notification.priority]} 
+                           {!notification.isRead ? 'bg-blue-50/60' : 'bg-white'} 
+                           {getNotificationTargetUrl(notification) ? 'cursor-pointer hover:-translate-y-0.5 hover:shadow-md hover:border-surface-300' : ''}"
 					onclick={() => handleNotificationClick(notification)}
-					role={notification.actionUrl ? 'button' : 'article'}
-					{...notification.actionUrl ? { tabindex: 0 } : {}}
+                    role={getNotificationTargetUrl(notification) ? 'button' : 'article'}
+                    {...getNotificationTargetUrl(notification) ? { tabindex: 0 } : {}}
 				>
 					<div class="flex items-start justify-between">
-						<div class="flex items-start gap-3 flex-1">
+                        <div class="flex items-start gap-4 flex-1">
 							<!-- Icon -->
-							<div class="flex-shrink-0 mt-1">
+                            <div class="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-surface-100 dark:bg-surface-800">
 								<Icon
 									icon={notificationConfig[notification.type]?.icon || 'mdi:bell-outline'}
-									class="w-5 h-5 {notificationConfig[notification.type]?.color || 'text-gray-500'}"
+                                    class="h-5 w-5 {notificationConfig[notification.type]?.color || 'text-gray-500'}"
 								/>
 							</div>
 
 							<!-- Content -->
 							<div class="flex-1 min-w-0">
-								<div class="flex items-center gap-2 mb-1">
-									<h3 class="font-medium text-sm">{notification.title}</h3>
+                                <div class="mb-1.5 flex items-center gap-2">
+                                    <h3 class="text-sm font-semibold text-surface-900 dark:text-surface-100">{notification.title}</h3>
 									{#if !notification.isRead}
 										<span class="w-2 h-2 bg-blue-500 rounded-full"></span>
 									{/if}
@@ -348,22 +368,23 @@
 									{/if}
 								</div>
 
-								<p class="text-sm text-gray-600 mb-2">{@html notification.content}</p>
+								<p class="mb-3 whitespace-normal break-words text-sm leading-relaxed text-surface-600 dark:text-surface-300">{@html notification.content}</p>
 
-                                <div class="flex items-center gap-4 text-xs text-gray-500">
+                                <div class="flex flex-wrap items-center gap-3 text-xs text-surface-500">
                                     <span>{getTimeAgo(notification.createdAt)}</span>
                                     <span class="capitalize">{notification.type.replace(/_/g, ' ')}</span>
                                     {#if notification.expiresAt}
                                         <span>Expires: {new Date(notification.expiresAt).toLocaleDateString()}</span>
                                     {/if}
-                                    {#if notification.relatedPaperId && (
-                                        notification.type.includes('review') || notification.type.includes('paper') || notification.type.includes('reviewer')
-                                    )}
+                                    {#if getNotificationTargetUrl(notification)}
                                         <button
-                                            class="btn btn-xs preset-filled-primary-500 ml-2"
+                                            class="btn btn-xs preset-filled-primary-500 ml-auto"
                                             onclick={(e) => {
                                                 e.stopPropagation();
-                                                window.location.href = `/notifications`;
+                                                const targetUrl = getNotificationTargetUrl(notification);
+                                                if (targetUrl) {
+                                                    window.location.href = targetUrl;
+                                                }
                                             }}
                                         >
                                             Read more
@@ -374,7 +395,7 @@
 						</div>
 
 						<!-- Actions -->
-						<div class="flex gap-1 flex-shrink-0">
+                        <div class="flex flex-shrink-0 gap-1">
 							{#if !notification.isRead}
 								<button
 									class="btn btn-sm preset-tonal"

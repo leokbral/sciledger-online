@@ -1,9 +1,11 @@
 import { json } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import Papers from '$lib/db/models/Paper';
-import Invitations from '$lib/db/models/Invitation';
+import PaperReviewInvitation from '$lib/db/models/PaperReviewInvitation';
 import Users from '$lib/db/models/User';
+import { NotificationService } from '$lib/services/NotificationService';
 import type { RequestHandler } from './$types';
+import { randomUUID } from 'crypto';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
 	await start_mongo();
@@ -14,16 +16,33 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			return json({ error: 'User not authenticated' }, { status: 401 });
 		}
 
-		const { paperId, reviewerIds, peerReviewType } = await request.json();
+		const { paperId, reviewerIds, reviewerId, peerReviewType } = await request.json();
+		const normalizedReviewerIds: string[] = Array.isArray(reviewerIds)
+			? reviewerIds.filter(Boolean).map((id: string) => String(id))
+			: reviewerId
+				? [String(reviewerId)]
+				: [];
 
-		if (!paperId || !reviewerIds || !Array.isArray(reviewerIds)) {
+		if (!paperId || normalizedReviewerIds.length === 0) {
 			return json({ error: 'Invalid request data' }, { status: 400 });
 		}
 
 		// Buscar o paper
-		const paper = await Papers.findOne({ id: paperId });
+		const paper = await Papers.findOne({ $or: [{ id: paperId }, { _id: paperId }] });
 		if (!paper) {
 			return json({ error: 'Paper not found' }, { status: 404 });
+		}
+
+		const isStandalonePaper = !paper.hubId;
+		const hasAuthorizedPaymentHold =
+			!!paper.paymentHold?.stripePaymentIntentId &&
+			(paper.paymentHold?.status === 'authorized' || paper.paymentHold?.status === 'captured');
+
+		if (isStandalonePaper && !hasAuthorizedPaymentHold) {
+			return json(
+				{ error: 'Payment authorization is required before inviting reviewers for standalone papers.' },
+				{ status: 403 }
+			);
 		}
 
 		// Verificar se é o autor do paper
@@ -63,35 +82,57 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 		// Criar convites para cada revisor
 		const invitations = [];
-		for (const reviewerId of reviewerIds) {
+		for (const rawReviewerId of normalizedReviewerIds) {
+			// Verificar se o revisor existe
+			const reviewer = await Users.findOne({ $or: [{ id: rawReviewerId }, { _id: rawReviewerId }] });
+			if (!reviewer) {
+				console.warn(`Reviewer ${rawReviewerId} not found`);
+				continue;
+			}
+
+			const normalizedReviewerId = String(reviewer.id || reviewer._id);
+			const normalizedPaperId = String(paper.id || paper._id);
+
 			// Verificar se já existe convite pendente
-			const existingInvite = await Invitations.findOne({
-				paper: paperId,
-				reviewer: reviewerId,
+			const existingInvite = await PaperReviewInvitation.findOne({
+				paper: normalizedPaperId,
+				reviewer: normalizedReviewerId,
 				status: 'pending'
 			});
 
 			if (!existingInvite) {
-				const invitation = new Invitations({
-					id: crypto.randomUUID(),
-					paper: paperId,
-					reviewer: reviewerId,
+				const invitationId = randomUUID();
+				const invitation = new PaperReviewInvitation({
+					_id: invitationId,
+					id: invitationId,
+					paper: normalizedPaperId,
+					reviewer: normalizedReviewerId,
 					invitedBy: user.id,
 					status: 'pending',
 					invitedAt: new Date(),
-					type: 'paper_review'
+					hubId: paper.hubId || null
 				});
 
 				await invitation.save();
 				invitations.push(invitation);
+
+				// Criar notificação para o revisor
+				try {
+					await NotificationService.createPaperReviewRequest({
+						reviewerId: normalizedReviewerId,
+						paperId: normalizedPaperId,
+						paperTitle: paper.title,
+						authorName: `${user.firstName} ${user.lastName}`
+					});
+				} catch (notifyError) {
+					console.error('Failed to create notification:', notifyError);
+					// Não falha se notificação não puder ser criada
+				}
 			}
 		}
 
 		paper.updatedAt = new Date();
 		await paper.save();
-
-		// TODO: Criar notificações para os revisores
-		// await NotificationService.createReviewerInvitationNotifications({...});
 
 		return json({
 			success: true,
@@ -101,7 +142,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	} catch (error) {
 		console.error('Error assigning reviewers:', error);
 		return json(
-			{ error: 'Failed to assign reviewers', success: false },
+			{ error: 'Failed to assign reviewers', details: (error as Error).message, success: false },
 			{ status: 500 }
 		);
 	}

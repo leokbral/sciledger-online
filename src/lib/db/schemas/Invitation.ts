@@ -1,4 +1,5 @@
 import { Schema } from "mongoose";
+import * as crypto from "crypto";
 
 export const InvitationSchema: Schema = new Schema({
     _id: { type: String, required: true },

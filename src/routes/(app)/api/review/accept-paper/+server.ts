@@ -67,7 +67,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
                 $set: { 
                     status: 'in review',
                     acceptedAt: new Date(),
-                    acceptedBy: user._id,
+                    acceptedBy: user.id,
                     reviewType: reviewType,
                     updatedAt: new Date()
                 }
@@ -75,7 +75,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
         );
 
         // Buscar informações adicionais do editor e revisores designados
-        const editor = await db.collection('users').findOne({ _id: user._id });
+        const editor = await db.collection('users').findOne({ id: user.id });
         const editorName = `${editor?.firstName || ''} ${editor?.lastName || ''}`.trim();
 
         // Buscar revisores designados (se existirem)
@@ -96,7 +96,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
         // Se houver coautores, incluir nas notificações
         if (paper.coAuthors && Array.isArray(paper.coAuthors)) {
             for (const coAuthorId of paper.coAuthors) {
-                if (coAuthorId !== user._id && coAuthorId !== authorId) {
+                if (coAuthorId !== user.id && coAuthorId !== authorId) {
                     await NotificationService.createNotification({
                         user: String(coAuthorId),
                         type: 'paper_accepted_for_review',

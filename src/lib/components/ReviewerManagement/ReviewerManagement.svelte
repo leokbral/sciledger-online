@@ -109,10 +109,10 @@
 				await loadPendingInvites();
 			} else {
 				// Handle remove action
-				const response = await fetch(`/hub/view/${hubId}/reviewers/remove`, {
+				const response = await fetch(`/hub/view/${hubId}/reviewers`, {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ reviewers: userIds })
+					body: JSON.stringify({ reviewers: userIds, action: 'remove' })
 				});
 
 				if (response.ok) {

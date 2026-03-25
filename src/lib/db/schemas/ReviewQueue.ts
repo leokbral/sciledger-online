@@ -1,4 +1,5 @@
 import { Schema } from "mongoose";
+import * as crypto from 'crypto';
 
 export const ReviewQueueSchema: Schema = new Schema({
     _id: { type: String, required: true },

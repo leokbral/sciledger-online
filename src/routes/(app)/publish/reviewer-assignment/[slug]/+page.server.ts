@@ -1,5 +1,6 @@
 import Papers from '$lib/db/models/Paper';
 import Users from '$lib/db/models/User';
+import '$lib/db/models/Review';
 import { error, redirect } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongooseConnection';
 
@@ -40,7 +41,7 @@ function sanitize(obj: unknown): unknown {
 }
 
 export async function load({ locals, params }) {
-	if (!locals.user) redirect(302, `/login`);
+	if (!locals.user) throw redirect(302, `/login`);
 
 	await start_mongo();
 

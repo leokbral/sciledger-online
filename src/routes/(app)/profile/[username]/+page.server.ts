@@ -6,21 +6,30 @@ import { start_mongo } from '$lib/db/mongo';
 // function findUser(id: string) {
 //     return userProfiles.find((a: { id: string; }) => a.id === (id).replace(/\s+/g, ''))
 // }
-await start_mongo(); // Não necessário mais
+await start_mongo(); // No longer necessary
+
+function toSerializable<T>(value: T): T {
+	return JSON.parse(JSON.stringify(value)) as T;
+}
 
 export async function load({ locals, params }) {
 
     const user = locals.user;
-    if (!user) { redirect(302, '/login') }
+    if (!user) {
+		throw redirect(302, '/login');
+	}
     
     const fetchUser = async () => {
-		const user = await Users.findOne({username: params.username}, { _id: 0 }).populate("papers").lean().exec();
+		const user = await Users.findOne({ username: params.username }, { _id: 0 })
+			.populate('papers')
+			.lean()
+			.exec();
 		//console.log(user)
-		return user;
+		return toSerializable(user);
 	};
 	//console.log("chamou kkk", userCount);
 	return {
 		user: await fetchUser(),
-		loggedUser: user
+		loggedUser: toSerializable(user)
 	};
 }

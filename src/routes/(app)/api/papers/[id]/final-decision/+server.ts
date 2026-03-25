@@ -67,7 +67,7 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
                     status: newStatus,
                     finalDecision: decision,
                     finalDecisionAt: finalDecisionAt,
-                    finalDecisionBy: user._id,
+                    finalDecisionBy: user.id,
                     rejectionReason: decision === 'reject' ? rejectionReason : undefined,
                     updatedAt: new Date()
                 }
@@ -75,7 +75,7 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
         );
 
         // Buscar informações para as notificações
-        const editor = await db.collection('users').findOne({ _id: user._id });
+        const editor = await db.collection('users').findOne({ id: user.id });
         const editorName = `${editor?.firstName || ''} ${editor?.lastName || ''}`.trim();
         
         const paperTitle = paper.title;
@@ -92,7 +92,7 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
                 paperTitle: paperTitle,
                 authorId: authorId,
                 authorName: authorName,
-                editorId: String(user._id),
+                editorId: String(user.id),
                 editorName: editorName,
                 reviewerIds: reviewerIds,
                 hubId: paper.hubId ? String(paper.hubId) : undefined,
@@ -105,7 +105,7 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
                 paperTitle: paperTitle,
                 authorId: authorId,
                 authorName: authorName,
-                editorId: String(user._id),
+                editorId: String(user.id),
                 editorName: editorName,
                 reviewerIds: reviewerIds,
                 rejectionReason: rejectionReason,

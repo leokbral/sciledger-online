@@ -1,13 +1,10 @@
 <script lang="ts">
 	import { TagsInput, FileUpload } from '@skeletonlabs/skeleton-svelte';
-	import type { Author } from '../../types/Author';
 	import type { User } from '$lib/types/User';
 	import { writable } from 'svelte/store';
-	import type { Paper } from '$lib/types/Paper';
 	import type { PaperPublishStoreData } from '$lib/types/PaperPublishStoreData';
 	import { page } from '$app/state';
 	import RichTextEditor from '$lib/components/Text/RichTextEditor.svelte';
-	import PapersImages from '$lib/components/PapersImages.svelte';
 	import Autocomplete from '$lib/components/Autocomplete.svelte';
 
 	import IconDropzone from '@lucide/svelte/icons/image-plus';
@@ -15,11 +12,8 @@
 	import IconRemove from '@lucide/svelte/icons/circle-x';
 	import Icon from '@iconify/svelte';
 	import OrcidProfile from '$lib/components/OrcidProfile/OrcidProfile.svelte';
-	import { SCOPUS_AREAS, getSubAreasForArea, getAllAreaNames } from '$lib/constants/scopusAreas';
+	import { getSubAreasForArea, getAllAreaNames } from '$lib/constants/scopusAreas';
 
-	let fileName = $state('');
-	let pdfPaperPreview = $state();
-	let pdfFile: File | null = $state(null);
 	// Add these new variables
 	let docxPreview = $state();
 	let docxFile: File | null = $state(null);
@@ -237,8 +231,6 @@
 		$store.supplementaryMaterials = supplementaryMaterials;
 	}
 
-	// let files: FileList = $state();
-
 	let inputAuthor = $state('');
 	let inputAuthorList = $state(
 		inicialValue.authors?.length > 0
@@ -282,28 +274,16 @@
 		// });
 	}
 
-	function onRemoveHandler(event: any): void {
-		$store.authors = authorsOptions.filter((a: Author) => inputAuthorList.includes(a.id));
-	}
-
-	interface ValidateArgs {
+	type ValidateArgs = {
 		inputValue: string;
-		// value: string[];
-	}
+	};
+
+
 
 	function isValidAuthor(value: ValidateArgs): boolean {
 		return authorsOptions.some((option: User) => option.username === value.inputValue);
 	}
 
-	async function onChangeHandler(event: any): Promise<void> {
-		const file = event.target?.files[0];
-
-		if (file && file.type.startsWith('image/')) {
-			const reader = new FileReader();
-			reader.readAsDataURL(file);
-			fileName = file.name;
-		}
-	}
 
 	// async function uploadFile() {
 	// 	if (!pdfFile) {
@@ -1024,22 +1004,6 @@
 	// 	// dispatch('savePaper', { store: $store });
 	// }
 
-	function generatePreview(event: any) {
-		if (event.acceptedFiles.length === 0) {
-			pdfPaperPreview = null;
-			return;
-		}
-		const reader = new FileReader();
-		reader.onload = (event) => {
-			pdfPaperPreview = event.target?.result;
-			// set the pdfPaperPreview as the src of an pdfPaperPreview element
-			// console.log('event', pdfPaperPreview);
-		};
-
-		const _file = event.acceptedFiles[0];
-		pdfFile = _file;
-		reader.readAsDataURL(_file);
-	}
 
 	function generateDocxPreview(event: any) {
 		if (event.acceptedFiles.length === 0) {

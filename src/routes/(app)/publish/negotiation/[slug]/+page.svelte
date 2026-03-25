@@ -26,6 +26,12 @@
 	let isHubOwner: boolean = $state(!!(data as any).isHubOwner);
 	let isApprovingPublication = $state(false);
 	let approvePublicationError = $state('');
+	let isStandalonePaper = $derived(!!paper && !paper.hubId);
+	let hasStandalonePaymentAuthorization = $derived(
+		!!paper?.paymentHold?.stripePaymentIntentId &&
+		(paper?.paymentHold?.status === 'authorized' || paper?.paymentHold?.status === 'captured')
+	);
+	let requiresPaymentBeforeInviting = $derived(isStandalonePaper && !hasStandalonePaymentAuthorization);
 
 	interface ImageItem {
 		id?: string;
@@ -112,6 +118,12 @@
 		if (!paper) return;
 
 		try {
+			// Se o paper NÃO tem hub, exigir pagamento
+			if (!paper.hubId && !hasStandalonePaymentAuthorization) {
+				goto(`/publish/payment-hold?paperId=${paper.id}`);
+				return;
+			}
+
 			// Check if at least 3 reviewers have accepted
 			const acceptedReviewers = paper.peer_review?.responses?.filter(
 				response => response.status === 'accepted'
@@ -317,6 +329,11 @@
 			isApprovingPublication = false;
 		}
 	}
+
+	async function goToPaymentHold() {
+		if (!paper?.id) return;
+		await goto(`/publish/payment-hold?paperId=${paper.id}`);
+	}
 </script>
 
 <!-- UI HTML -->
@@ -345,6 +362,38 @@
 	<div class="container page max-w-[700px] p-4 m-auto">
 		<h4 class="h4 px-4 text-primary-500 font font-semibold">Reviewer Assignment</h4>
 		<hr class="mt-2 mb-4 border-t-2!" />
+		{#if requiresPaymentBeforeInviting}
+			<div class="mb-4 rounded-lg border-l-4 border-amber-500 bg-amber-50 p-4">
+				<div class="flex gap-3">
+					<Icon icon="mdi:credit-card-lock-outline" class="h-5 w-5 flex-shrink-0 text-amber-700" />
+					<div class="text-sm text-amber-900">
+						<strong>Payment required before reviewer invitations</strong>
+						<p class="mt-1">
+							For standalone papers, payment authorization is required before inviting reviewers.
+						</p>
+						<div class="mt-3">
+							<button class="btn preset-filled-primary-500" onclick={goToPaymentHold}>
+								<Icon icon="mdi:credit-card-fast-outline" class="size-5" />
+								Proceed to Payment
+							</button>
+						</div>
+					</div>
+				</div>
+			</div>
+		{/if}
+		{#if isStandalonePaper && hasStandalonePaymentAuthorization}
+			<div class="mb-4 rounded-lg border-l-4 border-green-500 bg-green-50 p-4">
+				<div class="flex gap-3">
+					<Icon icon="mdi:check-decagram-outline" class="h-5 w-5 flex-shrink-0 text-green-700" />
+					<div class="text-sm text-green-900">
+						<strong>Payment already confirmed</strong>
+						<p class="mt-1">
+							Your payment authorization is active. You can proceed to invite reviewers.
+						</p>
+					</div>
+				</div>
+			</div>
+		{/if}
 		{#if paper.hubId}
 			<div class="mb-4 rounded-lg border-l-4 border-blue-500 bg-blue-50 p-4">
 				<div class="flex gap-3">
@@ -352,8 +401,7 @@
 					<div class="text-sm text-blue-900">
 						<strong>Status: Reviewer Assignment (Hub)</strong>
 						<p class="mt-1">
-							Este paper já foi submetido a um Hub e está em negociação. Enquanto estiver neste status,
-							ele não pode ser editado.
+							This paper is linked to a hub and is currently under review.
 						</p>
 					</div>
 				</div>
@@ -390,20 +438,21 @@
 		<PaperPreview {paper} user={$page.data.user} />
 
 		<!-- Hub Selection Section -->
-		<div class="mt-6 space-y-4">
-			<div class="flex items-center gap-2">
-				<label class="relative inline-flex items-center cursor-pointer">
-					<input type="checkbox" bind:checked={isLinkedToHub} class="sr-only peer" disabled={!!paper?.hubId} />
-					<div
-						class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"
-					></div>
-					<span class="ml-3 text-sm font-medium text-gray-900">Link to Hub/Event</span>
-				</label>
-			</div>
+		{#if !paper?.hubId}
+			<div class="mt-6 space-y-4">
+				<div class="flex items-center gap-2">
+					<label class="relative inline-flex items-center cursor-pointer">
+						<input type="checkbox" bind:checked={isLinkedToHub} class="sr-only peer" />
+						<div
+							class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"
+						></div>
+						<span class="ml-3 text-sm font-medium text-gray-900">Link to Hub/Event</span>
+					</label>
+				</div>
 
-			{#if isLinkedToHub}
-				<div class="space-y-4">
-					<h5 class="text-lg font-semibold">Available Hubs</h5>
+				{#if isLinkedToHub}
+					<div class="space-y-4">
+						<h5 class="text-lg font-semibold">Available Hubs</h5>
 
 					{#if isLoadingHubs}
 						<div class="flex items-center justify-center p-4">
@@ -469,19 +518,20 @@
 							{/each}
 						</div>
 					{/if}
-				</div>
-			{/if}
-			{#if selectedHub}
-				<div class="flex justify-end mt-4">
-					<button
-						class="bg-primary-500 text-white px-4 py-2 rounded-lg hover:bg-primary-600"
-						onclick={confirmHubSelection}
-					>
-						Confirm Selection
-					</button>
-				</div>
-			{/if}
-		</div>
+					</div>
+				{/if}
+				{#if selectedHub}
+					<div class="flex justify-end mt-4">
+						<button
+							class="bg-primary-500 text-white px-4 py-2 rounded-lg hover:bg-primary-600"
+							onclick={confirmHubSelection}
+						>
+							Confirm Selection
+						</button>
+					</div>
+				{/if}
+			</div>
+		{/if}
 
 		<!-- Price -->
 		<!-- <p>Amount</p>
@@ -562,6 +612,7 @@
 			name="peer_review"
 			class="w-full p-2 border border-surface-300 rounded-lg"
 			bind:value={peer_review}
+			disabled={requiresPaymentBeforeInviting}
 		>
 			<option value="" disabled selected>Select peer review option</option>
 			<option value="open">Open</option>
@@ -569,16 +620,23 @@
 		</select>
 
 		{#if peer_review === 'selected'}
+			{#if requiresPaymentBeforeInviting}
+				<div class="mt-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+					Invitations are locked until payment is confirmed for this paper.
+				</div>
+			{/if}
 			<!-- <AvailableReviewers {reviewers} {selectedReviewers} {toggleReviewerSelection} /> -->
-			<ReviewerModal
-				paperId={paper.id}
-				users={reviewers}
-				assignedReviewers={selectedReviewers}
-				onReviewerChange={(newList) => (selectedReviewers = newList)}
-			/>
+			{#if !requiresPaymentBeforeInviting}
+				<ReviewerModal
+					paperId={paper.id}
+					users={reviewers}
+					assignedReviewers={selectedReviewers}
+					onReviewerChange={(newList) => (selectedReviewers = newList)}
+				/>
+			{/if}
 			
 			<!-- Invite Hub Reviewers (Only for hub owners) -->
-			{#if data.isHubOwner && paper.hubId && typeof paper.hubId === 'object' && paper.hubId.reviewers}
+			{#if !requiresPaymentBeforeInviting && data.isHubOwner && paper.hubId && typeof paper.hubId === 'object' && paper.hubId.reviewers}
 				<div class="mt-4">
 					<PaperReviewerInvite
 						paperId={paper.id}

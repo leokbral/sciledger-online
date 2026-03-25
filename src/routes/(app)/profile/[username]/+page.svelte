@@ -2,13 +2,11 @@
 	// Imports
 	import Icon from '@iconify/svelte';
 	import ProfilePage from '$lib/Pages/Profile/ProfilePage.svelte';
-	import { Avatar } from '@skeletonlabs/skeleton-svelte';
-	import type { KnowledgeArea } from '$lib/types/KnowledgeArea';
-	import { knowledgeAreas, type SubArea } from '../../KnowledgeAreas';
 	import type { Paper } from '$lib/types/Paper';
+	import { knowledgeAreas, type SubArea } from '../../KnowledgeAreas';
 	import { getInitials } from '$lib/utils/GetInitials';
 	import type { PageData } from './$types';
-	import type { User } from '$lib/types/User';
+	import ImageCropper from '$lib/components/ImageCropper.svelte';
 
 	interface Props {
 		data: PageData;
@@ -23,6 +21,10 @@
 	let editedPosition = $state('');
 	let editedInstitution = $state('');
 	let profilePictureUrl = $state('');
+	let isUploadingProfilePicture = $state(false);
+	let profilePictureError = $state('');
+	let showImageCropper = $state(false);
+	let fileToProcess = $state<File | null>(null);
 	let publications = $state<Paper[]>([]);
 	let interestAreas = $state<string[]>([]);
 	let contactInfo = $state('');
@@ -40,8 +42,6 @@
 	// expertise
 	// 	.map((areaId) => knowledgeAreas.find((area) => area.id === areaId))
 	// 	.filter(Boolean);
-
-	let userAdditionalInfo = $state({}); //user?.performanceReviews || {};
 
 	// Update edited values when user changes
 	$effect(() => {
@@ -63,10 +63,6 @@
 	});
 
 	let maxBioLength = 1000;
-
-	let imageSize = 100;
-	let imagePositionX = 0;
-	let imagePositionY = 0;
 
 	// Tabs configuration
 	let tabs = [
@@ -99,15 +95,14 @@
 
 	async function saveProfile() {
 		if (isEditing) {
-			// Validation
-			if (!editedPosition || !editedInstitution) {
-				alert('Forneça sua posição e instituição.');
+			if (isUploadingProfilePicture) {
+				alert('Aguarde o upload da foto terminar.');
 				return;
 			}
 
 			// Save logic here, make an API call to save changes
 			try {
-				const response = await fetch('/profile/${user.username}', {
+				const response = await fetch(`/profile/${user.username}`, {
 					method: 'PUT',
 					headers: {
 						'Content-Type': 'application/json'
@@ -116,7 +111,8 @@
 						id: user?.id,
 						position: editedPosition,
 						institution: editedInstitution,
-						bio: editedBio
+						bio: editedBio,
+						profilePictureUrl
 					})
 				});
 
@@ -128,12 +124,12 @@
 				} else {
 					// Handle errors
 					const errorData = await response.json();
-					console.error('Erro ao salvar perfil:', errorData.error);
-					alert('Erro ao salvar perfil. Por favor, tente novamente.');
+					console.error('Error saving profile:', errorData.error);
+					alert('Error saving profile. Please try again.');
 				}
 			} catch (error) {
-				console.error('Erro ao salvar perfil:', error);
-				alert('Erro interno do servidor. Por favor, tente novamente.');
+			console.error('Error saving profile:', error);
+			alert('Internal server error. Please try again.');
 			}
 		}
 	}
@@ -142,9 +138,77 @@
 		const input = event.target as HTMLInputElement;
 		if (input.files && input.files.length > 0) {
 			const file = input.files[0];
-			// Handle file upload logic here
-			console.log('Selected file:', file);
+
+			if (!file.type.startsWith('image/')) {
+				profilePictureError = 'Please select a valid image file.';
+				input.value = '';
+				return;
+			}
+
+			const maxBytes = 5 * 1024 * 1024;
+			if (file.size > maxBytes) {
+				profilePictureError = 'Image must be at most 5MB.';
+				input.value = '';
+				return;
+			}
+
+			profilePictureError = '';
+			fileToProcess = file;
+			showImageCropper = true;
+			input.value = '';
+	}
+	}
+
+	async function uploadProfilePictureBlob(blob: Blob) {
+		const formData = new FormData();
+		formData.append('image', new File([blob], 'profile-picture.png', { type: 'image/png' }));
+
+		const response = await fetch('/api/images/upload', {
+			method: 'POST',
+			body: formData
+		});
+
+		if (!response.ok) {
+			throw new Error('Failed to upload image.');
 		}
+
+		const result = await response.json();
+		if (!result?.id) {
+			throw new Error('Image ID not found.');
+		}
+
+		profilePictureUrl = `/api/images/${result.id}`;
+	}
+
+	async function handleCropperApply(blob: Blob) {
+		isUploadingProfilePicture = true;
+		profilePictureError = '';
+
+		try {
+			await uploadProfilePictureBlob(blob);
+			showImageCropper = false;
+			fileToProcess = null;
+		} catch (error) {
+			console.error('Error uploading profile picture:', error);
+			profilePictureError = 'Could not crop/upload the photo. Try again.';
+		} finally {
+			isUploadingProfilePicture = false;
+		}
+	}
+
+	function handleCropperCancel() {
+		showImageCropper = false;
+		fileToProcess = null;
+		profilePictureError = '';
+	}
+
+	function removeProfilePicture() {
+		if (isUploadingProfilePicture) {
+			return;
+		}
+
+		profilePictureError = '';
+		profilePictureUrl = '';
 	}
 </script>
 
@@ -154,6 +218,15 @@
 		<!-- Edit Button -->
 		<div class="mt-4 flex justify-end">
 			{#if isEditing}
+				{#if profilePictureUrl}
+					<button
+						class="bg-gray-700 text-white p-2 rounded-full mr-2"
+						onclick={removeProfilePicture}
+						disabled={isUploadingProfilePicture}
+					>
+						Remove photo
+					</button>
+				{/if}
 				<button class="bg-red-500 text-white p-2 rounded-full mr-2" onclick={toggleEdit}>
 					Cancel
 				</button>
@@ -173,9 +246,13 @@
 		<!-- Profile Picture and Info -->
 		<div class="flex items-center gap-4 mt-6">
 			<div class="relative w-36 h-36 mr-4">
-				{#if user?.profilePictureUrl}
+				{#if profilePictureUrl}
 					<div class="relative group cursor-pointer w-32 h-32">
-						<Avatar src={user.profilePictureUrl} name={user.firstName} size="w-32" />
+						<img
+							src={profilePictureUrl}
+							alt={user.firstName}
+							class="w-32 h-32 rounded-full object-cover"
+						/>
 						{#if isEditing}
 							<label
 								for="profilePicture"
@@ -192,6 +269,7 @@
 								id="profilePicture"
 								accept="image/*"
 								class="hidden"
+								disabled={isUploadingProfilePicture}
 								onchange={handleProfilePictureChange}
 							/>
 						{/if}
@@ -219,6 +297,7 @@
 								id="profilePicture"
 								accept="image/*"
 								class="hidden"
+								disabled={isUploadingProfilePicture}
 								onchange={handleProfilePictureChange}
 							/>
 						{/if}
@@ -244,12 +323,23 @@
 								id="profilePicture"
 								accept="image/*"
 								class="hidden"
+								disabled={isUploadingProfilePicture}
 								onchange={handleProfilePictureChange}
 							/>
 						{/if}
 					</div>
 				{/if}
 			</div>
+			{#if isEditing && (isUploadingProfilePicture || profilePictureError)}
+				<div class="mt-2 text-sm">
+					{#if isUploadingProfilePicture}
+						<p class="text-blue-600">Enviando foto...</p>
+					{/if}
+					{#if profilePictureError}
+						<p class="text-red-600">{profilePictureError}</p>
+					{/if}
+				</div>
+			{/if}
 
 			<div>
 				<div class="text-2xl font-bold">{user?.firstName} {user?.lastName}</div>
@@ -272,6 +362,14 @@
 				</div>
 			</div>
 		</div>
+
+{#if showImageCropper && fileToProcess}
+		<ImageCropper 
+			file={fileToProcess}
+			onApply={handleCropperApply}
+			onCancel={handleCropperCancel}
+		/>
+		{/if}
 
 		<!-- Following and Followers Section -->
 		<div class="flex gap-4 mt-6">
@@ -362,3 +460,11 @@
 		</div>
 	</div>
 </section>
+
+{#if showImageCropper && fileToProcess}
+	<ImageCropper 
+		file={fileToProcess}
+		onApply={handleCropperApply}
+		onCancel={handleCropperCancel}
+	/>
+{/if}

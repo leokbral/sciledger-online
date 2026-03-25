@@ -96,7 +96,7 @@
 			}}
 			positioning={{ placement: 'bottom-end' }}
 			triggerBase="relative"
-			contentBase="card bg-surface-950-50 card p-4 w-80 shadow-xl text-surface-50-950 max-h-96 overflow-y-auto"
+			contentBase="card p-4 shadow-2xl text-surface-50-950 w-[min(92vw,42rem)] max-h-[78vh] overflow-hidden rounded-2xl border border-surface-200 bg-white dark:bg-surface-900"
 			arrow
 			arrowBackground="!bg-surface-950 dark:!bg-surface-50"
 		>
@@ -105,7 +105,7 @@
 			{/snippet}
 
 			{#snippet content()}
-				<div class="max-h-80 overflow-y-auto">
+				<div class="max-h-[70vh] overflow-y-auto pr-1">
 					<Notifications
 						notifications={currentNotifications}
 						on:notificationChange={handleNotificationChange}
@@ -138,10 +138,14 @@
 				<div class="space-y-4 flex flex-col">
 					<div class="flex gap-2">
 						{#if user.profilePictureUrl}
-							<Avatar src={user.profilePictureUrl} name={user.firstName} size="w-9" />
+							<img 
+								src={user.profilePictureUrl} 
+								alt={user.firstName}
+								class="w-16 h-16 rounded-full object-cover"
+							/>
 						{:else}
 							<div
-								class="w-9 h-9 flex items-center justify-center bg-gray-300 text-white rounded-full"
+								class="w-16 h-16 flex items-center justify-center bg-gray-300 text-white rounded-full"
 							>
 								<span class="text-xl font-bold">{getInitials(user.firstName, user.lastName)}</span>
 							</div>

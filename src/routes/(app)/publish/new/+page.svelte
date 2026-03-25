@@ -15,13 +15,20 @@
 	//let articleComponent: PaperPublishPage;
 	
 	let hubId = $derived($page.url.searchParams.get('hubId'));
+	let paymentAuthorizationCodeFromUrl = $derived($page.url.searchParams.get('authorizationCode'));
 
 	async function savePaper( store: any) {
 		console.log(store);
 
+		if (!hubId && !paymentAuthorizationCodeFromUrl) {
+			goto('/publish/payment-hold');
+			return;
+		}
+
 		const paper = {
 			...store,
-			...(hubId && { hubId, isLinkedToHub: true })
+			...(hubId && { hubId, isLinkedToHub: true }),
+			...(paymentAuthorizationCodeFromUrl && { paymentAuthorizationCode: paymentAuthorizationCodeFromUrl })
 		};
 		console.log(paper)
 		try {
@@ -88,6 +95,13 @@
 	authorsOptions={userProfiles}
 /> -->
 
+
+<div class="mb-4 rounded-lg border-l-4 border-blue-500 bg-blue-50 p-4">
+	<p class="text-sm text-blue-900">
+		Need help with submission?
+		<a class="font-semibold underline hover:opacity-80" href="/help/how-to-submit">Read the guide: How to Submit</a>
+	</p>
+</div>
 
 <PaperPublishPage  author={data.user} authorsOptions={userProfiles} {savePaper}/>
 <!-- <PaperPublishPage on:savePaper={hdlSavePaper} author={data.user} authorsOptions={userProfiles} /> -->

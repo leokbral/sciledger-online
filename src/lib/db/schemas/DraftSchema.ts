@@ -1,4 +1,5 @@
 import mongoose, { Schema } from "mongoose";
+import * as crypto from 'crypto';
 
 export const DraftSchema: Schema = new Schema({
     _id: { type: String, required: true },

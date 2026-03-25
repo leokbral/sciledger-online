@@ -102,6 +102,4 @@
 			</div>
 		{/each}
 	</div>
-{:else}
-	<p class="text-surface-600">No pending review invitations</p>
 {/if}

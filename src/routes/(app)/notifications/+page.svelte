@@ -83,9 +83,10 @@
                 // Reload page to update notifications
                 window.location.reload();
             } else {
+                const reasons = Array.isArray(result?.reasons) ? result.reasons.join(', ') : '';
                 toaster.error({
                     title: 'Error',
-                    description: result.error || `Failed to ${action} invitation`
+                    description: reasons ? `${result.error}: ${reasons}` : (result.error || `Failed to ${action} invitation`)
                 });
             }
         } catch (error) {
@@ -101,12 +102,8 @@
 
     async function markAsRead(notificationId: string) {
         try {
-            const response = await fetch('/api/notifications/mark-read', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ notificationId })
+            const response = await fetch(`/api/notifications/${notificationId}/read`, {
+                method: 'POST'
             });
 
             if (response.ok) {
