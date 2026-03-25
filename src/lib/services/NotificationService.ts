@@ -97,7 +97,7 @@ export class NotificationService {
         return await this.createNotification({
             user: data.reviewerId,
             type: 'review_request',
-            title: `Nova solicitação de revisão`,
+            title: `New Review Request`,
             content: isHubPaper 
                 ? `You have been invited to review the paper "${data.paperTitle}" in the hub "${data.hubName}"`
                 : `You have been invited to review the paper "${data.paperTitle}" by ${data.authorName}`,
