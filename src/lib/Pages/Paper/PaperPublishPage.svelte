@@ -350,8 +350,23 @@
 					});
 
 					if (!response.ok) {
-						const errorData = await response.json();
-						throw new Error(`${pendingFile.filename}: ${errorData.message || 'Upload failed'}`);
+						let errorMessage = 'Upload failed';
+						
+						// Handle different error status codes
+						if (response.status === 413) {
+							errorMessage = 'File or total size exceeds the 10MB limit';
+						}
+						
+						// Try to parse error response as JSON
+						try {
+							const errorData = await response.json();
+							errorMessage = errorData.message || errorMessage;
+						} catch {
+							// If not JSON, use the status text or default message
+							errorMessage = `${response.status}: ${response.statusText || errorMessage}`;
+						}
+						
+						throw new Error(`${pendingFile.filename}: ${errorMessage}`);
 					}
 
 					const uploadedData = await response.json();

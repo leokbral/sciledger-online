@@ -23,7 +23,9 @@ const config = {
 			out: 'build',
 			precompress: true,
 			envPrefix: ''
-		})
+		}),
+		// Increase body size limit to 50MB for file uploads
+		bodySize: 50 * 1024 * 1024
 	}
 };
 export default config;
