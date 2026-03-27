@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Avatar } from '@skeletonlabs/skeleton-svelte';
 	import SupplementaryMaterials from '$lib/components/SupplementaryMaterials.svelte';
+	import SupplementaryFiles from '$lib/components/SupplementaryFiles.svelte';
 	import { onMount } from 'svelte';
 
 	interface Props {
@@ -156,6 +157,12 @@
 			{#if paper.supplementaryMaterials && paper.supplementaryMaterials.length > 0}
 				<div class="mt-6">
 					<SupplementaryMaterials materials={paper.supplementaryMaterials} />
+				</div>
+			{/if}
+
+			{#if paper.supplementaryFiles && paper.supplementaryFiles.length > 0}
+				<div class="mt-6">
+					<SupplementaryFiles files={paper.supplementaryFiles} allowDownload={true} />
 				</div>
 			{/if}
 

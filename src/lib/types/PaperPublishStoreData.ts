@@ -1,6 +1,18 @@
 import type { Paper } from "./Paper";
 import type { User } from "./User";
 
+export interface SupplementaryFile {
+	id: string;
+	fileId: string;
+	filename: string;
+	title: string;
+	description?: string;
+	fileSize: number;
+	mimeType: string;
+	uploadedBy?: string;
+	createdAt?: Date;
+	updatedAt?: Date;
+}
 export interface Block {
 	id: string;
 	type: string;
@@ -29,5 +41,6 @@ export interface PaperPublishStoreData extends Omit<Paper, 'mainAuthor' | 'creat
 	// authors: User[],
 	// peer_review?: string,
 	mainAuthor: User | null,
-	supplementaryMaterials?: SupplementaryMaterial[]
+	supplementaryMaterials?: SupplementaryMaterial[],
+	supplementaryFiles?: SupplementaryFile[]
 }

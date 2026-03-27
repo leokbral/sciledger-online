@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Avatar } from '@skeletonlabs/skeleton-svelte';
 	import SupplementaryMaterials from '$lib/components/SupplementaryMaterials.svelte';
+	import SupplementaryFiles from '$lib/components/SupplementaryFiles.svelte';
 	import type { PageData } from './$types';
 	import { onMount } from 'svelte';
 
@@ -191,6 +192,14 @@
 			{/if}
 
 			<!-- Tags/Keywords -->
+						<!-- Supplementary Files Section -->
+						{#if paper.supplementaryFiles && paper.supplementaryFiles.length > 0}
+							<div class="mt-6">
+								<SupplementaryFiles files={paper.supplementaryFiles} allowDownload={true} />
+							</div>
+						{/if}
+
+						<!-- Tags/Keywords -->
 			{#if paper.keywords && paper.keywords.length > 0}
 				<div class="mt-4 flex flex-wrap gap-2">
 					{#each paper.keywords as keyword}

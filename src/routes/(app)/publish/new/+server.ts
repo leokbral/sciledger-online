@@ -17,7 +17,7 @@ export const POST: RequestHandler = async ({ request }) => {
     await start_mongo(); // Não necessário mais
 
     try {
-        const { paperPictures, content, mainAuthor, correspondingAuthor, title, abstract, keywords, pdfUrl, submittedBy, price, coAuthors, status, authors, hubId, isLinkedToHub, scopusArea, scopusSubArea, scopusClassifications, supplementaryMaterials, paymentAuthorizationCode } =
+        const { paperPictures, content, mainAuthor, correspondingAuthor, title, abstract, keywords, pdfUrl, submittedBy, price, coAuthors, status, authors, hubId, isLinkedToHub, scopusArea, scopusSubArea, scopusClassifications, supplementaryMaterials, supplementaryFiles, paymentAuthorizationCode } =
             await request.json();
         console.log("chamou server")
         console.log(mainAuthor, correspondingAuthor, title, abstract, keywords, pdfUrl, submittedBy)
@@ -29,9 +29,11 @@ export const POST: RequestHandler = async ({ request }) => {
         }
 
         const isStandaloneSubmission = !hubId && !isLinkedToHub;
+        const currentStatus = status || 'draft';
+        const requiresPaymentAuthorization = isStandaloneSubmission && currentStatus !== 'draft';
 
         // Para paper avulso, o bloqueio de pagamento é obrigatório
-        if (isStandaloneSubmission && !paymentAuthorizationCode) {
+        if (requiresPaymentAuthorization && !paymentAuthorizationCode) {
             return json({ error: 'Payment authorization required. Please complete the payment hold step.' }, { status: 403 });
         }
 
@@ -60,7 +62,7 @@ export const POST: RequestHandler = async ({ request }) => {
                 receiptUrl: paymentIntent.charges.data[0]?.receipt_url || null
             };
         } catch (stripeError) {
-            if (isStandaloneSubmission) {
+            if (requiresPaymentAuthorization) {
                 console.error('Stripe verification error:', stripeError);
                 return json({ error: 'Failed to verify payment authorization' }, { status: 400 });
             }
@@ -87,6 +89,7 @@ export const POST: RequestHandler = async ({ request }) => {
             ...(scopusSubArea && { scopusSubArea }),
             ...(scopusClassifications && scopusClassifications.length > 0 && { scopusClassifications }),
             ...(supplementaryMaterials && supplementaryMaterials.length > 0 && { supplementaryMaterials }),
+                        ...(supplementaryFiles && supplementaryFiles.length > 0 && { supplementaryFiles }),
             // Adicionar dados de pagamento
             ...(paymentIntentData && { paymentHold: paymentIntentData }),
             createdAt: new Date(),

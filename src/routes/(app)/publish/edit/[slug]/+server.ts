@@ -51,7 +51,8 @@ export const POST: RequestHandler = async ({ request }) => {
             ...(data.scopusArea && { scopusArea: data.scopusArea }),
             ...(data.scopusSubArea && { scopusSubArea: data.scopusSubArea }),
             ...(data.scopusClassifications && data.scopusClassifications.length > 0 && { scopusClassifications: data.scopusClassifications }),
-            ...(data.supplementaryMaterials && data.supplementaryMaterials.length > 0 && { supplementaryMaterials: data.supplementaryMaterials }),
+            supplementaryMaterials: data.supplementaryMaterials || [],
+            supplementaryFiles: data.supplementaryFiles || [],
             updatedAt: new Date().toISOString()
         };
 

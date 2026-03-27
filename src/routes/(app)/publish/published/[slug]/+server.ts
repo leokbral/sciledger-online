@@ -12,7 +12,7 @@ export const POST: RequestHandler = async ({ request }) => {
     await start_mongo();
 
     try {
-        const { id, mainAuthor, correspondingAuthor, title, abstract, keywords, pdfUrl, submittedBy, price, coAuthors, status, authors, peer_review, selectedReviewers, paperPictures, hubId, hub, supplementaryMaterials  } =
+        const { id, mainAuthor, correspondingAuthor, title, abstract, keywords, pdfUrl, submittedBy, price, coAuthors, status, authors, peer_review, selectedReviewers, paperPictures, hubId, hub, supplementaryMaterials, supplementaryFiles  } =
             await request.json();
 
         // console.log(mainAuthor, correspondingAuthor, title, abstract, keywords, pdfUrl, submittedBy)
@@ -44,7 +44,8 @@ export const POST: RequestHandler = async ({ request }) => {
                 paperPictures,
                 hubId: hubId, // Add this line
                 hub: hub, // Add this line
-                ...(supplementaryMaterials && supplementaryMaterials.length > 0 && { supplementaryMaterials }),
+                supplementaryMaterials: supplementaryMaterials || [],
+                supplementaryFiles: supplementaryFiles || [],
                 updatedAt: new Date().toISOString(),
             },
             { new: true, runValidators: true } // Retorna o documento atualizado e aplica validação
