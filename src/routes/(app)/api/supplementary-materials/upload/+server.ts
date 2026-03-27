@@ -1,6 +1,5 @@
 import { GridFSBucket } from 'mongodb';
 import { db } from '$lib/db/mongo';
-import { Readable } from 'stream';
 import type { RequestHandler } from '@sveltejs/kit';
 import * as crypto from 'crypto';
 import { fsFiles } from '$lib/db/fs';
@@ -40,52 +39,64 @@ async function saveSupplementaryFile(file: File, paperId?: string, uploadedBy?: 
         );
     }
 
-    const fileHash = await getUniqueFileHash(file);
-    const customId = crypto.randomUUID();
+    try {
+        const fileHash = await getUniqueFileHash(file);
+        const customId = crypto.randomUUID();
 
-    // Check if file already exists
-    const dbFile = await fsFiles.findOne({ 'metadata.fileHash': fileHash });
-    console.log('File exists in DB:', dbFile !== null);
+        // Check if file already exists
+        const dbFile = await fsFiles.findOne({ 'metadata.fileHash': fileHash });
+        console.log('File exists in DB:', dbFile !== null);
 
-    if (!dbFile) {
-        const arrayBuffer = await file.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-        const stream = Readable.from(buffer);
+        if (!dbFile) {
+            const arrayBuffer = await file.arrayBuffer();
+            const buffer = Buffer.from(arrayBuffer);
 
-        // Save file to MongoDB using GridFS
-        const uploadStream = bucket.openUploadStream(file.name, {
-            contentType: file.type,
-            metadata: {
+            // Save file to MongoDB using GridFS
+            const uploadStream = bucket.openUploadStream(file.name, {
+                contentType: file.type,
+                metadata: {
+                    id: customId,
+                    fileHash,
+                    lastModified: file.lastModified,
+                    size: file.size,
+                    type: 'supplementary', // Add type to distinguish from images and PDFs
+                    uploadedBy: uploadedBy || null
+                }
+            });
+
+            await new Promise((resolve, reject) => {
+                uploadStream.on('error', (err) => {
+                    console.error('GridFS upload stream error:', err);
+                    reject(new Error(`GridFS upload failed: ${err.message}`));
+                });
+                uploadStream.on('finish', () => {
+                    console.log('File successfully uploaded to GridFS:', file.name);
+                    resolve(null);
+                });
+                uploadStream.end(buffer);
+            });
+
+            return {
                 id: customId,
-                fileHash,
-                lastModified: file.lastModified,
-                size: file.size,
-                type: 'supplementary', // Add type to distinguish from images and PDFs
-                uploadedBy: uploadedBy || null
-            }
-        });
-
-        await new Promise((resolve, reject) => {
-            stream.pipe(uploadStream)
-                .on('error', reject)
-                .on('finish', resolve);
-        });
-
-        return {
-            id: customId,
-            fileId: customId,
-            filename: file.name,
-            fileSize: file.size,
-            mimeType: file.type
-        };
-    } else {
-        return {
-            id: dbFile.metadata.id,
-            fileId: dbFile.metadata.id,
-            filename: file.name,
-            fileSize: file.size,
-            mimeType: file.type
-        };
+                fileId: customId,
+                filename: file.name,
+                fileSize: file.size,
+                mimeType: file.type
+            };
+        } else {
+            console.log('Using existing file from database:', dbFile.filename);
+            return {
+                id: dbFile.metadata.id,
+                fileId: dbFile.metadata.id,
+                filename: file.name,
+                fileSize: file.size,
+                mimeType: file.type
+            };
+        }
+    } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        console.error('saveSupplementaryFile error:', errorMsg);
+        throw err;
     }
 }
 
@@ -110,7 +121,26 @@ export const OPTIONS: RequestHandler = async () => {
 export const POST: RequestHandler = async ({ request }) => {
     console.log('POST request received for supplementary file upload');
     try {
-        const formData = await request.formData();
+        let formData;
+        try {
+            formData = await request.formData();
+        } catch (formErr) {
+            console.error('Failed to parse form data:', formErr);
+            return new Response(
+                JSON.stringify({
+                    message: 'Invalid form data',
+                    error: 'Failed to parse multipart form data'
+                }),
+                {
+                    status: 400,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Access-Control-Allow-Origin': '*'
+                    }
+                }
+            );
+        }
+
         const file = formData.get('file') as File;
         const paperId = formData.get('paperId') as string;
         const uploadedBy = formData.get('uploadedBy') as string;
@@ -118,6 +148,19 @@ export const POST: RequestHandler = async ({ request }) => {
         if (!file) {
             return new Response(
                 JSON.stringify({ message: 'No file uploaded' }),
+                {
+                    status: 400,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Access-Control-Allow-Origin': '*'
+                    }
+                }
+            );
+        }
+
+        if (!file.size) {
+            return new Response(
+                JSON.stringify({ message: 'File is empty' }),
                 {
                     status: 400,
                     headers: {
@@ -180,11 +223,12 @@ export const POST: RequestHandler = async ({ request }) => {
             }
         );
     } catch (err) {
-        console.error('Supplementary file upload failed:', err);
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+        console.error('Supplementary file upload failed:', errorMessage, err);
         return new Response(
             JSON.stringify({
                 message: 'Failed to upload supplementary file',
-                error: (err as Error).message
+                error: errorMessage
             }),
             {
                 status: 500,
