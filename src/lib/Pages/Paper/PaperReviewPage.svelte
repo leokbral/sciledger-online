@@ -13,6 +13,8 @@
 	import { createEventDispatcher } from 'svelte';
 	import ReviewForms from '../Review/ReviewForms.svelte';
 	import CorrectionProgressBar from '$lib/components/CorrectionProgressBar/CorrectionProgressBar.svelte';
+	import SupplementaryMaterials from '$lib/components/SupplementaryMaterials.svelte';
+	import SupplementaryFiles from '$lib/components/SupplementaryFiles.svelte';
 
 	const dispatch = createEventDispatcher();
 
@@ -315,6 +317,18 @@
 					>
 						{@html paper.content}
 					</div>
+
+					{#if paper.supplementaryMaterials && paper.supplementaryMaterials.length > 0}
+						<div class="mt-6">
+							<SupplementaryMaterials materials={paper.supplementaryMaterials} />
+						</div>
+					{/if}
+
+					{#if paper.supplementaryFiles && paper.supplementaryFiles.length > 0}
+						<div class="mt-6">
+							<SupplementaryFiles files={paper.supplementaryFiles} allowDownload={true} />
+						</div>
+					{/if}
 
 					<!-- Tags/Keywords -->
 					{#if paper.keywords && paper.keywords.length > 0}

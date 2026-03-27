@@ -158,6 +158,21 @@ export const PaperSchema: Schema = new Schema({
         description: { type: String }, // Detailed description
         createdAt: { type: Date, default: () => new Date() }, // When it was added
         updatedAt: { type: Date, default: () => new Date() } // Last update
+    }],
+
+    // Supplementary Files - Direct file uploads (up to 10MB each)
+    supplementaryFiles: [{
+        _id: false, // Disable automatic Mongoose _id
+        id: { type: String, required: true }, // Unique ID for this item
+        filename: { type: String, required: true }, // Original filename
+        fileId: { type: String, required: true }, // GridFS file ID
+        title: { type: String, required: true }, // Title for the file
+        description: { type: String }, // File description
+        fileSize: { type: Number, required: true }, // File size in bytes
+        mimeType: { type: String, required: true }, // MIME type (e.g., 'application/pdf')
+        uploadedBy: { type: String, ref: 'User' }, // User who uploaded the file
+        createdAt: { type: Date, default: () => new Date() }, // When it was uploaded
+        updatedAt: { type: Date, default: () => new Date() } // Last update
     }]
 
 }, { collection: 'papers' });

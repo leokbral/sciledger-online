@@ -54,6 +54,8 @@
 			content: '',
 			pdfUrl: '',
 			paperPictures: [], // Alterado de articlePictures para paperPictures
+						supplementaryMaterials: [],
+						supplementaryFiles: [],
 			citations: [], // Lista de citações como UUIDs
 			likes: [], // Lista de usuários que curtiram como UUIDs
 			comments: [], // Lista de comentários como UUIDs
@@ -230,6 +232,136 @@
 		supplementaryMaterials = supplementaryMaterials.filter((_, i) => i !== index);
 		$store.supplementaryMaterials = supplementaryMaterials;
 	}
+		// ========== Material Suplementar - Arquivos ========== //
+		interface SupplementaryFileUpload {
+			id?: string;
+			file?: File;
+			title: string;
+			description?: string;
+			previewUrl?: string;
+			fileId?: string;
+			filename?: string;
+			fileSize?: number;
+			mimeType?: string;
+			isUploading?: boolean;
+			uploadError?: string;
+		}
+
+		const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
+		let supplementaryFiles = $state<SupplementaryFileUpload[]>(
+			inicialValue.supplementaryFiles ? [...inicialValue.supplementaryFiles] : []
+		);
+
+		let pendingSupplementaryFiles = $state<SupplementaryFileUpload[]>([]);
+		let supplementaryUploadError = $state('');
+		let isUploadingSupplementaryFiles = $state(false);
+
+		function getTitleFromFilename(filename: string): string {
+			const lastDotIndex = filename.lastIndexOf('.');
+			if (lastDotIndex <= 0) return filename;
+			return filename.substring(0, lastDotIndex);
+		}
+
+		function handleSupplementaryFileInputChange(event: Event) {
+			const input = event.currentTarget as HTMLInputElement;
+			const files = Array.from(input.files || []);
+			if (files.length === 0) return;
+
+			const validFiles: SupplementaryFileUpload[] = [];
+			let oversizedCount = 0;
+
+			for (const file of files) {
+				if (file.size > MAX_FILE_SIZE) {
+					oversizedCount += 1;
+					continue;
+				}
+
+				validFiles.push({
+					id: crypto.randomUUID(),
+					file,
+					title: getTitleFromFilename(file.name),
+					description: '',
+					filename: file.name,
+					fileSize: file.size,
+					mimeType: file.type || 'application/octet-stream'
+				});
+			}
+
+			if (validFiles.length > 0) {
+				pendingSupplementaryFiles = [...pendingSupplementaryFiles, ...validFiles];
+				supplementaryUploadError = '';
+			}
+
+			if (oversizedCount > 0) {
+				supplementaryUploadError = `${oversizedCount} file(s) were ignored because they exceed 10MB.`;
+			}
+
+			// Allow selecting the same file again if needed
+			input.value = '';
+		}
+
+		function removePendingSupplementaryFile(index: number) {
+			pendingSupplementaryFiles = pendingSupplementaryFiles.filter((_, i) => i !== index);
+		}
+
+		async function uploadPendingSupplementaryFiles() {
+			if (pendingSupplementaryFiles.length === 0) {
+				supplementaryUploadError = 'Please select at least one file.';
+				return;
+			}
+
+			isUploadingSupplementaryFiles = true;
+			supplementaryUploadError = '';
+			const uploadedItems: SupplementaryFileUpload[] = [];
+
+			try {
+				for (const pendingFile of pendingSupplementaryFiles) {
+					if (!pendingFile.file) continue;
+
+					const formData = new FormData();
+					formData.append('file', pendingFile.file);
+					formData.append('uploadedBy', author?.id || '');
+
+					const response = await fetch('/api/supplementary-materials/upload', {
+						method: 'POST',
+						body: formData
+					});
+
+					if (!response.ok) {
+						const errorData = await response.json();
+						throw new Error(`${pendingFile.filename}: ${errorData.message || 'Upload failed'}`);
+					}
+
+					const uploadedData = await response.json();
+
+					uploadedItems.push({
+						id: uploadedData.id || crypto.randomUUID(),
+						fileId: uploadedData.fileId,
+						filename: uploadedData.filename,
+						fileSize: uploadedData.fileSize,
+						mimeType: uploadedData.mimeType,
+						title: pendingFile.title || getTitleFromFilename(uploadedData.filename),
+						description: pendingFile.description
+					});
+				}
+
+				supplementaryFiles = [...supplementaryFiles, ...uploadedItems];
+				// @ts-ignore
+				$store.supplementaryFiles = supplementaryFiles;
+				pendingSupplementaryFiles = [];
+			} catch (error) {
+				supplementaryUploadError = (error as Error).message;
+			} finally {
+				isUploadingSupplementaryFiles = false;
+			}
+		}
+
+		function removeSupplementaryFile(index: number) {
+			supplementaryFiles = supplementaryFiles.filter((_, i) => i !== index);
+			// @ts-ignore
+			$store.supplementaryFiles = supplementaryFiles;
+		}
 
 	let inputAuthor = $state('');
 	let inputAuthorList = $state(
@@ -1674,6 +1806,135 @@
 				{#if page.url.pathname.includes('edit')}
 					<!-- <PapersImages /> AKI MUDAR DEPOIS DA DEFESA -->
 				{/if}
+			</section>
+
+			<!-- Supplementary Files Section -->
+			<section class="w-full bg-white/95 dark:bg-surface-900/95 backdrop-blur-sm border border-surface-200/80 dark:border-surface-700 rounded-2xl p-5 mb-6 shadow-[0_10px_35px_-20px_rgba(0,0,0,0.45)]">
+				<div class="mb-4 pb-4 border-b border-surface-200 dark:border-surface-700">
+					<h3 class="text-xl font-semibold text-surface-900 dark:text-surface-100 tracking-tight">
+						Supplementary Files (max 10MB per file)
+					</h3>
+					<p class="text-sm text-surface-600 dark:text-surface-400 mt-1">
+						Upload any file format up to 10MB. Larger materials should be shared using the supplementary links section above.
+					</p>
+				</div>
+
+				{#if supplementaryFiles.length > 0}
+					<div class="mb-5 space-y-2">
+						<div class="block text-sm font-semibold text-surface-700 dark:text-surface-300 mb-2">
+							Uploaded Files ({supplementaryFiles.length}):
+						</div>
+						<div class="space-y-3">
+							{#each supplementaryFiles as file, index}
+								<div class="bg-gradient-to-r from-surface-50 to-white dark:from-surface-800 dark:to-surface-800/80 border border-surface-200 dark:border-surface-700 rounded-xl p-4 group hover:border-primary-300 dark:hover:border-primary-600 hover:shadow-md transition-all duration-200">
+									<div class="flex justify-between items-start mb-2">
+										<div class="flex-1">
+											<div class="flex items-center gap-2 mb-1">
+												<div class="w-6 h-6 rounded-md border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-900 text-surface-700 dark:text-surface-300 flex items-center justify-center">
+													<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+														<path d="M8 16.5a1 1 0 11-2 0 1 1 0 012 0zM15 7a2 2 0 11-4 0 2 2 0 014 0zM16.824 15.80a2 2 0 00-1.02-1.496c.726-.447 1.596-.481 2.831-.919C19.884 12.846 20 12.469 20 12a2 2 0 00-2-2h-2.172a2 2 0 00-1.414.586l-.828-.828A2.5 2.5 0 0013.586 9H15a1 1 0 100-2h-1.172a2.5 2.5 0 00-1.768.732l-.828-.828A2 2 0 009.172 8H7a2 2 0 00-2 2v4a2 2 0 002 2h5a2 2 0 001.824-1.2z" />
+													</svg>
+												</div>
+												<h4 class="font-semibold text-surface-900 dark:text-surface-100 tracking-tight flex-1 truncate">
+													{file.title}
+												</h4>
+											</div>
+											<div class="text-xs text-surface-500 dark:text-surface-400 mt-1 font-mono">
+												{file.filename} • {(file.fileSize! / 1024 / 1024).toFixed(2)}MB
+											</div>
+											{#if file.description}
+												<p class="text-sm text-surface-600 dark:text-surface-400 mt-2 leading-relaxed">
+													{file.description}
+												</p>
+											{/if}
+										</div>
+										<button
+											type="button"
+											onclick={() => removeSupplementaryFile(index)}
+											class="ml-2 text-error-600 hover:text-error-800 dark:text-error-400 dark:hover:text-error-300 transition-colors flex-shrink-0 p-1 rounded-md hover:bg-error-50 dark:hover:bg-error-900/20"
+											title="Remove file"
+											aria-label="Remove file"
+										>
+											<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+												<path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+											</svg>
+										</button>
+									</div>
+								</div>
+							{/each}
+						</div>
+					</div>
+				{/if}
+
+				<div class="bg-gradient-to-b from-surface-50 to-white dark:from-surface-800 dark:to-surface-900 rounded-xl p-4 border border-surface-200 dark:border-surface-700">
+					<div class="block text-sm font-semibold text-surface-700 dark:text-surface-300 mb-3">
+						Add Files (multiple):
+					</div>
+
+					{#if supplementaryUploadError}
+						<div class="mb-3 p-3 bg-error-50 dark:bg-error-900/20 border border-error-200 dark:border-error-700 rounded-lg text-sm text-error-700 dark:text-error-300">
+							{supplementaryUploadError}
+						</div>
+					{/if}
+
+					<div class="grid grid-cols-1 gap-3">
+						<div class="border-2 border-dashed border-surface-300 dark:border-surface-600 rounded-lg p-6 hover:border-primary-400 dark:hover:border-primary-500 transition-colors">
+							<label for="supplementary-file-input" class="block mb-2 text-sm font-medium text-surface-700 dark:text-surface-300">
+								Select one or more files (any format, max 10MB each)
+							</label>
+							<input
+								id="supplementary-file-input"
+								type="file"
+								onchange={handleSupplementaryFileInputChange}
+								multiple
+								class="block w-full text-sm text-surface-700 dark:text-surface-300 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary-600 file:text-white hover:file:bg-primary-700"
+								disabled={isUploadingSupplementaryFiles}
+							/>
+						</div>
+
+						{#if pendingSupplementaryFiles.length > 0}
+							<div class="p-3 bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-700 rounded-lg">
+								<p class="text-sm font-medium text-primary-700 dark:text-primary-300 mb-2">
+									{pendingSupplementaryFiles.length} file(s) selected and ready for upload
+								</p>
+								<div class="space-y-2 max-h-48 overflow-auto">
+									{#each pendingSupplementaryFiles as pending, index}
+										<div class="flex items-center justify-between gap-2 text-xs bg-white dark:bg-surface-800 border border-primary-200 dark:border-primary-800 rounded-md p-2">
+											<div class="min-w-0">
+												<p class="font-medium text-surface-800 dark:text-surface-200 truncate">{pending.filename}</p>
+												<p class="text-surface-500 dark:text-surface-400">{(pending.fileSize! / 1024 / 1024).toFixed(2)}MB</p>
+											</div>
+											<button
+												type="button"
+												onclick={() => removePendingSupplementaryFile(index)}
+												class="text-error-600 hover:text-error-700 text-xs px-2 py-1 rounded hover:bg-error-50 dark:hover:bg-error-900/20"
+											>
+												Remove
+											</button>
+										</div>
+									{/each}
+								</div>
+							</div>
+						{/if}
+
+						<div class="text-xs text-surface-600 dark:text-surface-400">
+							{#if pendingSupplementaryFiles.length > 0}
+								Ready to upload. Click "Upload Selected Files".
+							{:else}
+								Choose one or more files to enable batch upload.
+							{/if}
+						</div>
+
+						<button
+							type="button"
+							onclick={uploadPendingSupplementaryFiles}
+							disabled={pendingSupplementaryFiles.length === 0 || isUploadingSupplementaryFiles}
+							class="w-full bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 disabled:from-surface-300 disabled:to-surface-300 dark:disabled:from-surface-700 dark:disabled:to-surface-700 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
+						>
+							{isUploadingSupplementaryFiles ? 'Uploading files...' : 'Upload Selected Files'}
+						</button>
+					</div>
+				</div>
 			</section>
 
 			<div class="mt-4">

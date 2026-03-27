@@ -20,11 +20,6 @@
 	async function savePaper( store: any) {
 		console.log(store);
 
-		if (!hubId && !paymentAuthorizationCodeFromUrl) {
-			goto('/publish/payment-hold');
-			return;
-		}
-
 		const paper = {
 			...store,
 			...(hubId && { hubId, isLinkedToHub: true }),

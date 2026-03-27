@@ -111,4 +111,16 @@ export type Paper = {
         createdAt?: Date; // When it was added
         updatedAt?: Date; // Last update
     }>;
+    supplementaryFiles?: Array<{
+        id: string;
+        fileId: string;
+        filename: string;
+        title: string;
+        description?: string;
+        fileSize: number;
+        mimeType: string;
+        uploadedBy?: string;
+        createdAt?: Date;
+        updatedAt?: Date;
+    }>;
 }
