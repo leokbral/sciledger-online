@@ -4,18 +4,40 @@ import { Readable } from 'stream';
 import type { RequestHandler } from '@sveltejs/kit';
 import * as crypto from 'crypto';
 import { fsFiles } from '$lib/db/fs';
+import Papers from '$lib/db/models/Paper';
 
 const bucket = new GridFSBucket(db);
 
-// Maximum file size: 10MB
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
+// Maximum total size for all supplementary files: 10MB
+const MAX_TOTAL_SIZE = 10 * 1024 * 1024; // 10MB in bytes
 
-async function saveSupplementaryFile(file: File, uploadedBy?: string) {
+async function saveSupplementaryFile(file: File, paperId?: string, uploadedBy?: string) {
     console.log('Saving supplementary file:', file.name, file.size, file.type);
 
-    // Validate file size
-    if (file.size > MAX_FILE_SIZE) {
-        throw new Error(`File size exceeds maximum allowed size of 10MB. Current size: ${(file.size / 1024 / 1024).toFixed(2)}MB`);
+    // Calculate total size of existing supplementary files
+    let totalExistingSize = 0;
+    if (paperId) {
+        try {
+            const paper = await Papers.findById(paperId);
+            if (paper && paper.supplementaryFiles) {
+                totalExistingSize = paper.supplementaryFiles.reduce((sum: number, f: any) => sum + (f.fileSize || 0), 0);
+            }
+        } catch (err) {
+            console.error('Error fetching paper:', err);
+        }
+    }
+
+    const newTotalSize = totalExistingSize + file.size;
+
+    // Validate total size
+    if (newTotalSize > MAX_TOTAL_SIZE) {
+        const remainingSpace = MAX_TOTAL_SIZE - totalExistingSize;
+        throw new Error(
+            `Total size of supplementary files exceeds 10MB limit. ` +
+            `Current total: ${(totalExistingSize / 1024 / 1024).toFixed(2)}MB, ` +
+            `Available space: ${(remainingSpace / 1024 / 1024).toFixed(2)}MB, ` +
+            `File size: ${(file.size / 1024 / 1024).toFixed(2)}MB`
+        );
     }
 
     const fileHash = await getUniqueFileHash(file);
@@ -90,6 +112,7 @@ export const POST: RequestHandler = async ({ request }) => {
     try {
         const formData = await request.formData();
         const file = formData.get('file') as File;
+        const paperId = formData.get('paperId') as string;
         const uploadedBy = formData.get('uploadedBy') as string;
 
         if (!file) {
@@ -105,13 +128,31 @@ export const POST: RequestHandler = async ({ request }) => {
             );
         }
 
-        // Validate file size
-        if (file.size > MAX_FILE_SIZE) {
+        // Calculate available space
+        let totalExistingSize = 0;
+        if (paperId) {
+            try {
+                const paper = await Papers.findById(paperId);
+                if (paper && paper.supplementaryFiles) {
+                    totalExistingSize = paper.supplementaryFiles.reduce((sum: number, f: any) => sum + (f.fileSize || 0), 0);
+                }
+            } catch (err) {
+                console.error('Error fetching paper:', err);
+            }
+        }
+
+        const newTotalSize = totalExistingSize + file.size;
+
+        // Validate total size
+        if (newTotalSize > MAX_TOTAL_SIZE) {
+            const remainingSpace = MAX_TOTAL_SIZE - totalExistingSize;
             return new Response(
                 JSON.stringify({
-                    message: 'File size exceeds maximum allowed size of 10MB',
-                    maxSize: MAX_FILE_SIZE,
-                    currentSize: file.size
+                    message: 'Total supplementary files size would exceed 10MB limit',
+                    maxTotalSize: MAX_TOTAL_SIZE,
+                    currentTotalSize: totalExistingSize,
+                    fileSize: file.size,
+                    remainingSpace: remainingSpace
                 }),
                 {
                     status: 413, // Payload Too Large
@@ -123,7 +164,7 @@ export const POST: RequestHandler = async ({ request }) => {
             );
         }
 
-        const result = await saveSupplementaryFile(file, uploadedBy);
+        const result = await saveSupplementaryFile(file, paperId, uploadedBy);
 
         return new Response(
             JSON.stringify({

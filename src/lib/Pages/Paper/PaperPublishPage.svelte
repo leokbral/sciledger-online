@@ -247,7 +247,7 @@
 			uploadError?: string;
 		}
 
-		const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+		const MAX_TOTAL_SIZE = 10 * 1024 * 1024; // 10MB total for all supplementary files
 
 		let supplementaryFiles = $state<SupplementaryFileUpload[]>(
 			inicialValue.supplementaryFiles ? [...inicialValue.supplementaryFiles] : []
@@ -256,6 +256,24 @@
 		let pendingSupplementaryFiles = $state<SupplementaryFileUpload[]>([]);
 		let supplementaryUploadError = $state('');
 		let isUploadingSupplementaryFiles = $state(false);
+
+		// Calculate current total size of uploaded files
+		const getCurrentUsedSize = () => {
+			return supplementaryFiles.reduce((sum, f) => sum + (f.fileSize || 0), 0);
+		};
+
+		const getAvailableSpace = () => {
+			const usedSize = getCurrentUsedSize();
+			return MAX_TOTAL_SIZE - usedSize;
+		};
+
+		const getFormattedSize = (bytes: number) => {
+			if (bytes === 0) return '0 B';
+			const k = 1024;
+			const sizes = ['B', 'KB', 'MB'];
+			const i = Math.floor(Math.log(bytes) / Math.log(k));
+			return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+		};
 
 		function getTitleFromFilename(filename: string): string {
 			const lastDotIndex = filename.lastIndexOf('.');
@@ -270,9 +288,10 @@
 
 			const validFiles: SupplementaryFileUpload[] = [];
 			let oversizedCount = 0;
+			const availableSpace = getAvailableSpace();
 
 			for (const file of files) {
-				if (file.size > MAX_FILE_SIZE) {
+				if (file.size > availableSpace) {
 					oversizedCount += 1;
 					continue;
 				}
@@ -294,7 +313,8 @@
 			}
 
 			if (oversizedCount > 0) {
-				supplementaryUploadError = `${oversizedCount} file(s) were ignored because they exceed 10MB.`;
+				const usedSize = getCurrentUsedSize();
+				supplementaryUploadError = `${oversizedCount} file(s) were ignored because they exceed available space. Used: ${getFormattedSize(usedSize)} / 10 MB.`;
 			}
 
 			// Allow selecting the same file again if needed
@@ -321,6 +341,7 @@
 
 					const formData = new FormData();
 					formData.append('file', pendingFile.file);
+					formData.append('paperId', inicialValue.id || '');
 					formData.append('uploadedBy', author?.id || '');
 
 					const response = await fetch('/api/supplementary-materials/upload', {
@@ -1868,7 +1889,7 @@
 
 				<div class="bg-gradient-to-b from-surface-50 to-white dark:from-surface-800 dark:to-surface-900 rounded-xl p-4 border border-surface-200 dark:border-surface-700">
 					<div class="block text-sm font-semibold text-surface-700 dark:text-surface-300 mb-3">
-						Add Files (multiple):
+						Add Supplementary Files
 					</div>
 
 					{#if supplementaryUploadError}
@@ -1877,10 +1898,29 @@
 						</div>
 					{/if}
 
+					<!-- Storage Usage Indicator -->
+					<div class="mb-4 p-3 bg-surface-100 dark:bg-surface-800 rounded-lg">
+						<div class="flex items-center justify-between mb-2">
+							<span class="text-xs font-medium text-surface-600 dark:text-surface-400">Total Storage Used</span>
+							<span class="text-xs font-semibold text-surface-700 dark:text-surface-300">
+								{getFormattedSize(getCurrentUsedSize())} / 10 MB
+							</span>
+						</div>
+						<div class="w-full bg-surface-200 dark:bg-surface-700 rounded-full h-2">
+							<div 
+								class="bg-gradient-to-r from-primary-500 to-primary-600 h-2 rounded-full transition-all duration-300"
+								style="width: {(getCurrentUsedSize() / MAX_TOTAL_SIZE) * 100}%"
+							></div>
+						</div>
+						<p class="text-xs text-surface-500 dark:text-surface-400 mt-2">
+							Available space: {getFormattedSize(getAvailableSpace())}
+						</p>
+					</div>
+
 					<div class="grid grid-cols-1 gap-3">
 						<div class="border-2 border-dashed border-surface-300 dark:border-surface-600 rounded-lg p-6 hover:border-primary-400 dark:hover:border-primary-500 transition-colors">
 							<label for="supplementary-file-input" class="block mb-2 text-sm font-medium text-surface-700 dark:text-surface-300">
-								Select one or more files (any format, max 10MB each)
+								Select one or more files (any format, max {getFormattedSize(getAvailableSpace())})
 							</label>
 							<input
 								id="supplementary-file-input"
@@ -1888,7 +1928,7 @@
 								onchange={handleSupplementaryFileInputChange}
 								multiple
 								class="block w-full text-sm text-surface-700 dark:text-surface-300 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary-600 file:text-white hover:file:bg-primary-700"
-								disabled={isUploadingSupplementaryFiles}
+								disabled={isUploadingSupplementaryFiles || getAvailableSpace() <= 0}
 							/>
 						</div>
 
