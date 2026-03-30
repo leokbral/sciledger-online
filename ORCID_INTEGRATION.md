@@ -13,9 +13,11 @@ Adicione no arquivo `.env`:
 ORCID_CLIENT_ID=seu_client_id_aqui
 ORCID_CLIENT_SECRET=seu_client_secret_aqui
 ORCID_REDIRECT_URI=http://localhost:5173/orcid/callback
+ORCID_SANDBOX=true
 
 # Para produção, use:
 # ORCID_REDIRECT_URI=https://seudominio.com/orcid/callback
+# ORCID_SANDBOX=false
 ```
 
 ### 2. Obter Credenciais ORCID
@@ -32,9 +34,9 @@ ORCID_REDIRECT_URI=http://localhost:5173/orcid/callback
 3. Configure a redirect URI: `https://seudominio.com/orcid/callback`
 4. Copie o `Client ID` e `Client Secret`
 
-**IMPORTANTE**: Para usar produção, altere as URLs em:
-- [/orcid/redirect/+server.ts](src/routes/orcid/redirect/+server.ts) linha 27: `https://orcid.org/oauth/authorize`
-- [/orcid/callback/+server.ts](src/routes/orcid/callback/+server.ts) linha 49: `https://orcid.org/oauth/token`
+**IMPORTANTE**: O ambiente ORCID agora é controlado por `ORCID_SANDBOX`:
+- `ORCID_SANDBOX=true` usa sandbox (`sandbox.orcid.org` e `pub.sandbox.orcid.org`)
+- `ORCID_SANDBOX=false` usa produção (`orcid.org` e `pub.orcid.org`)
 
 ## 🚀 Como Usar
 
@@ -184,7 +186,7 @@ Se houver erro, o usuário é redirecionado para `/login?error=codigo_erro`:
 
 ### Modo Produção:
 
-1. Altere URLs nas rotas (conforme documentado acima)
+1. Configure `ORCID_SANDBOX=false`
 2. Configure `.env` com credenciais produção
 3. Teste com conta ORCID real
 

@@ -1,12 +1,24 @@
 import Stripe from 'stripe';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { env } from '$env/dynamic/private';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
-  apiVersion: '2026-02-25.preview'
-});
+function getStripe() {
+  const stripeSecretKey = env.STRIPE_SECRET_KEY;
+  if (!stripeSecretKey) {
+    return null;
+  }
+  return new Stripe(stripeSecretKey, {
+    apiVersion: '2026-02-25.preview'
+  });
+}
 
 export const POST: RequestHandler = async ({ request }) => {
+  const stripe = getStripe();
+  if (!stripe) {
+    return json({ error: 'Stripe not configured' }, { status: 500 });
+  }
+
   const body = await request.json();
   const priceId = body?.priceId as string | undefined;
   const quantity = typeof body?.quantity === 'number' ? body.quantity : 1;
