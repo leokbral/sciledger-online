@@ -1,6 +1,6 @@
 import type { RequestHandler } from './$types';
 import { redirect } from '@sveltejs/kit';
-import { ORCID_CLIENT_ID, ORCID_REDIRECT_URI } from '$env/static/private';
+import { ORCID_CLIENT_ID, ORCID_REDIRECT_URI, ORCID_SANDBOX } from '$env/static/private';
 
 /**
  * Rota para iniciar o fluxo OAuth 2.0 com ORCID
@@ -17,8 +17,6 @@ import { ORCID_CLIENT_ID, ORCID_REDIRECT_URI } from '$env/static/private';
  */
 export const GET: RequestHandler = async () => {
 	console.log('🔵 ORCID Redirect - Starting...');
-	console.log('CLIENT_ID:', ORCID_CLIENT_ID);
-	console.log('REDIRECT_URI:', ORCID_REDIRECT_URI);
 	
 	// Valida que as variáveis de ambiente estão configuradas
 	if (!ORCID_CLIENT_ID || !ORCID_REDIRECT_URI) {
@@ -26,8 +24,10 @@ export const GET: RequestHandler = async () => {
 		throw redirect(302, '/login?error=orcid_config_error');
 	}
 
-	// URL de autorização do ORCID - PRODUÇÃO
-	const ORCID_AUTH_URL = 'https://orcid.org/oauth/authorize';
+	const useSandbox = ORCID_SANDBOX === 'true';
+	const ORCID_AUTH_URL = useSandbox
+		? 'https://sandbox.orcid.org/oauth/authorize'
+		: 'https://orcid.org/oauth/authorize';
 
 	// Parâmetros necessários para OAuth 2.0
 	const params = new URLSearchParams({
@@ -39,7 +39,7 @@ export const GET: RequestHandler = async () => {
 
 	// Redireciona para página de autorização do ORCID
 	const authUrl = `${ORCID_AUTH_URL}?${params.toString()}`;
-	console.log('✅ Redirecting to:', authUrl);
+	console.log('✅ Redirecting to ORCID', { useSandbox });
 	
 	throw redirect(302, authUrl);
 };

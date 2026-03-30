@@ -1,10 +1,39 @@
 import type { RequestHandler } from './$types';
-import { redirect } from '@sveltejs/kit';
-import { ORCID_CLIENT_ID, ORCID_CLIENT_SECRET, ORCID_REDIRECT_URI } from '$env/static/private';
+import { isRedirect, redirect } from '@sveltejs/kit';
+import { ORCID_CLIENT_ID, ORCID_CLIENT_SECRET, ORCID_REDIRECT_URI, ORCID_SANDBOX } from '$env/static/private';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import Users from '$lib/db/models/User';
 import { respond } from '../../(auth)/_respond';
 import * as crypto from 'crypto';
+
+/**
+ * Verifica se o perfil do usuário está completo
+ * Retorna true se todos os dados essenciais foram preenchidos
+ */
+function isProfileComplete(user: any): boolean {
+	return !!(
+		user.firstName &&
+		user.firstName !== 'User' &&
+		user.lastName &&
+		user.lastName !== 'ORCID' &&
+		user.email &&
+		!user.email.includes('@orcid.placeholder')
+	);
+}
+
+/**
+ * Faz login e redireciona para a página correta
+ */
+function loginAndRedirect(user: any): Response {
+	const response = respond({ user });
+	const redirectPath = isProfileComplete(user) ? '/' : '/complete-profile';
+	response.headers.set('Location', redirectPath);
+
+	return new Response(null, {
+		status: 302,
+		headers: response.headers
+	});
+}
 
 /**
  * Rota de callback OAuth 2.0 do ORCID
@@ -52,12 +81,15 @@ export const GET: RequestHandler = async ({ url }) => {
 		}
 		
 		console.log('✅ All validations passed, exchanging code for token...');
+		const useSandbox = ORCID_SANDBOX === 'true';
 
 		// ====================================================================
 		// ETAPA 1: Trocar authorization_code por access_token
 		// ====================================================================
 		
-		const ORCID_TOKEN_URL = 'https://orcid.org/oauth/token';
+		const ORCID_TOKEN_URL = useSandbox
+			? 'https://sandbox.orcid.org/oauth/token'
+			: 'https://orcid.org/oauth/token';
 		
 		const tokenParams = new URLSearchParams({
 			client_id: ORCID_CLIENT_ID,
@@ -101,8 +133,8 @@ export const GET: RequestHandler = async ({ url }) => {
 		// ETAPA 2: Buscar informações detalhadas do usuário no ORCID
 		// ====================================================================
 		
-		// Busca dados públicos do perfil ORCID - PRODUÇÃO
-		const ORCID_API_URL = `https://pub.orcid.org/v3.0/${orcid}/person`;
+		const ORCID_API_BASE = useSandbox ? 'https://pub.sandbox.orcid.org/v3.0' : 'https://pub.orcid.org/v3.0';
+		const ORCID_API_URL = `${ORCID_API_BASE}/${orcid}/person`;
 		
 		console.log('📡 Fetching ORCID profile:', ORCID_API_URL);
 		
@@ -171,14 +203,8 @@ export const GET: RequestHandler = async ({ url }) => {
 			
 			console.log('✅ Tokens updated, logging in and redirecting');
 
-			// Faz login usando sistema atual (define cookie) e redireciona
-			const response = respond({ user });
-			response.headers.set('Location', '/');
-			
-			return new Response(null, {
-				status: 302,
-				headers: response.headers
-			});
+			// Faz login e redireciona para home ou complete-profile
+			return loginAndRedirect(user);
 		}
 
 		// 3.2: Se tem email, buscar por email
@@ -200,14 +226,8 @@ export const GET: RequestHandler = async ({ url }) => {
 				
 				console.log('✅ ORCID associated, logging in and redirecting');
 
-				// Faz login usando sistema atual (define cookie) e redireciona
-				const response = respond({ user });
-				response.headers.set('Location', '/');
-				
-				return new Response(null, {
-					status: 302,
-					headers: response.headers
-				});
+				// Faz login e redireciona para home ou complete-profile
+				return loginAndRedirect(user);
 			}
 		}
 
@@ -217,7 +237,7 @@ export const GET: RequestHandler = async ({ url }) => {
 
 		console.log('🆕 Creating new user from ORCID');
 
-		// Se não tem email do ORCID, usa email placeholder (usuário pode atualizar depois)
+		// Se não tem email do ORCID, usa email placeholder determinístico
 		const userEmail = email || `${orcid}@orcid.placeholder`;
 
 		console.log('Email:', userEmail);
@@ -242,6 +262,18 @@ export const GET: RequestHandler = async ({ url }) => {
 
 		const userId = crypto.randomUUID();
 
+		// Evita conflito com conta antiga que por acaso já tenha o placeholder
+		const existingPlaceholderUser = await Users.findOne({ email: userEmail });
+		if (existingPlaceholderUser) {
+			existingPlaceholderUser.orcid = orcid;
+			existingPlaceholderUser.orcidAccessToken = access_token;
+			existingPlaceholderUser.orcidRefreshToken = refresh_token;
+			existingPlaceholderUser.orcidTokenExpiry = new Date(Date.now() + expires_in * 1000);
+			await existingPlaceholderUser.save();
+
+			return loginAndRedirect(existingPlaceholderUser);
+		}
+
 		// Cria novo usuário
 		const newUser = new Users({
 			_id: userId,
@@ -265,24 +297,16 @@ export const GET: RequestHandler = async ({ url }) => {
 		await newUser.save();
 
 		console.log('✅ New user created successfully:', newUser.id);
-		console.log('✅ User logged in via respond, redirecting to home');
+		console.log('✅ User logged in, redirecting to profile completion or home');
 
-		// Faz login usando sistema atual (define cookie)
-		const response = respond({ user: newUser });
-		
-		// Adiciona header de redirect
-		response.headers.set('Location', '/');
-		
-		return new Response(null, {
-			status: 302,
-			headers: response.headers
-		});
+		// Faz login e redireciona para complete-profile (já que dados podem estar incompletos)
+		return loginAndRedirect(newUser);
 
 	} catch (error) {
 		console.error('❌ ORCID callback error:', error);
 		
 		// Se for um redirect, propaga
-		if (error instanceof Response) {
+		if (isRedirect(error)) {
 			throw error;
 		}
 		

@@ -20,6 +20,7 @@ export const UserSchema: Schema = new Schema({
     orcidAccessToken: { type: String }, // ORCID access token
     orcidRefreshToken: { type: String }, // ORCID refresh token
     orcidTokenExpiry: { type: Date }, // ORCID token expiry date
+    profileCompletedAt: { type: Date }, // When user completed their profile (especially after ORCID login)
     darkMode: { type: Boolean, default: false }, // Dark mode
     roles: { // User roles definition
         author: { type: Boolean, default: true },
