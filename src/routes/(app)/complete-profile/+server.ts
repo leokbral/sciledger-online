@@ -3,6 +3,18 @@ import { json } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import Users from '$lib/db/models/User';
 
+function getUserIdFromAuth(localsUser: any, jwtCookie?: string): string | null {
+	if (localsUser?.id) return String(localsUser.id);
+
+	if (!jwtCookie) return null;
+
+	try {
+		const decoded = JSON.parse(Buffer.from(jwtCookie, 'base64').toString());
+		return decoded?.user?.id || decoded?.user?._id || decoded?.id || decoded?.sub || null;
+	} catch {
+		return null;
+	}
+}
 interface CompleteProfileRequest {
 	firstName: string;
 	lastName: string;
@@ -11,7 +23,7 @@ interface CompleteProfileRequest {
 	dob?: string;
 }
 
-export const POST: RequestHandler = async ({ request, cookies }) => {
+export const POST: RequestHandler = async ({ request, cookies, locals }) => {
 	try {
 		await start_mongo();
 
@@ -28,23 +40,9 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 			);
 		}
 
-		// Pega o userId do cookie/session
-		const sessionCookie = cookies.get('session');
-		if (!sessionCookie) {
-			return json(
-				{
-					success: false,
-					message: 'Sessão expirada. Faça login novamente.'
-				},
-				{ status: 401 }
-			);
-		}
-
-		// Decodifica o JWT ou get user ID (depende da implementação)
-		// Aqui vou assumir que você tem um middleware que extrai o user
-		// Se não tiver, você pode extrair do JWT do cookie
-		const userPayload = JSON.parse(Buffer.from(sessionCookie.split('.')[1], 'base64').toString());
-		const userId = userPayload.id || userPayload.sub;
+<<<<<<< HEAD
+		const jwtCookie = cookies.get('jwt');
+		const userId = getUserIdFromAuth(locals.user, jwtCookie);
 
 		if (!userId) {
 			return json(
