@@ -1,6 +1,7 @@
 import type { RequestHandler } from './$types';
 import { isRedirect, redirect } from '@sveltejs/kit';
-import { ORCID_CLIENT_ID, ORCID_CLIENT_SECRET, ORCID_REDIRECT_URI, ORCID_SANDBOX } from '$env/static/private';
+import { ORCID_CLIENT_ID, ORCID_CLIENT_SECRET, ORCID_REDIRECT_URI } from '$env/static/private';
+import { env } from '$env/dynamic/private';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import Users from '$lib/db/models/User';
 import { respond } from '../../(auth)/_respond';
@@ -81,7 +82,7 @@ export const GET: RequestHandler = async ({ url }) => {
 		}
 		
 		console.log('✅ All validations passed, exchanging code for token...');
-		const useSandbox = ORCID_SANDBOX === 'true';
+		const useSandbox = env.ORCID_SANDBOX === 'true';
 
 		// ====================================================================
 		// ETAPA 1: Trocar authorization_code por access_token

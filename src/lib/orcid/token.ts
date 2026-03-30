@@ -1,12 +1,13 @@
 // src/lib/orcid/token.ts
-import { ORCID_CLIENT_ID, ORCID_CLIENT_SECRET, ORCID_SANDBOX } from '$env/static/private';
+import { ORCID_CLIENT_ID, ORCID_CLIENT_SECRET } from '$env/static/private';
+import { env } from '$env/dynamic/private';
 
 export async function getOrcidToken() {
     if (!ORCID_CLIENT_ID || !ORCID_CLIENT_SECRET) {
         throw new Error('Missing ORCID credentials');
     }
 
-    const tokenUrl = ORCID_SANDBOX === 'true'
+    const tokenUrl = env.ORCID_SANDBOX === 'true'
         ? 'https://sandbox.orcid.org/oauth/token'
         : 'https://orcid.org/oauth/token';
 
