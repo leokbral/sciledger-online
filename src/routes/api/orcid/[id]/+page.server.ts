@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import { ORCID_SANDBOX } from '$env/static/private';
+import { env } from '$env/dynamic/private';
 
 export async function load({ params }) {
     const orcidId = params.id;
@@ -9,7 +9,7 @@ export async function load({ params }) {
     
     try {
         // Exemplo de busca de dados do ORCID
-        const apiBase = ORCID_SANDBOX === 'true' ? 'https://pub.sandbox.orcid.org/v3.0' : 'https://pub.orcid.org/v3.0';
+        const apiBase = env.ORCID_SANDBOX === 'true' ? 'https://pub.sandbox.orcid.org/v3.0' : 'https://pub.orcid.org/v3.0';
         const response = await fetch(`${apiBase}/${orcidId}/record`, {
             headers: {
                 'Accept': 'application/json'

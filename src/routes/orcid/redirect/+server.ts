@@ -1,6 +1,7 @@
 import type { RequestHandler } from './$types';
 import { redirect } from '@sveltejs/kit';
-import { ORCID_CLIENT_ID, ORCID_REDIRECT_URI, ORCID_SANDBOX } from '$env/static/private';
+import { ORCID_CLIENT_ID, ORCID_REDIRECT_URI } from '$env/static/private';
+import { env } from '$env/dynamic/private';
 
 /**
  * Rota para iniciar o fluxo OAuth 2.0 com ORCID
@@ -24,7 +25,7 @@ export const GET: RequestHandler = async () => {
 		throw redirect(302, '/login?error=orcid_config_error');
 	}
 
-	const useSandbox = ORCID_SANDBOX === 'true';
+	const useSandbox = env.ORCID_SANDBOX === 'true';
 	const ORCID_AUTH_URL = useSandbox
 		? 'https://sandbox.orcid.org/oauth/authorize'
 		: 'https://orcid.org/oauth/authorize';

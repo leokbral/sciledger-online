@@ -40,7 +40,6 @@ export const POST: RequestHandler = async ({ request, cookies, locals }) => {
 			);
 		}
 
-<<<<<<< HEAD
 		const jwtCookie = cookies.get('jwt');
 		const userId = getUserIdFromAuth(locals.user, jwtCookie);
 

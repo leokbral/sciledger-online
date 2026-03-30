@@ -1,7 +1,7 @@
 // src/routes/api/orcid/[id]/+server.ts
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { ORCID_SANDBOX } from '$env/static/private';
+import { env } from '$env/dynamic/private';
 
 export const GET: RequestHandler = async ({ params, fetch }) => {
     const orcidId = params.id;
@@ -18,7 +18,7 @@ export const GET: RequestHandler = async ({ params, fetch }) => {
 
     try {
         // ORCID Public API endpoint
-        const apiBase = ORCID_SANDBOX === 'true' ? 'https://pub.sandbox.orcid.org/v3.0' : 'https://pub.orcid.org/v3.0';
+        const apiBase = env.ORCID_SANDBOX === 'true' ? 'https://pub.sandbox.orcid.org/v3.0' : 'https://pub.orcid.org/v3.0';
         const orcidApiUrl = `${apiBase}/${orcidId}`;
         
         const response = await fetch(orcidApiUrl, {
