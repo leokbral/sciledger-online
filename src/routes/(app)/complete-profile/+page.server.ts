@@ -3,28 +3,24 @@ import { redirect } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import Users from '$lib/db/models/User';
 
+function getUserIdFromAuth(localsUser: any, jwtCookie?: string): string | null {
+	if (localsUser?.id) return String(localsUser.id);
+
+	if (!jwtCookie) return null;
+
+	try {
+		const decoded = JSON.parse(Buffer.from(jwtCookie, 'base64').toString());
+		return decoded?.user?.id || decoded?.user?._id || decoded?.id || decoded?.sub || null;
+	} catch {
+		return null;
+	}
+}
 export const load: PageServerLoad = async ({ locals, cookies }) => {
 	try {
 		await start_mongo();
 
-		// Pega o userId da sessão/locals
-		// Isso depende de como você implementou a autenticação
-		// Se usar JWT no cookie:
-		const sessionCookie = cookies.get('session');
-		if (!sessionCookie) {
-			throw redirect(302, '/login');
-		}
-
-		// Decodifica o JWT (adapte conforme sua implementação)
-		let userId: string | null = null;
-		try {
-			const userPayload = JSON.parse(
-				Buffer.from(sessionCookie.split('.')[1], 'base64').toString()
-			);
-			userId = userPayload.id || userPayload.sub;
-		} catch {
-			throw redirect(302, '/login');
-		}
+		const jwtCookie = cookies.get('jwt');
+		const userId = getUserIdFromAuth(locals.user, jwtCookie);
 
 		if (!userId) {
 			throw redirect(302, '/login');
