@@ -155,7 +155,7 @@
 							<p class="opacity-50">{user.username}</p>
 						</div>
 					</div>
-					<p>{user.position} at {user.institution}</p>
+					<p>{user?.position || 'No position'} at {user?.institution || 'No institution'}</p>
 					<div class="flex gap-4">
 						<small
 							><strong>{user?.following.length || 0}</strong>

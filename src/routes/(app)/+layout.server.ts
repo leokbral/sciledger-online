@@ -1,4 +1,5 @@
 import Notifications, { type INotification } from '$lib/db/models/Notification'; 
+import Users from '$lib/db/models/User';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import type { LayoutServerLoad } from './$types';
 import type { Notification } from '$lib/types/Notification'; // ajuste se necessário
@@ -6,13 +7,30 @@ import type { Notification } from '$lib/types/Notification'; // ajuste se necess
 await start_mongo();
 
 export const load: LayoutServerLoad = async ({ locals }) => {
-	const user = locals.user;
+	const sessionUser = locals.user;
 
-	if (!user) {
+	if (!sessionUser) {
 		return {
-			user: user,
+			user: sessionUser,
 			notifications: []
 		};
+	}
+
+	let user = sessionUser;
+	try {
+		const freshUser = await Users.findOne({ id: sessionUser.id })
+			.select('-password -refreshToken -resetPasswordToken -resetPasswordExpiry -orcidAccessToken -orcidRefreshToken')
+			.lean();
+
+		if (freshUser) {
+			user = {
+				...sessionUser,
+				...freshUser,
+				id: freshUser.id || sessionUser.id
+			};
+		}
+	} catch (error) {
+		console.error('Erro ao sincronizar usuário do banco no layout:', error);
 	}
 
 	let notifications: Notification[] = [];
