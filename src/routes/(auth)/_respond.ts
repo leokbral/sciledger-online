@@ -19,6 +19,8 @@ export function respond(body: any) {
 			roles: body.user.roles,
 			profilePictureUrl: body.user.profilePictureUrl,
 			bio: body.user.bio,
+			position: body.user.position,
+			institution: body.user.institution,
 			orcid: body.user.orcid
 		};
 		

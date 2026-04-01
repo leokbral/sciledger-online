@@ -120,7 +120,9 @@ export const PUT: RequestHandler = async ({ request, locals, params }) => {
 				lastName: updatedUser.lastName,
 				roles: updatedUser.roles,
 				profilePictureUrl: updatedUser.profilePictureUrl,
-				bio: updatedUser.bio
+				bio: updatedUser.bio,
+				position: updatedUser.position,
+				institution: updatedUser.institution
 			},
 			token: locals.token,
 			refreshToken: locals.refreshToken
