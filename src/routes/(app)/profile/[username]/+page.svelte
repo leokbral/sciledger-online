@@ -64,6 +64,17 @@
 
 	let maxBioLength = 1000;
 
+	const actionButtonBase =
+		'inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold tracking-wide transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2';
+	const editButtonClass =
+		`${actionButtonBase} bg-gradient-to-r from-primary-600 to-primary-500 text-white shadow-[0_10px_25px_-12px_rgba(37,99,235,0.9)] hover:from-primary-500 hover:to-primary-400 hover:-translate-y-0.5 focus-visible:ring-primary-500`;
+	const saveButtonClass =
+		`${actionButtonBase} btn preset-filled-primary-500 border-0 hover:-translate-y-0.5 focus-visible:ring-primary-500`;
+	const cancelButtonClass =
+		`${actionButtonBase} bg-white text-surface-700 border border-surface-300 hover:bg-surface-100 hover:text-surface-900 hover:-translate-y-0.5 focus-visible:ring-surface-400`;
+	const dangerButtonClass =
+		`${actionButtonBase} bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 hover:text-rose-800 focus-visible:ring-rose-400 disabled:opacity-60 disabled:cursor-not-allowed`;
+
 	// Tabs configuration
 	let tabs = [
 		{ name: 'Publications', icon: 'material-symbols-light:draft-outline-rounded' },
@@ -216,28 +227,32 @@
 <section class="flex items-center justify-center min-h-screen bg-gray-100">
 	<div class="p-6 mx-32 bg-white rounded-sm shadow-lg max-w-3xl w-full">
 		<!-- Edit Button -->
-		<div class="mt-4 flex justify-end">
+		<div class="mt-4 flex justify-end items-center gap-2 flex-wrap">
 			{#if isEditing}
 				{#if profilePictureUrl}
 					<button
-						class="bg-gray-700 text-white p-2 rounded-full mr-2"
+						class={dangerButtonClass}
 						onclick={removeProfilePicture}
 						disabled={isUploadingProfilePicture}
 					>
+						<Icon icon="material-symbols:delete-outline-rounded" class="text-base" />
 						Remove photo
 					</button>
 				{/if}
-				<button class="bg-red-500 text-white p-2 rounded-full mr-2" onclick={toggleEdit}>
+				<button class={cancelButtonClass} onclick={toggleEdit}>
+					<Icon icon="material-symbols:close-rounded" class="text-base" />
 					Cancel
 				</button>
-				<button class="bg-green-500 text-white p-2 rounded-full" onclick={saveProfile}>
+				<button class={saveButtonClass} onclick={saveProfile}>
+					<Icon icon="material-symbols:check-rounded" class="text-base" />
 					Save
 				</button>
 			{:else if user?.id === data.loggedUser.id}
 				<button
-					class="bg-blue-500 text-white p-2 rounded-full flex items-center"
+					class={editButtonClass}
 					onclick={toggleEdit}
 				>
+					<Icon icon="material-symbols:edit-outline-rounded" class="text-base" />
 					Edit profile
 				</button>
 			{/if}
