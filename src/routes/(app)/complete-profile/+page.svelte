@@ -38,15 +38,15 @@
 			});
 
 			if (response.success) {
-				formSuccess = 'Perfil atualizado com sucesso!';
+				formSuccess = 'Profile updated successfully!';
 				setTimeout(() => {
 					goto('/');
 				}, 1000);
 			} else {
-				formWarning = response.message || 'Erro ao atualizar perfil';
+				formWarning = response.message || 'Error updating profile';
 			}
 		} catch (error) {
-			formWarning = 'Erro ao enviar formulário. Tente novamente.';
+			formWarning = 'Error submitting form. Please try again.';
 			console.error(error);
 		} finally {
 			isLoading = false;
@@ -58,16 +58,16 @@
 	<div class="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8">
 		<img src="/favicon.png" alt="Logo" width="64px" height="60px" class="mb-6" />
 
-		<h1 class="text-3xl font-bold mb-2 text-surface-900">Complete seu Perfil</h1>
+		<h1 class="text-3xl font-bold mb-2 text-surface-900">Complete Your Profile</h1>
 		<p class="text-surface-600 mb-6">
-			Encontramos alguns dados faltando. Por favor, preencha as informações abaixo.
+			We found some missing details. Please fill in the information below.
 		</p>
 
 		<form on:submit={handleSubmit} class="space-y-4">
 			<!-- First Name -->
 			<div>
 				<label for="firstName" class="block text-sm font-medium text-surface-700 mb-1">
-					Nome
+					First Name
 				</label>
 				<input
 					type="text"
@@ -82,7 +82,7 @@
 			<!-- Last Name -->
 			<div>
 				<label for="lastName" class="block text-sm font-medium text-surface-700 mb-1">
-					Sobrenome
+					Last Name
 				</label>
 				<input
 					type="text"
@@ -108,14 +108,14 @@
 					class="w-full px-4 py-2 rounded-lg border border-surface-300 focus:outline-none focus:ring-2 focus:ring-primary-500"
 				/>
 				<p class="text-xs text-surface-500 mt-1">
-					Email será usado para recuperação de conta e notificações
+					This email will be used for account recovery and notifications
 				</p>
 			</div>
 
 			<!-- Country -->
 			<div>
 				<label for="country" class="block text-sm font-medium text-surface-700 mb-1">
-					País (Opcional)
+					Country (Optional)
 				</label>
 				<input
 					type="text"
@@ -129,7 +129,7 @@
 			<!-- Date of Birth -->
 			<div>
 				<label for="dob" class="block text-sm font-medium text-surface-700 mb-1">
-					Data de Nascimento (Opcional)
+					Date of Birth (Optional)
 				</label>
 				<input
 					type="date"
@@ -165,14 +165,14 @@
 				class="w-full mt-6 bg-primary-500 hover:bg-primary-600 disabled:bg-surface-400 text-white font-semibold py-3 rounded-lg transition-colors"
 			>
 				{#if isLoading}
-					Salvando...
+					Saving...
 				{:else}
-					Continuar
+					Continue
 				{/if}
 			</button>
 
 			<p class="text-center text-xs text-surface-500 mt-4">
-				Você pode atualizar esses dados depois em suas configurações de conta
+				You can update this information later in your account settings
 			</p>
 		</form>
 	</div>
