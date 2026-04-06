@@ -32,6 +32,40 @@
 		return username ? `/profile/${username}` : null;
 	}
 
+	function getAuthorAcademicInfo(paperData: any, author: any): { department: string; university: string } {
+		if (!author) return { department: '', university: '' };
+
+		const authorId = String(author?.id || author?._id || '').trim();
+		const authorUsername = String(author?.username || '').trim();
+
+		if (Array.isArray(paperData?.authorAffiliations)) {
+			const matchedAffiliation = paperData.authorAffiliations.find((item: any) => {
+				const affiliationUserId = String(item?.userId || '').trim();
+				const affiliationUsername = String(item?.username || '').trim();
+
+				if (authorId && affiliationUserId && authorId === affiliationUserId) return true;
+				if (authorUsername && affiliationUsername && authorUsername === affiliationUsername) return true;
+				return false;
+			});
+
+			const customDepartment = String(matchedAffiliation?.department || '').trim();
+			const customUniversity = String(matchedAffiliation?.affiliation || '').trim();
+			if (customDepartment || customUniversity) {
+				return { department: customDepartment, university: customUniversity };
+			}
+		}
+
+		return {
+			department: String(author?.position || '').trim(),
+			university: String(author?.institution || '').trim()
+		};
+	}
+
+	function hasAcademicInfo(paperData: any, author: any): boolean {
+		const info = getAuthorAcademicInfo(paperData, author);
+		return Boolean(info.department || info.university);
+	}
+
 	function styleReferenceLinks() {
 		if (typeof window === 'undefined') return;
 
@@ -74,50 +108,78 @@
 
 			<h2 class="text-3xl font-semibold text-gray-800 mb-4">{@html paper.title}</h2>
 
-			<div class="flex gap-3 items-center mb-4">
-				{#if paper.mainAuthor?.profilePictureUrl}
-					<Avatar
-						src={paper.mainAuthor.profilePictureUrl}
-						name={getDisplayName(paper.mainAuthor)}
-						size="w-9"
-					/>
-				{:else}
-					<div class="w-9 h-9 flex items-center justify-center bg-gray-300 text-white rounded-full">
-						<span class="text-xs font-bold text-gray-600">{getInitials(getDisplayName(paper.mainAuthor))}</span>
-					</div>
-				{/if}
-				<div class="flex items-center">
-					{#if getProfileUrl(paper.mainAuthor)}
-						<a class="text-primary-500 whitespace-nowrap" href={getProfileUrl(paper.mainAuthor) ?? '#'}>
-							{getDisplayName(paper.mainAuthor)}
-						</a>
-					{:else}
-						<span class="text-surface-700 whitespace-nowrap">{getDisplayName(paper.mainAuthor)}</span>
-					{/if}
-				</div>
-
-				{#each paper.coAuthors ?? [] as ca}
-					{@const coAuthorName = getDisplayName(ca)}
-					{@const coAuthorProfileUrl = getProfileUrl(ca)}
-					<div class="flex items-center gap-2">
-						{#if ca.profilePictureUrl}
-							<Avatar src={ca.profilePictureUrl} name={coAuthorName} size="w-9" />
+			<div class="mb-4">
+				<p class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Authors</p>
+				<div class="flex flex-wrap gap-2">
+					<div class="flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-2.5 py-2">
+						{#if paper.mainAuthor?.profilePictureUrl}
+							<Avatar src={paper.mainAuthor.profilePictureUrl} name={getDisplayName(paper.mainAuthor)} size="w-8" />
 						{:else}
-							<div class="w-9 h-9 flex items-center justify-center bg-gray-300 text-white rounded-full">
-								<span class="text-xs font-bold text-gray-600">{getInitials(coAuthorName)}</span>
+							<div class="w-8 h-8 flex items-center justify-center bg-gray-300 text-white rounded-full">
+								<span class="text-xs font-bold text-gray-600">{getInitials(getDisplayName(paper.mainAuthor))}</span>
 							</div>
 						{/if}
-						<div class="flex items-center">
-							{#if coAuthorProfileUrl}
-								<a class="text-primary-500 whitespace-nowrap" href={coAuthorProfileUrl}>
-									{coAuthorName}
+						<div class="leading-tight">
+							{#if getProfileUrl(paper.mainAuthor)}
+								<a class="text-sm font-medium text-primary-600 hover:underline" href={getProfileUrl(paper.mainAuthor) ?? '#'}>
+									{getDisplayName(paper.mainAuthor)}
 								</a>
 							{:else}
-								<span class="text-surface-700 whitespace-nowrap">{coAuthorName}</span>
+								<span class="text-sm font-medium text-surface-700">{getDisplayName(paper.mainAuthor)}</span>
+							{/if}
+							{#if hasAcademicInfo(paper, paper.mainAuthor)}
+								<details class="mt-1">
+									<summary class="text-[11px] text-primary-700 hover:text-primary-800 cursor-pointer select-none">Details</summary>
+									<div class="mt-1 text-xs text-gray-600 space-y-0.5">
+										{#if getAuthorAcademicInfo(paper, paper.mainAuthor).department}
+											<p><span class="font-medium">Department:</span> {getAuthorAcademicInfo(paper, paper.mainAuthor).department}</p>
+										{/if}
+										{#if getAuthorAcademicInfo(paper, paper.mainAuthor).university}
+											<p><span class="font-medium">University:</span> {getAuthorAcademicInfo(paper, paper.mainAuthor).university}</p>
+										{/if}
+									</div>
+								</details>
 							{/if}
 						</div>
 					</div>
-				{/each}
+
+					{#each paper.coAuthors ?? [] as ca}
+						{@const coAuthorName = getDisplayName(ca)}
+						{@const coAuthorProfileUrl = getProfileUrl(ca)}
+						{@const coAuthorInfo = getAuthorAcademicInfo(paper, ca)}
+						<div class="flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-2.5 py-2">
+							{#if ca.profilePictureUrl}
+								<Avatar src={ca.profilePictureUrl} name={coAuthorName} size="w-8" />
+							{:else}
+								<div class="w-8 h-8 flex items-center justify-center bg-gray-300 text-white rounded-full">
+									<span class="text-xs font-bold text-gray-600">{getInitials(coAuthorName)}</span>
+								</div>
+							{/if}
+							<div class="leading-tight">
+								{#if coAuthorProfileUrl}
+									<a class="text-sm font-medium text-primary-600 hover:underline" href={coAuthorProfileUrl}>
+										{coAuthorName}
+									</a>
+								{:else}
+									<span class="text-sm font-medium text-surface-700">{coAuthorName}</span>
+								{/if}
+								{#if coAuthorInfo.department || coAuthorInfo.university}
+									<details class="mt-1">
+										<summary class="text-[11px] text-primary-700 hover:text-primary-800 cursor-pointer select-none">Details</summary>
+										<div class="mt-1 text-xs text-gray-600 space-y-0.5">
+											{#if coAuthorInfo.department}
+												<p><span class="font-medium">Department:</span> {coAuthorInfo.department}</p>
+											{/if}
+											{#if coAuthorInfo.university}
+												<p><span class="font-medium">University:</span> {coAuthorInfo.university}</p>
+											{/if}
+										</div>
+									</details>
+								{/if}
+							</div>
+						</div>
+					{/each}
+				</div>
 			</div>
 
 			<span class="text-xs">Published: {new Date(paper.createdAt).toDateString()}</span>

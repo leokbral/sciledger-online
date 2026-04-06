@@ -63,11 +63,13 @@
     }
     
     let selectedPaper: Paper | null = $state(null);
+    let selectedAuthorsPaper: Paper | null = $state(null);
     let selectedReviewers: string[] = $state([]);
     let openInviteModal = $state(false);
     let openManageReviewersModal = $state(false);
     let openManageDeadlinesModal = $state(false);
     let openRejectModal = $state(false);
+    let openAuthorsModal = $state(false);
     let rejectionReason = $state('');
     let loading = $state(false);
     let searchTerm = $state('');
@@ -162,6 +164,11 @@
         rejectionReason = '';
         openRejectModal = true;
     }
+
+    function openAuthorsDialog(paper: Paper) {
+        selectedAuthorsPaper = paper;
+        openAuthorsModal = true;
+    }
     
     async function rejectPaper() {
         if (!selectedPaper || !rejectionReason.trim()) {
@@ -236,6 +243,42 @@
         } else {
             selectedReviewers = [...selectedReviewers, reviewerId];
         }
+    }
+
+    function getAuthorAcademicInfo(paper: any, author: any): { department: string; university: string } {
+        if (!author) return { department: '', university: '' };
+
+        const authorId = String(author?.id || author?._id || '').trim();
+        const authorUsername = String(author?.username || '').trim();
+
+        if (Array.isArray(paper?.authorAffiliations)) {
+            const matchedAffiliation = paper.authorAffiliations.find((item: any) => {
+                const affiliationUserId = String(item?.userId || '').trim();
+                const affiliationUsername = String(item?.username || '').trim();
+
+                if (authorId && affiliationUserId && authorId === affiliationUserId) return true;
+                if (authorUsername && affiliationUsername && authorUsername === affiliationUsername) return true;
+                return false;
+            });
+
+            const customDepartment = String(matchedAffiliation?.department || '').trim();
+            const customUniversity = String(matchedAffiliation?.affiliation || '').trim();
+            if (customDepartment || customUniversity) {
+                return { department: customDepartment, university: customUniversity };
+            }
+        }
+
+        return {
+            department: String(author?.position || '').trim(),
+            university: String(author?.institution || '').trim()
+        };
+    }
+
+    function getPaperAuthors(paper: any): any[] {
+        const list: any[] = [];
+        if (paper?.mainAuthor) list.push(paper.mainAuthor);
+        if (Array.isArray(paper?.coAuthors)) list.push(...paper.coAuthors.filter(Boolean));
+        return list;
     }
     
     async function sendInvitations() {
@@ -379,68 +422,26 @@
                                         {@html paper.title}
                                     </a>
                                 </h3>
-                                <div class="text-sm text-gray-600 mt-1 flex items-center">
-                                    <span class="mr-2">
-                                        {new Date(paper.createdAt).toLocaleDateString()} |
-                                    </span>
-                                    <div class="flex items-center gap-2">
-                                        <!-- Main Author -->
-                                        {#if paper.mainAuthor}
-                                            <div class="flex items-center gap-1">
-                                                {#if paper.mainAuthor.profilePictureUrl}
-                                                    <Avatar
-                                                        src={paper.mainAuthor.profilePictureUrl}
-                                                        name={paper.mainAuthor.firstName}
-                                                        size="w-6"
-                                                    />
-                                                {:else}
-                                                    <div class="w-6 h-6 rounded-full bg-gray-300 flex items-center justify-center">
-                                                        <span class="text-xs font-bold text-gray-600">
-                                                            {getInitials(paper.mainAuthor.firstName, paper.mainAuthor.lastName)}
-                                                        </span>
-                                                    </div>
-                                                {/if}
-                                                <a
-                                                    href={`/profile/${paper.mainAuthor.username}`}
-                                                    class="text-blue-600 hover:text-blue-800 hover:underline"
-                                                >
-                                                    {paper.mainAuthor.firstName + ' ' + paper.mainAuthor.lastName}
-                                                </a>
-                                            </div>
-                                        {/if}
+                                <div class="text-sm text-gray-600 mt-1">
+                                    <span>{new Date(paper.createdAt).toLocaleDateString()}</span>
+                                </div>
 
-                                        <!-- Co-authors -->
-                                        {#if paper.coAuthors && paper.coAuthors.length > 0}
-                                            <div class="flex items-center gap-1">
-                                                {#each paper.coAuthors as coAuthor, i}
-                                                    <div class="flex items-center gap-1">
-                                                        {#if coAuthor.profilePictureUrl}
-                                                            <Avatar
-                                                                src={coAuthor.profilePictureUrl}
-                                                                name={coAuthor.firstName}
-                                                                size="w-6"
-                                                            />
-                                                        {:else}
-                                                            <div class="w-6 h-6 rounded-full bg-gray-300 flex items-center justify-center">
-                                                                <span class="text-xs font-bold text-gray-600">
-                                                                    {getInitials(coAuthor.firstName, coAuthor.lastName)}
-                                                                </span>
-                                                            </div>
-                                                        {/if}
-                                                        <a
-                                                            href={`/profile/${coAuthor.username}`}
-                                                            class="text-blue-600 hover:text-blue-800 hover:underline"
-                                                        >
-                                                            {coAuthor.firstName + ' ' + coAuthor.lastName}
-                                                        </a>
-                                                        {#if i < paper.coAuthors.length - 1}
-                                                            <span class="mx-1">,</span>
-                                                        {/if}
-                                                    </div>
-                                                {/each}
-                                            </div>
-                                        {/if}
-                                    </div>
+                                <div class="mt-2 flex items-center gap-2 text-sm">
+                                    {#if paper.mainAuthor}
+                                        <a
+                                            href={`/profile/${paper.mainAuthor.username}`}
+                                            class="font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                                        >
+                                            {paper.mainAuthor.firstName + ' ' + paper.mainAuthor.lastName}
+                                        </a>
+                                    {/if}
+                                    <button
+                                        class="btn btn-xs bg-surface-100 hover:bg-surface-200 text-surface-700 border border-surface-300"
+                                        onclick={() => openAuthorsDialog(paper)}
+                                    >
+                                        <Icon icon="mdi:account-details" width="16" height="16" />
+                                        Authors
+                                    </button>
                                 </div>
 
                                 {#if paper.abstract}
@@ -524,6 +525,78 @@
         {/if}
     </div>
 </section>
+
+<!-- Authors and affiliations modal -->
+<Modal
+    open={openAuthorsModal}
+    onOpenChange={(e) => (openAuthorsModal = e.open)}
+    contentBase="card bg-white dark:bg-surface-800 p-6 space-y-4 shadow-2xl rounded-lg max-w-2xl w-full sm:w-[92vw]"
+>
+    {#snippet content()}
+        {#if selectedAuthorsPaper}
+            <div class="space-y-4">
+                <div class="flex justify-between items-center border-b pb-3">
+                    <div>
+                        <h3 class="text-xl font-bold text-gray-900 dark:text-white">Authors</h3>
+                        <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">{@html selectedAuthorsPaper.title}</p>
+                    </div>
+                    <button class="btn-icon btn-icon-sm" onclick={() => (openAuthorsModal = false)}>
+                        <Icon icon="mdi:close" class="text-gray-600" />
+                    </button>
+                </div>
+
+                <div class="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
+                    {#each getPaperAuthors(selectedAuthorsPaper) as authorItem}
+                        {@const academicInfo = getAuthorAcademicInfo(selectedAuthorsPaper, authorItem)}
+                        <div class="flex items-center justify-between rounded-lg border border-surface-200 dark:border-surface-700 p-3 bg-surface-50 dark:bg-surface-900">
+                            <div class="flex items-center gap-3">
+                                {#if authorItem?.profilePictureUrl}
+                                    <Avatar src={authorItem.profilePictureUrl} name={authorItem.firstName} size="w-9" />
+                                {:else}
+                                    <div class="w-9 h-9 rounded-full bg-gray-300 flex items-center justify-center">
+                                        <span class="text-xs font-bold text-gray-600">
+                                            {getInitials(authorItem.firstName, authorItem.lastName)}
+                                        </span>
+                                    </div>
+                                {/if}
+                                <div class="leading-tight">
+                                    <a
+                                        href={`/profile/${authorItem.username}`}
+                                        class="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                                    >
+                                        {authorItem.firstName} {authorItem.lastName}
+                                    </a>
+                                    <p class="text-xs text-gray-500">Author profile</p>
+                                </div>
+                            </div>
+                            {#if academicInfo.department || academicInfo.university}
+                                <details class="text-right">
+                                    <summary class="text-xs text-primary-700 hover:text-primary-800 cursor-pointer select-none">Details</summary>
+                                    <div class="mt-1 flex flex-col items-end gap-1">
+                                        {#if academicInfo.department}
+                                            <span class="px-2 py-1 rounded-full text-xs bg-primary-100 text-primary-800">
+                                                {academicInfo.department}
+                                            </span>
+                                        {/if}
+                                        {#if academicInfo.university}
+                                            <span class="px-2 py-1 rounded-full text-xs bg-sky-100 text-sky-800">
+                                                {academicInfo.university}
+                                            </span>
+                                        {/if}
+                                    </div>
+                                </details>
+                            {:else}
+                                <span class="px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-500">
+                                    No academic data
+                                </span>
+                            {/if}
+                        </div>
+                    {/each}
+                </div>
+            </div>
+        {/if}
+    {/snippet}
+</Modal>
 
 <!-- Modal para gerenciar revisores -->
 <Modal

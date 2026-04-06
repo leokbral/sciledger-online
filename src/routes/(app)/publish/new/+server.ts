@@ -12,12 +12,32 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
   apiVersion: '2026-02-25.preview'
 });
 
+function normalizeAuthorAffiliations(input: unknown) {
+    if (!Array.isArray(input)) return [];
+
+    return input
+        .map((item) => {
+            const affiliation = item as Record<string, unknown>;
+            const name = String(affiliation.name ?? '').trim();
+            if (!name) return null;
+
+            return {
+                userId: affiliation.userId ? String(affiliation.userId) : undefined,
+                username: affiliation.username ? String(affiliation.username) : undefined,
+                name,
+                department: String(affiliation.department ?? '').trim(),
+                affiliation: String(affiliation.affiliation ?? '').trim()
+            };
+        })
+        .filter(Boolean);
+}
+
 export const POST: RequestHandler = async ({ request }) => {
 
     await start_mongo(); // Não necessário mais
 
     try {
-        const { paperPictures, content, mainAuthor, correspondingAuthor, title, abstract, keywords, pdfUrl, submittedBy, price, coAuthors, status, authors, hubId, isLinkedToHub, scopusArea, scopusSubArea, scopusClassifications, supplementaryMaterials, supplementaryFiles, paymentAuthorizationCode } =
+        const { paperPictures, content, mainAuthor, correspondingAuthor, title, abstract, keywords, pdfUrl, submittedBy, price, coAuthors, status, authors, authorAffiliations, hubId, isLinkedToHub, scopusArea, scopusSubArea, scopusClassifications, supplementaryMaterials, supplementaryFiles, paymentAuthorizationCode } =
             await request.json();
         console.log("chamou server")
         console.log(mainAuthor, correspondingAuthor, title, abstract, keywords, pdfUrl, submittedBy)
@@ -70,6 +90,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
         const _coAuthors = coAuthors.map((a: User) => a.id)
         const _authors = authors?.map((a: User) => a.id) || [];
+        const normalizedAuthorAffiliations = normalizeAuthorAffiliations(authorAffiliations);
         console.log("coAu", _coAuthors, coAuthors)
         const id = crypto.randomUUID()
         // Cria um novo paper
@@ -80,6 +101,7 @@ export const POST: RequestHandler = async ({ request }) => {
            
             correspondingAuthor: correspondingAuthor.id,
             coAuthors: _coAuthors,
+            authorAffiliations: normalizedAuthorAffiliations,
             authors: _authors,
             status,
             content,

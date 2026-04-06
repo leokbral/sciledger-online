@@ -8,6 +8,13 @@ export type Paper = {
     mainAuthor: User; // Main author as UUID
     correspondingAuthor: User; // Corresponding author as UUID
     coAuthors: User[]; // List of co-authors as UUIDs
+    authorAffiliations?: Array<{
+        userId?: string;
+        username?: string;
+        name: string;
+        department?: string;
+        affiliation?: string;
+    }>;
     reviewers: Array<User | string>; // List of reviewers as User objects or UUIDs
     title: string;
     abstract: string;

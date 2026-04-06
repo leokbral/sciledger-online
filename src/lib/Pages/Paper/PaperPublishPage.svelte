@@ -11,6 +11,7 @@
 	import IconFile from '@lucide/svelte/icons/paperclip';
 	import IconRemove from '@lucide/svelte/icons/circle-x';
 	import Icon from '@iconify/svelte';
+	import { onMount } from 'svelte';
 	import OrcidProfile from '$lib/components/OrcidProfile/OrcidProfile.svelte';
 	import { getSubAreasForArea, getAllAreaNames } from '$lib/constants/scopusAreas';
 
@@ -38,6 +39,14 @@
 		savePaper: (paper: PaperPublishStoreData) => void;
 	}
 
+	interface AuthorAffiliationForm {
+		userId?: string;
+		username?: string;
+		name: string;
+		department: string;
+		affiliation: string;
+	}
+
 	let {
 		authorsOptions = $bindable(),
 		author,
@@ -47,6 +56,7 @@
 			mainAuthor: null,
 			abstract: '', //{ time: Date.now(), blocks: [] },
 			coAuthors: [], //{ time: Date.now(), blocks: [] },
+			authorAffiliations: [],
 			id: '', // ID único gerado para o paper
 			correspondingAuthor: author, // Autor correspondente como UUID
 			reviewers: [], // Lista de revisores como UUIDs
@@ -409,13 +419,77 @@
 	);
 	let selected = $state({ value: '' });
 	let content = $state(inicialValue.content || '');
+	let authorAffiliations = $state<Record<string, AuthorAffiliationForm>>({});
 	// let inputComponent: TagsInput = $state();
+
+	function syncAuthorAffiliationsForUsernames(usernames: string[]) {
+		const nextAffiliations: Record<string, AuthorAffiliationForm> = {};
+
+		for (const username of usernames) {
+			const baseValues = getInitialAffiliationForUsername(username);
+			const previousValues = authorAffiliations[username];
+			nextAffiliations[username] = {
+				...baseValues,
+				...previousValues,
+				username,
+				name: (previousValues?.name || baseValues.name || username).trim(),
+				department: previousValues?.department ?? baseValues.department,
+				affiliation: previousValues?.affiliation ?? baseValues.affiliation
+			};
+		}
+
+		authorAffiliations = nextAffiliations;
+	}
 
 	$effect(() => {
 		if (author?.username && inputAuthorList.length === 0) {
 			inputAuthorList = [author.username];
+			syncAuthorAffiliationsForUsernames(inputAuthorList);
 		}
 	});
+
+	function getAuthorByUsername(username: string): User | undefined {
+		return authorsOptions.find((option: User) => option.username === username);
+	}
+
+	function getInitialAffiliationForUsername(username: string): AuthorAffiliationForm {
+		const selectedAuthor = getAuthorByUsername(username);
+		const existing = inicialValue.authorAffiliations?.find(
+			(item) =>
+				item.username === username ||
+				(Boolean(item.userId) && Boolean(selectedAuthor?.id) && item.userId === selectedAuthor?.id)
+		);
+
+		const displayName = [selectedAuthor?.firstName, selectedAuthor?.lastName]
+			.filter(Boolean)
+			.join(' ')
+			.trim();
+
+		return {
+			userId: selectedAuthor?.id || existing?.userId,
+			username,
+			name: existing?.name || displayName || username,
+			department: existing?.department || selectedAuthor?.position || '',
+			affiliation: existing?.affiliation || selectedAuthor?.institution || ''
+		};
+	}
+
+	function serializeAuthorAffiliations(): AuthorAffiliationForm[] {
+		return inputAuthorList
+			.map((username) => {
+				const selectedAuthor = getAuthorByUsername(username);
+				const values = authorAffiliations[username] || getInitialAffiliationForUsername(username);
+
+				return {
+					userId: selectedAuthor?.id || values.userId,
+					username,
+					name: values.name.trim(),
+					department: values.department.trim(),
+					affiliation: values.affiliation.trim()
+				};
+			})
+			.filter((item) => item.name.length > 0);
+	}
 
 	authorsOptions = authorsOptions.map((a: User) => {
 		return { ...a, label: a.username };
@@ -1101,6 +1175,7 @@
 		);
 		$store.mainAuthor = $store.authors[0];
 		$store.coAuthors = $store.authors.slice(1, $store.authors.length);
+		$store.authorAffiliations = serializeAuthorAffiliations();
 		//const uploadResult = await uploadFile();
 		//console.log(uploadResult.result);
 		// if (
@@ -1364,6 +1439,10 @@
 		orcidError = '';
 		selectedOrcidProfile = false;
 	}
+
+	onMount(() => {
+		syncAuthorAffiliationsForUsernames(inputAuthorList);
+	});
 </script>
 
 <main class="grid p-5">
@@ -1424,7 +1503,10 @@
 					base="grid !h-auto "
 					value={inputAuthorList}
 					{onInputValueChange}
-					onValueChange={(e) => (inputAuthorList = e.value)}
+					onValueChange={(e) => {
+						inputAuthorList = e.value;
+						syncAuthorAffiliationsForUsernames(inputAuthorList);
+					}}
 					onValueInvalid={onInvalidHandler}
 					placeholder="Add author..."
 					tagBackground="preset-filled-primary-500"
@@ -1449,9 +1531,77 @@
 							selected = option.username;
 
 							inputAuthorList = [...inputAuthorList, option.username];
+							syncAuthorAffiliationsForUsernames(inputAuthorList);
 							// console.log('inputAuthorList', inputAuthorList);
 						}}
 					/>
+				</div>
+			</section>
+
+			<section class="mb-4 w-full">
+				<div class="bg-surface-50 dark:bg-surface-800 rounded-lg p-4 border">
+					<h3 class="text-lg font-semibold mb-2 text-surface-900 dark:text-surface-100">
+						Author Affiliations and Departments
+					</h3>
+					<p class="text-xs text-surface-600 dark:text-surface-400 mb-3">
+						Define how each author should appear in the paper: full name, department, and
+						affiliation/institution.
+					</p>
+
+					{#if inputAuthorList.length === 0}
+						<p class="text-sm text-surface-500">Add at least one author to fill affiliation details.</p>
+					{:else}
+						<div class="space-y-4">
+							{#each inputAuthorList as username (username)}
+								{#if authorAffiliations[username]}
+									<div class="rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-900 p-3">
+										<p class="text-sm font-semibold text-surface-800 dark:text-surface-100 mb-2">
+											{authorAffiliations[username].name || username}
+											<span class="text-surface-500 font-normal"> (@{username})</span>
+										</p>
+										<div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+											<div>
+												<label for={`author-display-name-${username}`} class="block text-xs font-medium text-surface-600 dark:text-surface-400 mb-1">
+													Display name
+												</label>
+												<input
+													id={`author-display-name-${username}`}
+													type="text"
+													bind:value={authorAffiliations[username].name}
+													placeholder="Full author name"
+													class="w-full p-2 border border-surface-300 dark:border-surface-600 rounded-lg text-sm bg-white dark:bg-surface-800"
+												/>
+											</div>
+											<div>
+												<label for={`author-department-${username}`} class="block text-xs font-medium text-surface-600 dark:text-surface-400 mb-1">
+													Department
+												</label>
+												<input
+													id={`author-department-${username}`}
+													type="text"
+													bind:value={authorAffiliations[username].department}
+													placeholder="Computer Science Department"
+													class="w-full p-2 border border-surface-300 dark:border-surface-600 rounded-lg text-sm bg-white dark:bg-surface-800"
+												/>
+											</div>
+											<div>
+												<label for={`author-affiliation-${username}`} class="block text-xs font-medium text-surface-600 dark:text-surface-400 mb-1">
+													Affiliation / Institution
+												</label>
+												<input
+													id={`author-affiliation-${username}`}
+													type="text"
+													bind:value={authorAffiliations[username].affiliation}
+													placeholder="Federal University"
+													class="w-full p-2 border border-surface-300 dark:border-surface-600 rounded-lg text-sm bg-white dark:bg-surface-800"
+												/>
+											</div>
+										</div>
+									</div>
+								{/if}
+							{/each}
+						</div>
+					{/if}
 				</div>
 			</section>
 

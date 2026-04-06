@@ -7,6 +7,14 @@ export const PaperSchema: Schema = new Schema({
     mainAuthor: { type: String, required: true, ref: 'User' }, // Main author as UUID
     correspondingAuthor: { type: String, required: true, ref: 'User' }, // Corresponding author as UUID
     coAuthors: [{ type: String, ref: 'User' }], // List of co-authors as UUIDs
+    authorAffiliations: [{
+        _id: false,
+        userId: { type: String, ref: 'User' },
+        username: { type: String },
+        name: { type: String, required: true },
+        department: { type: String, default: '' },
+        affiliation: { type: String, default: '' }
+    }],
     reviewers: [{ type: String, ref: 'User' }], // List of reviewers as UUIDs
     title: { type: String, required: true },
     abstract: { type: String, required: true },
