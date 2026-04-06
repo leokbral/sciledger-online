@@ -5,6 +5,26 @@ import Papers from '$lib/db/models/Paper';
 import '$lib/db/models/User';
 import type { User } from '$lib/types/User';
 
+function normalizeAuthorAffiliations(input: unknown) {
+    if (!Array.isArray(input)) return [];
+
+    return input
+        .map((item) => {
+            const affiliation = item as Record<string, unknown>;
+            const name = String(affiliation.name ?? '').trim();
+            if (!name) return null;
+
+            return {
+                userId: affiliation.userId ? String(affiliation.userId) : undefined,
+                username: affiliation.username ? String(affiliation.username) : undefined,
+                name,
+                department: String(affiliation.department ?? '').trim(),
+                affiliation: String(affiliation.affiliation ?? '').trim()
+            };
+        })
+        .filter(Boolean);
+}
+
 export const POST: RequestHandler = async ({ request }) => {
     await start_mongo();
 
@@ -32,6 +52,7 @@ export const POST: RequestHandler = async ({ request }) => {
         // Safely handle arrays with optional chaining
         const _coAuthors = data.coAuthors?.map((a: User) => a.id) || [];
         const _authors = data.authors?.map((a: User) => a.id) || [];
+        const normalizedAuthorAffiliations = normalizeAuthorAffiliations(data.authorAffiliations);
 
         const updateData = {
             mainAuthor: data.mainAuthor?.id,
@@ -39,6 +60,7 @@ export const POST: RequestHandler = async ({ request }) => {
             paperPictures: data.paperPictures,
             correspondingAuthor: data.correspondingAuthor,
             coAuthors: _coAuthors,
+            authorAffiliations: normalizedAuthorAffiliations,
             status: data.status,//'draft', //'reviewer assignment'
             content: data.content,
             title: data.title,
