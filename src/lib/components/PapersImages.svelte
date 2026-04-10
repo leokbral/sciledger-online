@@ -36,7 +36,7 @@
 </script>
 
 <section class="my-8">
-	<h2 class="text-xl font-bold mb-4">Paper Images</h2>
+	<h2 class="text-xl font-bold mb-4">Paper Cover Image <span class="text-primary-600 dark:text-primary-400">(Main/Featured)</span></h2>
 
 	<div class="grid grid-cols-[auto_1fr_auto] gap-4 items-center">
 		<!-- Button: Left -->

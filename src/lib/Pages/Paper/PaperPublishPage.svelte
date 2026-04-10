@@ -2143,9 +2143,9 @@
 			</section>
 
 			<div class="mt-4">
-				<h5 class="text-lg font-semibold mb-1">Paper Images</h5>
+				<h5 class="text-lg font-semibold mb-1">Paper Cover Image <span class="text-primary-600 dark:text-primary-400">(Main/Featured)</span></h5>
 				<p class="text-xs text-surface-600 dark:text-surface-400 mb-3">
-					Upload images, figures, or diagrams that support your paper (optional). These will be displayed alongside your paper.
+					Upload a main image that will appear at the very beginning of your article (PNG format recommended). Choose an image that best represents your paper, or use a graphical abstract. This field is optional.
 				</p>
 				<div class="grid grid-cols-2 gap-4">
 					<div class="border-2 border-dashed border-surface-300 rounded-lg p-4">
