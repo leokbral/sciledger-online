@@ -137,6 +137,16 @@
 		}
 	}
 
+	function confirmReviewerRemoval(reviewerId: string, reviewerName: string) {
+		const shouldRemove = confirm(
+			`Are you sure you want to remove ${reviewerName} as reviewer? This action can be reverted by inviting them again.`
+		);
+
+		if (!shouldRemove) return;
+
+		manageReviewers('remove', [reviewerId]);
+	}
+
 	async function sendEmailInvitation() {
 		if (!emailInvite.trim()) {
 			toaster.warning({ title: 'Please enter an email address' });
@@ -365,7 +375,11 @@
 								{reviewer.lastName}
 								<button
 									class="ml-2 text-red-500 hover:text-red-700"
-									onclick={() => manageReviewers('remove', [reviewer._id])}
+									onclick={() =>
+										confirmReviewerRemoval(
+											reviewer._id,
+											`${reviewer.firstName} ${reviewer.lastName}`
+										)}
 								>
 									<Icon icon="mdi:close" />
 								</button>
