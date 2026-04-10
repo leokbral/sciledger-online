@@ -193,17 +193,17 @@
 					<a
 						href={hub.guidelinesUrl}
 						target="_blank"
-						class="flex items-center gap-2 text-blue-600 hover:text-blue-700"
+						class="inline-flex items-center gap-2 rounded-full border border-surface-300 dark:border-surface-600 bg-white/95 dark:bg-surface-800 px-4 py-2 text-sm font-medium text-blue-700 dark:text-white shadow-sm hover:bg-surface-50 dark:hover:bg-surface-700 hover:shadow-md transition-all"
 					>
 						<Icon icon="mdi:file-document-outline" width="24" height="24" />
-						<span class="underline">Guidelines</span>
+						<span>Guidelines</span>
 					</a>
 				{/if}
 				
 				{#if isCreator}
 					<a
 						href="/hub/edit/{hub._id}"
-						class="btn preset-tonal flex items-center gap-2"
+						class="btn inline-flex items-center gap-2 rounded-full border border-surface-300 dark:border-surface-600 bg-white/95 dark:bg-surface-800 px-4 py-2 text-surface-800 dark:text-surface-100 shadow-sm hover:bg-surface-50 dark:hover:bg-surface-700 hover:shadow-md transition-all"
 					>
 						<Icon icon="mdi:pencil" width="20" />
 						Edit Hub
@@ -224,12 +224,12 @@
 				<Modal
 					open={openCalendarModal}
 					onOpenChange={(e) => (openCalendarModal = e.open)}
-					triggerBase="btn preset-tonal"
+					triggerBase="btn inline-flex items-center gap-2 rounded-full border border-surface-300 dark:border-surface-600 bg-white/95 dark:bg-surface-800 px-4 py-2 text-surface-800 dark:text-surface-100 shadow-sm hover:bg-surface-50 dark:hover:bg-surface-700 hover:shadow-md transition-all"
 					contentBase="card bg-surface-100-900 p-4 space-y-4 shadow-xl max-w-screen-sm"
 					backdropClasses="backdrop-blur-sm"
 				>
 					{#snippet trigger()}
-						<h2 class="text-gray-800 flex items-center gap-2">
+						<h2 class="flex items-center gap-2 text-gray-800 dark:text-white">
 							<Icon icon="mdi:calendar-outline" width="24" height="24" />Calendar
 						</h2>
 					{/snippet}
@@ -303,7 +303,7 @@
 				<Modal
 					open={openAcknowledgementModal}
 					onOpenChange={(e) => (openAcknowledgementModal = e.open)}
-					triggerBase="btn preset-tonal"
+					triggerBase="btn inline-flex items-center gap-2 rounded-full border border-surface-300 dark:border-surface-600 bg-white/95 dark:bg-surface-800 px-4 py-2 text-surface-800 dark:text-surface-100 shadow-sm hover:bg-surface-50 dark:hover:bg-surface-700 hover:shadow-md transition-all"
 					contentBase="card bg-surface-100-900 p-4 space-y-4 shadow-xl max-w-screen-sm"
 					backdropClasses="backdrop-blur-sm"
 				>

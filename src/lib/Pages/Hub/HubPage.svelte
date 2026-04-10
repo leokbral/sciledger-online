@@ -28,7 +28,7 @@
         <h1 class="text-2xl font-bold">Research Hubs</h1>
         <a
             href="/hub/new"
-            class="btn preset-filled-primary-500 text-white transition-colors duration-200"
+                class="btn preset-filled-primary-500 text-white dark:text-surface-950 border border-primary-700/20 dark:border-primary-200/40 shadow-sm dark:shadow-lg dark:shadow-black/20 transition-colors duration-200 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-50 dark:focus-visible:ring-offset-surface-950"
             data-sveltekit-preload-data="hover"
         >
             Create New Hub
