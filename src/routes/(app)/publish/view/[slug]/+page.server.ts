@@ -3,6 +3,7 @@ import Users from '$lib/db/models/User';
 import { error, redirect } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import type { PageServerLoad, Actions } from './$types';
+import { isHubViceManager } from '$lib/helpers/hubPermissions';
 
 // Type for MongoDB ObjectId
 interface ObjectId {
@@ -93,6 +94,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		? (paperDoc.hubId?.createdBy?._id || paperDoc.hubId?.createdBy?.id || paperDoc.hubId?.createdBy)
 		: null;
 	const isHubOwner = hubCreatorId?.toString() === userId;
+	const isHubVice = typeof paperDoc.hubId === 'object' && isHubViceManager(paperDoc.hubId as any, userId);
 	
 	const isHubReviewer = typeof paperDoc.hubId === 'object' && paperDoc.hubId?.reviewers?.includes(userId);
 
@@ -108,7 +110,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 	}
 
 	// Verificar permissões - apenas hub owner, hub reviewer ou revisor designado podem ver
-	if (!isHubOwner && !isHubReviewer && !isReviewer) {
+	if (!isHubOwner && !isHubVice && !isHubReviewer && !isReviewer) {
 		// Autores devem ver suas próprias rotas
 		if (isPaperAuthor) {
 			if (paperStatus === 'draft') {

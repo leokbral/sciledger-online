@@ -4,11 +4,13 @@ import Users from '$lib/db/models/User';
 import { json } from '@sveltejs/kit';
 import crypto from 'crypto';
 import { NotificationService } from '$lib/services/NotificationService';
+import { canManageHub, isHubOwner, normalizeId } from '$lib/helpers/hubPermissions';
 
 export async function POST({ request, locals }) {
 	try {
-		const { hubId, reviewerId } = await request.json();
-		console.log('Received data:', { hubId, reviewerId });
+		const { hubId, reviewerId, role } = await request.json();
+		const inviteRole = role === 'vice_manager' ? 'vice_manager' : 'reviewer';
+		console.log('Received data:', { hubId, reviewerId, role: inviteRole });
 
 		// Get hub and inviter information
 		const hub = await Hubs.findById(hubId).populate('createdBy');
@@ -21,12 +23,31 @@ export async function POST({ request, locals }) {
 			return json({ error: 'Unauthorized' }, { status: 401 });
 		}
 
+		if (!canManageHub(hub, inviter.id)) {
+			return json({ error: 'Only hub managers can send invitations' }, { status: 403 });
+		}
+
+		if (inviteRole === 'vice_manager' && !isHubOwner(hub, inviter.id)) {
+			return json({ error: 'Only the hub owner can invite a vice manager' }, { status: 403 });
+		}
+
+		const existingPending = await Invitation.findOne({
+			reviewer: reviewerId,
+			hubId,
+			status: 'pending',
+			role: inviteRole
+		});
+		if (existingPending) {
+			return json({ error: 'User already has a pending invitation for this role' }, { status: 409 });
+		}
+
 		const id = crypto.randomUUID();
 
 		const invitation = new Invitation({
 			_id: id,
 			id,
 			reviewer: reviewerId,
+			role: inviteRole,
 			hubId,
 			status: 'pending',
 			assignedAt: new Date(),
@@ -43,7 +64,7 @@ export async function POST({ request, locals }) {
 			hubId: String(hubId),
 			hubName: hub.title,
 			inviterName: inviterName,
-			role: 'reviewer'
+			role: inviteRole === 'vice_manager' ? 'vice manager' : 'reviewer'
 		});
 
 		return json({ success: true, invitation });
@@ -71,13 +92,21 @@ export async function GET({ locals }) {
 		const invitations = await Invitation.find({ reviewer: user.id, status: 'pending' })
 			.populate({
 				path: 'hubId',
-				select: 'title type description logoUrl createdBy'
+				select: 'title type description logoUrl createdBy assistantManagers'
 			})
 			.lean();
 
-		console.log('GET reviewer-invitations: Found', invitations.length, 'invitations');
+		const filteredInvitations = invitations.filter((inv: any) => {
+			const hub = inv.hubId;
+			const role = inv.role || 'reviewer';
+			if (!hub) return true;
+			if (role !== 'vice_manager') return true;
+			return !isHubOwner(hub as any, user.id) && !canManageHub(hub as any, user.id);
+		});
 
-		return json({ success: true, reviewerInvitations: invitations });
+		console.log('GET reviewer-invitations: Found', filteredInvitations.length, 'invitations');
+
+		return json({ success: true, reviewerInvitations: filteredInvitations });
 	} catch (error) {
 		console.error('Error fetching invitations:', error);
 		return json({ error: 'Failed to fetch invitations' }, { status: 500 });

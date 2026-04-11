@@ -31,6 +31,10 @@ export default defineConfig({
         noExternal: []
     },
     optimizeDeps: {
-        exclude: ['entities', 'htmlparser2', 'domutils', 'cheerio', 'jsdom']
+        exclude: ['entities', 'htmlparser2', 'domutils', 'cheerio', 'jsdom'],
+        esbuildOptions: {
+            // Avoid noisy warnings from third-party packages that ship broken sourcemap references.
+            sourcemap: false
+        }
     }
 });

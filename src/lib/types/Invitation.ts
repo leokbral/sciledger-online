@@ -5,6 +5,7 @@ export type Invitation = {
     id: string; // Unique ID generated, e.g. using uuid
     // paperId: string; // ID of the paper related to the review
     reviewer: User; // Single reviewer for this request
+    role: 'reviewer' | 'vice_manager';
     // peerReviewType: 'open' | 'selected'; // Review type
     hubId: string; // Hub ID, if applicable
     // isLinkedToHub: boolean; // Indicates whether linked to a hub

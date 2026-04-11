@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import Hubs from '$lib/db/models/Hub';
+import { canManageHub } from '$lib/helpers/hubPermissions';
 
 export const POST: RequestHandler = async ({ request, locals, params }) => {
     if (!locals.user) {
@@ -18,9 +19,9 @@ export const POST: RequestHandler = async ({ request, locals, params }) => {
             return json({ error: 'Hub not found' }, { status: 404 });
         }
 
-        // Check if the current user is the hub creator
-        if (hub.createdBy.toString() !== locals.user.id) {
-            return json({ error: 'Only hub creators can manage reviewers' }, { status: 403 });
+        // Hub owner and vice manager can manage reviewers
+        if (!canManageHub(hub, locals.user.id)) {
+            return json({ error: 'Only hub managers can manage reviewers' }, { status: 403 });
         }
 
         const { reviewers, action } = await request.json();
@@ -62,8 +63,8 @@ export const GET: RequestHandler = async ({ locals, params }) => {
             return json({ error: 'Hub not found' }, { status: 404 });
         }
 
-        // Only hub creators can see the full reviewer list
-        if (hub.createdBy.toString() === locals.user.id) {
+        // Hub owner and vice manager can see the full reviewer list
+        if (canManageHub(hub, locals.user.id)) {
             return json({ reviewers: hub.reviewers });
         }
 

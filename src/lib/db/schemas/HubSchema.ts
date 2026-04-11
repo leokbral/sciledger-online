@@ -52,6 +52,7 @@ export const HubSchema: Schema = new Schema({
 	},
 
 	createdBy: { type: String, required: true, ref: 'User' },
+	assistantManagers: [{ type: String, ref: 'User' }],
 	reviewers: [{ type: String, ref: 'User' }],
 	submittedPapers: [{ type: String, ref: 'Paper' }],
 	assignedReviews: [{

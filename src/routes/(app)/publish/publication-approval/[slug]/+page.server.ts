@@ -2,6 +2,7 @@ import Papers from '$lib/db/models/Paper';
 import { error, redirect } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import type { PageServerLoad } from './$types';
+import { isHubViceManager } from '$lib/helpers/hubPermissions';
 
 // Type for MongoDB ObjectId
 interface ObjectId {
@@ -86,12 +87,13 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		? (paperDoc.hubId?.createdBy?._id || paperDoc.hubId?.createdBy?.id || paperDoc.hubId?.createdBy)
 		: null;
 	const isHubOwner = hubCreatorId?.toString() === userId;
+	const isViceManager = typeof paperDoc.hubId === 'object' && isHubViceManager(paperDoc.hubId as any, userId);
 
 	// Verificar se é revisor do hub
 	const isHubReviewer = typeof paperDoc.hubId === 'object' && paperDoc.hubId?.reviewers?.includes(userId);
 
-	// Apenas donos e revisores do hub podem acessar esta página
-	if (!isHubOwner && !isHubReviewer) {
+	// Dono, vice manager e revisores do hub podem acessar esta página
+	if (!isHubOwner && !isHubReviewer && !isViceManager) {
 		throw error(403, 'You do not have permission to view this page');
 	}
 
@@ -101,6 +103,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 	}
 
 	return {
-		paper: sanitize(paperDoc)
+		paper: sanitize(paperDoc),
+		canFinalizePublication: isHubOwner
 	};
 };

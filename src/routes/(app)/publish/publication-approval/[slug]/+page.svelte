@@ -9,6 +9,7 @@
 
 	let { data }: Props = $props();
 	let paper = data.paper as unknown as Paper;
+	const canFinalizePublication = data.canFinalizePublication === true;
 
 	let expanded: Record<string, boolean> = $state({});
 	let isApproving = $state(false);
@@ -152,22 +153,30 @@
 			>
 				Collapse all
 			</button>
-			<button
-				class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed"
-				disabled={isApproving || isRejecting}
-				onclick={approve}
-			>
-				{isApproving ? 'Approving…' : 'Approve'}
-			</button>
-			<button
-				class="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-60 disabled:cursor-not-allowed"
-				disabled={isApproving || isRejecting}
-				onclick={reject}
-			>
-				{isRejecting ? 'Rejecting…' : 'Reject'}
-			</button>
+			{#if canFinalizePublication}
+				<button
+					class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed"
+					disabled={isApproving || isRejecting}
+					onclick={approve}
+				>
+					{isApproving ? 'Approving…' : 'Approve'}
+				</button>
+				<button
+					class="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-60 disabled:cursor-not-allowed"
+					disabled={isApproving || isRejecting}
+					onclick={reject}
+				>
+					{isRejecting ? 'Rejecting…' : 'Reject'}
+				</button>
+			{/if}
 		</div>
 	</div>
+
+	{#if !canFinalizePublication}
+		<div class="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-900 text-sm">
+			You can review all publication data, but only the hub owner can approve or reject the final publication.
+		</div>
+	{/if}
 
 	{#if actionError}
 		<div class="mb-6 rounded-lg border border-rose-200 bg-rose-50 p-4 text-rose-800 text-sm">

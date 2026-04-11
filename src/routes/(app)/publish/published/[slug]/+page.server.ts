@@ -2,6 +2,7 @@ import Papers from '$lib/db/models/Paper';
 import Users from '$lib/db/models/User';
 import { error, redirect } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongooseConnection';
+import { isHubViceManager } from '$lib/helpers/hubPermissions';
 
 // Type for MongoDB ObjectId
 interface ObjectId {
@@ -92,6 +93,7 @@ export async function load({ locals, params }) {
 		? (paperDoc.hubId?.createdBy?._id || paperDoc.hubId?.createdBy?.id || paperDoc.hubId?.createdBy)
 		: null;
 	const isHubOwner = hubCreatorId?.toString() === userId;
+	const isHubVice = typeof paperDoc.hubId === 'object' && isHubViceManager(paperDoc.hubId as any, userId);
 	
 	const isHubReviewer = typeof paperDoc.hubId === 'object' && paperDoc.hubId?.reviewers?.includes(userId);
 
@@ -118,7 +120,7 @@ export async function load({ locals, params }) {
 		}
 		
 		// Revisores (do paper ou do hub) e dono do hub vão para a rota de revisão apropriada
-		if (isReviewer || isHubReviewer || isHubOwner) {
+		if (isReviewer || isHubReviewer || isHubOwner || isHubVice) {
 			if (paperStatus === 'reviewer assignment') {
 				redirect(302, `/review/paperspool/${paperDoc.id}`);
 			} else if (paperStatus === 'in review') {

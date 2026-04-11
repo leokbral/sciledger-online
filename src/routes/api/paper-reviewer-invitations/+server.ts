@@ -7,6 +7,7 @@ import ReviewAssignment from '$lib/db/models/ReviewAssignment';
 import Hubs from '$lib/db/models/Hub';
 import { checkReviewerEligibility } from '$lib/helpers/reviewerEligibility';
 import { NotificationService } from '$lib/services/NotificationService';
+import { canManageHub } from '$lib/helpers/hubPermissions';
 import type { RequestHandler } from './$types';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
@@ -45,12 +46,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			);
 		}
 
-		const hubCreatorId = typeof paper.hubId === 'object'
-			? (paper.hubId?.createdBy?._id || paper.hubId?.createdBy?.id || paper.hubId?.createdBy)
-			: null;
-		
-		if (hubCreatorId?.toString() !== user.id) {
-			return json({ error: 'Only hub owner can invite reviewers' }, { status: 403 });
+		if (!canManageHub(paper.hubId as any, user.id)) {
+			return json({ error: 'Only hub managers can invite reviewers' }, { status: 403 });
 		}
 
 		// Inicializar reviewSlots se não existir

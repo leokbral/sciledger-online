@@ -4,11 +4,17 @@ import Users from '$lib/db/models/User';
 import { json } from '@sveltejs/kit';
 import { NotificationService } from '$lib/services/NotificationService';
 import { start_mongo } from '$lib/db/mongooseConnection';
+import { normalizeId } from '$lib/helpers/hubPermissions';
 
 export async function POST({ params, request, locals }) {
     await start_mongo();
     
     try {
+        const user = locals.user;
+        if (!user) {
+            return json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
         const { action } = await request.json();
         const { inviteId } = params;
 
@@ -17,6 +23,10 @@ export async function POST({ params, request, locals }) {
         if (!invitation) {
             return json({ error: 'Invitation not found' }, { status: 404 });
         }
+
+		if (normalizeId(invitation.reviewer) !== user.id) {
+			return json({ error: 'This invitation is not for the current user' }, { status: 403 });
+		}
 
         // Get hub and reviewer information
         const hub = await Hubs.findById(invitation.hubId);
@@ -35,28 +45,38 @@ export async function POST({ params, request, locals }) {
         const reviewerName = `${reviewer.firstName || ''} ${reviewer.lastName || ''}`.trim() || reviewer.email;
 
         if (action === 'accept') {
-            // Add reviewer to hub's reviewers array
-            if (!hub.reviewers) {
-                hub.reviewers = [];
+            const acceptedRole = invitation.role || 'reviewer';
+            const reviewerId = String(invitation.reviewer);
+
+            // Vice managers can also review papers when needed.
+            if (!hub.reviewers) hub.reviewers = [];
+            if (!hub.reviewers.includes(reviewerId)) {
+				hub.reviewers.push(reviewerId);
             }
-            if (!hub.reviewers.includes(String(invitation.reviewer))) {
-                hub.reviewers.push(String(invitation.reviewer));
-                await hub.save();
+
+            if (acceptedRole === 'vice_manager') {
+                if (!hub.assistantManagers) hub.assistantManagers = [];
+                if (!hub.assistantManagers.includes(reviewerId)) {
+                    hub.assistantManagers.push(reviewerId);
+                }
             }
+
+            await hub.save();
 
             // Notify hub creator that reviewer accepted
             await NotificationService.createNotification({
                 user: String(hub.createdBy),
                 type: 'hub_reviewer_accepted',
                 title: 'Reviewer Accepted Invitation',
-                content: `${reviewerName} has accepted the invitation to review for "${hub.title}"`,
+                content: `${reviewerName} accepted the invitation as ${acceptedRole === 'vice_manager' ? 'vice manager' : 'reviewer'} for "${hub.title}"`,
                 relatedHubId: String(invitation.hubId),
                 actionUrl: `/notifications`,
                 priority: 'medium',
                 metadata: {
                     reviewerName: reviewerName,
                     reviewerId: String(invitation.reviewer),
-                    hubName: hub.title
+                    hubName: hub.title,
+                    role: acceptedRole
                 }
             });
         } else {
@@ -72,7 +92,8 @@ export async function POST({ params, request, locals }) {
                 metadata: {
                     reviewerName: reviewerName,
                     reviewerId: String(invitation.reviewer),
-                    hubName: hub.title
+                    hubName: hub.title,
+                    role: invitation.role || 'reviewer'
                 }
             });
         }

@@ -8,6 +8,7 @@ import ReviewAssignment from '$lib/db/models/ReviewAssignment';
 import Hubs from '$lib/db/models/Hub';
 import { checkReviewerEligibility } from '$lib/helpers/reviewerEligibility';
 import { NotificationService } from '$lib/services/NotificationService';
+import { canManageHub } from '$lib/helpers/hubPermissions';
 import type { RequestHandler } from './$types';
 import Stripe from 'stripe';
 import { env } from '$env/dynamic/private';
@@ -457,13 +458,9 @@ export const DELETE: RequestHandler = async ({ params, locals }) => {
 			return json({ error: 'Invitation not found' }, { status: 404 });
 		}
 
-		// Verificar se o usuário é o criador do hub (pode cancelar)
-		const hubCreatorId = typeof invitation.hubId === 'object'
-			? (invitation.hubId?.createdBy?._id || invitation.hubId?.createdBy?.id || invitation.hubId?.createdBy)
-			: null;
-
-		if (hubCreatorId?.toString() !== user.id) {
-			return json({ error: 'Only hub owner can cancel invitations' }, { status: 403 });
+		// Verificar se o usuário é manager do hub (owner ou vice)
+		if (!canManageHub(invitation.hubId as any, user.id)) {
+			return json({ error: 'Only hub managers can cancel invitations' }, { status: 403 });
 		}
 
 		// Deletar o convite

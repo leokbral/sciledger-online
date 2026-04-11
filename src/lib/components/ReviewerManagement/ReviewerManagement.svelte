@@ -6,17 +6,13 @@
 	import type { ReviewQueue } from '$lib/types/ReviewQueue';
 
 	// Props
-	const { hubId, isCreator, users } = $props<{
+	const { hubId, canManageHub, canInviteVice, assistantManagerIds, users }: {
 		hubId: string;
-		isCreator: boolean;
-		users: {
-			_id: string;
-			firstName: string;
-			lastName: string;
-			email: string;
-			profilePicture?: string;
-		}[];
-	}>();
+		canManageHub: boolean;
+		canInviteVice: boolean;
+		assistantManagerIds: string[];
+		users: any[];
+	} = $props();
 
 	// State
 	let reviewers = $state<typeof users>([]);
@@ -28,6 +24,10 @@
 	let pendingInvites = $state<ReviewQueue[]>([]);
 	let activeTab = $state(0);
 	let emailInvite = $state('');
+	let memberSearch = $state('');
+	let memberRoleFilter = $state<'all' | 'vice' | 'reviewer'>('all');
+	let memberPage = $state(1);
+	const MEMBERS_PER_PAGE = 12;
 
 	// Load reviewers do hub
 	async function loadReviewers() {
@@ -80,7 +80,7 @@
 	});
 
 	// Adicionar ou remover revisores
-	async function manageReviewers(action: 'invite' | 'remove', userIds: string[]) {
+	async function manageReviewers(action: 'invite' | 'remove', userIds: string[], role: 'reviewer' | 'vice_manager' = 'reviewer') {
 		loading = true;
 		try {
 			if (action === 'invite') {
@@ -91,7 +91,8 @@
 						headers: { 'Content-Type': 'application/json' },
 						body: JSON.stringify({
 							hubId,
-							reviewerId
+							reviewerId,
+							role
 						})
 					});
 
@@ -104,7 +105,9 @@
 				await Promise.all(promises);
 				toaster.success({
 					title: 'Invitations sent',
-					description: 'The selected users have been invited to be reviewers.'
+					description: role === 'vice_manager'
+						? 'The selected users have been invited to be vice managers.'
+						: 'The selected users have been invited to be reviewers.'
 				});
 				await loadPendingInvites();
 			} else {
@@ -126,8 +129,8 @@
 		} catch (error) {
 			console.error(`Error ${action}ing reviewers:`, error);
 			toaster.error({
-				title: `Error ${action === 'invite' ? 'inviting' : 'removing'} reviewers`,
-				description: `An error occurred while trying to ${action === 'invite' ? 'invite' : 'remove'} reviewers.`
+				title: `Error ${action === 'invite' ? 'inviting' : 'removing'} users`,
+				description: `An error occurred while trying to ${action === 'invite' ? 'invite' : 'remove'} users.`
 			});
 		} finally {
 			loading = false;
@@ -146,6 +149,78 @@
 
 		manageReviewers('remove', [reviewerId]);
 	}
+
+	function isViceManager(userId: string): boolean {
+		return assistantManagerIds.includes(userId);
+	}
+
+	function getViceReviewers() {
+		return reviewers.filter((reviewer: any) => isViceManager(reviewer._id));
+	}
+
+	function getRegularReviewers() {
+		return reviewers.filter((reviewer: any) => !isViceManager(reviewer._id));
+	}
+
+	function getUserAvatar(user: any): string {
+		return user?.profilePictureUrl || user?.profilePicture || '';
+	}
+
+	function getManagedMembers() {
+		return reviewers
+			.map((reviewer: any) => {
+				const firstName = reviewer.firstName || '';
+				const lastName = reviewer.lastName || '';
+				const fullName = `${firstName} ${lastName}`.trim() || reviewer.email || 'Unknown user';
+				return {
+					id: reviewer._id,
+					fullName,
+					email: reviewer.email || '',
+					avatarUrl: getUserAvatar(reviewer),
+					role: isViceManager(reviewer._id) ? 'vice' : 'reviewer'
+				};
+			})
+			.sort((a, b) => a.fullName.localeCompare(b.fullName));
+	}
+
+	function initialsFromName(name: string): string {
+		const parts = name.split(' ');
+		let initials = '';
+		for (const part of parts) {
+			if (!part) continue;
+			initials += part[0];
+			if (initials.length >= 2) break;
+		}
+		return initials.toUpperCase();
+	}
+
+	function getFilteredManagedMembers() {
+		const term = memberSearch.trim().toLowerCase();
+		return getManagedMembers().filter((member) => {
+			const roleMatch = memberRoleFilter === 'all' || member.role === memberRoleFilter;
+			if (!roleMatch) return false;
+			if (!term) return true;
+			return member.fullName.toLowerCase().includes(term) || member.email.toLowerCase().includes(term);
+		});
+	}
+
+	function getTotalPages() {
+		const total = getFilteredManagedMembers().length;
+		return Math.max(1, Math.ceil(total / MEMBERS_PER_PAGE));
+	}
+
+	function getVisibleMembers() {
+		const list = getFilteredManagedMembers();
+		const start = (memberPage - 1) * MEMBERS_PER_PAGE;
+		return list.slice(start, start + MEMBERS_PER_PAGE);
+	}
+
+	$effect(() => {
+		memberSearch;
+		memberRoleFilter;
+		reviewers;
+		memberPage = 1;
+	});
 
 	async function sendEmailInvitation() {
 		if (!emailInvite.trim()) {
@@ -189,24 +264,26 @@
 	}
 </script>
 
-{#if isCreator}
+{#if canManageHub}
 	<Modal
 		open={openModal}
 		onOpenChange={(e) => (openModal = e.open)}
-		triggerBase="btn preset-filled"
-		contentBase="card bg-white dark:bg-surface-800 p-6 space-y-6 shadow-2xl rounded-lg max-w-2xl w-full sm:w-[90vw]"
+		triggerBase="btn inline-flex items-center gap-2 rounded-full border border-surface-300 dark:border-surface-600 bg-white/95 dark:bg-surface-800 px-4 py-2 text-surface-800 dark:text-surface-100 shadow-sm hover:bg-surface-50 dark:hover:bg-surface-700 hover:shadow-md transition-all"
+		contentBase="card bg-white dark:bg-surface-800 p-4 sm:p-6 shadow-2xl rounded-lg max-w-4xl w-full sm:w-[92vw] max-h-[90vh] overflow-hidden flex flex-col"
 	>
 		{#snippet trigger()}
 			<div class="flex items-center gap-2">
-				<Icon icon="mdi:account-multiple" />
-				Manage Reviewers
+				<Icon icon="mdi:account-group" width="20" />
+				Manage Members
 			</div>
 		{/snippet}
 
 		{#snippet content()}
-			<header class="flex justify-between items-center border-b pb-2 mb-4">
-				<h2 class="text-2xl font-semibold">Manage Reviewers</h2>
+			<header class="flex-shrink-0 flex justify-between items-center border-b pb-2 mb-4">
+				<h2 class="text-2xl font-semibold">Manage Hub Members</h2>
 			</header>
+
+			<div class="flex-1 overflow-y-auto pr-1 space-y-4">
 
 			<!-- Tab Navigation -->
 			<div class="flex gap-2 mb-4">
@@ -229,6 +306,25 @@
 			<!-- Tab Content -->
 			{#if activeTab === 0}
 						<!-- Registered Users Tab -->
+						<div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-1 mb-3">
+							<div class="rounded-lg border border-blue-200 bg-blue-50 p-3">
+								<div class="flex items-center gap-2 mb-1 text-blue-900 font-semibold">
+									<Icon icon="mdi:account-check" />
+									Reviewer
+								</div>
+								<p class="text-xs text-blue-800">Can review papers and receive review assignments.</p>
+							</div>
+							{#if canInviteVice}
+								<div class="rounded-lg border border-amber-200 bg-amber-50 p-3">
+									<div class="flex items-center gap-2 mb-1 text-amber-900 font-semibold">
+										<Icon icon="mdi:shield-account" />
+										Vice Manager
+									</div>
+									<p class="text-xs text-amber-800">Can manage hub workflows, but cannot make final publication decisions.</p>
+								</div>
+							{/if}
+						</div>
+
 						<!-- Search -->
 						<div class="relative">
 							<input
@@ -249,7 +345,7 @@
 								<Icon icon="mdi:account-multiple" class="size-4" />
 								Selected: {selectedUsers.length}
 							</span>
-							<span class="text-xs text-gray-500 dark:text-gray-400">Invite selected users to become hub reviewers.</span>
+							<span class="text-xs text-gray-500 dark:text-gray-400">Choose one action below to send invitations.</span>
 						</div>
 
 						<!-- Lista de usuários filtrados -->
@@ -263,9 +359,9 @@
 											<div
 												class="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-gray-200 dark:bg-surface-500"
 											>
-												{#if user.profilePicture}
+												{#if user.profilePictureUrl || user.profilePicture}
 													<img
-														src={user.profilePicture}
+														src={user.profilePictureUrl || user.profilePicture}
 														alt={`${user.firstName}'s profile`}
 														class="w-full h-full object-cover"
 													/>
@@ -299,16 +395,26 @@
 								{/each}
 							</div>
 
-							<!-- Botão de adicionar -->
-							<div class="flex justify-end mt-4">
+							<!-- Ações de convite separadas -->
+							<div class="flex flex-wrap justify-end gap-2 mt-4">
 								<button
-									class="btn preset-filled"
-									onclick={() => manageReviewers('invite', selectedUsers)}
+									class="btn preset-filled-primary-500"
+									onclick={() => manageReviewers('invite', selectedUsers, 'reviewer')}
 									disabled={selectedUsers.length === 0 || loading}
 								>
-									<Icon icon="mdi:email-send" class="mr-2" />
-									Send Invitations ({selectedUsers.length})
+									<Icon icon="mdi:account-check" class="mr-2" />
+									Invite as Reviewers ({selectedUsers.length})
 								</button>
+								{#if canInviteVice}
+								<button
+										class="btn bg-amber-600 hover:bg-amber-700 text-white"
+										onclick={() => manageReviewers('invite', selectedUsers, 'vice_manager')}
+									disabled={selectedUsers.length === 0 || loading}
+								>
+										<Icon icon="mdi:shield-account" class="mr-2" />
+										Invite as Vice Managers ({selectedUsers.length})
+								</button>
+								{/if}
 							</div>
 						{:else}
 							<p class="text-center text-gray-500 dark:text-gray-400">No users found</p>
@@ -368,23 +474,82 @@
 			<div class="pt-4 border-t mt-4 space-y-2">
 				<h3 class="font-medium text-lg">Current Reviewers</h3>
 				{#if reviewers.length > 0}
-					<div class="flex flex-wrap gap-2">
-						{#each reviewers as reviewer}
-							<div class="chip variant-filled flex items-center">
-								{reviewer.firstName}
-								{reviewer.lastName}
-								<button
-									class="ml-2 text-red-500 hover:text-red-700"
-									onclick={() =>
-										confirmReviewerRemoval(
-											reviewer._id,
-											`${reviewer.firstName} ${reviewer.lastName}`
-										)}
-								>
-									<Icon icon="mdi:close" />
-								</button>
+					<div class="rounded-xl border border-surface-200 dark:border-surface-700 p-3 space-y-3">
+						<div class="flex flex-wrap items-center justify-between gap-2">
+							<div class="text-sm text-gray-600 dark:text-gray-300">
+								Total: <strong>{reviewers.length}</strong>
+								<span class="ml-2 text-amber-700">Vice: {getViceReviewers().length}</span>
+								<span class="ml-2 text-blue-700">Reviewer: {getRegularReviewers().length}</span>
 							</div>
-						{/each}
+							<div class="flex items-center gap-2">
+								<button class="btn btn-xs {memberRoleFilter === 'all' ? 'preset-filled' : 'preset-outlined'}" onclick={() => (memberRoleFilter = 'all')}>All</button>
+								<button class="btn btn-xs {memberRoleFilter === 'vice' ? 'preset-filled' : 'preset-outlined'}" onclick={() => (memberRoleFilter = 'vice')}>Vice</button>
+								<button class="btn btn-xs {memberRoleFilter === 'reviewer' ? 'preset-filled' : 'preset-outlined'}" onclick={() => (memberRoleFilter = 'reviewer')}>Reviewer</button>
+							</div>
+						</div>
+
+						<div class="relative">
+							<input
+								type="text"
+								bind:value={memberSearch}
+								placeholder="Search current members by name or email..."
+								class="w-full p-2.5 pl-9 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-surface-700 dark:text-white"
+							/>
+							<Icon icon="mdi:magnify" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+						</div>
+
+						<div class="max-h-72 overflow-auto rounded-lg border border-surface-200 dark:border-surface-700">
+							<div class="grid grid-cols-[1.6fr_1.2fr_auto] gap-2 px-3 py-2 text-xs font-semibold text-gray-500 bg-surface-50 dark:bg-surface-800 sticky top-0">
+								<div>Member</div>
+								<div>Role</div>
+								<div>Action</div>
+							</div>
+							{#if getVisibleMembers().length > 0}
+								{#each getVisibleMembers() as member}
+									<div class="grid grid-cols-[1.6fr_1.2fr_auto] gap-2 px-3 py-2.5 border-t border-surface-200 dark:border-surface-700 items-center">
+										<div class="min-w-0">
+											<div class="flex items-center gap-2 min-w-0">
+												{#if member.avatarUrl}
+													<img src={member.avatarUrl} alt={member.fullName} class="w-7 h-7 rounded-full object-cover" />
+												{:else}
+													<div class="w-7 h-7 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center text-[10px] font-bold">
+														{initialsFromName(member.fullName)}
+													</div>
+												{/if}
+												<div class="min-w-0">
+													<div class="text-sm font-medium text-gray-900 dark:text-white truncate">{member.fullName}</div>
+													<div class="text-xs text-gray-500 truncate">{member.email || 'No email'}</div>
+												</div>
+											</div>
+										</div>
+										<div>
+											{#if member.role === 'vice'}
+												<span class="inline-flex rounded-full bg-amber-100 text-amber-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">Vice Manager</span>
+											{:else}
+												<span class="inline-flex rounded-full bg-blue-100 text-blue-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">Reviewer</span>
+											{/if}
+										</div>
+										<div>
+											<button class="btn btn-xs preset-filled-error-500" onclick={() => confirmReviewerRemoval(member.id, member.fullName)}>
+												Remove
+											</button>
+										</div>
+									</div>
+								{/each}
+							{:else}
+								<div class="px-3 py-6 text-sm text-center text-gray-500">No members found for this filter.</div>
+							{/if}
+						</div>
+
+						{#if getFilteredManagedMembers().length > MEMBERS_PER_PAGE}
+							<div class="flex items-center justify-between text-xs text-gray-600">
+								<span>Page {memberPage} of {getTotalPages()} ({getFilteredManagedMembers().length} results)</span>
+								<div class="flex items-center gap-1">
+									<button class="btn btn-xs preset-outlined" onclick={() => (memberPage = Math.max(1, memberPage - 1))} disabled={memberPage <= 1}>Prev</button>
+									<button class="btn btn-xs preset-outlined" onclick={() => (memberPage = Math.min(getTotalPages(), memberPage + 1))} disabled={memberPage >= getTotalPages()}>Next</button>
+								</div>
+							</div>
+						{/if}
 					</div>
 				{:else}
 					<p class="text-center text-gray-500 dark:text-gray-400">No reviewers assigned yet</p>
@@ -400,6 +565,15 @@
 							<div class="chip variant-ghost flex items-center">
 								{users.find((u: { _id: User }) => u._id === invite.reviewer)?.firstName}
 								{users.find((u: { _id: User }) => u._id === invite.reviewer)?.lastName}
+								{#if (invite as any).role === 'vice_manager'}
+									<span class="ml-2 rounded-full bg-amber-100 text-amber-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
+										Vice
+									</span>
+								{:else if (invite as any).role === 'reviewer'}
+									<span class="ml-2 rounded-full bg-blue-100 text-blue-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
+										Reviewer
+									</span>
+								{/if}
 								<span class="ml-2 text-yellow-500">
 									<Icon icon="mdi:clock-outline" />
 								</span>
@@ -408,6 +582,7 @@
 					</div>
 				</div>
 			{/if}
+			</div>
 		{/snippet}
 	</Modal>
 {/if}

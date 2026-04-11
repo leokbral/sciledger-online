@@ -4,6 +4,7 @@ import Papers from '$lib/db/models/Paper';
 import Users from '$lib/db/models/User';
 import ReviewQueue from '$lib/db/models/ReviewQueue';
 import { NotificationService } from '$lib/services/NotificationService';
+import { canManageHub } from '$lib/helpers/hubPermissions';
 import type { RequestHandler } from './$types';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
@@ -27,13 +28,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			return json({ error: 'Paper not found' }, { status: 404 });
 		}
 
-		// Verificar se o usuário é o dono do hub
-		const hubCreatorId = typeof paper.hubId === 'object'
-			? (paper.hubId?.createdBy?._id || paper.hubId?.createdBy?.id || paper.hubId?.createdBy)
-			: null;
-		
-		if (hubCreatorId?.toString() !== user.id) {
-			return json({ error: 'Only hub owner can remove reviewers' }, { status: 403 });
+		// Verificar se o usuário é manager do hub (owner ou vice)
+		if (!canManageHub(paper.hubId as any, user.id)) {
+			return json({ error: 'Only hub managers can remove reviewers' }, { status: 403 });
 		}
 
 		// Encontrar o slot do revisor
