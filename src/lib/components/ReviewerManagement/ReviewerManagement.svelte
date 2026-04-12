@@ -119,11 +119,16 @@
 				});
 
 				if (response.ok) {
+					const data = await response.json();
 					await loadReviewers();
 					toaster.success({
 						title: 'Reviewers removed',
 						description: 'The reviewers have been removed successfully.'
 					});
+
+					if (data?.removedCurrentUserAsVice || (Array.isArray(data?.removedViceManagers) && data.removedViceManagers.length > 0)) {
+						window.location.reload();
+					}
 				}
 			}
 		} catch (error) {
