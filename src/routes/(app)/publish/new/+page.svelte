@@ -30,7 +30,8 @@
 			const response = await post(`/publish/new`, paper);
 
 			if (response.paper) {
-				goto(`/publish/edit/${response.paper.id}`);
+				const isSubmitted = store?.status === 'reviewer assignment';
+				goto(`/publish/edit/${response.paper.id}${isSubmitted ? '?submitted=1' : ''}`);
 			} else {
 				console.log(paper);
 				alert(`Issue! ${JSON.stringify(response)}`);
