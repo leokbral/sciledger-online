@@ -5,6 +5,7 @@ import * as crypto from 'crypto';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import Papers from '$lib/db/models/Paper';
 import Users from '$lib/db/models/User';
+import Hubs from '$lib/db/models/Hub';
 import type { User } from '$lib/types/User';
 import Stripe from 'stripe';
 import { PaperLifecycleEmailService } from '$lib/services/PaperLifecycleEmailService';
@@ -160,6 +161,27 @@ export const POST: RequestHandler = async ({ request }) => {
                 });
             } catch (emailError) {
                 console.error('Failed to send paper submission email:', emailError);
+            }
+
+            if (newPaper.hubId) {
+                try {
+                    const hub = await Hubs.findById(String(newPaper.hubId))
+                        .select('title createdBy')
+                        .lean();
+
+                    const hubAdminId = hub?.createdBy ? String(hub.createdBy) : '';
+                    if (hubAdminId) {
+                        await PaperLifecycleEmailService.sendHubAdminSubmissionEmail({
+                            hubAdminId,
+                            hubName: String(hub?.title || 'Hub'),
+                            paperId: String(newPaper.id),
+                            paperTitle: String(newPaper.title || 'Untitled paper'),
+                            submittedByName: submitterName || undefined
+                        });
+                    }
+                } catch (adminEmailError) {
+                    console.error('Failed to send hub admin submission email:', adminEmailError);
+                }
             }
         }
 

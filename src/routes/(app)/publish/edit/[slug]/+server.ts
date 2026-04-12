@@ -2,6 +2,7 @@ import type { RequestHandler } from './$types';
 import { json } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import Papers from '$lib/db/models/Paper';
+import Hubs from '$lib/db/models/Hub';
 import '$lib/db/models/User';
 import type { User } from '$lib/types/User';
 import { PaperLifecycleEmailService } from '$lib/services/PaperLifecycleEmailService';
@@ -136,6 +137,28 @@ export const POST: RequestHandler = async ({ request }) => {
                 });
             } catch (emailError) {
                 console.error('Failed to send submission confirmation email on edit:', emailError);
+            }
+
+            const hubId = String((paper as any).hubId || '');
+            if (hubId) {
+                try {
+                    const hub = await Hubs.findById(hubId)
+                        .select('title createdBy')
+                        .lean();
+
+                    const hubAdminId = hub?.createdBy ? String(hub.createdBy) : '';
+                    if (hubAdminId) {
+                        await PaperLifecycleEmailService.sendHubAdminSubmissionEmail({
+                            hubAdminId,
+                            hubName: String(hub?.title || 'Hub'),
+                            paperId: String((paper as any).id || data.id),
+                            paperTitle: String((paper as any).title || 'Untitled paper'),
+                            submittedByName: submitterName || undefined
+                        });
+                    }
+                } catch (adminEmailError) {
+                    console.error('Failed to send hub admin submission email on edit:', adminEmailError);
+                }
             }
         }
 

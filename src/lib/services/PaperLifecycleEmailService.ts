@@ -119,6 +119,23 @@ export class PaperLifecycleEmailService {
 		};
 	}
 
+	static buildHubAdminSubmissionEmailPayload(data: {
+		recipientName: string;
+		hubName: string;
+		paperId: string;
+		paperTitle: string;
+		submittedByName?: string;
+	}): EmailPayload {
+		const paperUrl = buildPaperUrl(data.paperId);
+		const submittedByLabel = data.submittedByName || 'an author';
+
+		return {
+			subject: `New Hub Submission: ${data.paperTitle}`,
+			text: `Dear ${data.recipientName},\n\nA new paper has been submitted to your hub "${data.hubName}".\n\nPaper title: "${data.paperTitle}"\nSubmitted by: ${submittedByLabel}\n\nYou can review the submission at:\n${paperUrl}\n\nRegards,\nSciLedger Team\n\nThis is an automated message. Please do not reply.`,
+			html: `<p>Dear ${data.recipientName},</p><p>A new paper has been submitted to your hub <strong>${data.hubName}</strong>.</p><p><strong>Paper title:</strong> ${data.paperTitle}<br/><strong>Submitted by:</strong> ${submittedByLabel}</p><p>You can review the submission at:<br/><a href="${paperUrl}">${paperUrl}</a></p><p>Regards,<br/>SciLedger Team</p><p><small>This is an automated message. Please do not reply.</small></p>`
+		};
+	}
+
 	static async sendSubmissionConfirmation(data: {
 		paperId: string;
 		paperTitle: string;
@@ -195,5 +212,43 @@ export class PaperLifecycleEmailService {
 				html: payload.html
 			});
 		}
+	}
+
+	static async sendHubAdminSubmissionEmail(data: {
+		hubAdminId: string;
+		hubName: string;
+		paperId: string;
+		paperTitle: string;
+		submittedByName?: string;
+	}) {
+		const transporter = this.getTransporter();
+		if (!transporter) {
+			console.warn('PaperLifecycleEmailService: SMTP is not configured. Skipping hub admin submission email.');
+			return;
+		}
+
+		const recipients = await this.resolveRecipients([data.hubAdminId]);
+		if (recipients.length === 0) {
+			return;
+		}
+
+		const recipient = recipients[0];
+		const recipientName = getDisplayName(recipient);
+		const payload = this.buildHubAdminSubmissionEmailPayload({
+			recipientName,
+			hubName: data.hubName,
+			paperId: data.paperId,
+			paperTitle: data.paperTitle,
+			submittedByName: data.submittedByName
+		});
+
+		const sender = env.SMTP_USER || 'no-reply@sciledger.online';
+		await transporter.sendMail({
+			from: `"SciLedger Team" <${sender}>`,
+			to: recipient.email,
+			subject: payload.subject,
+			text: payload.text,
+			html: payload.html
+		});
 	}
 }
