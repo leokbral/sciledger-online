@@ -3,6 +3,7 @@ import type { RequestHandler } from './$types';
 import { db } from '$lib/db/mongo';
 import { NotificationService } from '$lib/services/NotificationService';
 import { ObjectId } from 'mongodb';
+import { PaperLifecycleEmailService } from '$lib/services/PaperLifecycleEmailService';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
     try {
@@ -114,6 +115,25 @@ export const POST: RequestHandler = async ({ request, locals }) => {
                     });
                 }
             }
+        }
+
+        try {
+            const authorIds = [
+                String(paper.mainAuthor || ''),
+                String(paper.correspondingAuthor || ''),
+                String(paper.submittedBy || ''),
+                ...((paper.coAuthors || []).map((id: string) => String(id)))
+            ].filter(Boolean);
+
+            await PaperLifecycleEmailService.sendPaperAcceptedEmail({
+                paperId: String(paper.id || paperObjectId),
+                paperTitle: String(paperTitle || 'Paper sem titulo'),
+                authorIds,
+                acceptedByName: editorName || undefined,
+                acceptanceType: 'review'
+            });
+        } catch (emailError) {
+            console.error('Failed to send acceptance-for-review email:', emailError);
         }
 
         return json({ 

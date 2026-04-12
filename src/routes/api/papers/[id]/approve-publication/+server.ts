@@ -4,6 +4,7 @@ import Papers from '$lib/db/models/Paper';
 import Hubs from '$lib/db/models/Hub';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import { NotificationService } from '$lib/services/NotificationService';
+import { PaperLifecycleEmailService } from '$lib/services/PaperLifecycleEmailService';
 
 export const POST: RequestHandler = async ({ params, locals, request }) => {
 	try {
@@ -69,6 +70,27 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 			});
 		} catch (notificationError) {
 			console.error('Failed to create paper published notification:', notificationError);
+		}
+
+		try {
+			const authorIds = [
+				String(paperDoc.mainAuthor || ''),
+				String(paperDoc.correspondingAuthor || ''),
+				String(paperDoc.submittedBy || ''),
+				...((paperDoc.coAuthors || []).map((id: string) => String(id)))
+			].filter(Boolean);
+
+			const hubOwnerName = `${(user.firstName || '').trim()} ${(user.lastName || '').trim()}`.trim();
+
+			await PaperLifecycleEmailService.sendPaperAcceptedEmail({
+				paperId: String(paperDoc.id),
+				paperTitle: String(paperDoc.title || 'Paper sem titulo'),
+				authorIds,
+				acceptedByName: hubOwnerName || undefined,
+				acceptanceType: 'publication'
+			});
+		} catch (emailError) {
+			console.error('Failed to send paper publication email:', emailError);
 		}
 
 		return json({

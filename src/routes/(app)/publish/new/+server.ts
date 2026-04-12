@@ -5,8 +5,10 @@ import * as crypto from 'crypto';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import Papers from '$lib/db/models/Paper';
 import Users from '$lib/db/models/User';
+import Hubs from '$lib/db/models/Hub';
 import type { User } from '$lib/types/User';
 import Stripe from 'stripe';
+import { PaperLifecycleEmailService } from '$lib/services/PaperLifecycleEmailService';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
   apiVersion: '2026-02-25.preview'
@@ -136,6 +138,50 @@ export const POST: RequestHandler = async ({ request }) => {
             if (coAuthor) {
                 coAuthor.papers.push(newPaper.id);  // Adiciona o artigo ao coautor
                 await coAuthor.save();  // Salva as alterações do coautor
+            }
+        }
+
+        // Email de comprovante apenas para submissao (nao para rascunho)
+        if (newPaper.status && newPaper.status !== 'draft') {
+            const authorIds = [
+                String(newPaper.mainAuthor || ''),
+                String(newPaper.correspondingAuthor || ''),
+                String(newPaper.submittedBy || ''),
+                ...((newPaper.coAuthors || []).map((id: string) => String(id)))
+            ].filter(Boolean);
+
+            const submitterName = `${(submittedBy?.firstName || '').trim()} ${(submittedBy?.lastName || '').trim()}`.trim();
+
+            try {
+                await PaperLifecycleEmailService.sendSubmissionConfirmation({
+                    paperId: String(newPaper.id),
+                    paperTitle: String(newPaper.title || 'Paper sem titulo'),
+                    authorIds,
+                    submittedByName: submitterName || undefined
+                });
+            } catch (emailError) {
+                console.error('Failed to send paper submission email:', emailError);
+            }
+
+            if (newPaper.hubId) {
+                try {
+                    const hub = await Hubs.findById(String(newPaper.hubId))
+                        .select('title createdBy')
+                        .lean();
+
+                    const hubAdminId = hub?.createdBy ? String(hub.createdBy) : '';
+                    if (hubAdminId) {
+                        await PaperLifecycleEmailService.sendHubAdminSubmissionEmail({
+                            hubAdminId,
+                            hubName: String(hub?.title || 'Hub'),
+                            paperId: String(newPaper.id),
+                            paperTitle: String(newPaper.title || 'Untitled paper'),
+                            submittedByName: submitterName || undefined
+                        });
+                    }
+                } catch (adminEmailError) {
+                    console.error('Failed to send hub admin submission email:', adminEmailError);
+                }
             }
         }
 
