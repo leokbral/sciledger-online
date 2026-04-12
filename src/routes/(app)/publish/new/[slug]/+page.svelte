@@ -41,10 +41,15 @@
 						...response.paper,
 						mainAuthor: response.paper?.mainAuthor
 					} as PaperPublishStoreData;
-					alert('Draft updated successfully!');
+					if (store?.status === 'reviewer assignment') {
+						await goto('/publish/?submitted=1');
+					} else {
+						alert('Draft updated successfully!');
+					}
 				} else {
 					// Se era criação, navegar para a página de edição
-				goto(`/publish/edit/${response.paper.id}`);
+					const isSubmitted = store?.status === 'reviewer assignment';
+					goto(`/publish/edit/${response.paper.id}${isSubmitted ? '?submitted=1' : ''}`);
 				}
 			} else {
 				alert(`Issue! ${JSON.stringify(response)}`);
