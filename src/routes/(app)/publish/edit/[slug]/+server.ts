@@ -4,6 +4,17 @@ import { start_mongo } from '$lib/db/mongooseConnection';
 import Papers from '$lib/db/models/Paper';
 import '$lib/db/models/User';
 import type { User } from '$lib/types/User';
+import { PaperLifecycleEmailService } from '$lib/services/PaperLifecycleEmailService';
+
+function normalizeId(input: any): string | undefined {
+    if (!input) return undefined;
+    if (typeof input === 'string') return input;
+    if (typeof input === 'object') {
+        if (input.id) return String(input.id);
+        if (input._id) return String(input._id);
+    }
+    return undefined;
+}
 
 function normalizeAuthorAffiliations(input: unknown) {
     if (!Array.isArray(input)) return [];
@@ -39,6 +50,11 @@ export const POST: RequestHandler = async ({ request }) => {
             return json({ error: 'Paper ID is required.' }, { status: 400 });
         }
 
+        const existingPaper = await Papers.findById(data.id).lean().exec();
+        if (!existingPaper) {
+            return json({ error: 'Paper not found' }, { status: 404 });
+        }
+
         // Validate required fields
         const requiredFields = ['mainAuthor', 'correspondingAuthor', 'title', 'abstract', 'keywords', 'pdfUrl', 'submittedBy'];
         const missingFields = requiredFields.filter(field => !data[field]);
@@ -53,12 +69,15 @@ export const POST: RequestHandler = async ({ request }) => {
         const _coAuthors = data.coAuthors?.map((a: User) => a.id) || [];
         const _authors = data.authors?.map((a: User) => a.id) || [];
         const normalizedAuthorAffiliations = normalizeAuthorAffiliations(data.authorAffiliations);
+        const normalizedMainAuthorId = normalizeId(data.mainAuthor);
+        const normalizedCorrespondingAuthorId = normalizeId(data.correspondingAuthor);
+        const normalizedSubmittedById = normalizeId(data.submittedBy);
 
         const updateData = {
-            mainAuthor: data.mainAuthor?.id,
+            mainAuthor: normalizedMainAuthorId,
             authors: _authors,
             paperPictures: data.paperPictures,
-            correspondingAuthor: data.correspondingAuthor,
+            correspondingAuthor: normalizedCorrespondingAuthorId,
             coAuthors: _coAuthors,
             authorAffiliations: normalizedAuthorAffiliations,
             status: data.status,//'draft', //'reviewer assignment'
@@ -67,7 +86,7 @@ export const POST: RequestHandler = async ({ request }) => {
             abstract: data.abstract,
             keywords: data.keywords,
             pdfUrl: data.pdfUrl,
-            submittedBy: data.submittedBy,
+            submittedBy: normalizedSubmittedById,
             price: data.price || 0,
             peer_review: data.peer_review,
             ...(data.scopusArea && { scopusArea: data.scopusArea }),
@@ -93,6 +112,31 @@ export const POST: RequestHandler = async ({ request }) => {
 
         if (!paper) {
             return json({ error: 'Paper not found' }, { status: 404 });
+        }
+
+        // Disparar comprovante de submissao quando sair de draft para reviewer assignment.
+        const previousStatus = String((existingPaper as any).status || '');
+        const nextStatus = String((paper as any).status || '');
+        if (nextStatus === 'reviewer assignment' && previousStatus !== 'reviewer assignment') {
+            const authorIds = [
+                String((paper as any).mainAuthor || ''),
+                String((paper as any).correspondingAuthor || ''),
+                String((paper as any).submittedBy || ''),
+                ...((((paper as any).coAuthors || []) as string[]).map((id) => String(id)))
+            ].filter(Boolean);
+
+            const submitterName = `${(data?.submittedBy?.firstName || '').trim()} ${(data?.submittedBy?.lastName || '').trim()}`.trim();
+
+            try {
+                await PaperLifecycleEmailService.sendSubmissionConfirmation({
+                    paperId: String((paper as any).id || data.id),
+                    paperTitle: String((paper as any).title || 'Paper sem titulo'),
+                    authorIds,
+                    submittedByName: submitterName || undefined
+                });
+            } catch (emailError) {
+                console.error('Failed to send submission confirmation email on edit:', emailError);
+            }
         }
 
         return json({ paper }, { status: 200 });

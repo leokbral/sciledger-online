@@ -7,6 +7,7 @@ import Papers from '$lib/db/models/Paper';
 import Users from '$lib/db/models/User';
 import type { User } from '$lib/types/User';
 import Stripe from 'stripe';
+import { PaperLifecycleEmailService } from '$lib/services/PaperLifecycleEmailService';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
   apiVersion: '2026-02-25.preview'
@@ -136,6 +137,29 @@ export const POST: RequestHandler = async ({ request }) => {
             if (coAuthor) {
                 coAuthor.papers.push(newPaper.id);  // Adiciona o artigo ao coautor
                 await coAuthor.save();  // Salva as alterações do coautor
+            }
+        }
+
+        // Email de comprovante apenas para submissao (nao para rascunho)
+        if (newPaper.status && newPaper.status !== 'draft') {
+            const authorIds = [
+                String(newPaper.mainAuthor || ''),
+                String(newPaper.correspondingAuthor || ''),
+                String(newPaper.submittedBy || ''),
+                ...((newPaper.coAuthors || []).map((id: string) => String(id)))
+            ].filter(Boolean);
+
+            const submitterName = `${(submittedBy?.firstName || '').trim()} ${(submittedBy?.lastName || '').trim()}`.trim();
+
+            try {
+                await PaperLifecycleEmailService.sendSubmissionConfirmation({
+                    paperId: String(newPaper.id),
+                    paperTitle: String(newPaper.title || 'Paper sem titulo'),
+                    authorIds,
+                    submittedByName: submitterName || undefined
+                });
+            } catch (emailError) {
+                console.error('Failed to send paper submission email:', emailError);
             }
         }
 

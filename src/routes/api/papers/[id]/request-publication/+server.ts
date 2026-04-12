@@ -4,6 +4,7 @@ import Papers from '$lib/db/models/Paper';
 import Hubs from '$lib/db/models/Hub';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import { NotificationService } from '$lib/services/NotificationService';
+import { PaperLifecycleEmailService } from '$lib/services/PaperLifecycleEmailService';
 
 function isAuthorOfPaper(paper: any, userId: string): boolean {
 	if (!paper || !userId) return false;
@@ -65,6 +66,27 @@ export const POST: RequestHandler = async ({ params, locals }) => {
 				});
 			} catch (notificationError) {
 				console.error('Failed to create paper published notification:', notificationError);
+			}
+
+			try {
+				const authorIds = [
+					String(paperDoc.mainAuthor || ''),
+					String(paperDoc.correspondingAuthor || ''),
+					String(paperDoc.submittedBy || ''),
+					...((paperDoc.coAuthors || []).map((id: string) => String(id)))
+				].filter(Boolean);
+
+				const acceptedByName = `${(user.firstName || '').trim()} ${(user.lastName || '').trim()}`.trim();
+
+				await PaperLifecycleEmailService.sendPaperAcceptedEmail({
+					paperId: String(paperDoc.id),
+					paperTitle: String(paperDoc.title || 'Paper sem titulo'),
+					authorIds,
+					acceptedByName: acceptedByName || undefined,
+					acceptanceType: 'publication'
+				});
+			} catch (emailError) {
+				console.error('Failed to send standalone publication email:', emailError);
 			}
 
 			return json({
