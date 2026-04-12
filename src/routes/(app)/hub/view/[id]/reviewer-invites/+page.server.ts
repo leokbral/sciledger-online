@@ -5,6 +5,7 @@ import Hubs from '$lib/db/models/Hub';
 import Users from '$lib/db/models/User';
 import PaperReviewInvitation from '$lib/db/models/PaperReviewInvitation';
 import { sanitizePaper } from '$lib/helpers/sanitizePaper';
+import { canManageHub } from '$lib/helpers/hubPermissions';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
 	await start_mongo();
@@ -22,9 +23,9 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		redirect(302, '/hub');
 	}
 
-	// Verificar se o usuário é criador do hub
-	const isCreator = hub.createdBy === user.id || (typeof hub.createdBy === 'object' && hub.createdBy._id === user.id);
-	if (!isCreator) {
+	// Verificar se o usuário é manager do hub (owner ou vice)
+	const isManager = canManageHub(hub as any, user.id);
+	if (!isManager) {
 		redirect(302, `/hub/view/${hubId}`);
 	}
 
@@ -49,7 +50,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 
 	return {
 		hub,
-		isCreator,
+		isCreator: hub.createdBy === user.id || (typeof hub.createdBy === 'object' && hub.createdBy._id === user.id),
 		invitations: sanitizedInvitations || [],
 		reviewers: reviewers || []
 	};

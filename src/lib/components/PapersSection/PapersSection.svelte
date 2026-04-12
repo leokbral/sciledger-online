@@ -12,12 +12,13 @@
         papers: Paper[];
         hub: Hub;
         isCreator: boolean;
+        isHubManager: boolean;
         userId: string;
         shouldHighlight: (paper: any) => boolean;
         reviewAssignments?: any[];
     }
 
-    let { papers, hub, isCreator, userId, shouldHighlight, reviewAssignments }: Props = $props();
+    let { papers, hub, isCreator, isHubManager, userId, shouldHighlight, reviewAssignments }: Props = $props();
     
     let hubId = $derived(hub._id);
 
@@ -43,7 +44,7 @@
         // Default routing by status (for authors/creators)
         if (paper?.status === 'reviewer assignment') {
             // Se for creator (hub owner), mostra na rota view
-            if (isCreator) return `/publish/view/${slug}`;
+            if (isHubManager) return `/publish/view/${slug}`;
             return `/publish/reviewer-assignment/${slug}`;
         }
         if (paper?.status === 'in review') return `/publish/inreview/${slug}`;
@@ -52,7 +53,7 @@
         }
         if (paper?.status === 'rejected' || paper?.rejectedByHub) {
             // Papers rejeitados vão para view se for creator
-            if (isCreator) return `/publish/view/${slug}`;
+            if (isHubManager) return `/publish/view/${slug}`;
         }
         return `/publish/published/${slug}`;
     }
@@ -390,8 +391,8 @@
                                 <div
                                     class="mb-3 p-2 bg-yellow-100 border border-yellow-300 rounded text-yellow-800 text-sm font-medium"
                                 >
-                                    {#if isCreator || hub.reviewers?.includes(userId)}
-                                        This article has <strong>not been published</strong> yet and is visible to you as a hub {isCreator ? 'owner' : 'reviewer'}.
+                                    {#if isHubManager || hub.reviewers?.includes(userId)}
+                                        This article has <strong>not been published</strong> yet and is visible to you as a hub {isCreator ? 'owner' : isHubManager ? 'vice manager' : 'reviewer'}.
                                     {:else}
                                         This article has <strong>not been published</strong> yet and is visible only to you and the authors involved.
                                     {/if}
@@ -414,7 +415,7 @@
                                     <a
                                         href={paper.status === 'published' 
                                             ? `/publish/published/${paper._id}` 
-                                            : (paper.status === 'rejected' || paper.rejectedByHub || paper.status === 'reviewer assignment') && isCreator
+                                            : (paper.status === 'rejected' || paper.rejectedByHub || paper.status === 'reviewer assignment') && isHubManager
                                                 ? `/publish/view/${paper._id}`
                                                 : `/publish/published/${paper._id}`}
                                         class="hover:text-primary-600 transition-colors"
@@ -466,8 +467,8 @@
 
                             <!-- Action buttons -->
                             <div class="flex items-center gap-2">
-                                {#if isCreator && paper.status !== 'published'}
-                                    {#if paper.status === 'reviewer assignment' && !paper.rejectedByHub}
+                                {#if isHubManager && paper.status !== 'published'}
+                                    {#if isCreator && paper.status === 'reviewer assignment' && !paper.rejectedByHub}
                                         <button
                                             class="btn btn-sm preset-filled-error-500 text-white shadow-md hover:shadow-lg transition-all duration-200 flex items-center gap-1"
                                             onclick={() => openRejectDialog(paper)}

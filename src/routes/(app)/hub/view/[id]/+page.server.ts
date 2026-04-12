@@ -7,6 +7,7 @@ import Hubs from '$lib/db/models/Hub';
 import Invitation from '$lib/db/models/Invitation';
 import PaperReviewInvitation from '$lib/db/models/PaperReviewInvitation';
 import { sanitizePaper } from '$lib/helpers/sanitizePaper';
+import { canManageHub, isHubViceManager } from '$lib/helpers/hubPermissions';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
 	if (!locals.user) redirect(302, `/login`);
@@ -15,7 +16,8 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 
 	const fetchHub = async () => {
 		const hub = await Hubs.findById(params.id)
-			.populate('createdBy', 'name email')
+			.populate('createdBy', 'firstName lastName name email profilePictureUrl')
+			.populate('assistantManagers', '_id firstName lastName email profilePictureUrl')
 			.populate('reviewers', '_id firstName lastName email profilePictureUrl')
 			.lean();
 
@@ -36,16 +38,16 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		if (!hub) {
 			throw error(404, 'Hub not found');
 		}
-		const isCreator = hub.createdBy.toString() === locals.user.id;
+		const isManager = canManageHub(hub as any, locals.user.id);
 		const isHubReviewer = hub.reviewers?.includes(locals.user.id);
 
 		console.log('🔍 Fetching papers for user:', locals.user.id);
-		console.log('📊 isCreator:', isCreator, 'isHubReviewer:', isHubReviewer);
+		console.log('📊 isManager:', isManager, 'isHubReviewer:', isHubReviewer);
 
 		let paperQuery;
 
-		if (isCreator) {
-			// Admin do hub: vê todos os papers exceto drafts
+		if (isManager) {
+			// Managers do hub (owner/vice): veem todos os papers exceto drafts
 			paperQuery = { 
 				hubId: params.id,
 				status: { $ne: 'draft' }
@@ -144,17 +146,19 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		console.log('🏢 Hub createdBy:', hubData.createdBy);
 		console.log('🏢 Hub createdBy type:', typeof hubData.createdBy);
 		
-		// Buscar ReviewAssignments para este hub (apenas se for criador)
+		// Buscar ReviewAssignments para este hub (apenas para manager do hub)
 		const createdById = typeof hubData.createdBy === 'object' 
 			? (hubData.createdBy._id || hubData.createdBy.id || hubData.createdBy)
 			: hubData.createdBy;
 		const isCreator = createdById.toString() === locals.user.id;
+		const isViceManager = isHubViceManager(hubData as any, locals.user.id);
+		const isHubManager = isCreator || isViceManager;
 		let reviewAssignments: any[] = [];
 		
-		console.log('🔍 Fetching ReviewAssignments - isCreator:', isCreator);
+		console.log('🔍 Fetching ReviewAssignments - isHubManager:', isHubManager);
 		console.log('📋 Hub ID:', params.id);
 		
-		if (isCreator) {
+		if (isHubManager) {
 			const ReviewAssignment = (await import('$lib/db/models/ReviewAssignment')).default;
 			const assignmentsRaw = await ReviewAssignment.find({ 
 				hubId: params.id,
@@ -190,7 +194,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 				});
 			});
 		} else {
-			console.log('❌ User is NOT creator, skipping ReviewAssignments fetch');
+			console.log('❌ User is NOT hub manager, skipping ReviewAssignments fetch');
 		}
 
 		// Buscar convites pendentes para o usuário neste hub
@@ -214,6 +218,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		hubInvitations = hubInvitesRaw.map((inv: any) => ({
 			_id: String(inv._id),
 			hubId: typeof inv.hubId === 'object' ? inv.hubId : null,
+			role: inv.role || 'reviewer',
 			status: inv.status,
 			createdAt: inv.createdAt
 		}));
@@ -252,6 +257,9 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 			hub: hubData,
 			users: usersData,
 			papers: papersData,
+			isCreator,
+			isViceManager,
+			isHubManager,
 			reviewAssignments: reviewAssignments,
 			hubInvitations: hubInvitations,
 			paperReviewInvitations: paperReviewInvitations

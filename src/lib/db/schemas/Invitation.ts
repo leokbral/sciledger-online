@@ -6,6 +6,7 @@ export const InvitationSchema: Schema = new Schema({
     id: { type: String, default: () => crypto.randomUUID(), unique: true },
     // paperId: { type: String, required: true }, // Paper ID
     reviewer: {  type: String, ref: 'User', required: true }, // A single reviewer
+    role: { type: String, enum: ['reviewer', 'vice_manager'], default: 'reviewer' },
     // peerReviewType: { type: String, enum: ['open', 'selected'], required: true }, // Review type
     hubId: { type: String, ref: 'Hub', required: true }, // Hub ID with reference
     // isLinkedToHub: { type: Boolean, required: true }, // Whether linked to a hub

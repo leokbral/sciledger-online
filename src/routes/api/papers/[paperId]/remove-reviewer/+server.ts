@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import Papers from '$lib/db/models/Paper';
 import Hubs from '$lib/db/models/Hub';
+import { canManageHub } from '$lib/helpers/hubPermissions';
 
 export async function POST({ params, request, locals }) {
     try {
@@ -25,10 +26,10 @@ export async function POST({ params, request, locals }) {
             return json({ error: 'Cannot remove reviewers from published papers' }, { status: 400 });
         }
 
-        // Verificar se o usuário é o criador do hub
+        // Verificar se o usuário é manager do hub (owner ou vice)
         const hub = await Hubs.findById(paper.hubId);
-        if (!hub || hub.createdBy.toString() !== locals.user.id) {
-            return json({ error: 'Only hub creators can remove reviewers' }, { status: 403 });
+        if (!hub || !canManageHub(hub, locals.user.id)) {
+            return json({ error: 'Only hub managers can remove reviewers' }, { status: 403 });
         }
 
         // Remover o revisor do array

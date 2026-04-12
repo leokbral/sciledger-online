@@ -3,6 +3,7 @@ import { start_mongo } from '$lib/db/mongooseConnection';
 import PaperReviewInvitation from '$lib/db/models/PaperReviewInvitation';
 import Papers from '$lib/db/models/Paper';
 import { NotificationService } from '$lib/services/NotificationService';
+import { canManageHub } from '$lib/helpers/hubPermissions';
 import type { RequestHandler } from './$types';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
@@ -35,13 +36,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			return json({ error: 'Paper not found' }, { status: 404 });
 		}
 
-		// Verificar se o usuário é o dono do hub (apenas hub owners podem alterar deadlines)
-		const hubCreatorId = typeof paper.hubId === 'object'
-			? (paper.hubId?.createdBy?._id || paper.hubId?.createdBy?.id || paper.hubId?.createdBy)
-			: null;
-		
-		if (hubCreatorId?.toString() !== user.id) {
-			return json({ error: 'Only hub owner can manage review deadlines' }, { status: 403 });
+		// Verificar se o usuário é manager do hub (owner ou vice)
+		if (!canManageHub(paper.hubId as any, user.id)) {
+			return json({ error: 'Only hub managers can manage review deadlines' }, { status: 403 });
 		}
 
 		// Calcular nova deadline
