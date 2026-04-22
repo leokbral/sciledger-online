@@ -96,7 +96,7 @@
 			}}
 			positioning={{ placement: 'bottom-end' }}
 			triggerBase="relative"
-			contentBase="card p-4 shadow-2xl text-surface-50-950 w-[min(92vw,42rem)] max-h-[78vh] overflow-hidden rounded-2xl border border-surface-200 bg-white dark:bg-surface-900"
+			contentBase="card p-4 shadow-2xl text-surface-50-950 w-[min(92vw,42rem)] max-h-[78vh] overflow-hidden rounded-3xl border border-surface-200 bg-white/95 backdrop-blur dark:bg-surface-950/95 dark:border-surface-700"
 			arrow
 			arrowBackground="!bg-surface-950 dark:!bg-surface-50"
 		>
