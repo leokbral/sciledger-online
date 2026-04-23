@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { json } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import PaperReviewInvitation from '$lib/db/models/PaperReviewInvitation';
@@ -6,9 +7,11 @@ import Users from '$lib/db/models/User';
 import ReviewQueue from '$lib/db/models/ReviewQueue';
 import ReviewAssignment from '$lib/db/models/ReviewAssignment';
 import Hubs from '$lib/db/models/Hub';
+import { MAX_ACTIVE_REVIEW_ASSIGNMENTS } from '$lib/constants/reviewerLimits';
 import { checkReviewerEligibility } from '$lib/helpers/reviewerEligibility';
-import { NotificationService } from '$lib/services/NotificationService';
 import { canManageHub } from '$lib/helpers/hubPermissions';
+import { resolveUserIdentifiers } from '$lib/helpers/userIdentifiers';
+import { NotificationService } from '$lib/services/NotificationService';
 import type { RequestHandler } from './$types';
 import Stripe from 'stripe';
 import { env } from '$env/dynamic/private';
@@ -39,69 +42,75 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 			return json({ error: 'Invalid action' }, { status: 400 });
 		}
 
-		// Buscar o convite
-		const invitation = await PaperReviewInvitation.findOne({ 
-			$or: [{ _id: inviteId }, { id: inviteId }] 
+		const invitation = await PaperReviewInvitation.findOne({
+			$or: [{ _id: inviteId }, { id: inviteId }]
 		})
-		.populate('paper')
-		.populate('invitedBy')
-		.populate('reviewer');
+			.populate('paper')
+			.populate('invitedBy')
+			.populate('reviewer');
 
 		if (!invitation) {
 			return json({ error: 'Invitation not found' }, { status: 404 });
 		}
 
-		// Verificar se o usuário é o revisor convidado
-		const reviewerId = typeof invitation.reviewer === 'object' 
-			? (invitation.reviewer._id || invitation.reviewer.id) 
-			: invitation.reviewer;
+		const { canonicalId: canonicalReviewerId, aliases: invitationReviewerAliases } =
+			await resolveUserIdentifiers(invitation.reviewer as any);
+		const currentUserAliases = [String(user.id), String(user._id || '')].filter(Boolean);
 
-		if (reviewerId.toString() !== user.id) {
+		if (!currentUserAliases.some((alias) => invitationReviewerAliases.includes(alias))) {
 			return json({ error: 'Unauthorized' }, { status: 403 });
 		}
 
-		// Atualizar status do convite somente após validar ação
+		const actingReviewerId = canonicalReviewerId || String(user.id);
 
-		const paper = typeof invitation.paper === 'object' ? invitation.paper : await Papers.findOne({ id: invitation.paper });
-		const invitedBy = typeof invitation.invitedBy === 'object' ? invitation.invitedBy : await Users.findOne({ id: invitation.invitedBy });
+		const paper =
+			typeof invitation.paper === 'object'
+				? invitation.paper
+				: await Papers.findOne({ id: invitation.paper });
+		const invitedBy =
+			typeof invitation.invitedBy === 'object'
+				? invitation.invitedBy
+				: await Users.findOne({ id: invitation.invitedBy });
 
 		if (action === 'accept') {
 			let paymentCaptured = false;
 			let capturedPaymentIntentId: string | null = null;
-			// Validar elegibilidade antes de aceitar
+
 			const hubReviewerIds: string[] = [];
 			const isHubPaper = !!invitation.hubId && !!paper.hubId;
-			
-			// Apenas validar hub reviewers se for um paper do hub
+
 			if (isHubPaper) {
 				try {
 					const hubDoc = await Hubs.findById(String(invitation.hubId)).lean();
 					if (hubDoc?.reviewers && Array.isArray(hubDoc.reviewers)) {
 						hubReviewerIds.push(...hubDoc.reviewers.map((r: any) => String(r)));
 					}
-				} catch (e) {}
+				} catch (e) {
+					console.error('Failed to load hub reviewers during invitation acceptance:', e);
+				}
 			}
 
-			const alreadyAssignedIds: string[] = (paper.peer_review?.assignedReviewers || []).map((r: any) => String(r));
-			const activeAssignmentsCount = await ReviewAssignment.countDocuments({ reviewerId: user.id, status: { $in: ['accepted', 'pending'] } });
-
-			// Para papers do hub, limite é 3. Para papers avulsos, permite mais uma (4)
-			const maxAssignments = isHubPaper ? 3 : 4;
-
-			const eligibility = checkReviewerEligibility(
-				paper as any,
-				user as any,
-				{
-					hubReviewerIds,
-					alreadyAssignedIds,
-					activeAssignmentsCount,
-					maxActiveAssignments: maxAssignments,
-					requireExpertiseMatch: false
-				}
+			const alreadyAssignedIds: string[] = (paper.peer_review?.assignedReviewers || []).map(
+				(r: any) => String(r)
 			);
+			const activeAssignmentsCount =
+				typeof MAX_ACTIVE_REVIEW_ASSIGNMENTS === 'number'
+					? await ReviewAssignment.countDocuments({
+							reviewerId: actingReviewerId,
+							status: { $in: ['accepted', 'pending'] }
+						})
+					: 0;
 
-			console.log('🔍 Reviewer Eligibility Check:', {
-				reviewerId: user.id,
+			const eligibility = checkReviewerEligibility(paper as any, user as any, {
+				hubReviewerIds,
+				alreadyAssignedIds,
+				activeAssignmentsCount,
+				maxActiveAssignments: MAX_ACTIVE_REVIEW_ASSIGNMENTS,
+				requireExpertiseMatch: false
+			});
+
+			console.log('Reviewer Eligibility Check:', {
+				reviewerId: actingReviewerId,
 				eligible: eligibility.eligible,
 				reasons: eligibility.reasons,
 				isHubPaper,
@@ -111,10 +120,9 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 				reviewerRoles: user.roles
 			});
 
-			// Convite explícito: bloquear apenas razões críticas.
-			// Regras de capacidade/hub podem mudar entre convite e aceite e não devem impedir o aceite.
-			const hardStopReasons = (eligibility.reasons || []).filter((reason: string) =>
-				reason.includes('Conflict of interest') || reason.includes('already assigned')
+			const hardStopReasons = (eligibility.reasons || []).filter(
+				(reason: string) =>
+					reason.includes('Conflict of interest') || reason.includes('already assigned')
 			);
 
 			if (hardStopReasons.length > 0) {
@@ -127,11 +135,10 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 				);
 			}
 
-			// Atualizar status do convite
 			invitation.status = 'accepted';
 			invitation.respondedAt = new Date();
 			await invitation.save();
-			// Verificar se o paper tem o sistema de slots inicializado
+
 			if (!paper.reviewSlots || paper.reviewSlots.length === 0) {
 				paper.reviewSlots = [
 					{ slotNumber: 1, reviewerId: null, status: 'available' },
@@ -142,49 +149,44 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 				paper.availableSlots = 3;
 			}
 
-			// Verificar se há slots disponíveis
 			const availableSlot = paper.reviewSlots.find(
-				slot => slot.status === 'available' || slot.status === 'declined'
+				(slot) => slot.status === 'available' || slot.status === 'declined'
 			);
 
 			if (!availableSlot) {
-				return json({ 
-					error: 'No available review slots. All 3 reviewer slots are already occupied.',
-					slotsOccupied: paper.reviewSlots.filter(s => s.status === 'occupied').length,
-					maxSlots: paper.maxReviewSlots || 3
-				}, { status: 400 });
+				return json(
+					{
+						error: 'No available review slots. All 3 reviewer slots are already occupied.',
+						slotsOccupied: paper.reviewSlots.filter((s) => s.status === 'occupied').length,
+						maxSlots: paper.maxReviewSlots || 3
+					},
+					{ status: 400 }
+				);
 			}
 
-			// Ocupar o slot disponível
-			availableSlot.reviewerId = user.id;
+			availableSlot.reviewerId = actingReviewerId;
 			availableSlot.status = 'occupied';
 			availableSlot.acceptedAt = new Date();
-			
-			// Atualizar contador de slots disponíveis
-			paper.availableSlots = paper.reviewSlots.filter(
-				slot => slot.status === 'available' || slot.status === 'declined'
-			).length;
 
-			// Salvar as alterações no paper
+			paper.availableSlots = paper.reviewSlots.filter(
+				(slot) => slot.status === 'available' || slot.status === 'declined'
+			).length;
 			await paper.save();
 
-			// Criar entrada na ReviewQueue para o revisor poder revisar o paper
 			const queueId = crypto.randomUUID();
 			const reviewQueueEntry = new ReviewQueue({
 				_id: queueId,
 				id: queueId,
 				paperId: typeof paper === 'object' ? paper.id : paper,
-				reviewer: user.id,
+				reviewer: actingReviewerId,
 				peerReviewType: 'selected',
 				hubId: invitation.hubId,
 				isLinkedToHub: !!invitation.hubId && !!paper.hubId,
 				status: 'accepted',
 				assignedAt: new Date()
 			});
-
 			await reviewQueueEntry.save();
 
-			// Criar ReviewAssignment automaticamente para iniciar o processo de revisão
 			const deadlineDays = invitation.customDeadlineDays || 15;
 			const acceptedAt = new Date();
 			const deadline = new Date(acceptedAt.getTime() + deadlineDays * 24 * 60 * 60 * 1000);
@@ -194,37 +196,31 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 				_id: assignmentId,
 				id: assignmentId,
 				paperId: typeof paper === 'object' ? paper.id : paper,
-				reviewerId: user.id,
-				status: 'accepted', // Já aceito automaticamente
+				reviewerId: actingReviewerId,
+				status: 'accepted',
 				assignedAt: new Date(),
-				acceptedAt: acceptedAt,
-				deadline: deadline,
+				acceptedAt,
+				deadline,
 				hubId: invitation.hubId,
 				isLinkedToHub: !!invitation.hubId && !!paper.hubId
 			});
-
 			await reviewAssignment.save();
 
-			// Atualizar o convite com a referência ao ReviewAssignment
 			invitation.reviewAssignmentId = assignmentId;
 			await invitation.save();
 
-			// Adicionar revisor ao campo reviewers do Paper e atualizar peer_review
 			const paperDoc = await Papers.findOne({ id: typeof paper === 'object' ? paper.id : paper });
 			if (paperDoc) {
-				console.log('📄 Paper found:', paperDoc.id, 'Status:', paperDoc.status);
-				console.log('👤 Adding reviewer:', user.id, '(type:', typeof user.id, ')');
-				console.log('📋 Current reviewers:', paperDoc.reviewers, '(types:', paperDoc.reviewers?.map(r => typeof r));
-				
-				// Adicionar ao array reviewers
+				console.log('Paper found:', paperDoc.id, 'Status:', paperDoc.status);
+				console.log('Adding reviewer:', actingReviewerId);
+
 				if (!paperDoc.reviewers) {
 					paperDoc.reviewers = [];
 				}
-				if (!paperDoc.reviewers.includes(user.id)) {
-					paperDoc.reviewers.push(user.id);
+				if (!paperDoc.reviewers.includes(actingReviewerId)) {
+					paperDoc.reviewers.push(actingReviewerId);
 				}
 
-				// Adicionar/atualizar peer_review.responses
 				if (!paperDoc.peer_review) {
 					paperDoc.peer_review = {
 						reviewType: 'selected',
@@ -238,12 +234,12 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 				}
 
 				const existingResponse = paperDoc.peer_review.responses.find(
-					(r: any) => r.reviewerId === user.id
+					(r: any) => r.reviewerId === actingReviewerId
 				);
 
 				if (!existingResponse) {
 					paperDoc.peer_review.responses.push({
-						reviewerId: user.id,
+						reviewerId: actingReviewerId,
 						status: 'accepted',
 						responseDate: new Date(),
 						assignedAt: new Date()
@@ -254,23 +250,21 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 					existingResponse.assignedAt = new Date();
 				}
 
-				// Adicionar aos assignedReviewers
-				if (!paperDoc.peer_review.assignedReviewers.some((r: any) => String(r) === user.id)) {
-					paperDoc.peer_review.assignedReviewers.push(user.id);
+				if (
+					!paperDoc.peer_review.assignedReviewers.some((r: any) => String(r) === actingReviewerId)
+				) {
+					paperDoc.peer_review.assignedReviewers.push(actingReviewerId);
 				}
 
-				// Contar revisores aceitos
 				const acceptedCount = paperDoc.peer_review.responses.filter(
 					(r: any) => r.status === 'accepted' || r.status === 'completed'
 				).length;
 
-				// Só muda para "in review" quando os 3 revisores aceitarem
 				if (acceptedCount >= REQUIRED_REVIEWERS && paperDoc.status === 'reviewer assignment') {
 					paperDoc.status = 'in review';
 					paperDoc.peer_review.reviewStatus = 'in_progress';
 				}
 
-				// Só libera/captura pagamento quando os 3 revisores aceitarem
 				if (
 					acceptedCount >= REQUIRED_REVIEWERS &&
 					paperDoc.paymentHold?.stripePaymentIntentId &&
@@ -288,25 +282,23 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 							paymentCaptured = true;
 							capturedPaymentIntentId = paymentIntent.id;
 							console.log(
-								`✅ Payment captured after ${REQUIRED_REVIEWERS} reviewer acceptances:`,
+								`Payment captured after ${REQUIRED_REVIEWERS} reviewer acceptances:`,
 								paymentIntent.id
 							);
 						} catch (captureError) {
-							console.error('⚠️ Failed to capture payment after 3 acceptances:', captureError);
+							console.error('Failed to capture payment after 3 acceptances:', captureError);
 						}
 					} else {
-						console.error('⚠️ STRIPE_SECRET_KEY not configured. Could not capture payment.');
+						console.error('STRIPE_SECRET_KEY not configured. Could not capture payment.');
 					}
 				}
 
 				await paperDoc.save();
-				
-				console.log('✅ Reviewer added successfully. Paper status:', paperDoc.status);
+				console.log('Reviewer added successfully. Paper status:', paperDoc.status);
 			} else {
-				console.error('❌ Paper not found for ID:', typeof paper === 'object' ? paper.id : paper);
+				console.error('Paper not found for ID:', typeof paper === 'object' ? paper.id : paper);
 			}
 
-			// Notificar o criador do hub que o revisor aceitou
 			if (invitedBy) {
 				const notificationData: any = {
 					user: String(invitedBy._id || invitedBy.id),
@@ -318,12 +310,11 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 					priority: 'medium',
 					metadata: {
 						reviewerName: `${user.firstName} ${user.lastName}`,
-						reviewerId: user.id,
+						reviewerId: actingReviewerId,
 						paperTitle: paper?.title
 					}
 				};
 
-				// Adicionar hubId apenas se o paper for do hub
 				if (invitation.hubId && paper.hubId) {
 					notificationData.relatedHubId = String(invitation.hubId);
 				}
@@ -337,9 +328,12 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 				const amountInBrl = paper?.paymentHold?.amount
 					? `R$${(Number(paper.paymentHold.amount) / 100).toFixed(2)} BRL`
 					: 'the authorized amount';
-				const authorId = typeof paper?.submittedBy === 'object'
-					? String((paper.submittedBy as any)?._id || (paper.submittedBy as any)?.id)
-					: (paper?.submittedBy ? String(paper.submittedBy) : null);
+				const authorId =
+					typeof paper?.submittedBy === 'object'
+						? String((paper.submittedBy as any)?._id || (paper.submittedBy as any)?.id)
+						: paper?.submittedBy
+							? String(paper.submittedBy)
+							: null;
 				const editorId = invitedBy ? String(invitedBy._id || invitedBy.id) : null;
 
 				if (authorId) {
@@ -379,30 +373,26 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 				}
 			}
 		} else {
-			// Atualizar status do convite como declined
 			invitation.status = 'declined';
 			invitation.respondedAt = new Date();
 			await invitation.save();
-			// Quando o revisor recusa, marcar o slot como declined (mantém disponível para outros)
-			// Verificar se o revisor tinha um slot pendente
+
 			const reviewerSlot = paper.reviewSlots?.find(
-				slot => slot.reviewerId?.toString() === user.id && slot.status === 'pending'
+				(slot) => slot.reviewerId?.toString() === actingReviewerId && slot.status === 'pending'
 			);
 
 			if (reviewerSlot) {
 				reviewerSlot.status = 'declined';
 				reviewerSlot.declinedAt = new Date();
-				reviewerSlot.reviewerId = null; // Liberar o slot
-				
-				// Atualizar contador de slots disponíveis
+				reviewerSlot.reviewerId = null;
+
 				paper.availableSlots = paper.reviewSlots.filter(
-					slot => slot.status === 'available' || slot.status === 'declined'
+					(slot) => slot.status === 'available' || slot.status === 'declined'
 				).length;
-				
+
 				await paper.save();
 			}
 
-			// Notificar o criador do hub que o revisor recusou
 			if (invitedBy) {
 				await NotificationService.createNotification({
 					user: String(invitedBy._id || invitedBy.id),
@@ -415,19 +405,20 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 					priority: 'low',
 					metadata: {
 						reviewerName: `${user.firstName} ${user.lastName}`,
-						reviewerId: user.id,
+						reviewerId: actingReviewerId,
 						paperTitle: paper?.title
 					}
 				});
 			}
 		}
 
-		return json({ 
+		return json({
 			success: true,
 			action,
-			message: action === 'accept' 
-				? 'You accepted the review invitation. The paper is now available for you to review.'
-				: 'You declined the review invitation.'
+			message:
+				action === 'accept'
+					? 'You accepted the review invitation. The paper is now available for you to review.'
+					: 'You declined the review invitation.'
 		});
 	} catch (error) {
 		console.error('Error responding to paper review invitation:', error);
@@ -446,7 +437,6 @@ export const DELETE: RequestHandler = async ({ params, locals }) => {
 
 		const { inviteId } = params;
 
-		// Buscar o convite
 		const invitation = await PaperReviewInvitation.findOne({
 			$or: [{ _id: inviteId }, { id: inviteId }]
 		})
@@ -458,24 +448,25 @@ export const DELETE: RequestHandler = async ({ params, locals }) => {
 			return json({ error: 'Invitation not found' }, { status: 404 });
 		}
 
-		// Verificar se o usuário é manager do hub (owner ou vice)
 		if (!canManageHub(invitation.hubId as any, user.id)) {
 			return json({ error: 'Only hub managers can cancel invitations' }, { status: 403 });
 		}
 
-		// Deletar o convite
 		await PaperReviewInvitation.deleteOne({ _id: inviteId });
 
-		// Notificar o revisor que o convite foi cancelado
-		const reviewerId = typeof invitation.reviewer === 'object'
-			? invitation.reviewer._id || invitation.reviewer.id
-			: invitation.reviewer;
-
+		const { canonicalId: canonicalInvitationReviewerId } = await resolveUserIdentifiers(
+			invitation.reviewer as any
+		);
+		const reviewerId =
+			canonicalInvitationReviewerId ||
+			(typeof invitation.reviewer === 'object'
+				? String((invitation.reviewer as any)._id || (invitation.reviewer as any).id || '')
+				: String(invitation.reviewer || ''));
 		const paper = typeof invitation.paper === 'object' ? invitation.paper : null;
 
 		if (reviewerId) {
 			await NotificationService.createNotification({
-				user: String(reviewerId),
+				user: reviewerId,
 				type: 'invitation_cancelled',
 				title: 'Review Invitation Cancelled',
 				content: `Your invitation to review "${paper?.title || 'a paper'}" has been cancelled.`,

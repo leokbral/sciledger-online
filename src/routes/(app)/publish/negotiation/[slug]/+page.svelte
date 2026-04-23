@@ -643,6 +643,7 @@
 						hubId={typeof paper.hubId === 'object' ? paper.hubId._id || paper.hubId.id : paper.hubId}
 						hubReviewers={paper.hubId.reviewers as User[]}
 						currentAssignedReviewers={paper.peer_review?.assignedReviewers?.map(r => typeof r === 'object' ? r._id || r.id : r) || []}
+						currentPendingReviewers={data.pendingReviewerIds || []}
 						reviewSlots={paper.reviewSlots as { slotNumber: number; reviewerId: string | null; status: 'pending' | 'declined' | 'available' | 'occupied'; }[] || []}
 						mainAuthorId={typeof paper.mainAuthor === 'object' ? paper.mainAuthor._id || paper.mainAuthor.id : paper.mainAuthor}
 						coAuthorIds={paper.coAuthors?.map(a => typeof a === 'object' ? a._id || a.id : a) || []}

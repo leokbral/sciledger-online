@@ -92,7 +92,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 	// Verificar se é revisor do hub
 	const isHubReviewer = typeof paperDoc.hubId === 'object' && paperDoc.hubId?.reviewers?.includes(userId);
 
-	// Dono, vice manager e revisores do hub podem acessar esta página
+	// Dono, Editor-in-chief e revisores do hub podem acessar esta página
 	if (!isHubOwner && !isHubReviewer && !isViceManager) {
 		throw error(403, 'You do not have permission to view this page');
 	}

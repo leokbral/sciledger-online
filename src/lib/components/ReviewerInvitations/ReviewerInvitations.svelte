@@ -110,7 +110,7 @@
 						{/if}
 						<div>
 							<p class="font-medium">
-								Invitation to join as {invite.role === 'vice_manager' ? 'Vice Manager' : 'Reviewer'}: {invite.hubId?.title || 'Unknown Hub'}
+								Invitation to join as {invite.role === 'vice_manager' ? 'Editor-in-chief' : 'Reviewer'}: {invite.hubId?.title || 'Unknown Hub'}
 							</p>
 							<p class="text-sm text-gray-500">
 								{invite.hubId?.type || 'Hub'} • Received {new Date(invite.createdAt).toLocaleDateString()}

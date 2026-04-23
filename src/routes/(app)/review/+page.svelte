@@ -66,6 +66,40 @@
 	let user: any = data.user; //userProfiles[0];
 	let reviewerInvitations = data.reviewerInvitations;
 
+	function getIdAliases(value: unknown): string[] {
+		if (!value) return [];
+
+		if (typeof value === 'string') {
+			return [String(value)];
+		}
+
+		if (typeof value !== 'object') {
+			return [];
+		}
+
+		const candidate = value as {
+			id?: unknown;
+			_id?: unknown;
+			toString?: () => string;
+		};
+
+		const aliases = [candidate.id, candidate._id]
+			.filter(Boolean)
+			.map((alias) => String(alias));
+
+		const stringified = candidate.toString?.();
+		if (stringified && stringified !== '[object Object]') {
+			aliases.push(String(stringified));
+		}
+
+		return Array.from(new Set(aliases));
+	}
+
+	function matchesUser(value: unknown, userId: string | undefined): boolean {
+		if (!userId) return false;
+		return getIdAliases(value).includes(String(userId));
+	}
+
 	let papersPool = papers
 		.filter((p: Paper) => {
 			const userId = user.id?.toString();
@@ -73,30 +107,36 @@
 
 			if (!isReviewerRole) return false; // ← if not a reviewer, cannot see any paper
 
-			const correspondingAuthorId = p.correspondingAuthor?.toString();
-			const mainAuthorId = (
-				typeof p.mainAuthor === 'object' ? (p.mainAuthor.id ?? p.mainAuthor._id) : p.mainAuthor
-			)?.toString();
-			const isAuthor = correspondingAuthorId === userId;
-			const isMainAuthor = mainAuthorId === userId;
-			const isCoAuthor = p.coAuthors?.some((author) => author.id?.toString() === userId);
+			const isAuthor = matchesUser(p.correspondingAuthor, userId);
+			const isMainAuthor = matchesUser(p.mainAuthor, userId);
+			const isCoAuthor = (p.coAuthors ?? []).some((author) => matchesUser(author, userId));
 
-			const isHubReviewer = typeof p.hubId === 'object' && p.hubId?.reviewers?.includes(userId);
-			const isHubOwner = typeof p.hubId === 'object' && 
-				(p.hubId?.createdBy?.id || p.hubId?.createdBy)?.toString() === userId;
+			const isHubReviewer =
+				typeof p.hubId === 'object' &&
+				Array.isArray(p.hubId?.reviewers) &&
+				p.hubId.reviewers.some((reviewer) => matchesUser(reviewer, userId));
+			const isHubOwner = typeof p.hubId === 'object' && matchesUser(p.hubId?.createdBy, userId);
 			const isPaperInHub = !!p.hubId;
+			const isAcceptedForReview = p.isAcceptedForReview === true;
 
 			const isUnderNegotiation = p.status === 'reviewer assignment';
 			const isInvolved = isAuthor || isCoAuthor || isMainAuthor;
 
 			const canSeeWithoutHub = !isPaperInHub && isUnderNegotiation && !isInvolved;
-			const canSeeWithHub = isPaperInHub && isUnderNegotiation && (isHubReviewer || isHubOwner) && !isInvolved;
+			const canSeeWithHub =
+				isPaperInHub &&
+				isUnderNegotiation &&
+				(isHubReviewer || isHubOwner || isAcceptedForReview) &&
+				!isInvolved;
 
 			return canSeeWithoutHub || canSeeWithHub;
 		})
 		.map((paper) => ({
 			...paper,
-			isHubPaper: typeof paper.hubId === 'object' && paper.hubId?.reviewers?.includes(user.id)
+			isHubPaper:
+				typeof paper.hubId === 'object' &&
+				Array.isArray(paper.hubId?.reviewers) &&
+				paper.hubId.reviewers.some((reviewer) => matchesUser(reviewer, user.id))
 		}));
 
 	console.log(papersPool);
@@ -108,15 +148,18 @@
 		const userId = user.id?.toString();
 		
 		// Verifica se é dono do hub
-		const hubCreatorId = typeof p.hubId === 'object' ? p.hubId?.createdBy?.id || p.hubId?.createdBy : null;
-		const isHubOwner = hubCreatorId?.toString() === userId;
+		const isHubOwner = typeof p.hubId === 'object' && matchesUser(p.hubId?.createdBy, userId);
 		
 		// Verifica se é revisor do hub
-		const isHubReviewer = typeof p.hubId === 'object' && p.hubId?.reviewers?.includes(userId);
+		const isHubReviewer =
+			typeof p.hubId === 'object' &&
+			Array.isArray(p.hubId?.reviewers) &&
+			p.hubId.reviewers.some((reviewer) => matchesUser(reviewer, userId));
 		
 		// Verifica se é revisor designado
 		const isReviewer = p.peer_review?.responses?.some(
-			(r) => r.reviewerId === userId && (r.status === 'accepted' || r.status === 'completed')
+			(r) =>
+				matchesUser(r.reviewerId, userId) && (r.status === 'accepted' || r.status === 'completed')
 		);
 		
 		return isReviewer || isHubReviewer || isHubOwner;
@@ -129,15 +172,18 @@
 		const userId = user.id?.toString();
 		
 		// Verifica se é dono do hub
-		const hubCreatorId = typeof p.hubId === 'object' ? p.hubId?.createdBy?.id || p.hubId?.createdBy : null;
-		const isHubOwner = hubCreatorId?.toString() === userId;
+		const isHubOwner = typeof p.hubId === 'object' && matchesUser(p.hubId?.createdBy, userId);
 		
 		// Verifica se é revisor do hub
-		const isHubReviewer = typeof p.hubId === 'object' && p.hubId?.reviewers?.includes(userId);
+		const isHubReviewer =
+			typeof p.hubId === 'object' &&
+			Array.isArray(p.hubId?.reviewers) &&
+			p.hubId.reviewers.some((reviewer) => matchesUser(reviewer, userId));
 		
 		// Verifica se é revisor designado
 		const isReviewer = p.peer_review?.responses?.some(
-			(r) => r.reviewerId === userId && (r.status === 'accepted' || r.status === 'completed')
+			(r) =>
+				matchesUser(r.reviewerId, userId) && (r.status === 'accepted' || r.status === 'completed')
 		);
 		
 		return isReviewer || isHubReviewer || isHubOwner;
@@ -151,7 +197,7 @@
 		
 		// Verificar se o usuário completou uma revisão deste paper
 		const hasCompleted = p.peer_review?.responses?.some(
-			(r) => r.reviewerId === userId && r.status === 'completed'
+			(r) => matchesUser(r.reviewerId, userId) && r.status === 'completed'
 		);
 		
 		return hasCompleted;

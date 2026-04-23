@@ -106,7 +106,7 @@
 				toaster.success({
 					title: 'Invitations sent',
 					description: role === 'vice_manager'
-						? 'The selected users have been invited to be vice managers.'
+						? 'The selected users have been invited to be Editor-in-chief.'
 						: 'The selected users have been invited to be reviewers.'
 				});
 				await loadPendingInvites();
@@ -323,7 +323,7 @@
 								<div class="rounded-lg border border-amber-200 bg-amber-50 p-3">
 									<div class="flex items-center gap-2 mb-1 text-amber-900 font-semibold">
 										<Icon icon="mdi:shield-account" />
-										Vice Manager
+										Editor-in-chief
 									</div>
 									<p class="text-xs text-amber-800">Can manage hub workflows, but cannot make final publication decisions.</p>
 								</div>
@@ -417,7 +417,7 @@
 									disabled={selectedUsers.length === 0 || loading}
 								>
 										<Icon icon="mdi:shield-account" class="mr-2" />
-										Invite as Vice Managers ({selectedUsers.length})
+										Invite as Editor-in-chief ({selectedUsers.length})
 								</button>
 								{/if}
 							</div>
@@ -529,7 +529,7 @@
 										</div>
 										<div>
 											{#if member.role === 'vice'}
-												<span class="inline-flex rounded-full bg-amber-100 text-amber-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">Vice Manager</span>
+												<span class="inline-flex rounded-full bg-amber-100 text-amber-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">Editor-in-chief</span>
 											{:else}
 												<span class="inline-flex rounded-full bg-blue-100 text-blue-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">Reviewer</span>
 											{/if}

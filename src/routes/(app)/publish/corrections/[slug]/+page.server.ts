@@ -9,6 +9,40 @@ interface ObjectId {
 	constructor: { name: string };
 }
 
+function getIdAliases(value: unknown): string[] {
+	if (!value) return [];
+
+	if (typeof value === 'string') {
+		return [String(value)];
+	}
+
+	if (typeof value !== 'object') {
+		return [];
+	}
+
+	const candidate = value as {
+		id?: unknown;
+		_id?: unknown;
+		toString?: () => string;
+	};
+
+	const aliases = [candidate.id, candidate._id]
+		.filter(Boolean)
+		.map((alias) => String(alias));
+
+	const stringified = candidate.toString?.();
+	if (stringified && stringified !== '[object Object]') {
+		aliases.push(String(stringified));
+	}
+
+	return Array.from(new Set(aliases));
+}
+
+function matchesCurrentUser(value: unknown, currentUser: Record<string, unknown>): boolean {
+	const userAliases = new Set(getIdAliases(currentUser));
+	return getIdAliases(value).some((alias) => userAliases.has(alias));
+}
+
 // 🔧 Função de sanitização
 function sanitize(obj: unknown): unknown {
 	if (obj === null || obj === undefined) {
@@ -45,7 +79,7 @@ function sanitize(obj: unknown): unknown {
 }
 
 export async function load({ locals, params }) {
-	if (!locals.user) redirect(302, `/login`);
+	if (!locals.user) throw redirect(302, `/login`);
 
 	const id = params.slug;
 
@@ -54,6 +88,7 @@ export async function load({ locals, params }) {
 		.populate("authors")
 		.populate("mainAuthor")
 		.populate("coAuthors")
+		.populate("hubId")
 		.populate({
 			path: 'peer_review.reviews',
 			populate: {
@@ -66,6 +101,28 @@ export async function load({ locals, params }) {
 
 	if (!paperDoc) {
 		throw error(404, 'Paper not found');
+	}
+
+	const isReviewerAccepted = (paperDoc.peer_review?.responses ?? []).some((response: any) => {
+		return (
+			(response?.status === 'accepted' || response?.status === 'completed') &&
+			matchesCurrentUser(response?.reviewerId, locals.user as Record<string, unknown>)
+		);
+	});
+
+	const hubData = typeof paperDoc.hubId === 'object' ? paperDoc.hubId : null;
+	const isHubReviewer =
+		Array.isArray(hubData?.reviewers) &&
+		hubData.reviewers.some((reviewer: any) =>
+			matchesCurrentUser(reviewer, locals.user as Record<string, unknown>)
+		);
+	const isHubOwner = matchesCurrentUser(
+		hubData?.createdBy,
+		locals.user as Record<string, unknown>
+	);
+
+	if (isReviewerAccepted || isHubReviewer || isHubOwner) {
+		throw redirect(302, `/review/correction/${id}`);
 	}
 
 	// Verificar se é autor do paper (main author ou co-author)

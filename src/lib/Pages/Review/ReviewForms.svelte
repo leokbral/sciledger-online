@@ -34,7 +34,7 @@
 
 		// Part II – Qualitative Evaluation
 		strengths: '',
-		weaknesses: '',
+		corrections: '',
 
 		// Part III – Ethics
 		involvesHumanResearch: '',
@@ -334,7 +334,7 @@
 
 						// Part II – Qualitative Evaluation
 						strengths: form.strengths,
-						weaknesses: form.weaknesses,
+						corrections: form.corrections,
 
 						// Part III – Ethics
 						involvesHumanResearch: form.involvesHumanResearch,
@@ -407,9 +407,7 @@
 
 						// Part II – Qualitative Evaluation
 						strengths: form.strengths,
-						weaknesses: form.weaknesses,
-
-						// Part III – Ethics
+					corrections: form.corrections,
 						involvesHumanResearch: form.involvesHumanResearch,
 						ethicsApproval: form.ethicsApproval,
 
@@ -656,8 +654,8 @@
 			</div>
 
 			<div class="bg-white p-4 rounded mb-4">
-				<h4 class="font-semibold text-purple-900 mb-2">⚠️ Weaknesses:</h4>
-				<p class="text-gray-700 text-sm whitespace-pre-wrap">{previousReview.form?.weaknesses || 'N/A'}</p>
+				<h4 class="font-semibold text-purple-900 mb-2">✏️ Corrections:</h4>
+				<p class="text-gray-700 text-sm whitespace-pre-wrap">{previousReview.form?.corrections || 'N/A'}</p>
 			</div>
 
 			<div class="bg-white p-4 rounded">
@@ -801,19 +799,19 @@
 					</div>
 
 					<div>
-						<label for="weaknesses" class="block text-sm font-medium text-gray-700 mb-2">
-							2. Weaknesses and suggestions for improvement:
+						<label for="corrections" class="block text-sm font-medium text-gray-700 mb-2">
+							2. Corrections and suggestions for improvement:
 						</label>
 						<p class="text-sm text-gray-600 mb-3">
 							Indicate aspects that should be improved and offer constructive suggestions.
 						</p>
 						<textarea
-							id="weaknesses"
-							bind:value={form.weaknesses}
+							id="corrections"
+							bind:value={form.corrections}
 							disabled={hasSubmittedInCurrentRound}
 							rows="4"
 							class="w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {hasSubmittedInCurrentRound ? 'bg-gray-100 cursor-not-allowed' : ''}"
-							placeholder="Describe the weaknesses and suggestions for improvement..."
+							placeholder="Describe the corrections and suggestions for improvement..."
 						></textarea>
 					</div>
 				</div>

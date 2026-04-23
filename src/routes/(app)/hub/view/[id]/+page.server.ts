@@ -9,6 +9,39 @@ import PaperReviewInvitation from '$lib/db/models/PaperReviewInvitation';
 import { sanitizePaper } from '$lib/helpers/sanitizePaper';
 import { canManageHub, isHubViceManager } from '$lib/helpers/hubPermissions';
 
+function getIdAliases(value: unknown): string[] {
+	if (!value) return [];
+
+	if (typeof value === 'string') {
+		return [String(value)];
+	}
+
+	if (typeof value !== 'object') {
+		return [];
+	}
+
+	const candidate = value as {
+		id?: unknown;
+		_id?: unknown;
+		toString?: () => string;
+	};
+
+	const aliases = [candidate.id, candidate._id]
+		.filter(Boolean)
+		.map((alias) => String(alias));
+
+	const stringified = candidate.toString?.();
+	if (stringified && stringified !== '[object Object]') {
+		aliases.push(String(stringified));
+	}
+
+	return Array.from(new Set(aliases));
+}
+
+function matchesUser(value: unknown, userId: string): boolean {
+	return getIdAliases(value).includes(String(userId));
+}
+
 export const load: PageServerLoad = async ({ params, locals }) => {
 	if (!locals.user) redirect(302, `/login`);
 
@@ -117,8 +150,16 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 
 			// Marcar se o usuário é revisor deste paper (está no campo reviewers)
 			// reviewers pode conter objetos populados ou strings
-			const reviewerIds = paper.reviewers?.map(r => typeof r === 'object' ? (r._id || r.id) : r) || [];
-			const isAcceptedForReview = reviewerIds.includes(locals.user.id);
+			const reviewerIds =
+				paper.reviewers?.flatMap((reviewer: any) => getIdAliases(reviewer)) || [];
+			const isAcceptedForReview =
+				reviewerIds.includes(locals.user.id) ||
+				(paper.peer_review?.responses ?? []).some((response: any) => {
+					return (
+						matchesUser(response?.reviewerId, locals.user.id) &&
+						(response?.status === 'accepted' || response?.status === 'completed')
+					);
+				});
 			
 			console.log(`  📋 Paper ${paper.id} - isAcceptedForReview: ${isAcceptedForReview}`);
 			console.log(`     Reviewer IDs: [${reviewerIds.join(', ')}]`);
@@ -154,6 +195,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		const isViceManager = isHubViceManager(hubData as any, locals.user.id);
 		const isHubManager = isCreator || isViceManager;
 		let reviewAssignments: any[] = [];
+		let pendingPaperInvitations: Array<{ paperId: string; reviewerId: string }> = [];
 		
 		console.log('🔍 Fetching ReviewAssignments - isHubManager:', isHubManager);
 		console.log('📋 Hub ID:', params.id);
@@ -193,6 +235,20 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 					status: ra.status
 				});
 			});
+
+			const pendingInvitesRaw = await PaperReviewInvitation.find({
+				hubId: params.id,
+				status: 'pending'
+			})
+				.select('paper reviewer')
+				.lean();
+
+			pendingPaperInvitations = pendingInvitesRaw
+				.map((invite: any) => ({
+					paperId: String(invite?.paper || '').trim(),
+					reviewerId: String(invite?.reviewer || '').trim()
+				}))
+				.filter((invite) => invite.paperId && invite.reviewerId);
 		} else {
 			console.log('❌ User is NOT hub manager, skipping ReviewAssignments fetch');
 		}
@@ -261,6 +317,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 			isViceManager,
 			isHubManager,
 			reviewAssignments: reviewAssignments,
+			pendingPaperInvitations,
 			hubInvitations: hubInvitations,
 			paperReviewInvitations: paperReviewInvitations
 		};

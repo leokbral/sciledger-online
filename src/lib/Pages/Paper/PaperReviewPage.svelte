@@ -15,6 +15,11 @@
 	import CorrectionProgressBar from '$lib/components/CorrectionProgressBar/CorrectionProgressBar.svelte';
 	import SupplementaryMaterials from '$lib/components/SupplementaryMaterials.svelte';
 	import SupplementaryFiles from '$lib/components/SupplementaryFiles.svelte';
+	import {
+		openPaperPdfPreview,
+		setupPaperHtmlPresentation
+	} from '$lib/utils/paperHtmlPresentation';
+	import { buildStandardPdfFilename, getPaperYear } from '$lib/utils/pdfFilename';
 
 	const dispatch = createEventDispatcher();
 
@@ -143,6 +148,7 @@
 	}: Props = $props();
 
 	let isReviewCollapsed = $state(false);
+	let paperHtmlRoot: HTMLElement | null = null;
 
 	function handleReviewCollapse(event: CustomEvent<{ collapsed: boolean }>) {
 		isReviewCollapsed = event.detail?.collapsed ?? false;
@@ -175,24 +181,36 @@
 		throw new Error('Function not implemented.');
 	}
 
-	// Function to style reference links
-	function styleReferenceLinks() {
-		if (typeof window !== 'undefined') {
-			const contentElements = document.querySelectorAll('.paper-content');
+	function resolvePrintFilename(): string {
+		const paperData = (paper ?? {}) as any;
+		const authorLastName =
+			paperData?.correspondingAuthor?.lastName ?? paperData?.mainAuthor?.lastName ?? '';
+		const hubTitle =
+			(typeof paperData?.hubId === 'object' ? paperData?.hubId?.title : null) ?? 'SciLedger';
 
-			contentElements.forEach((element) => {
-				const html = element.innerHTML;
-				const styledHtml = html.replace(
-					/\[(\d+)\]/g,
-					'<span class="reference-link text-primary-500 hover:text-primary-950 cursor-pointer font-medium">[<span class="reference-number">$1</span>]</span>'
-				);
-				element.innerHTML = styledHtml;
-			});
+		return buildStandardPdfFilename({
+			authorLastName,
+			journalTitle: hubTitle,
+			year: getPaperYear(paperData?.createdAt)
+		});
+	}
+
+	function handleDownloadHtmlPdf() {
+		if (!paperHtmlRoot) return;
+
+		const opened = openPaperPdfPreview(
+			paperHtmlRoot,
+			paper?.title ?? 'paper',
+			resolvePrintFilename()
+		);
+		if (!opened) {
+			alert('Allow pop-ups in the browser to generate the PDF preview.');
 		}
 	}
 
 	onMount(() => {
-		styleReferenceLinks();
+		if (!paperHtmlRoot) return;
+		return setupPaperHtmlPresentation(paperHtmlRoot);
 	});
 </script>
 
@@ -201,16 +219,16 @@
 		<!-- Barra de Progresso do Tempo de Revisão -->
 		{#if paper.status === 'in review' || paper.status === 'needing corrections'}
 			<div class="mb-6">
-				<CorrectionProgressBar 
-					{paper} 
-					{currentUser} 
-					showDetails={true} 
+				<CorrectionProgressBar
+					{paper}
+					{currentUser}
+					showDetails={true}
 					size="lg"
 					{reviewAssignments}
 				/>
 			</div>
 		{/if}
-		
+
 		{#if editable}
 			<div class="flex justify-end gap-3 mb-4">
 				<button class="bg-primary-500 text-white rounded-lg px-4 py-2" onclick={hdlSaveDraft}
@@ -233,89 +251,113 @@
 						: 'w-full min-w-0 lg:flex-1'}
 			>
 				<div class="p-4 md:p-6 bg-white rounded-lg shadow-lg">
-					<!-- Título do Paper -->
-					<h2 class="text-3xl font-semibold text-gray-800 mb-4">{@html paper.title}</h2>
+					<div class="mb-4 flex justify-end">
+						<button
+							type="button"
+							class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+							onclick={handleDownloadHtmlPdf}
+						>
+							Print / Save PDF
+						</button>
+					</div>
 
-					<!-- Autores -->
-					<div class="flex gap-3 items-center mb-4">
-						{#if paper.mainAuthor?.profilePictureUrl}
-							<Avatar
-								src={paper.mainAuthor.profilePictureUrl}
-								name={`${paper.mainAuthor.firstName} ${paper.mainAuthor.lastName}`}
-								size="w-9"
+					<div class="paper-line-numbered-root" bind:this={paperHtmlRoot}>
+						<!-- Título do Paper -->
+						<h2
+							class="paper-line-numbered-block paper-export-title text-3xl font-semibold text-gray-800 mb-4"
+						>
+							{@html paper.title}
+						</h2>
+
+						<!-- Autores -->
+						<div class="paper-line-number-exempt flex gap-3 items-center mb-4">
+							{#if paper.mainAuthor?.profilePictureUrl}
+								<Avatar
+									src={paper.mainAuthor.profilePictureUrl}
+									name={`${paper.mainAuthor.firstName} ${paper.mainAuthor.lastName}`}
+									size="w-9"
+								/>
+							{:else}
+								<Avatar
+									name="{paper.mainAuthor.firstName} {paper.mainAuthor.lastName}"
+									size="w-9"
+									style="width: 2.25rem; height: 2.25rem; display: flex; align-items: center; justify-content: center; background-color: silver; color: white; border-radius: 9999px;"
+								/>
+							{/if}
+							<div class="flex items-center">
+								<a
+									class="text-primary-500 whitespace-nowrap"
+									href="/profile/{paper.mainAuthor?.username}"
+								>
+									{paper.mainAuthor.firstName}
+									{paper.mainAuthor.lastName}
+								</a>
+							</div>
+
+							<!-- Coautores -->
+							{#each paper.coAuthors as ca}
+								<div class="flex items-center gap-2">
+									{#if ca.profilePictureUrl}
+										<Avatar
+											src={ca.profilePictureUrl}
+											name={`${ca.firstName} ${ca.lastName}`}
+											size="w-9"
+										/>
+									{:else}
+										<Avatar
+											name="{ca.firstName} {ca.lastName}"
+											size="w-9"
+											style="width: 2.25rem; height: 2.25rem; display: flex; align-items: center; justify-content: center; background-color: silver; color: white; border-radius: 9999px;"
+										/>
+									{/if}
+									<div class="flex items-center">
+										<a class="text-primary-500 whitespace-nowrap" href="/profile/{ca.username}">
+											{ca.firstName}
+											{ca.lastName}
+										</a>
+									</div>
+								</div>
+							{/each}
+						</div>
+
+						<span class="paper-line-number-exempt paper-export-metadata text-xs"
+							>Published: {new Date(paper.createdAt).toDateString()}</span
+						>
+
+						<!-- Imagem Principal -->
+						{#if paper.paperPictures && paper.paperPictures.length > 0}
+							<img
+								src={`/api/images/${paper.paperPictures[0]}`}
+								alt="Imagem do artigo"
+								class="paper-line-number-exempt paper-export-image w-full h-full object-cover rounded-sm mb-4"
 							/>
 						{:else}
-							<Avatar
-								name="{paper.mainAuthor.firstName} {paper.mainAuthor.lastName}"
-								size="w-9"
-								style="width: 2.25rem; height: 2.25rem; display: flex; align-items: center; justify-content: center; background-color: silver; color: white; border-radius: 9999px;"
-							/>
-						{/if}
-						<div class="flex items-center">
-							<a
-								class="text-primary-500 whitespace-nowrap"
-								href="/profile/{paper.mainAuthor?.username}"
+							<!-- Placeholder caso não haja imagem -->
+							<div
+								class="paper-line-number-exempt paper-export-image bg-gray-300 w-full h-48 rounded-sm flex items-center justify-center text-gray-500 mb-4"
 							>
-								{paper.mainAuthor.firstName}
-								{paper.mainAuthor.lastName}
-							</a>
-						</div>
-
-						<!-- Coautores -->
-						{#each paper.coAuthors as ca}
-							<div class="flex items-center gap-2">
-								{#if ca.profilePictureUrl}
-									<Avatar
-										src={ca.profilePictureUrl}
-										name={`${ca.firstName} ${ca.lastName}`}
-										size="w-9"
-									/>
-								{:else}
-									<Avatar
-										name="{ca.firstName} {ca.lastName}"
-										size="w-9"
-										style="width: 2.25rem; height: 2.25rem; display: flex; align-items: center; justify-content: center; background-color: silver; color: white; border-radius: 9999px;"
-									/>
-								{/if}
-								<div class="flex items-center">
-									<a class="text-primary-500 whitespace-nowrap" href="/profile/{ca.username}">
-										{ca.firstName}
-										{ca.lastName}
-									</a>
-								</div>
+								<span>No image available</span>
 							</div>
-						{/each}
-					</div>
+						{/if}
 
-					<span class="text-xs">Published: {new Date(paper.createdAt).toDateString()}</span>
-
-					<!-- Imagem Principal -->
-					{#if paper.paperPictures && paper.paperPictures.length > 0}
-						<img
-							src={`/api/images/${paper.paperPictures[0]}`}
-							alt="Imagem do artigo"
-							class="w-full h-full object-cover rounded-sm mb-4"
-						/>
-					{:else}
-						<!-- Placeholder caso não haja imagem -->
-						<div
-							class="bg-gray-300 w-full h-48 rounded-sm flex items-center justify-center text-gray-500 mb-4"
+						<!-- Abstract -->
+						<h3
+							class="paper-line-number-exempt paper-export-label mt-4 text-surface-900 font-bold prose text-2xl max-w-none"
 						>
-							<span>No image available</span>
+							Abstract
+						</h3>
+						<div
+							class="paper-line-numbered-block paper-export-abstract mt-4 text-surface-950 prose prose-m max-w-none [&>p]:text-lg paper-content"
+						>
+							{@html paper.abstract}
 						</div>
-					{/if}
 
-					<!-- Abstract -->
-					<h3 class="mt-4 text-surface-900 font-bold prose text-2xl max-w-none">Abstract</h3>
-					<div class="mt-4 text-surface-950 prose prose-m max-w-none [&>p]:text-lg paper-content">
-						{@html paper.abstract}
-					</div>
-
-					<!-- Conteúdo completo -->
-					<div
-						class="mt-4 text-surface-950 prose prose-m max-w-none [&>p]:text-lg [&>ol>li]:text-base [&>ol>li]:marker:text-primary-500 paper-content"
-					>
-						{@html paper.content}
+						<!-- Conteúdo completo -->
+						<div
+							class="paper-line-numbered-block paper-export-content mt-4 text-surface-950 prose prose-m max-w-none [&>p]:text-lg [&>ol>li]:text-base [&>ol>li]:marker:text-primary-500 paper-content"
+						>
+							{@html paper.content}
+						</div>
 					</div>
 
 					{#if paper.supplementaryMaterials && paper.supplementaryMaterials.length > 0}
@@ -355,7 +397,7 @@
 							paperTitle={paper.title}
 							paperId={paper.id}
 							reviewerId={currentUser?.id || ''}
-							paper={paper}
+							{paper}
 							on:collapseToggle={handleReviewCollapse}
 							on:reviewSubmitted={handleReviewSubmitted}
 						/>
@@ -380,7 +422,7 @@
 	</fieldset>
 </main>
 <!-- <ReviewForms
-    
+
     {editable}
     {currentUser}
     on:saveDraft={hdlSaveDraft}

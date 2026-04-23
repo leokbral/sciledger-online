@@ -1,15 +1,124 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import type { Paper } from '$lib/types/Paper';
+	import type { User } from '$lib/types/User';
 	import { getInitials } from '$lib/utils/GetInitials';
 	import { Avatar, Rating } from '@skeletonlabs/skeleton-svelte';
 	import CorrectionProgressBar from '$lib/components/CorrectionProgressBar/CorrectionProgressBar.svelte';
 
-	let { paper, user, showReadMore = true } = $props();
+	interface Props {
+		paper: Paper;
+		user?: User | null;
+		showReadMore?: boolean;
+		readMoreHref?: string;
+	}
+
+	let { paper, user, showReadMore = true, readMoreHref }: Props = $props();
 	let starValue = $state(2);
 	// export let paper: Paper;
 	// export let user;
 	// console.log('paper -- ', paper);
+
+	function getIdAliases(value: unknown): string[] {
+		if (!value) return [];
+
+		if (typeof value === 'string') {
+			return [String(value)];
+		}
+
+		if (typeof value !== 'object') {
+			return [];
+		}
+
+		const candidate = value as {
+			id?: unknown;
+			_id?: unknown;
+			toString?: () => string;
+		};
+
+		const aliases = [candidate.id, candidate._id]
+			.filter(Boolean)
+			.map((alias) => String(alias));
+
+		const stringified = candidate.toString?.();
+		if (stringified && stringified !== '[object Object]') {
+			aliases.push(String(stringified));
+		}
+
+		return Array.from(new Set(aliases));
+	}
+
+	function matchesCurrentUser(value: unknown): boolean {
+		if (!user) return false;
+
+		const userAliases = new Set(getIdAliases(user));
+		return getIdAliases(value).some((alias) => userAliases.has(alias));
+	}
+
+	function hasReviewerAccess(paper: Paper): boolean {
+		if (paper.isAcceptedForReview) {
+			return true;
+		}
+
+		const hasAcceptedResponse = (paper.peer_review?.responses ?? []).some((response: any) => {
+			return (
+				(response?.status === 'accepted' || response?.status === 'completed') &&
+				matchesCurrentUser(response?.reviewerId)
+			);
+		});
+
+		if (hasAcceptedResponse) {
+			return true;
+		}
+
+		if ((paper.reviewers ?? []).some((reviewer) => matchesCurrentUser(reviewer))) {
+			return true;
+		}
+
+		if ((paper.peer_review?.assignedReviewers ?? []).some((reviewer) => matchesCurrentUser(reviewer))) {
+			return true;
+		}
+
+		if (paper.hubId && typeof paper.hubId === 'object') {
+			const hub = paper.hubId as {
+				createdBy?: unknown;
+				reviewers?: unknown[];
+			};
+
+			if (matchesCurrentUser(hub.createdBy)) {
+				return true;
+			}
+
+			if (Array.isArray(hub.reviewers) && hub.reviewers.some((reviewer) => matchesCurrentUser(reviewer))) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	function getReadMoreHref() {
+		if (readMoreHref) {
+			return readMoreHref;
+		}
+
+		const slug = paper?.id || paper?._id || '';
+		if (!slug) {
+			return '#';
+		}
+
+		if (hasReviewerAccess(paper)) {
+			if (paper.status === 'in review') {
+				return `/review/inreview/${slug}`;
+			}
+
+			if (paper.status === 'needing corrections' || paper.status === 'under correction') {
+				return `/review/correction/${slug}`;
+			}
+		}
+
+		return `/articles/${slug}`;
+	}
 </script>
 
 <div class="flex flex-col gap-3">
@@ -135,7 +244,7 @@
 	<div class="flex justify-between my-3">
 		{#if showReadMore}
 			<span class="text-xs"
-				><a data-sveltekit-reload href="/articles/{paper.id}" class="flex flex-col gap-2"
+				><a data-sveltekit-reload href={getReadMoreHref()} class="flex flex-col gap-2"
 					>Read more...</a
 				></span
 			>
