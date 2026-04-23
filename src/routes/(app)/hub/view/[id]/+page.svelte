@@ -520,7 +520,7 @@
 			<div class="text-2xl font-bold text-violet-900">1</div>
 		</div>
 		<div class="rounded-xl border border-amber-200 bg-amber-50 p-4">
-			<div class="text-xs uppercase tracking-wide font-semibold text-amber-800 mb-1">Vice Managers</div>
+			<div class="text-xs uppercase tracking-wide font-semibold text-amber-800 mb-1">Editors-in-chief</div>
 			<div class="text-2xl font-bold text-amber-900">{assistantManagers.length}</div>
 		</div>
 		<div class="rounded-xl border border-blue-200 bg-blue-50 p-4">
@@ -571,7 +571,7 @@
 							{#if row.role === 'owner'}
 								<span class="inline-flex rounded-full bg-violet-100 text-violet-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">Owner</span>
 							{:else if row.role === 'vice'}
-								<span class="inline-flex rounded-full bg-amber-100 text-amber-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">Vice Manager</span>
+								<span class="inline-flex rounded-full bg-amber-100 text-amber-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">Editor-in-chief</span>
 							{:else}
 								<span class="inline-flex rounded-full bg-blue-100 text-blue-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">Reviewer</span>
 							{/if}
@@ -607,14 +607,16 @@
 {/if}
 
 <!-- Papers Section -->
-<PapersSection 
-	papers={filteredPapers} 
-	{hub} 
-	{isCreator} 
+<PapersSection
+	papers={filteredPapers}
+	{hub}
+	{isCreator}
 	isHubManager={isHubManager}
-	userId={data.user.id} 
-	{shouldHighlight} 
+	isHubReviewer={isReviewer}
+	userId={data.user.id}
+	{shouldHighlight}
 	reviewAssignments={data.reviewAssignments}
+	pendingPaperInvitations={data.pendingPaperInvitations}
 />
 
 <!-- Informações Gerais -->

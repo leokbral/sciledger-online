@@ -9,6 +9,39 @@ interface ObjectId {
 	constructor: { name: string };
 }
 
+function getIdAliases(value: unknown): string[] {
+	if (!value) return [];
+
+	if (typeof value === 'string') {
+		return [String(value)];
+	}
+
+	if (typeof value !== 'object') {
+		return [];
+	}
+
+	const candidate = value as {
+		id?: unknown;
+		_id?: unknown;
+		toString?: () => string;
+	};
+
+	const aliases = [candidate.id, candidate._id]
+		.filter(Boolean)
+		.map((alias) => String(alias));
+
+	const stringified = candidate.toString?.();
+	if (stringified && stringified !== '[object Object]') {
+		aliases.push(String(stringified));
+	}
+
+	return Array.from(new Set(aliases));
+}
+
+function matchesCurrentUser(value: unknown, userId: string): boolean {
+	return getIdAliases(value).includes(String(userId));
+}
+
 function sanitize(obj: unknown): unknown {
 	if (obj === null || obj === undefined) {
 		return obj;
@@ -44,16 +77,19 @@ function sanitize(obj: unknown): unknown {
 }
 
 export async function load({ locals, params }) {
-	if (!locals.user) redirect(302, `/login`);
+	if (!locals.user) throw redirect(302, `/login`);
 
 	const id = params.slug;
 	const userId = locals.user.id;
 
 	// Busca o paper com status "in review"
-	const paperDoc = await Papers.findOne({
-		id,
-		status: "in review"
-	}, {})
+	const paperDoc = await Papers.findOne(
+		{
+			id,
+			status: { $in: ['reviewer assignment', 'in review'] }
+		},
+		{}
+	)
 		.populate('authors')
 		.populate('mainAuthor')
 		.populate('coAuthors')
@@ -66,7 +102,9 @@ export async function load({ locals, params }) {
 	// Verificar se o usuário tem permissão para REVISAR este paper
 	// Precisa ter aceitado revisar (estar nos responses com status 'accepted')
 	const isReviewerAccepted = paperDoc.peer_review?.responses?.some(
-		(r: any) => r.reviewerId === userId && r.status === 'accepted'
+		(r: any) =>
+			matchesCurrentUser(r.reviewerId, userId) &&
+			(r.status === 'accepted' || r.status === 'completed')
 	);
 	
 	// Verificar se aceitou via ReviewQueue (novo sistema)
@@ -84,9 +122,10 @@ export async function load({ locals, params }) {
 	const isHubOwner = hubCreatorId?.toString() === userId;
 
 	// Verificar se é revisor do hub
-	const isHubReviewer = typeof paperDoc.hubId === 'object' && 
-		Array.isArray(paperDoc.hubId?.reviewers) && 
-		paperDoc.hubId?.reviewers?.includes(userId);
+	const isHubReviewer =
+		typeof paperDoc.hubId === 'object' &&
+		Array.isArray(paperDoc.hubId?.reviewers) &&
+		paperDoc.hubId?.reviewers?.some((reviewer: any) => matchesCurrentUser(reviewer, userId));
 
 	// Para REVISAR o paper: precisa ter aceitado (via responses OU ReviewQueue) OU ser dono do hub OU ser revisor do hub
 	if (!isReviewerAccepted && !hasAcceptedViaQueue && !isHubOwner && !isHubReviewer) {

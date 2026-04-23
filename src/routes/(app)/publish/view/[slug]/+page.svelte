@@ -1,9 +1,10 @@
 <script lang="ts">
-	import { Avatar } from '@skeletonlabs/skeleton-svelte';
+	import PaperAuthorsSection from '$lib/components/Paper/PaperAuthorsSection.svelte';
 	import SupplementaryMaterials from '$lib/components/SupplementaryMaterials.svelte';
 	import SupplementaryFiles from '$lib/components/SupplementaryFiles.svelte';
 	import type { PageData } from './$types';
 	import { onMount } from 'svelte';
+ 	import { enhancePaperReferenceLinks } from '$lib/utils/paperHtmlPresentation';
 
 	// Receber os dados do servidor
 	export let data: PageData;
@@ -12,26 +13,8 @@
 	let paper: any = null;
 	$: paper = data.paper as any;
 
-	// Function to style reference links
-	function styleReferenceLinks() {
-		if (typeof window !== 'undefined') {
-			// Find all elements that might contain reference links
-			const contentElements = document.querySelectorAll('.paper-content');
-
-			contentElements.forEach((element) => {
-				// Look for text patterns like [1], [2], etc.
-				const html = element.innerHTML;
-				const styledHtml = html.replace(
-					/\[(\d+)\]/g,
-					'<span class="reference-link text-primary-500 hover:text-primary-950 cursor-pointer font-medium">[<span class="reference-number">$1</span>]</span>'
-				);
-				element.innerHTML = styledHtml;
-			});
-		}
-	}
-
 	onMount(() => {
-		styleReferenceLinks();
+		enhancePaperReferenceLinks(document.body);
 	});
 </script>
 
@@ -101,56 +84,7 @@
 			<!-- Título do Paper -->
 			<h2 class="text-3xl font-semibold text-gray-800 mb-4">{@html paper.title}</h2>
 
-			<!-- Autores -->
-			<div class="flex gap-3 items-center mb-4">
-				{#if paper.mainAuthor?.profilePictureUrl}
-					<Avatar
-						src={paper.mainAuthor.profilePictureUrl}
-						name={`${paper.mainAuthor.firstName} ${paper.mainAuthor.lastName}`}
-						size="w-9"
-					/>
-				{:else}
-					<Avatar
-						name="{paper.mainAuthor.firstName} {paper.mainAuthor.lastName}"
-						size="w-9"
-						style="width: 2.25rem; height: 2.25rem; display: flex; align-items: center; justify-content: center; background-color: silver; color: white; border-radius: 9999px;"
-					/>
-				{/if}
-				<div class="flex items-center">
-					<a
-						class="text-primary-500 whitespace-nowrap"
-						href="/profile/{paper.mainAuthor?.username}"
-					>
-						{paper.mainAuthor.firstName}
-						{paper.mainAuthor.lastName}
-					</a>
-				</div>
-
-				<!-- Coautores -->
-				{#each paper.coAuthors as ca}
-					<div class="flex items-center gap-2">
-						{#if ca.profilePictureUrl}
-							<Avatar
-								src={ca.profilePictureUrl}
-								name={`${ca.firstName} ${ca.lastName}`}
-								size="w-9"
-							/>
-						{:else}
-							<Avatar
-								name="{ca.firstName} {ca.lastName}"
-								size="w-9"
-								style="width: 2.25rem; height: 2.25rem; display: flex; align-items: center; justify-content: center; background-color: silver; color: white; border-radius: 9999px;"
-							/>
-						{/if}
-						<div class="flex items-center">
-							<a class="text-primary-500 whitespace-nowrap" href="/profile/{ca.username}">
-								{ca.firstName}
-								{ca.lastName}
-							</a>
-						</div>
-					</div>
-				{/each}
-			</div>
+			<PaperAuthorsSection paper={paper} rootClass="mb-4" />
 
 			<span class="text-xs">Created: {new Date(paper.createdAt).toDateString()}</span>
 

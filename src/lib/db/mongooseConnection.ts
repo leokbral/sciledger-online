@@ -10,14 +10,27 @@ import mongoose from 'mongoose';
 import './models/Hub';
 import './models/Draft';
 
+let connectionPromise: Promise<typeof mongoose> | null = null;
+
 export async function start_mongo() {
-    if (mongoose.connection.readyState === 0) { // Check if a connection already exists
-        try {
-            mongoose.connect(MONGO_URL, {});
-            console.log('Connected to MongoDB via Mongoose');
-        } catch (error) {
-            console.error('Error connecting to MongoDB:', error);
-            throw error; // Throw the error to be handled elsewhere
-        }
+    if (mongoose.connection.readyState === 1) {
+        return mongoose;
     }
+
+    if (!connectionPromise) {
+        connectionPromise = mongoose
+            .connect(MONGO_URL, {})
+            .then((connection) => {
+                console.log('Connected to MongoDB via Mongoose');
+                return connection;
+            })
+            .catch((error) => {
+                connectionPromise = null;
+                console.error('Error connecting to MongoDB:', error);
+                throw error;
+            });
+    }
+
+    await connectionPromise;
+    return mongoose;
 }

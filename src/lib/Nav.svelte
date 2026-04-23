@@ -23,10 +23,15 @@
 	let currentNotifications = $state(notifications);
 	let currentUnreadCount = $state(unreadCount);
 
+	function syncUnreadCount(notificationList: Notification[]) {
+		currentUnreadCount = notificationList.filter((notification) => !notification.isRead).length;
+	}
+
 	// Atualizar estado quando props mudam
 	$effect(() => {
 		currentNotifications = notifications;
-		currentUnreadCount = unreadCount;
+		currentUnreadCount =
+			unreadCount || notifications.filter((notification) => !notification.isRead).length;
 	});
 
 	// Função para atualizar contador de não lidas
@@ -49,23 +54,24 @@
 			if (response.ok) {
 				const data = await response.json();
 				currentNotifications = data.notifications || [];
+				syncUnreadCount(currentNotifications);
 			}
 		} catch (error) {
 			console.error('Error reloading notifications:', error);
+			updateUnreadCount();
 		}
 	}
-
 	// Atualizar contador periodicamente
 	onMount(() => {
-		const interval = setInterval(updateUnreadCount, 30000); // A cada 30 segundos
+		reloadNotifications();
+		const interval = setInterval(reloadNotifications, 30000); // A cada 30 segundos
 		return () => clearInterval(interval);
 	});
 
 	// Callback quando notificação é lida/deletada
 	function handleNotificationChange() {
-		updateUnreadCount();
+		reloadNotifications();
 		// Opcionalmente recarregar todas as notificações
-		// reloadNotifications();
 	}
 
 	async function logout() {
@@ -89,8 +95,9 @@
 			open={showNotifications}
 			onOpenChange={(e) => {
 				showNotifications = e.open;
-				// Atualizar contador quando fechar
-				if (!e.open) {
+				if (e.open) {
+					reloadNotifications();
+				} else {
 					updateUnreadCount();
 				}
 			}}

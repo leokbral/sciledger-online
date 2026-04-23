@@ -13,12 +13,27 @@
         hub: Hub;
         isCreator: boolean;
         isHubManager: boolean;
+        isHubReviewer?: boolean;
         userId: string;
         shouldHighlight: (paper: any) => boolean;
         reviewAssignments?: any[];
+        pendingPaperInvitations?: Array<{
+            paperId: string;
+            reviewerId: string;
+        }>;
     }
 
-    let { papers, hub, isCreator, isHubManager, userId, shouldHighlight, reviewAssignments }: Props = $props();
+    let {
+        papers,
+        hub,
+        isCreator,
+        isHubManager,
+        isHubReviewer = false,
+        userId,
+        shouldHighlight,
+        reviewAssignments,
+        pendingPaperInvitations = []
+    }: Props = $props();
     
     let hubId = $derived(hub._id);
 
@@ -35,10 +50,16 @@
             return `/publish/publication-approval/${slug}`;
         }
 
-        // Designated reviewer: show review form instead of author view
-        if (isDesignatedReviewer(paper)) {
+        if (paper?.status === 'reviewer assignment' && isDesignatedReviewer(paper)) {
+            return `/review/inreview/${slug}`;
+        }
+
+        // Reviewers and hub owner should land on the full review page.
+        if (canUseReviewerView(paper)) {
             if (paper?.status === 'in review') return `/review/inreview/${slug}`;
-            if (paper?.status === 'needing corrections') return `/review/correction/${slug}`;
+            if (paper?.status === 'needing corrections' || paper?.status === 'under correction') {
+                return `/review/correction/${slug}`;
+            }
         }
 
         // Default routing by status (for authors/creators)
@@ -60,7 +81,20 @@
     
     // Verificar se o usuário é revisor designado deste paper
     function isDesignatedReviewer(paper: Paper): boolean {
-        return paper.isAcceptedForReview === true;
+        if (paper.isAcceptedForReview === true) {
+            return true;
+        }
+
+        return (paper.peer_review?.responses ?? []).some((response: any) => {
+            return (
+                getIdAliases(response?.reviewerId).includes(String(userId)) &&
+                (response?.status === 'accepted' || response?.status === 'completed')
+            );
+        });
+    }
+
+    function canUseReviewerView(paper: Paper): boolean {
+        return isCreator || isHubReviewer || isDesignatedReviewer(paper);
     }
     
     let selectedPaper: Paper | null = $state(null);
@@ -74,53 +108,62 @@
     let rejectionReason = $state('');
     let loading = $state(false);
     let searchTerm = $state('');
+
+    function getIdAliases(value: any): string[] {
+        if (!value) return [];
+
+        if (typeof value === 'string') {
+            return [String(value)];
+        }
+
+        const aliases = [value.id, value._id]
+            .filter(Boolean)
+            .map((alias) => String(alias));
+
+        return Array.from(new Set(aliases));
+    }
+
+    function intersectsAliases(source: any, blockedIds: Set<string>): boolean {
+        return getIdAliases(source).some((alias) => blockedIds.has(alias));
+    }
     
     // Filtrar revisores disponíveis que ainda não foram convidados
     // Excluir também autores, co-autores e submitter
     function getAvailableReviewers(paper: Paper): Array<User | string> {
         if (!hub.reviewers || !Array.isArray(hub.reviewers)) return [];
         
-        const assignedIds = paper.peer_review?.assignedReviewers?.map((r: any) => 
-            typeof r === 'object' ? (r._id || r.id) : r
-        ) || [];
+        const paperId = String(paper?.id || paper?._id || '');
+        const assignedIds = new Set<string>(
+            (paper.peer_review?.assignedReviewers || []).flatMap((reviewer: any) => getIdAliases(reviewer))
+        );
         
         // Coletar IDs de autores, co-autores e submitter
         const authorIds = new Set<string>();
         
-        // Adicionar autor principal
-        if (paper.mainAuthor) {
-            const mainId = typeof paper.mainAuthor === 'object' 
-                ? (paper.mainAuthor._id || paper.mainAuthor.id)
-                : paper.mainAuthor;
-            authorIds.add(String(mainId));
-        }
-        
-        // Adicionar co-autores
-        if (paper.coAuthors && Array.isArray(paper.coAuthors)) {
-            paper.coAuthors.forEach((author: any) => {
-                const authorId = typeof author === 'object'
-                    ? (author._id || author.id)
-                    : author;
-                authorIds.add(String(authorId));
-            });
-        }
-        
-        // Adicionar submitter
-        if (paper.submittedBy) {
-            const submitterId = typeof paper.submittedBy === 'object'
-                ? (paper.submittedBy._id || paper.submittedBy.id)
-                : paper.submittedBy;
-            authorIds.add(String(submitterId));
-        }
+        getIdAliases(paper.mainAuthor).forEach((id) => authorIds.add(id));
+        (paper.coAuthors || []).forEach((author: any) => {
+            getIdAliases(author).forEach((id) => authorIds.add(id));
+        });
+        getIdAliases(paper.submittedBy).forEach((id) => authorIds.add(id));
+
+        const pendingReviewerIds = new Set<string>(
+            (pendingPaperInvitations || [])
+                .filter((invite) => invite.paperId === paperId)
+                .flatMap((invite) => getIdAliases(invite.reviewerId))
+        );
         
         return hub.reviewers.filter((reviewer: any) => {
-            const reviewerId = typeof reviewer === 'object' ? (reviewer._id || reviewer.id) : reviewer;
+            const reviewerId = getIdAliases(reviewer);
             // Excluir se já foi atribuído
-            if (assignedIds.includes(reviewerId)) {
+            if (reviewerId.some((alias) => assignedIds.has(alias))) {
                 return false;
             }
             // Excluir se é autor/coautor/submitter
-            if (authorIds.has(String(reviewerId))) {
+            if (reviewerId.some((alias) => authorIds.has(alias))) {
+                return false;
+            }
+
+            if (reviewerId.some((alias) => pendingReviewerIds.has(alias))) {
                 return false;
             }
             return true;
@@ -281,10 +324,18 @@
         if (Array.isArray(paper?.coAuthors)) list.push(...paper.coAuthors.filter(Boolean));
         return list;
     }
-    
+
+    function formatInvitationIssues(skipped: Array<{ reviewerId: string; reasons: string[] }> = []) {
+        return skipped
+            .flatMap((entry) => entry.reasons || [])
+            .filter(Boolean)
+            .slice(0, 3)
+            .join(' | ');
+    }
+
     async function sendInvitations() {
         if (!selectedPaper || selectedReviewers.length === 0) return;
-        
+
         loading = true;
         try {
             const response = await fetch('/api/paper-reviewer-invitations', {
@@ -296,18 +347,26 @@
                     reviewerIds: selectedReviewers
                 })
             });
-            
+
             const data = await response.json();
-            
-            if (response.ok) {
+            const requestSucceeded = response.ok && data.success !== false;
+
+            if (requestSucceeded) {
                 toaster.success({
                     title: 'Success',
-                    description: `Invited ${selectedReviewers.length} reviewer(s) successfully!`
+                    description: data.message || `Invited ${selectedReviewers.length} reviewer(s) successfully!`
                 });
                 openInviteModal = false;
                 selectedReviewers = [];
             } else {
-                toaster.error({ title: 'Error', description: data.error || 'Failed to send invitations' });
+                toaster.warning({
+                    title: data.success === false ? 'No invitations created' : 'Error',
+                    description:
+                        formatInvitationIssues(data.skipped) ||
+                        data.message ||
+                        data.error ||
+                        'Failed to send invitations'
+                });
             }
         } catch (error) {
             console.error(error);
@@ -392,7 +451,7 @@
                                     class="mb-3 p-2 bg-yellow-100 border border-yellow-300 rounded text-yellow-800 text-sm font-medium"
                                 >
                                     {#if isHubManager || hub.reviewers?.includes(userId)}
-                                        This article has <strong>not been published</strong> yet and is visible to you as a hub {isCreator ? 'owner' : isHubManager ? 'vice manager' : 'reviewer'}.
+                                            This article has <strong>not been published</strong> yet and is visible to you as a hub {isCreator ? 'owner' : isHubManager ? 'Editor-in-chief' : 'reviewer'}.
                                     {:else}
                                         This article has <strong>not been published</strong> yet and is visible only to you and the authors involved.
                                     {/if}
@@ -413,11 +472,7 @@
                                 </a>
                                 <h3 class="text-lg font-medium text-gray-900 mt-4">
                                     <a
-                                        href={paper.status === 'published' 
-                                            ? `/publish/published/${paper._id}` 
-                                            : (paper.status === 'rejected' || paper.rejectedByHub || paper.status === 'reviewer assignment') && isHubManager
-                                                ? `/publish/view/${paper._id}`
-                                                : `/publish/published/${paper._id}`}
+                                        href={getReadMoreHref(paper)}
                                         class="hover:text-primary-600 transition-colors"
                                     >
                                         {@html paper.title}

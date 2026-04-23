@@ -20,7 +20,7 @@ export const POST: RequestHandler = async ({ request, locals, params }) => {
             return json({ error: 'Hub not found' }, { status: 404 });
         }
 
-        // Hub owner and vice manager can manage reviewers
+        // Hub owner and Editor-in-chief can manage reviewers
         if (!canManageHub(hub, locals.user.id)) {
             return json({ error: 'Only hub managers can manage reviewers' }, { status: 403 });
         }
@@ -65,7 +65,7 @@ export const POST: RequestHandler = async ({ request, locals, params }) => {
                     return !id || !targetIdSet.has(id);
                 });
 
-                // Keep manager roles in sync: if a removed member is vice manager, drop this role too.
+                // Keep manager roles in sync: if a removed member is Editor-in-chief, drop this role too.
                 hub.assistantManagers = (hub.assistantManagers || []).filter((manager: any) => {
                     const id = normalizeId(manager);
                     if (id && targetIdSet.has(id)) {
@@ -108,7 +108,7 @@ export const GET: RequestHandler = async ({ locals, params }) => {
             return json({ error: 'Hub not found' }, { status: 404 });
         }
 
-        // Hub owner and vice manager can see the full reviewer list
+        // Hub owner and Editor-in-chief can see the full reviewer list
         if (canManageHub(hub, locals.user.id)) {
             return json({ reviewers: hub.reviewers });
         }

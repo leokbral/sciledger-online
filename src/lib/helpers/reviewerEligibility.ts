@@ -1,5 +1,6 @@
 import type { Paper } from '$lib/types/Paper';
 import type { User } from '$lib/types/User';
+import { MAX_ACTIVE_REVIEW_ASSIGNMENTS } from '$lib/constants/reviewerLimits';
 
 export type EligibilityResult = {
     eligible: boolean;
@@ -14,7 +15,7 @@ export type EligibilityResult = {
  * - Must not be main author, co-author, or submittedBy of the paper
  * - If paper is linked to a hub, reviewer must belong to that hub's reviewers list
  * - Must not already be assigned/occupying a slot on the paper
- * - Capacity: must have fewer than maxActive (default 3) active assignments (accepted|pending)
+ * - Capacity: must have fewer than maxActive active assignments (accepted|pending) when a cap is configured
  * - Optional expertise-keyword overlap: if both exist, require at least one overlap
  */
 export function checkReviewerEligibility(
@@ -23,13 +24,13 @@ export function checkReviewerEligibility(
     opts?: {
         hubReviewerIds?: string[];
         alreadyAssignedIds?: Array<string>;
-        maxActiveAssignments?: number;
+        maxActiveAssignments?: number | null;
         activeAssignmentsCount?: number;
         requireExpertiseMatch?: boolean;
     }
 ): EligibilityResult {
     const reasons: string[] = [];
-    const maxActive = opts?.maxActiveAssignments ?? 3;
+    const maxActive = opts?.maxActiveAssignments ?? MAX_ACTIVE_REVIEW_ASSIGNMENTS;
     const activeCount = opts?.activeAssignmentsCount ?? 0;
     const assignedIds = new Set((opts?.alreadyAssignedIds ?? []).map(String));
 
@@ -67,7 +68,7 @@ export function checkReviewerEligibility(
     }
 
     // Capacity check
-    if (activeCount >= maxActive) {
+    if (typeof maxActive === 'number' && activeCount >= maxActive) {
         reasons.push('Reviewer exceeds active review capacity');
     }
 

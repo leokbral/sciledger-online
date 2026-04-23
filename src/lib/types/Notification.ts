@@ -1,54 +1,54 @@
 import type { User } from './User';
 
 export type NotificationType =
-    | 'invitation'
-    | 'comment'
-    | 'connection_request'
-    | 'paper_accepted'
-    | 'paper_rejected'
-    | 'paper_pending_review'
-    | 'paper_submitted'
-    | 'hub_invitation'
-    | 'review_request'
-    | 'review_completed'
-    | 'system'
-    | 'follow'
-    | 'mention'
-    | 'paper_published'
-    | 'hub_paper_pending'
-    | 'standalone_paper_pending'
-    | 'paper_accepted_for_review'
-    | 'reviewer_assigned'
-    | 'reviewer_accepted_review'
-    | 'reviewer_declined_review'
-    | 'hub_reviewer_accepted'
-    | 'hub_reviewer_declined'
-    | 'review_submitted'
-    | 'corrections_submitted'
-    | 'paper_final_acceptance'
-    | 'paper_final_rejection';
+	| 'invitation'
+	| 'comment'
+	| 'connection_request'
+	| 'paper_accepted'
+	| 'paper_rejected'
+	| 'paper_pending_review'
+	| 'paper_submitted'
+	| 'hub_invitation'
+	| 'review_request'
+	| 'review_completed'
+	| 'system'
+	| 'follow'
+	| 'mention'
+	| 'paper_published'
+	| 'hub_paper_pending'
+	| 'standalone_paper_pending'
+	| 'paper_accepted_for_review'
+	| 'reviewer_assigned'
+	| 'reviewer_accepted_review'
+	| 'reviewer_declined_review'
+	| 'invitation_cancelled'
+	| 'hub_reviewer_accepted'
+	| 'hub_reviewer_declined'
+	| 'review_submitted'
+	| 'corrections_submitted'
+	| 'paper_final_acceptance'
+	| 'paper_final_rejection';
 
 export type NotificationPriority = 'low' | 'medium' | 'high' | 'urgent';
 
 export type Notification = {
-    _id: string;
-    id: string;
-    user: User | string;
-    type: NotificationType;
-    title: string;
-    content: string;
-    relatedUser?: string;
-    relatedPaperId?: string;
-    relatedCommentId?: string;
-    relatedHubId?: string;
-    relatedReviewId?: string;
-    actionUrl?: string;
-    metadata?: Record<string, unknown>; 
-    isRead: boolean;
-    priority: NotificationPriority;
-    expiresAt?: Date;
-    createdAt: Date;
-    updatedAt: Date;
-    readAt?: Date;
+	_id: string;
+	id: string;
+	user: User | string;
+	type: NotificationType;
+	title: string;
+	content: string;
+	relatedUser?: string;
+	relatedPaperId?: string;
+	relatedCommentId?: string;
+	relatedHubId?: string;
+	relatedReviewId?: string;
+	actionUrl?: string;
+	metadata?: Record<string, unknown>;
+	isRead: boolean;
+	priority: NotificationPriority;
+	expiresAt?: Date;
+	createdAt: Date;
+	updatedAt: Date;
+	readAt?: Date;
 };
-
