@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { Avatar } from '@skeletonlabs/skeleton-svelte';
 	import { onMount } from 'svelte';
 
 	//AKIIIIIIIIIIIIIII
@@ -13,6 +12,7 @@
 	import { createEventDispatcher } from 'svelte';
 	import ReviewForms from '../Review/ReviewForms.svelte';
 	import CorrectionProgressBar from '$lib/components/CorrectionProgressBar/CorrectionProgressBar.svelte';
+	import PaperAuthorsSection from '$lib/components/Paper/PaperAuthorsSection.svelte';
 	import SupplementaryMaterials from '$lib/components/SupplementaryMaterials.svelte';
 	import SupplementaryFiles from '$lib/components/SupplementaryFiles.svelte';
 	import {
@@ -201,7 +201,8 @@
 		const opened = openPaperPdfPreview(
 			paperHtmlRoot,
 			paper?.title ?? 'paper',
-			resolvePrintFilename()
+			resolvePrintFilename(),
+			'In Review'
 		);
 		if (!opened) {
 			alert('Allow pop-ups in the browser to generate the PDF preview.');
@@ -269,58 +270,13 @@
 							{@html paper.title}
 						</h2>
 
-						<!-- Autores -->
-						<div class="paper-line-number-exempt flex gap-3 items-center mb-4">
-							{#if paper.mainAuthor?.profilePictureUrl}
-								<Avatar
-									src={paper.mainAuthor.profilePictureUrl}
-									name={`${paper.mainAuthor.firstName} ${paper.mainAuthor.lastName}`}
-									size="w-9"
-								/>
-							{:else}
-								<Avatar
-									name="{paper.mainAuthor.firstName} {paper.mainAuthor.lastName}"
-									size="w-9"
-									style="width: 2.25rem; height: 2.25rem; display: flex; align-items: center; justify-content: center; background-color: silver; color: white; border-radius: 9999px;"
-								/>
-							{/if}
-							<div class="flex items-center">
-								<a
-									class="text-primary-500 whitespace-nowrap"
-									href="/profile/{paper.mainAuthor?.username}"
-								>
-									{paper.mainAuthor.firstName}
-									{paper.mainAuthor.lastName}
-								</a>
-							</div>
+						<PaperAuthorsSection
+							paper={paper}
+							rootClass="paper-line-number-exempt mb-4"
+							headingText={null}
+						/>
 
-							<!-- Coautores -->
-							{#each paper.coAuthors as ca}
-								<div class="flex items-center gap-2">
-									{#if ca.profilePictureUrl}
-										<Avatar
-											src={ca.profilePictureUrl}
-											name={`${ca.firstName} ${ca.lastName}`}
-											size="w-9"
-										/>
-									{:else}
-										<Avatar
-											name="{ca.firstName} {ca.lastName}"
-											size="w-9"
-											style="width: 2.25rem; height: 2.25rem; display: flex; align-items: center; justify-content: center; background-color: silver; color: white; border-radius: 9999px;"
-										/>
-									{/if}
-									<div class="flex items-center">
-										<a class="text-primary-500 whitespace-nowrap" href="/profile/{ca.username}">
-											{ca.firstName}
-											{ca.lastName}
-										</a>
-									</div>
-								</div>
-							{/each}
-						</div>
-
-						<span class="paper-line-number-exempt paper-export-metadata text-xs"
+						<span class="paper-line-numbered-block paper-export-metadata text-xs"
 							>Published: {new Date(paper.createdAt).toDateString()}</span
 						>
 
@@ -329,12 +285,12 @@
 							<img
 								src={`/api/images/${paper.paperPictures[0]}`}
 								alt="Imagem do artigo"
-								class="paper-line-number-exempt paper-export-image w-full h-full object-cover rounded-sm mb-4"
+								class="paper-line-number-exempt paper-export-image paper-export-main-image w-full h-full object-cover rounded-sm mb-4"
 							/>
 						{:else}
 							<!-- Placeholder caso não haja imagem -->
 							<div
-								class="paper-line-number-exempt paper-export-image bg-gray-300 w-full h-48 rounded-sm flex items-center justify-center text-gray-500 mb-4"
+								class="paper-line-number-exempt paper-export-image paper-export-main-image bg-gray-300 w-full h-48 rounded-sm flex items-center justify-center text-gray-500 mb-4"
 							>
 								<span>No image available</span>
 							</div>
@@ -342,7 +298,7 @@
 
 						<!-- Abstract -->
 						<h3
-							class="paper-line-number-exempt paper-export-label mt-4 text-surface-900 font-bold prose text-2xl max-w-none"
+							class="paper-line-numbered-block paper-export-label mt-4 text-surface-900 font-bold prose text-2xl max-w-none"
 						>
 							Abstract
 						</h3>

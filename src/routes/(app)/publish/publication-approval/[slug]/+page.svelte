@@ -270,7 +270,7 @@
 
 				<div class="p-4 md:p-6">
 					<h3
-						class="paper-line-number-exempt paper-export-label text-sm font-semibold text-slate-800"
+						class="paper-line-numbered-block paper-export-label text-sm font-semibold text-slate-800"
 					>
 						Abstract
 					</h3>
@@ -281,7 +281,7 @@
 					</div>
 
 					<h3
-						class="paper-line-number-exempt paper-export-label mt-6 text-sm font-semibold text-slate-800"
+						class="paper-line-numbered-block paper-export-label mt-6 text-sm font-semibold text-slate-800"
 					>
 						Full article
 					</h3>

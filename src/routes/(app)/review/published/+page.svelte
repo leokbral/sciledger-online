@@ -2,6 +2,7 @@
 	import { Avatar } from '@skeletonlabs/skeleton-svelte';
 	import type { PageData } from './$types';
 	import { onMount } from 'svelte';
+ 	import { enhancePaperReferenceLinks } from '$lib/utils/paperHtmlPresentation';
 
 	// Receive data from server
 	export let data: PageData;
@@ -9,23 +10,8 @@
 	// Papers published that were reviewed by the user
 	$: reviewedPublishedPapers = data.papers || [];
 
-	// Function to style reference links
-	function styleReferenceLinks() {
-		if (typeof window !== 'undefined') {
-			const contentElements = document.querySelectorAll('.paper-content');
-			contentElements.forEach((element) => {
-				const html = element.innerHTML;
-				const styledHtml = html.replace(
-					/\[(\d+)\]/g,
-					'<span class="reference-link text-primary-500 hover:text-primary-950 cursor-pointer font-medium">[<span class="reference-number">$1</span>]</span>'
-				);
-				element.innerHTML = styledHtml;
-			});
-		}
-	}
-
 	onMount(() => {
-		styleReferenceLinks();
+		enhancePaperReferenceLinks(document.body);
 	});
 </script>
 
