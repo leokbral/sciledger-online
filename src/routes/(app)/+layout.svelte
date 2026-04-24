@@ -29,7 +29,7 @@
 </script>
 
 <svelte:head>
-	<title>Break Free from Nature</title>
+	<title>SciLedger - Open Science Publishing</title>
 </svelte:head>
 
 <!-- <svelte:head>{@html '<script>(' + autoModeWatcher.toString() + ')();</script>'}</svelte:head> -->
