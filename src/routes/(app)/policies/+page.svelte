@@ -133,7 +133,7 @@
 			If you have questions about our policies or need clarification on any guidelines, 
 			please don't hesitate to contact us.
 		</p>
-		<a href="/contact" class="text-primary-500 hover:text-primary-600 font-semibold">
+		<a href="/help/support" class="text-primary-500 hover:text-primary-600 font-semibold">
 			Contact Support →
 		</a>
 	</div>
