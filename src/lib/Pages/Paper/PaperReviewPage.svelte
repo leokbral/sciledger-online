@@ -148,7 +148,11 @@
 	function isUserReviewer() {
 		if (!currentUser) return false;
 		if (currentUser.roles?.reviewer) return true;
-		if (Array.isArray(reviewAssignments) && reviewAssignments.some((r) => r.reviewerId === currentUser.id)) return true;
+		if (
+			Array.isArray(reviewAssignments) &&
+			reviewAssignments.some((r) => r.reviewerId === currentUser.id)
+		)
+			return true;
 		if (Array.isArray(paper?.reviewers) && paper.reviewers.includes(currentUser.id)) return true;
 		return false;
 	}
@@ -229,8 +233,8 @@
 	});
 </script>
 
-<main class="w-full max-w-none px-2 md:px-4">
-	<fieldset class="py-4 md:py-6">
+<main class="w-full max-w-none px-0 sm:px-2 md:px-4">
+	<fieldset class="py-3 md:py-6">
 		<!-- Barra de Progresso do Tempo de Revisão -->
 		{#if paper.status === 'in review' || paper.status === 'needing corrections'}
 			<div class="mb-6">
@@ -257,22 +261,24 @@
 
 		<!-- Role-based rendering: reviewers get PDF + review form; others see HTML PublishedPaperView -->
 		{#if isUserReviewer()}
-			<div class="mb-8 {isHubAdmin ? 'w-full' : 'flex flex-col gap-4 w-full lg:flex-row'}">
+			<div class="mb-8 {isHubAdmin ? 'w-full' : 'flex flex-col gap-4 w-full xl:flex-row'}">
 				<!-- PDF à esquerda -->
 				<section
 					class={isHubAdmin
 						? 'w-full'
 						: isReviewCollapsed
-							? 'w-full min-w-0 lg:flex-[3_1_0%]'
-							: 'w-full min-w-0 lg:flex-1'}
+							? 'w-full min-w-0 xl:flex-[4_1_0%]'
+							: 'w-full min-w-0 xl:flex-[1_1_0%]'}
 				>
-					<div class="p-4 md:p-6 bg-white rounded-lg shadow-lg">
-						<div class="mb-2 flex items-center justify-between gap-3">
-						<h3 class="text-lg font-semibold text-slate-800">Paper PDF</h3>
-							<div class="flex items-center gap-2">
+					<div class="bg-white p-0 shadow-lg sm:rounded-lg sm:p-2 md:p-4">
+						<div
+							class="mb-2 flex flex-col gap-3 px-2 pt-2 sm:mb-3 sm:flex-row sm:items-center sm:justify-between sm:px-0 sm:pt-0"
+						>
+							<h3 class="text-lg font-semibold text-slate-800">Paper PDF</h3>
+							<div class="flex flex-col gap-2 min-[420px]:flex-row sm:items-center">
 								<button
 									type="button"
-									class="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+									class="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 min-[420px]:w-auto"
 									onclick={() => generateServerPdf(true)}
 									disabled={isGeneratingPdf}
 								>
@@ -280,7 +286,7 @@
 								</button>
 								<button
 									type="button"
-									class="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+									class="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 min-[420px]:w-auto"
 									onclick={handleOpenPdfPreview}
 									disabled={!generatedPdfId}
 								>
@@ -294,19 +300,23 @@
 						{/if}
 
 						{#if generatedPdfId}
-							<div class="border border-gray-300 p-2 md:p-4 h-[80vh] w-full">
+							<div
+								class="h-[125dvh] w-full overflow-hidden border border-gray-300 sm:h-[90dvh] lg:h-[86vh] xl:h-[calc(100vh-10rem)]"
+							>
 								<iframe
-									src={`/api/pdfs/${generatedPdfId}`}
+									src={`/api/pdfs/${generatedPdfId}#view=FitH&zoom=page-width`}
 									title="PDF file"
 									frameborder="1"
-									class="h-full w-full"
+									class="h-full w-full border-0"
 								></iframe>
 							</div>
 						{:else}
-							<div class="border border-dashed border-gray-300 rounded-lg p-6 text-center text-sm text-slate-600">
+							<div
+								class="border border-dashed border-gray-300 rounded-lg p-6 text-center text-sm text-slate-600"
+							>
 								{isGeneratingPdf
-								? 'Generating Paper PDF...'
-								: 'No PDF generated for this paper yet.'}
+									? 'Generating Paper PDF...'
+									: 'No PDF generated for this paper yet.'}
 							</div>
 						{/if}
 					</div>
@@ -316,8 +326,8 @@
 				{#if !isHubAdmin}
 					<section
 						class={isReviewCollapsed
-							? 'w-full lg:w-[300px] flex-none min-w-0'
-							: 'w-full lg:w-[520px] flex-none min-w-0'}
+							? 'w-full xl:w-[300px] flex-none min-w-0'
+							: 'w-full xl:w-[460px] flex-none min-w-0'}
 					>
 						{#if page.url.pathname.startsWith('/review/inreview/') || page.url.pathname.startsWith('/review/correction/')}
 							<ReviewForms
