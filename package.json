@@ -6,6 +6,8 @@
     "dev": "start cmd /k \"ssh mongovm -N -L 27017:localhost:27017\" & vite dev",
     "build": "vite build",
     "preview": "vite preview",
+    "postinstall": "playwright install chromium",
+    "playwright:install": "playwright install chromium",
     "migrate:paper-status-reviewer-assignment": "node scripts/migrate-paper-status-to-reviewer-assignment.js",
     "test": "npm run test:integration && npm run test:unit",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
