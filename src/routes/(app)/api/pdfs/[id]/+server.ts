@@ -126,14 +126,14 @@ async function resolveDownloadFilename(pdfId: string, fallbackFilename: string):
 export const GET: RequestHandler = async ({ params }) => {
 	const { id } = params;
 	if (!id) {
-		return new Response('ID do PDF nÃ£o fornecido', { status: 400 });
+		return new Response('ID do PDF nao fornecido', { status: 400 });
 	}
 
 	try {
 		const file = await fsFiles.findOne({ 'metadata.id': id });
 
 		if (!file) {
-			return new Response('Arquivo nÃ£o encontrado', { status: 404 });
+			return new Response('Arquivo nao encontrado', { status: 404 });
 		}
 
 		const originalFilename = String(file.filename || 'document.pdf');

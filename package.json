@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "dev": "vite dev",
+    "dev": "start cmd /k \"ssh mongovm -N -L 27017:localhost:27017\" & vite dev",
     "build": "vite build",
     "preview": "vite preview",
     "migrate:paper-status-reviewer-assignment": "node scripts/migrate-paper-status-to-reviewer-assignment.js",
@@ -64,6 +64,8 @@
     "mongodb": "^6.13.1",
     "mongoose": "^6.0.13",
     "nodemailer": "^7.0.6",
+    "pdfkit": "^0.18.0",
+    "playwright": "^1.59.1",
     "quill": "^2.0.3",
     "resend": "^4.6.0",
     "sanitize-html": "^2.15.0",

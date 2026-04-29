@@ -12,14 +12,7 @@
 	import { createEventDispatcher } from 'svelte';
 	import ReviewForms from '../Review/ReviewForms.svelte';
 	import CorrectionProgressBar from '$lib/components/CorrectionProgressBar/CorrectionProgressBar.svelte';
-	import PaperAuthorsSection from '$lib/components/Paper/PaperAuthorsSection.svelte';
-	import SupplementaryMaterials from '$lib/components/SupplementaryMaterials.svelte';
-	import SupplementaryFiles from '$lib/components/SupplementaryFiles.svelte';
-	import {
-		openPaperPdfPreview,
-		setupPaperHtmlPresentation
-	} from '$lib/utils/paperHtmlPresentation';
-	import { buildStandardPdfFilename, getPaperYear } from '$lib/utils/pdfFilename';
+	import PublishedPaperView from '$lib/components/Paper/PublishedPaperView.svelte';
 
 	const dispatch = createEventDispatcher();
 
@@ -148,7 +141,17 @@
 	}: Props = $props();
 
 	let isReviewCollapsed = $state(false);
-	let paperHtmlRoot: HTMLElement | null = null;
+	let generatedPdfId = $state<string>(paper?.pdfUrl ?? '');
+	let isGeneratingPdf = $state(false);
+	let generatePdfError = $state<string | null>(null);
+
+	function isUserReviewer() {
+		if (!currentUser) return false;
+		if (currentUser.roles?.reviewer) return true;
+		if (Array.isArray(reviewAssignments) && reviewAssignments.some((r) => r.reviewerId === currentUser.id)) return true;
+		if (Array.isArray(paper?.reviewers) && paper.reviewers.includes(currentUser.id)) return true;
+		return false;
+	}
 
 	function handleReviewCollapse(event: CustomEvent<{ collapsed: boolean }>) {
 		isReviewCollapsed = event.detail?.collapsed ?? false;
@@ -181,37 +184,48 @@
 		throw new Error('Function not implemented.');
 	}
 
-	function resolvePrintFilename(): string {
-		const paperData = (paper ?? {}) as any;
-		const authorLastName =
-			paperData?.correspondingAuthor?.lastName ?? paperData?.mainAuthor?.lastName ?? '';
-		const hubTitle =
-			(typeof paperData?.hubId === 'object' ? paperData?.hubId?.title : null) ?? 'SciLedger';
+	function handleOpenPdfPreview() {
+		if (!generatedPdfId) return;
 
-		return buildStandardPdfFilename({
-			authorLastName,
-			journalTitle: hubTitle,
-			year: getPaperYear(paperData?.createdAt)
-		});
+		const url = `/api/pdfs/${encodeURIComponent(generatedPdfId)}?download=0`;
+		const win = window.open(url, '_blank');
+		if (!win) {
+			alert('Allow pop-ups in the browser to open the PDF.');
+		}
 	}
 
-	function handleDownloadHtmlPdf() {
-		if (!paperHtmlRoot) return;
+	async function generateServerPdf(force = false) {
+		const paperId = String(paper?.id ?? '').trim();
+		if (!paperId || isGeneratingPdf) return;
 
-		const opened = openPaperPdfPreview(
-			paperHtmlRoot,
-			paper?.title ?? 'paper',
-			resolvePrintFilename(),
-			'In Review'
-		);
-		if (!opened) {
-			alert('Allow pop-ups in the browser to generate the PDF preview.');
+		isGeneratingPdf = true;
+		generatePdfError = null;
+
+		try {
+			const response = await fetch(`/api/pdfs/generate/${encodeURIComponent(paperId)}`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ force })
+			});
+
+			if (!response.ok) {
+				const payload = (await response.json().catch(() => null)) as { message?: string } | null;
+				throw new Error(payload?.message || 'Failed to generate PDF');
+			}
+
+			const payload = (await response.json()) as { pdfId?: string };
+			if (payload?.pdfId) {
+				generatedPdfId = payload.pdfId;
+			}
+		} catch (error) {
+			generatePdfError = error instanceof Error ? error.message : 'Failed to generate PDF';
+		} finally {
+			isGeneratingPdf = false;
 		}
 	}
 
 	onMount(() => {
-		if (!paperHtmlRoot) return;
-		return setupPaperHtmlPresentation(paperHtmlRoot);
+		void generateServerPdf(true);
 	});
 </script>
 
@@ -241,140 +255,88 @@
 			</div>
 		{/if}
 
-		<!-- Nova seção com Paper completo e ReviewForms lado a lado -->
-		<div class="mb-8 {isHubAdmin ? 'w-full' : 'flex flex-col gap-4 w-full lg:flex-row'}">
-			<!-- Paper completo à esquerda -->
-			<section
-				class={isHubAdmin
-					? 'w-full'
-					: isReviewCollapsed
-						? 'w-full min-w-0 lg:flex-[3_1_0%]'
-						: 'w-full min-w-0 lg:flex-1'}
-			>
-				<div class="p-4 md:p-6 bg-white rounded-lg shadow-lg">
-					<div class="mb-4 flex justify-end">
-						<button
-							type="button"
-							class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-							onclick={handleDownloadHtmlPdf}
-						>
-							Print / Save PDF
-						</button>
-					</div>
-
-					<div class="paper-line-numbered-root" bind:this={paperHtmlRoot}>
-						<!-- Título do Paper -->
-						<h2
-							class="paper-line-numbered-block paper-export-title text-3xl font-semibold text-gray-800 mb-4"
-						>
-							{@html paper.title}
-						</h2>
-
-						<PaperAuthorsSection
-							paper={paper}
-							rootClass="paper-line-number-exempt mb-4"
-							headingText={null}
-						/>
-
-						<span class="paper-line-numbered-block paper-export-metadata text-xs"
-							>Published: {new Date(paper.createdAt).toDateString()}</span
-						>
-
-						<!-- Imagem Principal -->
-						{#if paper.paperPictures && paper.paperPictures.length > 0}
-							<img
-								src={`/api/images/${paper.paperPictures[0]}`}
-								alt="Imagem do artigo"
-								class="paper-line-number-exempt paper-export-image paper-export-main-image w-full h-full object-cover rounded-sm mb-4"
-							/>
-						{:else}
-							<!-- Placeholder caso não haja imagem -->
-							<div
-								class="paper-line-number-exempt paper-export-image paper-export-main-image bg-gray-300 w-full h-48 rounded-sm flex items-center justify-center text-gray-500 mb-4"
-							>
-								<span>No image available</span>
+		<!-- Role-based rendering: reviewers get PDF + review form; others see HTML PublishedPaperView -->
+		{#if isUserReviewer()}
+			<div class="mb-8 {isHubAdmin ? 'w-full' : 'flex flex-col gap-4 w-full lg:flex-row'}">
+				<!-- PDF à esquerda -->
+				<section
+					class={isHubAdmin
+						? 'w-full'
+						: isReviewCollapsed
+							? 'w-full min-w-0 lg:flex-[3_1_0%]'
+							: 'w-full min-w-0 lg:flex-1'}
+				>
+					<div class="p-4 md:p-6 bg-white rounded-lg shadow-lg">
+						<div class="mb-2 flex items-center justify-between gap-3">
+						<h3 class="text-lg font-semibold text-slate-800">Paper PDF</h3>
+							<div class="flex items-center gap-2">
+								<button
+									type="button"
+									class="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+									onclick={() => generateServerPdf(true)}
+									disabled={isGeneratingPdf}
+								>
+									{isGeneratingPdf ? 'Generating PDF...' : 'Regenerate PDF'}
+								</button>
+								<button
+									type="button"
+									class="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+									onclick={handleOpenPdfPreview}
+									disabled={!generatedPdfId}
+								>
+									Open in new tab
+								</button>
 							</div>
+						</div>
+
+						{#if generatePdfError}
+							<p class="mb-2 text-sm text-red-600">{generatePdfError}</p>
 						{/if}
 
-						<!-- Abstract -->
-						<h3
-							class="paper-line-numbered-block paper-export-label mt-4 text-surface-900 font-bold prose text-2xl max-w-none"
-						>
-							Abstract
-						</h3>
-						<div
-							class="paper-line-numbered-block paper-export-abstract mt-4 text-surface-950 prose prose-m max-w-none [&>p]:text-lg paper-content"
-						>
-							{@html paper.abstract}
-						</div>
-
-						<!-- Conteúdo completo -->
-						<div
-							class="paper-line-numbered-block paper-export-content mt-4 text-surface-950 prose prose-m max-w-none [&>p]:text-lg [&>ol>li]:text-base [&>ol>li]:marker:text-primary-500 paper-content"
-						>
-							{@html paper.content}
-						</div>
+						{#if generatedPdfId}
+							<div class="border border-gray-300 p-2 md:p-4 h-[80vh] w-full">
+								<iframe
+									src={`/api/pdfs/${generatedPdfId}`}
+									title="PDF file"
+									frameborder="1"
+									class="h-full w-full"
+								></iframe>
+							</div>
+						{:else}
+							<div class="border border-dashed border-gray-300 rounded-lg p-6 text-center text-sm text-slate-600">
+								{isGeneratingPdf
+								? 'Generating Paper PDF...'
+								: 'No PDF generated for this paper yet.'}
+							</div>
+						{/if}
 					</div>
-
-					{#if paper.supplementaryMaterials && paper.supplementaryMaterials.length > 0}
-						<div class="mt-6">
-							<SupplementaryMaterials materials={paper.supplementaryMaterials} />
-						</div>
-					{/if}
-
-					{#if paper.supplementaryFiles && paper.supplementaryFiles.length > 0}
-						<div class="mt-6">
-							<SupplementaryFiles files={paper.supplementaryFiles} allowDownload={true} />
-						</div>
-					{/if}
-
-					<!-- Tags/Keywords -->
-					{#if paper.keywords && paper.keywords.length > 0}
-						<div class="mt-4 flex flex-wrap gap-2">
-							{#each paper.keywords as keyword}
-								<span class="bg-primary-100 text-primary-800 text-xs px-2 py-1 rounded">
-									{keyword}
-								</span>
-							{/each}
-						</div>
-					{/if}
-				</div>
-			</section>
-
-			<!-- ReviewForms à direita (apenas para revisores, não para admin do hub) -->
-			{#if !isHubAdmin}
-				<section
-					class={isReviewCollapsed
-						? 'w-full lg:w-[300px] flex-none min-w-0'
-						: 'w-full lg:w-[520px] flex-none min-w-0'}
-				>
-					{#if page.url.pathname.startsWith('/review/inreview/') || page.url.pathname.startsWith('/review/correction/')}
-						<ReviewForms
-							paperTitle={paper.title}
-							paperId={paper.id}
-							reviewerId={currentUser?.id || ''}
-							{paper}
-							on:collapseToggle={handleReviewCollapse}
-							on:reviewSubmitted={handleReviewSubmitted}
-						/>
-					{/if}
 				</section>
-			{/if}
-		</div>
 
-		<hr class="my-4" />
-
-		<!-- Seção do PDF (opcional, pode remover se não precisar) -->
-		<div class="mb-8 w-full">
-			<div class="border border-gray-300 p-2 md:p-4 h-[80vh] w-full">
-				<iframe
-					src={`/api/pdfs/${paper.pdfUrl}`}
-					title="PDF file"
-					frameborder="1"
-					class="h-full w-full"
-				></iframe>
+				<!-- ReviewForms à direita (apenas para revisores, não para admin do hub) -->
+				{#if !isHubAdmin}
+					<section
+						class={isReviewCollapsed
+							? 'w-full lg:w-[300px] flex-none min-w-0'
+							: 'w-full lg:w-[520px] flex-none min-w-0'}
+					>
+						{#if page.url.pathname.startsWith('/review/inreview/') || page.url.pathname.startsWith('/review/correction/')}
+							<ReviewForms
+								paperTitle={paper.title}
+								paperId={paper.id}
+								reviewerId={currentUser?.id || ''}
+								{paper}
+								on:collapseToggle={handleReviewCollapse}
+								on:reviewSubmitted={handleReviewSubmitted}
+							/>
+						{/if}
+					</section>
+				{/if}
 			</div>
-		</div>
+		{:else}
+			<div class="mb-8">
+				<PublishedPaperView {paper} showReviewedBadge={false} />
+			</div>
+		{/if}
 	</fieldset>
 </main>
 <!-- <ReviewForms
