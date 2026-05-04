@@ -78,6 +78,7 @@ ORCID_SANDBOX=true
 # Email Configuration
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
+SMTP_SECURE=false
 SMTP_USER=your-email@gmail.com
 SMTP_PASS=your-app-password
 
