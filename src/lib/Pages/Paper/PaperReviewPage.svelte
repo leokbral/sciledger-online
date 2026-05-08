@@ -276,6 +276,8 @@
 						>
 							<h3 class="text-lg font-semibold text-slate-800">Paper PDF</h3>
 							<div class="flex flex-col gap-2 min-[420px]:flex-row sm:items-center">
+								<!-- Regenerate PDF button hidden (manual override). -->
+								<!--
 								<button
 									type="button"
 									class="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 min-[420px]:w-auto"
@@ -284,6 +286,7 @@
 								>
 									{isGeneratingPdf ? 'Generating PDF...' : 'Regenerate PDF'}
 								</button>
+								-->
 								<button
 									type="button"
 									class="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 min-[420px]:w-auto"
