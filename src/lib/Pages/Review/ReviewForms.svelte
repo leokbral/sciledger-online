@@ -351,7 +351,6 @@
 			if (response.ok) {
 				draftSaveSuccess = true;
 				lastSavedTime = new Date().toLocaleString();
-				console.log('Draft saved successfully:', result);
 				
 				// Clear success message after 3 seconds
 				setTimeout(() => {
@@ -421,7 +420,6 @@
 
 			if (response.ok) {
 				submitSuccess = true;
-				console.log('Review submitted successfully:', result);
 				
 				// Clear draft after successful submission
 				await clearDraft();

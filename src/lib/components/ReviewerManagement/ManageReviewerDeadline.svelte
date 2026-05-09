@@ -39,26 +39,16 @@
 			newDeadlineDays
 		};
 
-		console.log('🚀 FRONTEND: Sending update deadline request');
-		console.log('🔄 Updating deadline with params:', payload);
-		console.log('📦 Reviewer object:', reviewer);
-		console.log('📝 Current deadline:', currentDeadline);
-
 		loading = true;
 		try {
-			console.log('📡 Making fetch request to /api/review-assignments/update-deadline');
 			const response = await fetch('/api/review-assignments/update-deadline', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify(payload)
 			});
-
-			console.log('📥 Response status:', response.status);
 			const data = await response.json();
-			console.log('📥 Response data:', data);
 
 			if (response.ok) {
-				console.log('✅ SUCCESS: Deadline updated');
 				toaster.success({ 
 					title: 'Deadline updated', 
 					description: `New deadline set to ${newDeadlineDays} days from now` 

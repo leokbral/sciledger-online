@@ -138,8 +138,6 @@
 				Array.isArray(paper.hubId?.reviewers) &&
 				paper.hubId.reviewers.some((reviewer) => matchesUser(reviewer, user.id))
 		}));
-
-	console.log(papersPool);
 	
 	// Filtrar papers "in review" - APENAS revisores designados, revisores do hub ou dono do hub (autores NÃO veem aqui)
 	let inReview = papers.filter((p: Paper) => {

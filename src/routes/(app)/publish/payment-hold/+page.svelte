@@ -123,7 +123,6 @@
       const userEmail = $page.data.user?.email || `user-${Date.now()}@temp.local`;
 
       // Step 1: Criar o Payment Intent no servidor
-      console.log('Creating payment intent...');
       
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 segundo timeout
@@ -185,10 +184,8 @@
         return;
       }
 
-      console.log('Payment intent created:', paymentIntentId);
 
       // Step 2: Confirmar o Payment Intent com o card element
-      console.log('Confirming card payment...');
       // @ts-ignore
       const confirmRes = await stripe.confirmCardPayment(clientSecret, {
         payment_method: {
@@ -215,7 +212,6 @@
         return;
       }
 
-      console.log('Card confirmed. Intent status:', paymentIntent.status);
 
       if (paymentIntent.status === 'succeeded' || paymentIntent.status === 'requires_capture') {
         success = true;
@@ -236,7 +232,6 @@
               console.error('Failed to update payment auth code:', updateError);
               // Não interrompe o fluxo, continua mesmo se falhar
             } else {
-              console.log('Paper updated with payment authorization');
             }
           } catch (err) {
             console.error('Error updating payment auth:', err);

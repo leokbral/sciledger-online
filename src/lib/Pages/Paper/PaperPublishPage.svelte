@@ -503,13 +503,11 @@
 
 	const onInputValueChange = (e: any) => {
 		// ={(e) => (inputAuthorList = e.value)}
-		console.log('chamou', e);
 		inputAuthor = e.inputValue;
 		// inputSkillList = e.value
 	};
 
 	function onInvalidHandler(event: any): void {
-		console.log(event.reason);
 		// toastStore.trigger({
 		// 	message: `"${event.detail.input}" é um valor inválido. Por favor tente novamente!`,
 		// 	background: 'preset-filled-error-500'
@@ -845,7 +843,6 @@
 		if (labeledTitleMatch) {
 			const labeledTitle = cleanHtmlText(labeledTitleMatch[1]);
 			if (labeledTitle.length >= 3) {
-				console.log('Extracted title (labeled line):', labeledTitle);
 				return labeledTitle;
 			}
 		}
@@ -859,7 +856,6 @@
 			while ((match = paragraphRegex.exec(betweenTitleAndAbstract)) !== null) {
 				const paragraphText = cleanHtmlText(match[1]);
 				if (paragraphText.length > 0) {
-					console.log('Extracted title:', paragraphText);
 					return paragraphText;
 				}
 			}
@@ -885,8 +881,6 @@
 			const text = cleanHtmlText(heading[1]);
 			const normalized = text.toLowerCase();
 			if (text.length < 3 || disallowedHeadings.has(normalized)) continue;
-
-			console.log('Extracted title (heading):', text);
 			return text;
 		}
 
@@ -901,7 +895,6 @@
 
 			if (blocks.length > 0) {
 				const best = blocks.reduce((acc, cur) => (cur.length > acc.length ? cur : acc));
-				console.log('Extracted title (fallback):', best);
 				return best;
 			}
 		}
@@ -917,7 +910,6 @@
 			);
 
 		if (firstParagraphs.length > 0) {
-			console.log('Extracted title (first paragraph fallback):', firstParagraphs[0]);
 			return firstParagraphs[0];
 		}
 
@@ -933,7 +925,6 @@
 			);
 
 		if (genericBlocks.length > 0) {
-			console.log('Extracted title (generic fallback):', genericBlocks[0]);
 			return genericBlocks[0];
 		}
 
@@ -951,11 +942,8 @@
 			);
 
 		if (candidateFromPlain) {
-			console.log('Extracted title (plain text fallback):', candidateFromPlain);
 			return candidateFromPlain;
 		}
-
-		console.log('Could not extract title from document');
 		return '';
 	}
 
@@ -979,7 +967,6 @@
 			while ((paragraphMatch = paragraphRegex.exec(sectionUntilNextHeading)) !== null) {
 				const text = cleanHtmlText(paragraphMatch[1]);
 				if (text.length > 20) {
-					console.log('Extracted abstract (after heading):', text.substring(0, 100) + '...');
 					return text;
 				}
 			}
@@ -1003,12 +990,8 @@
 			if (text.length <= 20) continue;
 			if (normalized === extractedTitle) continue;
 			if (/^(abstract|resumo|keywords?|palavras[-\s]?chave)\s*:?$/i.test(text)) continue;
-
-			console.log('Extracted abstract (fallback first paragraph):', text.substring(0, 100) + '...');
 			return text;
 		}
-
-		console.log('Could not extract abstract from document');
 		return '';
 	}
 
@@ -1023,7 +1006,6 @@
 			if (/(^|\b)(keywords?|palavras[-\s]?chave)\b/i.test(block)) {
 				const parsed = parseKeywordsText(block);
 				if (parsed.length > 0) {
-					console.log('Extracted keywords (labeled line):', parsed);
 					return parsed;
 				}
 			}
@@ -1036,7 +1018,6 @@
 
 		const abstractMatch = abstractHeadingRegex.exec(html);
 		if (!abstractMatch) {
-			console.log('Keywords: abstract heading not found');
 			return [];
 		}
 
@@ -1054,12 +1035,10 @@
 		}
 
 		if (paragraphs.length < 1) {
-			console.log('Keywords: not enough paragraphs between abstract and main');
 		} else {
 			for (let i = 0; i < Math.min(paragraphs.length, 5); i++) {
 				const parsed = parseKeywordsText(paragraphs[i]);
 				if (parsed.length > 0) {
-					console.log('Extracted keywords (near abstract):', parsed);
 					return parsed;
 				}
 			}
@@ -1079,7 +1058,6 @@
 		const keywords = parseKeywordsText(keywordsParagraph);
 
 		const uniqueKeywords = [...new Set(keywords)];
-		console.log('Extracted keywords:', uniqueKeywords);
 		return uniqueKeywords;
 	}
 
@@ -1091,7 +1069,6 @@
 
 		const formData = new FormData();
 		formData.append('file', file);
-		console.log('File:', file);
 
 		try {
 			// const response = await fetch('http://127.0.0.1:8000/api/convert', {
@@ -1112,49 +1089,32 @@
 
 			const data = await response.json();
 			content = data.html;
-			console.log('HTML conversion successful');
 
 			// Automatically extract and fill abstract
 			if (data.html) {
 				const firstSentenceSplit = extractFirstSentenceSplitFromHtml(data.html);
 				const extractedTitle = firstSentenceSplit.title || extractTitleFromHtml(data.html);
-				console.log('Checking if should fill title... Current:', $store.title ? 'has value' : 'empty');
 
 				if (extractedTitle && isEffectivelyEmptyText($store.title)) {
 					$store.title = extractedTitle;
-					console.log('✅ Title automatically filled from DOCX');
 				} else if (extractedTitle && $store.title) {
-					console.log('⚠️ Title field already has content, not overwriting');
 				} else {
-					console.log('❌ Could not extract title from document');
 				}
 
 				const extractedAbstract = firstSentenceSplit.abstract || extractAbstractFromHtml(data.html);
-				console.log('Checking if should fill abstract... Current:', $store.abstract ? 'has value' : 'empty');
 				
 				if (extractedAbstract && isEffectivelyEmptyText($store.abstract)) {
 					$store.abstract = extractedAbstract;
-					console.log('✅ Abstract automatically filled from DOCX');
-					console.log('Abstract content:', $store.abstract.substring(0, 150) + '...');
 				} else if (extractedAbstract && $store.abstract) {
-					console.log('⚠️ Abstract field already has content, not overwriting');
 				} else {
-					console.log('❌ Could not extract abstract from document');
 				}
 
 				const extractedKeywords = extractKeywordsFromHtml(data.html);
-				console.log(
-					'Checking if should fill keywords... Current:',
-					$store.keywords?.length ? 'has value' : 'empty'
-				);
 
 				if (extractedKeywords.length > 0 && (!$store.keywords || $store.keywords.length === 0)) {
 					$store.keywords = extractedKeywords;
-					console.log('✅ Keywords automatically filled from DOCX:', $store.keywords);
 				} else if (extractedKeywords.length > 0 && $store.keywords?.length) {
-					console.log('⚠️ Keywords field already has content, not overwriting');
 				} else {
-					console.log('❌ Could not extract keywords from document');
 				}
 			}
 
@@ -1205,8 +1165,6 @@
 
 		$store.paperPictures = allImageIds;
 		$store.content = content;
-
-		console.log($store);
 		savePaper($store);
 
 		return $store;
@@ -1229,7 +1187,6 @@
 		}
 
 		$store.status = 'reviewer assignment';
-		console.log($store);
 
 		showSubmitModal = false;
 		confirmInformationAccurate = false;
@@ -1261,9 +1218,7 @@
 		const _file = event.acceptedFiles[0];
 		docxFile = _file;
 		reader.readAsDataURL(_file);
-		convertDocument(_file).then(() => {
-			console.log('Document converted successfully!');
-		});
+		convertDocument(_file);
 	}
 
 	interface ImageItem {

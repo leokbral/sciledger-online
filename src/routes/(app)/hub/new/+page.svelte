@@ -269,7 +269,6 @@
 					body: formData
 				});
 				const data = await response.json();
-				console.log('Logo upload response:', data);
 				if (data.id) {
 					form.logoUrl = data.id;
 				}
@@ -284,7 +283,6 @@
 					body: formData
 				});
 				const data = await response.json();
-				console.log('Banner upload response:', data);
 				if (data.id) {
 					form.bannerUrl = data.id;
 				}
@@ -299,17 +297,10 @@
 					body: formData
 				});
 				const data = await response.json();
-				console.log('Card upload response:', data);
 				if (data.id) {
 					form.cardUrl = data.id;
 				}
 			}
-			
-			console.log('All images uploaded. Form URLs:', {
-				logoUrl: form.logoUrl,
-				bannerUrl: form.bannerUrl,
-				cardUrl: form.cardUrl
-			});
 		} catch (error) {
 			console.error('Error uploading images:', error);
 		}
@@ -326,12 +317,9 @@
 	}
 
 	async function handleSubmit() {
-		console.log('Form Data before image upload:', form);
 		try {
 			// First save any uploaded images
 			await saveImages();
-			
-			console.log('Form Data after image upload:', form);
 
 			const formData = {
 				...form,
@@ -342,8 +330,6 @@
 					eventEnd: form.dates.eventEnd
 				}
 			};
-			
-			console.log('Sending to server:', formData);
 
 			const response = await fetch('/hub/new', {
 				method: 'POST',
@@ -354,8 +340,6 @@
 			});
 
 			const data = await response.json();
-
-			console.log('Response:', data);
 
 			if (data.hub) {
 				// Mostrar notificação de sucesso

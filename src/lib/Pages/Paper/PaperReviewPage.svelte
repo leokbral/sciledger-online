@@ -164,7 +164,6 @@
 	// console.log('Reviewers', paper.reviewers);
 
 	function hdlSaveDraft(e: any) {
-		console.log('current message:', e.detail.currentMessage);
 		//Fz um put que atualiza currentMessage
 		currentMessage = e.detail.currentMessage;
 	}

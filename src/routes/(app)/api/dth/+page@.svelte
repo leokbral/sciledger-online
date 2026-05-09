@@ -8,7 +8,6 @@
 
 	// Load the document file
 	function loadDocument(event: any) {
-		console.log(event);
 		papertest = event.acceptedFiles[0];
 	}
 
@@ -42,7 +41,6 @@
 
 		const formData = new FormData();
 		formData.append('file', file);
-		console.log('File:', file);
 
 		try {
 			// const response = await fetch('http://127.0.0.1:8000/api/convert', {

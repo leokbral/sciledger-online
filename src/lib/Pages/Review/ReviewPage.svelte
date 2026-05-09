@@ -29,8 +29,6 @@
 	// console.log('Review tabs', tabs);
 	// console.log('Review papers', papers);
 	// console.log('Review data', reviews); // Verificando as revisões
-	console.log('reviewerInvitations', reviewerInvitations); // Verificando as revisões
-	console.log('reviewAssignments', reviewAssignments); // Verificando os assignments
 </script>
 
 <div class="container page p-4 m-auto">

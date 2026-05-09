@@ -44,19 +44,12 @@
 
 	// Function to get reviewer name by ID
 	function getReviewerName(reviewerId: string | any): string {
-		console.log('Looking for reviewer with ID:', reviewerId);
-		console.log('Available users:', users);
-		
 		// Handle if reviewerId is an object with id property
 		const actualReviewerId = typeof reviewerId === 'object' ? reviewerId?.id || reviewerId?._id : reviewerId;
-		
-		console.log('Actual reviewer ID to search:', actualReviewerId);
 		
 		const reviewer = users.find((user: any) => {
 			return user.id === actualReviewerId || user._id === actualReviewerId;
 		});
-		
-		console.log('Found reviewer:', reviewer);
 		
 		if (reviewer) {
 			return `${reviewer.firstName} ${reviewer.lastName}`;
@@ -225,8 +218,7 @@
 	// Function to save correction progress to database
 	async function saveCorrectionProgress() {
 		if (isSaving) return; // Prevent multiple simultaneous saves
-		
-		console.log('Saving correction progress:', correctionProgress);
+
 		isSaving = true;
 		try {
 			const response = await fetch(`/publish/corrections/${data.id}`, {
@@ -240,13 +232,10 @@
 				})
 			});
 
-			console.log('Save response status:', response.status);
 			const responseData = await response.json();
-			console.log('Save response data:', responseData);
 
 			if (response.ok) {
 				lastSaved = new Date();
-				console.log('Progress saved successfully at:', lastSaved);
 			} else {
 				console.error('Erro ao salvar progresso:', responseData);
 			}
@@ -260,9 +249,7 @@
 	// Function to toggle correction completion
 	function toggleCorrection(reviewIndex: number, type: 'weaknesses' | 'criterion', identifier: string) {
 		const key = `${reviewIndex}-${type}-${identifier}`;
-		console.log('Toggling correction:', key, 'to', !correctionProgress[key]);
 		correctionProgress[key] = !correctionProgress[key];
-		console.log('Current correctionProgress:', correctionProgress);
 		
 		// Force immediate save for testing
 		saveCorrectionProgress();
@@ -329,9 +316,7 @@
 	}
 
 	async function handleSavePaper(event: { detail: { store: Paper } }) {
-		console.log('Updated Paper Data:', event.detail.store);
 		const updatedPaper = event.detail.store;
-		console.log('Saving Updated Paper:', updatedPaper);
 
 		try {
 			const response = await post(`/publish/edit/${updatedPaper.id}`, updatedPaper);
@@ -342,7 +327,7 @@
 				alert(`Issue! ${JSON.stringify(response)}`);
 			}
 		} catch (error) {
-			console.log(error);
+			console.error(error);
 			alert('An error occurred. Please try again.');
 		}
 	}

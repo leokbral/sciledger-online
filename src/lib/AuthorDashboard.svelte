@@ -26,9 +26,6 @@
 
 	let { user, publishedPapers }: Props = $props();
 
-	console.log('Está sendo passado o user no AuthorDashboard', user);
-	console.log('Papers publicados:', publishedPapers);
-
 	let totalCitations = $state(0);
 	let publishedArticles = $state(0);
 	let averageReviewTime = $state(0);

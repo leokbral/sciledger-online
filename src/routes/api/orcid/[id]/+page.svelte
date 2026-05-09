@@ -3,17 +3,7 @@
 
   export let data: { profile: any };
 
-  // Debug: verificar dados recebidos
-  console.log('Dados completos recebidos:', data);
-  console.log('Profile específico:', data?.profile);
-  console.log('Tipo do profile:', typeof data?.profile);
-  
-  // Verificar se profile existe e tem conteúdo
-  if (data?.profile) {
-    console.log('Profile tem dados:', Object.keys(data.profile));
-  } else {
-    console.log('Profile está vazio ou undefined');
-  }
+  // Debug removed to avoid exposing profile data in console
 </script>
 
 <div>

@@ -22,7 +22,6 @@
 	let user = data.user;
 
 	// console.log('Publish tabs', tabs);
-	console.log('Publish papers', papers);
 	// console.log('Publish user', user);
 	// console.log('Publish paper', publishedPapers);
 </script>

@@ -13,12 +13,10 @@
 	};
 
 	function onChangeHandler(e: Event): void {
-		console.log('file data:', e);
 	}
 
 	const uploadFile = async () => {
 		if (file) {
-      console.log(file)
 			const formData = new FormData();
 			formData.append('pdf', file);
 
@@ -30,7 +28,6 @@
 
 				const result = await response.json();
 				if (result.success) {
-					console.log('File uploaded successfully');
 				} else {
 					console.error('Upload failed:', result.error);
 				}

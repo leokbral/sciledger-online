@@ -94,7 +94,6 @@
 		try {
 			// const response = await post(`/publish/edit/${updatedPaper.id}`, updatedPaper);
 			const response = await post(`/publish/edit/${store.id}`, store);
-			console.log(response);
 			if (response.paper) {
 				const isSubmitted = store?.status === 'reviewer assignment';
 				goto(`/publish/${isSubmitted ? '?submitted=1' : ''}`);
@@ -102,7 +101,7 @@
 				alert(`Issue! ${JSON.stringify(response)}`);
 			}
 		} catch (error) {
-			console.log(error);
+			console.error(error);
 			alert('An error occurred. Please try again.');
 		}
 	}

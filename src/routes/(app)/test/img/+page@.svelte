@@ -7,7 +7,6 @@
 
 	// Load the document file
 	function loadDocument(event: any) {
-		console.log(event);
 		const reader = new FileReader();
 		reader.onload = (event) => {
 			src = event?.target?.result;
@@ -38,7 +37,6 @@
 
 		const formData = new FormData();
 		formData.append('file', file);
-		console.log('File:', file);
 
 		try {
 			const response = await fetch('/api/images/upload', {
@@ -56,7 +54,6 @@
 			}
 
 			const data = await response.json();
-			console.log('saved image:', data);
 			// src = data.html;
 
 			// with open(filename, "w", encoding="utf-8") as f:

@@ -23,15 +23,12 @@
 	} as PaperPublishStoreData);
 
 	async function savePaper(store: any) {
-		console.log('Saving paper (new/draft):', store);
-
 		try {
 			// Determinar se é criação ou edição
 			const isEdit = store.id && store.id !== '';
 			const endpoint = isEdit ? `/publish/edit/${store.id}` : '/publish/new';
 			
 			const response = await post(endpoint, store);
-			console.log('Response:', response);
 
 			if (response.paper) {
 				if (isEdit) {

@@ -17,7 +17,6 @@
 
 	function toggleDarkMode() {
 		//document.documentElement.classList.toggle('dark');
-		console.log('toggleDarkMode');
 		if (document.documentElement.classList.contains('dark')) {
 			document.documentElement.classList.remove('dark');
 			localStorage.setItem('dark', 'false');
