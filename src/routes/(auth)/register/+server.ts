@@ -10,7 +10,7 @@ export const POST: RequestHandler = async ({ request }) => {
 	await start_mongo(); // Não necessário mais
 
 	try {
-		const { firstName, lastName, username, country, dob, email, password, confirmPassword } =
+		const { firstName, lastName, username, country, state, dob, email, password, confirmPassword } =
 			await request.json();
 
 		// Verifica se todas as informações necessárias foram enviadas
@@ -56,6 +56,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			firstName,
 			lastName,
 			country,
+			state,
 			dob,
 			email,
 			handle: email,
