@@ -25,6 +25,5 @@ export async function saveTask(
 		})
 	});
 
-	console.log(res);
 	alert('Verifique o console para saber se salvou!\n Falta implementar o redirect.');
 }

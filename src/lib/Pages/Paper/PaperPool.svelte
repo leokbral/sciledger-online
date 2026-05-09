@@ -15,7 +15,6 @@
 	let { papersData, rota = '', user }: Props = $props();
 	// const modalStore = getModalStore();
 	const papers: Paper[] = papersData.papersData[0];
-	console.log(papers);
 
 	let tabSet: number = 0;
 
@@ -27,11 +26,6 @@
 
 	// Função para aplicar os filtros
 	const applyFilters = () => {
-		console.log({
-			minPrice: $minPrice,
-			maxPrice: $maxPrice,
-			numberOfReviewers: $numberOfReviewers
-		});
 		// Aqui você pode chamar uma API ou filtrar os dados localmente
 	};
 

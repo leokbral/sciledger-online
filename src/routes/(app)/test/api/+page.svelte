@@ -22,11 +22,8 @@
 
 	async function uploadFile() {
 		if (!files) {
-			console.log('Sem arquivos');
 			return;
 		}
-
-		console.log('chamou uploadFile', files[0]);
 		const file = files[0];
 
 		const formData = new FormData();
@@ -39,7 +36,6 @@
 
 		if (response.ok) {
 			const data = await response.json();
-			console.log(data);
 			//location.reload(); descomente para atualizar a pagina depois de salvar
 		} else {
 			console.error('Erro ao fazer upload do arquivo:', response.statusText);

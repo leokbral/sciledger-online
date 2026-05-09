@@ -191,9 +191,6 @@
     }
     
     function openManageReviewersDialog(paper: Paper) {
-        console.log('📋 Opening Manage Reviewers for paper:', paper.id);
-        console.log('👥 Paper reviewers:', paper.reviewers);
-        console.log('🏢 Hub reviewers:', hub.reviewers);
         selectedPaper = paper;
         openManageReviewersModal = true;
     }
@@ -872,27 +869,8 @@
                             {@const assignment = reviewAssignments?.find(a => {
                                 const aReviewerId = typeof a.reviewerId === 'object' ? (a.reviewerId._id || a.reviewerId.id) : a.reviewerId;
                                 const aPaperId = typeof a.paperId === 'object' ? (a.paperId._id || a.paperId.id) : a.paperId;
-                                console.log(`🔍 Checking assignment for reviewer ${idx}:`, {
-                                    aReviewerId,
-                                    reviewerId,
-                                    match: aReviewerId === reviewerId,
-                                    aPaperId,
-                                    selectedPaperId: selectedPaper?.id,
-                                    paperMatch: aPaperId === selectedPaper?.id,
-                                    assignment: a
-                                });
                                 return aReviewerId === reviewerId && aPaperId === selectedPaper?.id;
                             })}
-                            {#if idx === 0}
-                                {console.log('📊 Modal Debug:', {
-                                    reviewAssignmentsLength: reviewAssignments?.length,
-                                    selectedPaperId: selectedPaper?.id,
-                                    reviewerId,
-                                    foundAssignment: !!assignment,
-                                    assignmentDeadline: assignment?.deadline,
-                                    assignmentId: assignment?._id || assignment?.id
-                                })}
-                            {/if}
                             
                             {#if reviewer}
                                 {@const rev = typeof reviewer === 'object' ? reviewer : null}

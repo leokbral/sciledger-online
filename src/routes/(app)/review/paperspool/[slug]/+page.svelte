@@ -38,10 +38,7 @@
 	}
 
 	async function handleSavePaper(event: { detail: { store: Paper } }) {
-		console.log('Updated Paper Data:', event.detail.store);
-
 		const updatedPaper = event.detail.store;
-		console.log('Saving Updated Paper:', updatedPaper);
 
 		try {
 			const response = await post(`/publish/reviewer-assignment/${updatedPaper.id}`, updatedPaper); // Use id se for o campo correto
@@ -53,7 +50,7 @@
 				alert(`Issue! ${JSON.stringify(response)}`);
 			}
 		} catch (error) {
-			console.log(error);
+			console.error(error);
 			alert('An error occurred. Please try again.');
 		}
 	}

@@ -75,7 +75,6 @@
 	}
 
 	function isOk2Add() {
-		console.log(selected, Math.round(menuContainer.scrollLeft / w));
 		return (
 			// menuContainer.scrollLeft / 80 <= selected &&
 			menuContainer.scrollLeft / w <= selected &&
@@ -87,7 +86,6 @@
 	}
 
 	function isOk2Sub() {
-		console.log(selected, Math.round(menuContainer.scrollLeft / w));
 		return (
 			0 < selected &&
 			selected <= len - 1 &&
@@ -106,7 +104,6 @@
 
 	onMount(() => {
 		setScrollX(selected);
-		console.log(innerWidth);
 		w = innerWidth * 0.83;
 	});
 </script>
