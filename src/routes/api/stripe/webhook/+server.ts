@@ -62,7 +62,7 @@ export const POST: RequestHandler = async ({ request }) => {
         break;
 
       default:
-        console.log(`Unhandled event type: ${event.type}`);
+		break;
     }
 
     return json({ received: true });
@@ -76,13 +76,11 @@ async function handlePaymentIntentSucceeded(paymentIntent: any) {
   const paperId = paymentIntent.metadata?.paperId;
 
   if (!paperId || paperId === 'pending') {
-    console.log('Payment intent succeeded but no paper linked:', paymentIntent.id);
     return json({ received: true });
   }
 
   const paper = await Papers.findById(paperId);
   if (!paper || !paper.paymentHold) {
-    console.log('Paper not found for payment intent:', paperId);
     return json({ received: true });
   }
 
@@ -91,7 +89,6 @@ async function handlePaymentIntentSucceeded(paymentIntent: any) {
     paper.paymentHold.status = 'authorized';
     paper.paymentHold.authorizedAt = new Date(paymentIntent.created * 1000);
     await paper.save();
-    console.log(`Payment hold authorized for paper ${paperId}`);
   }
 
   return json({ received: true });
@@ -113,8 +110,6 @@ async function handlePaymentIntentFailed(paymentIntent: any) {
   paper.paymentHold.status = 'failed';
   paper.paymentHold.failureReason = paymentIntent.last_payment_error?.message || 'Payment failed';
   await paper.save();
-
-  console.log(`Payment hold failed for paper ${paperId}: ${paper.paymentHold.failureReason}`);
   return json({ received: true });
 }
 
@@ -136,8 +131,6 @@ async function handlePaymentIntentCanceled(paymentIntent: any) {
     paper.paymentHold.releasedAt = new Date();
     paper.paymentHold.failureReason = 'Payment intent canceled';
     await paper.save();
-
-    console.log(`Payment hold released for paper ${paperId}`);
   }
 
   return json({ received: true });
@@ -152,7 +145,6 @@ async function handleChargeRefunded(charge: any) {
   });
 
   if (!paper) {
-    console.log('Paper not found for refunded charge:', paymentIntentId);
     return json({ received: true });
   }
 
@@ -162,8 +154,6 @@ async function handleChargeRefunded(charge: any) {
     paper.paymentHold.releasedAt = new Date();
     paper.paymentHold.failureReason = `Refunded: ${charge.amount / 100} ${charge.currency.toUpperCase()}`;
     await paper.save();
-
-    console.log(`Payment refunded for paper ${paper.id}:`, charge.refunds.data[0]?.reason || 'No reason');
   }
 
   return json({ received: true });

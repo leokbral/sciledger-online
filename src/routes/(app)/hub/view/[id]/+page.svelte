@@ -14,8 +14,6 @@
 	const papers = data.papers;
 
 	// Enhanced debug logging
-	// console.log('Current Hub ID:', hub._id);
-	// console.log('Papers before filtering:', papers?.length);
 
 	// Filter papers to only show ones that belong to this hub and are published
 	// const filteredPapers = papers?.filter((paper) => {
@@ -176,8 +174,6 @@
 		);
 	};
 
-	// console.log('Quem foi o responsavel foi esse',data.hub.createdBy._id);
-	// console.log('Is creator:', isCreator);
 	const shouldHighlight = (paper: any) => {
 		const isOwnerOrReviewer = isHubManager || isReviewer;
 		return paper.status !== 'published' && (isUserInvolved(paper) || isOwnerOrReviewer);

@@ -213,7 +213,6 @@ export async function load({ locals }) {
 
 		const fetchReviewInvitation = async (reviewerId: string) => {
 			const invitations = await Invitations.find({ reviewer: reviewerId }).lean().exec();
-			console.log('Invitations5:', invitations);
 			return invitations;
 		};
 
@@ -225,8 +224,6 @@ export async function load({ locals }) {
 			})
 				.lean()
 				.exec();
-
-			console.log(`Found ${assignments.length} ReviewAssignments for reviewer ${reviewerId}`);
 
 			return assignments.map((assignment: any) => ({
 				_id: assignment._id,

@@ -19,7 +19,6 @@
 	let messageFeed = data.messageFeed as MessageFeed;
 	let reviewAssignments = data.reviewAssignments;
 	let isHubOwner = data.isHubOwner || false;
-	//console.log("www",paper?.authors)
 
 	async function handleSavePaper(event: { detail: { store: Paper } }) {
 		const updatedPaper = event.detail.store;
@@ -42,7 +41,6 @@
 	async function hdlSubmitReview(event: CustomEvent) {
 		let { newMessage } = event.detail; //.messageFeed;
 		newMessage = { ...newMessage, sender: newMessage.sender.id, _id: newMessage.id };
-		//console.log('chamou review', event.detail)
 
 		try {
 			// const response = await fetch('/api/messagefeeds', {

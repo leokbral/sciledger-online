@@ -107,7 +107,6 @@ class EmailService {
 
         try {
             await this.transporter.sendMail(mailOptions);
-            console.log(`Co-author welcome email sent to: ${coAuthorEmail}`);
         } catch (error) {
             console.error('Error sending co-author welcome email:', error);
             throw new Error('Failed to send welcome email');

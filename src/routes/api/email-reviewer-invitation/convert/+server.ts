@@ -26,8 +26,6 @@ export async function POST({ request }) {
         await start_mongo();
         
         const { token, userId } = await request.json();
-        
-        console.log('Converting invitation - Token:', token, 'UserId:', userId);
 
         if (!token || !userId) {
             return json({ error: 'Missing required fields' }, { status: 400 });
@@ -51,8 +49,6 @@ export async function POST({ request }) {
             return json({ error: 'Hub not found' }, { status: 404 });
         }
 
-        console.log('Found hub:', hub.title);
-
         // Check if reviewer invitation already exists
         const existingInvitation = await Invitation.findOne({
             reviewer: userId,
@@ -61,7 +57,6 @@ export async function POST({ request }) {
         });
 
         if (existingInvitation) {
-            console.log('Invitation already exists, marking email as accepted');
             // Mark email invitation as accepted (converted)
             emailInvitation.status = 'accepted';
             emailInvitation.updatedAt = new Date();
@@ -88,14 +83,11 @@ export async function POST({ request }) {
         });
 
         await hubInvitation.save();
-        console.log('Created hub invitation:', invitationId);
 
         // Create notification for the user
         const inviterName = hub.createdBy?.firstName 
             ? `${hub.createdBy.firstName} ${hub.createdBy.lastName}`.trim() 
             : 'Hub Admin';
-            
-        console.log('Creating notification for user:', userId, 'Hub:', hub.title, 'Inviter:', inviterName);
         
         const notification = await NotificationService.createHubInvitationNotification({
             userId: userId,
@@ -105,14 +97,10 @@ export async function POST({ request }) {
             role: 'reviewer'
         });
 
-        console.log('Notification created:', notification._id);
-
         // Mark email invitation as accepted (converted to hub invitation)
         emailInvitation.status = 'accepted';
         emailInvitation.updatedAt = new Date();
         await emailInvitation.save();
-
-        console.log('Email invitation marked as accepted');
 
         return json({ 
             success: true, 

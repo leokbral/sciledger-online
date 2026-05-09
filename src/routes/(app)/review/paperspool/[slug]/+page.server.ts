@@ -8,8 +8,6 @@ export async function load({ locals, params }) {
 	const userId = locals.user.id;
 
 	try {
-		console.log('[PapersPool] Loading paper:', params.slug);
-		
 		const paperRaw = await Papers.findOne({ id: params.slug })
 			.populate("authors")
 			.populate("mainAuthor")
@@ -21,7 +19,6 @@ export async function load({ locals, params }) {
 
 		if (!paperRaw) throw error(404, "Paper não encontrado");
 
-		console.log('[PapersPool] Paper found, checking permissions...');
 
 		// Verificar permissões: revisor do hub ou dono do hub
 		let isHubReviewer = false;
@@ -56,7 +53,6 @@ export async function load({ locals, params }) {
 		// Para papers "reviewer assignment" sem hub, qualquer revisor pode ver
 		const isOpenReviewer = !paperRaw.hubId && locals.user.roles?.reviewer === true;
 
-		console.log('[PapersPool] Permissions:', { isHubReviewer, isHubOwner, isOpenReviewer, hasAcceptedViaQueue: !!hasAcceptedViaQueue });
 
 		if (!isHubReviewer && !isHubOwner && !isOpenReviewer && !hasAcceptedViaQueue) {
 			throw error(403, 'You do not have permission to view this paper');
@@ -97,7 +93,6 @@ export async function load({ locals, params }) {
 	const usersData = await Users.find({}, {}).lean().exec();
 	const users = JSON.parse(JSON.stringify(usersData));
 
-	console.log('[PapersPool] Successfully loaded paper');
 	return {
 		paper: paperData,
 		users

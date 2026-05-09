@@ -109,36 +109,27 @@ function generatePasswordResetEmailTemplate(firstName: string, resetUrl: string)
 }
 
 export const POST: RequestHandler = async ({ request }) => {
-	console.log('🔐 Starting password recovery process...');
-
 	try {
 		await start_mongo();
 
 		const { email } = await request.json();
-		console.log('📧 Email received:', email);
 
 		if (!email) {
-			console.log('❌ Email not provided');
 			return json({ error: 'Email is required' }, { status: 400 });
 		}
 
 		const normalizedEmail = normalizeEmail(email);
 		if (!normalizedEmail) {
-			console.log('❌ Invalid email format:', email);
 			return json({ error: 'Invalid email format' }, { status: 400 });
 		}
 
 		// Find user by email
-		console.log('🔍 Looking for user in database...');
 		const user = await User.findOne({ email: normalizedEmail });
 
 		if (!user) {
-			console.log(`⚠️ User not found for email: ${email}`);
 			// For security, always return success even if email doesn't exist
 			return json({ message: 'success' });
 		}
-
-		console.log(`✅ User found: ${user.firstName} (${user.email})`);
 
 		// Check if there's already a valid token (not expired)
 		if (user.resetPasswordToken && user.resetPasswordExpiry) {
@@ -146,18 +137,15 @@ export const POST: RequestHandler = async ({ request }) => {
 			const expiry = new Date(user.resetPasswordExpiry);
 
 			if (expiry > now) {
-				console.log(`⏰ Reset token still valid for: ${email}`);
 				return json({ message: 'success' });
 			}
 		}
 
 		// Generate new recovery token
-		console.log('🔑 Generating new recovery token...');
 		const resetToken = crypto.randomBytes(32).toString('hex');
 		const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour
 
 		// Save token to user
-		console.log('💾 Saving token to database...');
 		user.resetPasswordToken = resetToken;
 		user.resetPasswordExpiry = resetTokenExpiry.toISOString();
 		user.updatedAt = new Date().toISOString();
@@ -165,10 +153,8 @@ export const POST: RequestHandler = async ({ request }) => {
 
 		// Reset URL
 		const resetUrl = `${SITE_URL}/reset?token=${resetToken}`;
-		console.log('🔗 Reset URL generated');
 
 		// Verify transporter connection (same as test-email.js)
-		console.log('🔌 Verifying SMTP connection...');
 		const smtpTransporter = getTransporter();
 		if (!smtpTransporter) {
 			console.error('SMTP credentials are not configured.');
@@ -176,18 +162,12 @@ export const POST: RequestHandler = async ({ request }) => {
 		}
 
 		await smtpTransporter.verify();
-		console.log('✅ SMTP connection OK');
-
-		console.log('📧 Sending recovery email...');
 		const info = await smtpTransporter.sendMail({
 			from: `"SciLedger Team" <${env.SMTP_USER}>`,
 			to: user.email,
 			subject: '🔐 Reset Password - SciLedger',
 			html: generatePasswordResetEmailTemplate(user.firstName, resetUrl)
 		});
-
-		console.log(`✅ Recovery email sent! Message ID: ${info.messageId}`);
-		console.log(`📧 Email sent to: ${user.email}`);
 
 		return json({ message: 'success' });
 	} catch (error) {

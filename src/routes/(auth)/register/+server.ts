@@ -15,7 +15,6 @@ export const POST: RequestHandler = async ({ request }) => {
 
 		// Verifica se todas as informações necessárias foram enviadas
 		if (!firstName || !lastName || !username || !country || !dob || !email || !password || !confirmPassword) {
-			/* console.log(firstName, lastName, country, dob, email, password, confirmPassword) */
 			return json({ error: 'Todos os campos são obrigatórios.' }, { status: 400 });
 		}
 

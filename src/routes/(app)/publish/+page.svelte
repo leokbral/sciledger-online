@@ -48,7 +48,6 @@
 
 	let papers: Paper[] = data.papers;
 	let user = data.user;
-	//console.log(papers)
 
 	let tabs = [
 		{

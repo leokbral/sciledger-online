@@ -36,9 +36,6 @@ export async function POST({ params, request, locals }) {
         if (paper.reviewers && paper.reviewers.includes(reviewerId)) {
             paper.reviewers = paper.reviewers.filter(r => r !== reviewerId);
             await paper.save();
-            
-            console.log(`✅ Reviewer ${reviewerId} removed from paper ${paperId}`);
-            console.log(`📋 Remaining reviewers:`, paper.reviewers);
 
             return json({ 
                 success: true, 

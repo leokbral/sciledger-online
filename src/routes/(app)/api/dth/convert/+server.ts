@@ -14,7 +14,6 @@ export const POST: RequestHandler = async ({ request }) => {
     }
 
     try {
-        console.log('Starting convertion...');
         //const result = await convertDocument(file);
 
         // const response = await fetch('http://127.0.0.1:8000/api/convert', {//modify this to the server in VM
@@ -32,8 +31,6 @@ export const POST: RequestHandler = async ({ request }) => {
         if (!response.ok) {
             throw new Error(`Conversion failed: ${response.status}`);
         }
-
-        console.log('Convertion completed.');
 
         const data = await response.json();
         //return data.html; //convertedHtml = data.html;

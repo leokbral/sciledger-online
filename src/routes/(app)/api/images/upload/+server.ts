@@ -8,13 +8,11 @@ import { fsFiles } from '$lib/db/fs';
 const bucket = new GridFSBucket(db);
 
 async function saveImage(file: File) {
-    console.log('Saving image:', file.name, file.size, file.type, file.lastModified);
     const fileHash = await getUniqueFileHash(file);
     const customId = crypto.randomUUID();
 
     // Check if image already exists
     const dbFile = await fsFiles.findOne({ 'metadata.fileHash': fileHash });
-    console.log(dbFile, fileHash);
 
     if (!dbFile) {
         const arrayBuffer = await file.arrayBuffer();
@@ -64,8 +62,6 @@ export const OPTIONS: RequestHandler = async () => {
 };
 
 export const POST: RequestHandler = async ({ request }) => {
-    console.log('POST request received for image upload');
-    console.log('Received request to upload image');
     try {
         const formData = await request.formData();
         const file = formData.get('image') as File;

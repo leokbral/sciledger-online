@@ -172,8 +172,6 @@ export async function load({ locals, params }) {
 		status: { $in: ['accepted', 'pending'] }
 	}).lean().exec();
 	
-	console.log(`📋 [InReview Page] Found ${reviewAssignments.length} ReviewAssignments for reviewer ${userId}`);
-	
 	// Converter para formato serializável
 	const serializedAssignments = reviewAssignments.map(a => ({
 		_id: a._id,

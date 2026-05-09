@@ -31,7 +31,6 @@ async function savePDF(file: File) {
             console.error('Erro ao salvar o arquivo:', error);
         })
         .on('finish', () => {
-            console.log('Arquivo salvo com sucesso!');
         });
 
     return customId;
@@ -63,23 +62,13 @@ export const POST: RequestHandler = async ({ request }) => {
     }
 
     const fileName = await getUniqueFilename(file);
-    console.log('File to upload:', {
-        name: fileName,
-        type: file.type,
-        size: file.size,
-        file
-    });
-
-
     try {
-        console.log('Starting upload...');
         // const result = await pdfs.insertOne({
         //     filename: fileName,
         //     // outros campos que você deseja adicionar
         // });
 
         const result = await savePDF(file);
-        console.log('Upload completed.');
 
         return new Response(
             JSON.stringify({

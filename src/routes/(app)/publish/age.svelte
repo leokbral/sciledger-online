@@ -23,7 +23,6 @@
 	};
 
 	function onChangeHandler(e: Event): void {
-		console.log('file data:', e);
 	}
 
 	const uploadFile = async () => {
@@ -46,7 +45,6 @@
 
 				const result = await response.json();
 				if (result.success) {
-					console.log('File and data uploaded successfully');
 				} else {
 					console.error('Upload failed:', result.error);
 				}

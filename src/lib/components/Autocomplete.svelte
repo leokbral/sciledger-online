@@ -42,7 +42,6 @@
 		}
 		if (denylist.length) {
 			_options = _options.filter((option) => !denylist.includes(option.username));
-			// console.log('denylist', _options);
 		}
 		if (!allowlist.length && !denylist.length) {
 			_options = options;
@@ -74,7 +73,6 @@
 
 	function onSelection(option: any) {
 		// Handle selection
-		// console.log(option);
 		onSelect(option);
 	}
 

@@ -3,7 +3,6 @@ import { pdfs } from '$lib/db/pdfs';
 import type { PageServerLoad } from '../$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
-    console.log("loclas",(locals.user))
     try {
         const mncsData = await mncs.find({}, {
             projection: {
@@ -11,7 +10,6 @@ export const load: PageServerLoad = async ({ locals }) => {
                 nome: 1  // Inclui o campo `nome`
             }
         }).toArray();
-        console.log('Serialized mncs:', mncsData);
 
         const pdfsData = await pdfs.find({}, {
             projection: {
@@ -19,7 +17,6 @@ export const load: PageServerLoad = async ({ locals }) => {
                 // nome: 1  // Inclui o campo `nome`
             }
         }).toArray();
-        console.log('Serialized pdfs - 21:', pdfsData);
 
         return {
             pdfs: pdfsData,

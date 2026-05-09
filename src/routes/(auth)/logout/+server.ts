@@ -1,7 +1,6 @@
 import { json } from '@sveltejs/kit';
 
 export function POST() {
-	//console.log('sss - ')
 	return json(
 		{
 			ok: true

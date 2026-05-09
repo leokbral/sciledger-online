@@ -28,7 +28,6 @@
 
 	const initialPaper = (data.paper as Paper) ?? null;
 	let paper: Paper | null = $state(initialPaper);
-	//console.log("www",paper?.authors)
 	let userProfiles = data.users; // Ajuste conforme necessário
 	let currentRound = $state(initialPaper?.reviewRound || 1);
 	let submittedReviewsThisRound = $state<any[]>(
@@ -123,10 +122,7 @@
 	} as PaperPublishStoreData;
 
 	async function handleSavePaper(event: { detail: { store: Paper } }) {
-		console.log('Updated Paper Data:', event.detail.store);
-
 		const updatedPaper = event.detail.store;
-		console.log('Saving Updated Paper:', updatedPaper);
 
 		try {
 			const response = await post(`/publish/reviewer-assignment/${updatedPaper.id}`, updatedPaper); // Use id se for o campo correto
@@ -138,7 +134,6 @@
 				alert(`Issue! ${JSON.stringify(response)}`);
 			}
 		} catch (error) {
-			console.log(error);
 			alert('An error occurred. Please try again.');
 		}
 	}
@@ -176,7 +171,6 @@
 			syncRoundReviews(updatedPaper);
 			
 			lastRefreshTime = new Date();
-			console.log('✅ Reviews refreshed:', submittedReviewsThisRound.length, 'reviews received');
 		} catch (error) {
 			console.error('Error refreshing reviews:', error);
 		}

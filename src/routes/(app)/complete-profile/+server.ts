@@ -90,8 +90,6 @@ export const POST: RequestHandler = async ({ request, cookies, locals }) => {
 
 		await user.save();
 
-		console.log(`✅ Profile completed for user ${userId}`);
-
 		return json(
 			{
 				success: true,

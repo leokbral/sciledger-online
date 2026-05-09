@@ -18,20 +18,14 @@ export const POST: RequestHandler = async ({ request, params }) => {
         
         // Verificar se é para salvar progresso de correções
         if (body.action === 'saveCorrectionProgress') {
-            console.log('Recebida requisição para salvar progresso de correções');
             const { correctionProgress } = body;
             const paperId = params.slug;
             
-            console.log('Paper ID:', paperId);
-            console.log('Correction Progress:', correctionProgress);
-            
             if (!correctionProgress || !paperId) {
-                console.log('Erro: correctionProgress ou paperId ausentes');
                 return json({ error: 'correctionProgress e paperId são obrigatórios.' }, { status: 400 });
             }
             
             // Atualizar o progresso das correções no paper
-            console.log('Atualizando paper no banco de dados...');
             const updatedPaper = await Papers.findOneAndUpdate(
                 { id: paperId },
                 {
@@ -44,10 +38,7 @@ export const POST: RequestHandler = async ({ request, params }) => {
                 }
             ).lean().exec();
             
-            console.log('Paper atualizado:', updatedPaper ? 'Sucesso' : 'Falhou');
-            
             if (!updatedPaper) {
-                console.log('Erro: Paper não encontrado com ID:', paperId);
                 return json({ error: 'Paper não encontrado.' }, { status: 404 });
             }
 
@@ -90,7 +81,6 @@ export const POST: RequestHandler = async ({ request, params }) => {
                 ? Object.fromEntries(updatedPaper.correctionProgress)
                 : updatedPaper.correctionProgress || {};
                 
-            console.log('Enviando resposta de sucesso');
             return json({ 
                 success: true, 
                 correctionProgress: responseProgress
@@ -121,7 +111,6 @@ export const POST: RequestHandler = async ({ request, params }) => {
             throw new Error('newMessage not found');
         }
         
-        console.log(updMessageFeed);
         return json({ updMessageFeed }, { status: 201 });
 
     } catch (error) {

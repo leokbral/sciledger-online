@@ -11,8 +11,6 @@ const bucket = new GridFSBucket(db);
 const MAX_TOTAL_SIZE = 10 * 1024 * 1024; // 10MB in bytes
 
 async function saveSupplementaryFile(file: File, paperId?: string, uploadedBy?: string) {
-    console.log('Saving supplementary file:', file.name, file.size, file.type);
-
     // Calculate total size of existing supplementary files
     let totalExistingSize = 0;
     if (paperId) {
@@ -45,7 +43,6 @@ async function saveSupplementaryFile(file: File, paperId?: string, uploadedBy?: 
 
         // Check if file already exists
         const dbFile = await fsFiles.findOne({ 'metadata.fileHash': fileHash });
-        console.log('File exists in DB:', dbFile !== null);
 
         if (!dbFile) {
             const arrayBuffer = await file.arrayBuffer();
@@ -70,7 +67,6 @@ async function saveSupplementaryFile(file: File, paperId?: string, uploadedBy?: 
                     reject(new Error(`GridFS upload failed: ${err.message}`));
                 });
                 uploadStream.on('finish', () => {
-                    console.log('File successfully uploaded to GridFS:', file.name);
                     resolve(null);
                 });
                 uploadStream.end(buffer);
@@ -84,7 +80,6 @@ async function saveSupplementaryFile(file: File, paperId?: string, uploadedBy?: 
                 mimeType: file.type
             };
         } else {
-            console.log('Using existing file from database:', dbFile.filename);
             return {
                 id: dbFile.metadata.id,
                 fileId: dbFile.metadata.id,
@@ -119,7 +114,6 @@ export const OPTIONS: RequestHandler = async () => {
 };
 
 export const POST: RequestHandler = async ({ request }) => {
-    console.log('POST request received for supplementary file upload');
     try {
         let formData;
         try {

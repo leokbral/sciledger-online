@@ -151,9 +151,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 					paper: paperId,
 					reviewer: { $in: reviewerIdAliases }
 				});
-				console.log(
-					`Removed previous invitations for ${normalizedReviewerId} to allow re-invitation`
-				);
 			}
 
 			const inviteId = crypto.randomUUID();

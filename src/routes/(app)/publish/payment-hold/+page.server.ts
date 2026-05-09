@@ -27,8 +27,6 @@ export const load: PageServerLoad = async ({ locals }) => {
 		};
 	}
 
-	console.log('✓ Stripe public key loaded successfully');
-
 	return {
 		user: locals.user,
 		stripePublicKey

@@ -35,8 +35,6 @@ export const POST: RequestHandler = async ({ request }) => {
             createdBy
         } = await request.json();
 
-        console.log('Received data:', { title, logoUrl, bannerUrl, cardUrl });
-
         // Validação de campos obrigatórios
         const requiredFields = {
             title,
@@ -67,8 +65,6 @@ export const POST: RequestHandler = async ({ request }) => {
         }
 
         const id = crypto.randomUUID();
-
-        console.log('Creating hub with images:', { logoUrl, bannerUrl, cardUrl });
 
         // Criação do novo Hub
         const newHub = new Hubs({

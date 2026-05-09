@@ -17,7 +17,6 @@
 	let starValue = $state(2);
 	// export let paper: Paper;
 	// export let user;
-	// console.log('paper -- ', paper);
 
 	function getIdAliases(value: unknown): string[] {
 		if (!value) return [];

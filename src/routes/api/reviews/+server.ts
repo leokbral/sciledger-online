@@ -31,7 +31,6 @@ async function checkAndUpdatePaperStatusIfAllReviewsComplete(paperId: string, re
 		});
 
 		if (assignedReviewers.length === 0) {
-			console.log(`📋 No assigned reviewers found for paper ${paperId}`);
 			return;
 		}
 
@@ -41,8 +40,6 @@ async function checkAndUpdatePaperStatusIfAllReviewsComplete(paperId: string, re
 			reviewRound,
 			status: 'submitted'
 		});
-
-		console.log(`📋 [Review Check] Paper ${paperId}: ${submittedReviews.length}/${assignedReviewers.length} reviewers completed round ${reviewRound}`);
 
 		// Se o número de revisões submetidas = número de revisores atribuídos
 		if (submittedReviews.length === assignedReviewers.length) {
@@ -61,7 +58,6 @@ async function checkAndUpdatePaperStatusIfAllReviewsComplete(paperId: string, re
 			if (newStatus) {
 				paper.status = newStatus;
 				await paper.save();
-				console.log(`✅ [Status Update] Paper ${paperId} status changed to: ${newStatus}`);
 			}
 		}
 	} catch (error) {
@@ -268,7 +264,6 @@ export const POST: RequestHandler = async ({ request }) => {
 		// Verificar se o paper existe
 		const paper = await Papers.findOne({ id: paperId });
 		if (!paper) {
-            console.log('Paper not found:', paperId);
 			return json({ error: 'Paper not found' }, { status: 404 });
 		}
 

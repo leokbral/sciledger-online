@@ -16,7 +16,6 @@
 
 	let { data }: Props = $props();
 
-	//console.log("data 13--> ", data)
 	let tabs = data.tabs;
 	let tabsContent = data.tabsContent;
 </script>

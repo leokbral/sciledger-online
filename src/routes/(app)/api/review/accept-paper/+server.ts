@@ -19,8 +19,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
             return json({ error: 'Paper ID is required' }, { status: 400 });
         }
 
-        console.log('Received paperId:', paperId, 'Type:', typeof paperId);
-
         // Validar e converter o paperId para ObjectId
         let paperObjectId: ObjectId;
         try {

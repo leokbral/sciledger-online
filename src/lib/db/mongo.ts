@@ -6,11 +6,7 @@ const MONGO_URL = process.env.MONGO_URL;
 
 const client = new MongoClient(MONGO_URL as string)
 
-console.log(MONGO_URL)
-
 export function start_mongo() {
-	console.log('Starting mongo...');
-	console.log('Chama l13')
 	return client.connect();
 }
 

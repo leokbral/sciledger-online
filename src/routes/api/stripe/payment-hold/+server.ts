@@ -47,8 +47,6 @@ export const POST: RequestHandler = async ({ request }) => {
       // Use placeholder email if not provided
     }
 
-    console.log('Creating payment intent for amount:', amount, 'currency:', currency, 'email:', email);
-
     // Criar um Payment Intent com confirmação automática
     // Este vai autorizar o valor sem capturar imediatamente
     const paymentIntentData: any = {
@@ -74,8 +72,6 @@ export const POST: RequestHandler = async ({ request }) => {
     }
 
     const paymentIntent = await stripe.paymentIntents.create(paymentIntentData);
-
-    console.log('Payment intent created:', paymentIntent.id);
 
     return json({ 
       paymentIntentId: paymentIntent.id,

@@ -31,9 +31,6 @@ export const PUT: RequestHandler = async ({ request, params }) => {
             dates
         } = await request.json();
 
-        console.log('Updating hub:', params.id);
-        console.log('Received data:', { title, logoUrl, bannerUrl, cardUrl });
-
         const hub = await Hubs.findById(params.id);
         
         if (!hub) {

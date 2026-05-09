@@ -7,11 +7,5 @@
 </script>
 
 <div>
-  <!-- Debug visual na página -->
-  <details>
-    <summary>Debug Info (clique para expandir)</summary>
-    <pre>{JSON.stringify(data, null, 2)}</pre>
-  </details>
-  
   <OrcidProfile profile={data.profile} />
 </div>
