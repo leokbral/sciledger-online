@@ -21,7 +21,6 @@ export async function start_mongo() {
         connectionPromise = mongoose
             .connect(MONGO_URL, {})
             .then((connection) => {
-                console.log('Connected to MongoDB via Mongoose');
                 return connection;
             })
             .catch((error) => {

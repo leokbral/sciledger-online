@@ -134,8 +134,6 @@ function generateInvitationEmailTemplate(
 }
 
 export const POST: RequestHandler = async ({ request, locals }) => {
-	console.log('📧 Starting email reviewer invitation process...');
-
 	try {
 		await start_mongo();
 
@@ -145,7 +143,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		}
 
 		const { email, hubId } = await request.json();
-		console.log('📧 Data received:', { email, hubId });
 
 		// Validate input
 		if (!email || !hubId) {
@@ -187,7 +184,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		});
 
 		if (existingInvitation) {
-			console.log('⚠️ Invitation already exists for this email and hub');
 			return json(
 				{ error: 'An invitation has already been sent to this email for this hub' },
 				{ status: 400 }
@@ -195,7 +191,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		}
 
 		// Generate invitation token
-		console.log('🔑 Generating invitation token...');
 		const token = crypto.randomBytes(32).toString('hex');
 		const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
@@ -209,14 +204,11 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		});
 
 		await invitation.save();
-		console.log('✅ Invitation record created');
 
 		// Invitation URL
 		const invitationUrl = `${SITE_URL}/invite/register?token=${token}`;
-		console.log('🔗 Invitation URL generated');
 
 		// Send email
-		console.log('📧 Sending invitation email...');
 		await smtpTransporter.verify();
 
 		const info = await smtpTransporter.sendMail({
@@ -229,8 +221,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				invitationUrl
 			)
 		});
-
-		console.log(`✅ Invitation email sent! Message ID: ${info.messageId}`);
 
 		return json({
 			message: 'Invitation sent successfully',

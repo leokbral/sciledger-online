@@ -114,7 +114,6 @@
 	// 	]
 	// };
 
-	// console.log('44444',messageFeed)
 	let currentMessage = '';
 
 	// export let data = {
@@ -160,23 +159,12 @@
 	function handleReviewCollapse(event: CustomEvent<{ collapsed: boolean }>) {
 		isReviewCollapsed = event.detail?.collapsed ?? false;
 	}
-	// console.log('current', currentUser);
-	// console.log('Reviewers', paper.reviewers);
 
 	function hdlSaveDraft(e: any) {
 		//Fz um put que atualiza currentMessage
 		currentMessage = e.detail.currentMessage;
 	}
 
-	// function hdlSubmitReview(e: any) {
-	// 	console.log('asdas',e.detail);
-	// 	//Fz um put que:
-	// 	//1) atualiza os campos enviados em e.detail
-	// 	//2) Muda status do paper
-	// }
-	// function hdlSubmitReview(e: any) {
-	// 	//if (currentMessage.trim()) {
-	// 	console.log('aquiAQUIaqui:', e.detail);
 	// 	dispatch('sendMessage');
 	// 	// currentMessage = '';
 	// 	//}

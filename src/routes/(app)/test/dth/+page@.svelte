@@ -27,7 +27,6 @@
 	// async function saveToFile(filename: string, convertedHtml: string): Promise<void> {
 	// 	try {
 	// 		await writeFile(filename, convertedHtml, { encoding: 'utf-8' });
-	// 		console.log('Arquivo salvo com sucesso!');
 	// 	} catch (err) {
 	// 		console.error('Erro ao salvar o arquivo:', err);
 	// 	}

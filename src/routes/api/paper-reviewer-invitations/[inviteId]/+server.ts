@@ -109,17 +109,6 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 				requireExpertiseMatch: false
 			});
 
-			console.log('Reviewer Eligibility Check:', {
-				reviewerId: actingReviewerId,
-				eligible: eligibility.eligible,
-				reasons: eligibility.reasons,
-				isHubPaper,
-				hubReviewerIds,
-				alreadyAssignedIds,
-				activeAssignmentsCount,
-				reviewerRoles: user.roles
-			});
-
 			const hardStopReasons = (eligibility.reasons || []).filter(
 				(reason: string) =>
 					reason.includes('Conflict of interest') || reason.includes('already assigned')
@@ -211,9 +200,6 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 
 			const paperDoc = await Papers.findOne({ id: typeof paper === 'object' ? paper.id : paper });
 			if (paperDoc) {
-				console.log('Paper found:', paperDoc.id, 'Status:', paperDoc.status);
-				console.log('Adding reviewer:', actingReviewerId);
-
 				if (!paperDoc.reviewers) {
 					paperDoc.reviewers = [];
 				}
@@ -281,10 +267,6 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 							paperDoc.paymentHold.receiptUrl = null;
 							paymentCaptured = true;
 							capturedPaymentIntentId = paymentIntent.id;
-							console.log(
-								`Payment captured after ${REQUIRED_REVIEWERS} reviewer acceptances:`,
-								paymentIntent.id
-							);
 						} catch (captureError) {
 							console.error('Failed to capture payment after 3 acceptances:', captureError);
 						}
@@ -294,7 +276,6 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 				}
 
 				await paperDoc.save();
-				console.log('Reviewer added successfully. Paper status:', paperDoc.status);
 			} else {
 				console.error('Paper not found for ID:', typeof paper === 'object' ? paper.id : paper);
 			}

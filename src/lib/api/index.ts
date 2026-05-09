@@ -18,20 +18,11 @@ async function send(sendParams: SendOptions) {
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	const opts: { [key: string]: any } = { method, headers /* {} as Headers */ };
 
-	/*
-		//console.log("chamou send api")
-		console.log("method", method)
-		console.log("path", path)
-		console.log( "data", data)
-		console.log( "token", token) 
-	*/
-
 	if (data) {
 		opts.headers['Content-Type'] = 'application/json';
 		//opts.headers.set('Content-Type', 'application/json');
 
 		opts.body = JSON.stringify(data);
-		//console.log('chegou server', opts)
 	}
 
 	if (token) {
@@ -39,7 +30,6 @@ async function send(sendParams: SendOptions) {
 		opts.headers['Authorization'] = `Bearen ${token}`;
 	}
 
-	//console.log('sdwd', sendParams, `${base}/${path}`);
 	return await fetch(`${base}/${path}`, opts)
 		.then((r) => r.text())
 		.then((json) => {

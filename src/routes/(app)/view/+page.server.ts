@@ -17,7 +17,6 @@ export async function load() {
 
     const fetchPaper = async () => {
         const papers = await Papers.find({}, { _id: 0 }).lean().exec();
-        console.log(papers)
         // Buscando o artigo na coleção de publicações
 
         // Buscando informações dos autores, coautores e revisores
@@ -45,7 +44,6 @@ export async function load() {
     //             }
     //         });
 
-    //         console.log('Serialized PDF:', pdf);
 
     //         return pdf;
     //     } catch (error) {

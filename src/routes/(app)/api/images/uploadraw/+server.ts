@@ -19,9 +19,6 @@ export const OPTIONS: RequestHandler = async () => {
 };
 
 export const POST: RequestHandler = async ({ request }) => {
-    console.log('POST request received for image upload');
-    console.log('Received request to upload image');
-    
     const buffer = await request.arrayBuffer();
     const fileName = request.headers.get("x-filename") || "image.jpg";
     const contentType = request.headers.get("x-content-type") || "image/jpeg";

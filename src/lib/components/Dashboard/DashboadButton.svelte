@@ -17,7 +17,6 @@
 	}: Props = $props();
 
 	// function modalComponentFullscreen(): void {
-	// 	console.log("Chamou!")
 	// 	const modal: ModalSettings = {
 	// 		type: 'component',
 	// 		component /* : 'fullScreen' */,

@@ -14,7 +14,6 @@ export async function POST({ request, locals }) {
 	try {
 		const { hubId, reviewerId, role } = await request.json();
 		const inviteRole = role === 'vice_manager' ? 'vice_manager' : 'reviewer';
-		console.log('Received data:', { hubId, reviewerId, role: inviteRole });
 
 		const hub = await Hubs.findById(hubId).populate('createdBy');
 		if (!hub) {
@@ -103,11 +102,8 @@ export async function GET({ locals }) {
 		const user = locals.user;
 
 		if (!user) {
-			console.log('GET reviewer-invitations: No user in locals');
 			return json({ error: 'Unauthorized' }, { status: 401 });
 		}
-
-		console.log('GET reviewer-invitations: Fetching for user', user.id);
 
 		const { aliases } = await resolveUserIdentifiers(user);
 		const reviewerQueryIds = aliases.length > 0 ? aliases : [user.id];
@@ -128,8 +124,6 @@ export async function GET({ locals }) {
 			if (!hub || role !== 'vice_manager') return true;
 			return !canManageHub(hub as any, user.id);
 		});
-
-		console.log('GET reviewer-invitations: Found', filteredInvitations.length, 'invitations');
 
 		return json({ success: true, reviewerInvitations: filteredInvitations });
 	} catch (error) {

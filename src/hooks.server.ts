@@ -9,7 +9,6 @@ const initMongo = async () => {
 	try {
 		const { start_mongo } = await import("$lib/db/mongo");
 		await start_mongo();
-		console.log('Mongo started');
 	} catch (e) {
 		console.error('Failed to start MongoDB:', e);
 	}
@@ -29,13 +28,10 @@ export const handle: Handle = async ({ event, resolve }) => {
 	const jwt = cookies.jwt && Buffer.from(cookies.jwt, 'base64').toString('utf-8');
 
 	if (jwt) {
-		//console.log('heio', jwt)
 		const _jwt = JSON.parse(jwt);
-		//console.log('heia', _jwt)
 		event.locals.user = _jwt.user;
 		event.locals.token = _jwt.token;
 		event.locals.refreshToken = _jwt.refreshToken;
-		//console.log('heihu - ', event.locals)
 	}
 
 	const response = await resolve(event);

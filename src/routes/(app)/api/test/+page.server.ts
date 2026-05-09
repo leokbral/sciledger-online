@@ -11,7 +11,6 @@ export const load: PageServerLoad = async () => {
             }
         }).toArray();
 
-        //console.log('Serialized PDFs:', pdfs);
 
         return {
             pdfs

@@ -50,11 +50,6 @@ export const PATCH: RequestHandler = async ({ request, params }) => {
             updateData.correctionAcceptedAt = acceptedDate;
         }
 
-        console.log('Updating correction deadline:', {
-            paperId,
-            updateData
-        });
-
         const updatedPaper = await Papers.findOneAndUpdate(
             { id: paperId },
             updateData,

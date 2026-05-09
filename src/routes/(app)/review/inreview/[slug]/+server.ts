@@ -32,7 +32,6 @@ export const POST: RequestHandler = async ({ request }) => {
         if (!updMessageFeed) {
             throw new Error('newMessage not found');
         }
-        console.log(updMessageFeed)
         return json({ updMessageFeed }, { status: 201 });
 
     } catch (error) {

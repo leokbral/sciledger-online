@@ -15,10 +15,7 @@ export const POST: RequestHandler = async ({ request }) => {
         const { id, mainAuthor, correspondingAuthor, title, abstract, keywords, pdfUrl, submittedBy, price, coAuthors, status, authors, peer_review, supplementaryMaterials, supplementaryFiles } =
             await request.json();
 
-        // console.log(mainAuthor, correspondingAuthor, title, abstract, keywords, pdfUrl, submittedBy)
-        // Verifica se todas as informações necessárias foram enviadas
         if (!mainAuthor || !correspondingAuthor || !title || !abstract || !keywords || !pdfUrl || !submittedBy) {
-            /* console.log(firstName, lastName, country, dob, email, password, confirmPassword) */
             return json({ error: 'Todos os campos são obrigatórios.' }, { status: 400 });
         }
 

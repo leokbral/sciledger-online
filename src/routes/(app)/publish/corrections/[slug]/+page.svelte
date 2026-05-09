@@ -334,11 +334,8 @@
 
 	// Nova função para salvar via PaperPublishPage
 	async function savePaper(store: any) {
-		console.log('Saving corrected paper:', store);
-
 		try {
 			const response = await post(`/publish/edit/${store.id}`, store);
-			console.log(response);
 			if (response.paper) {
 				// Atualizar o paper local com as mudanças
 				paper = response.paper;
@@ -354,7 +351,6 @@
 				alert(`Issue! ${JSON.stringify(response)}`);
 			}
 		} catch (error) {
-			console.log(error);
 			alert('An error occurred. Please try again.');
 		}
 	}
@@ -373,10 +369,7 @@
 
 	async function hdlSubmitPublish(event: CustomEvent) {
 		let { newMessage } = event.detail;
-		console.log(event.detail);
 		newMessage = { ...newMessage, sender: newMessage.sender.id, _id: newMessage.id };
-
-		console.log(newMessage);
 
 		try {
 			const response = await fetch(`/publish/corrections/${data.id}`, {
@@ -389,7 +382,6 @@
 					id: (messageFeed as any)?.id
 				})
 			});
-			console.log(response.body);
 			if (!response.ok) {
 				const errorData = await response.json();
 				console.error('Erro ao enviar mensagem:', errorData);

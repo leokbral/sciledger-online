@@ -54,8 +54,7 @@ export async function POST({ params, request, locals }) {
 
 		invitation.status = action === 'accept' ? 'accepted' : 'declined';
 		invitation.respondedAt = new Date();
-		const saveRes = await invitation.save();
-		console.log('Invitation updated:', saveRes);
+		await invitation.save();
 
 		const reviewerName =
 			`${reviewer.firstName || ''} ${reviewer.lastName || ''}`.trim() || reviewer.email;
@@ -109,7 +108,6 @@ export async function POST({ params, request, locals }) {
 		}
 
 		await Invitation.findByIdAndDelete(inviteId);
-		console.log('Invitation deleted:', inviteId);
 
 		return json({ success: true });
 	} catch (error) {

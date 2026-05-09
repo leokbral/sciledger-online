@@ -14,7 +14,6 @@
 	let { data }: Props = $props();
 
 	let paper: Paper | null = (data.paper as Paper) ?? null;
-	//console.log("www",paper?.authors)
 	let userProfiles = data.users; // Ajuste conforme necessário
 	let submittedConfirmation = $derived($page.url.searchParams.get('submitted') === '1');
 	let showSubmittedConfirmation = $state(false);
@@ -89,7 +88,6 @@
 		// 	status: 'reviewer assignment'
 		// };
 
-		// console.log('Saving Updated Paper:', updatedPaper);
 
 		try {
 			// const response = await post(`/publish/edit/${updatedPaper.id}`, updatedPaper);

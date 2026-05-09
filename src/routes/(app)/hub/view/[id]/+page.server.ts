@@ -74,8 +74,6 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		const isManager = canManageHub(hub as any, locals.user.id);
 		const isHubReviewer = hub.reviewers?.includes(locals.user.id);
 
-		console.log('🔍 Fetching papers for user:', locals.user.id);
-		console.log('📊 isManager:', isManager, 'isHubReviewer:', isHubReviewer);
 
 		let paperQuery;
 
@@ -108,8 +106,6 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 			};
 		}
 
-		console.log('📋 Paper query:', JSON.stringify(paperQuery, null, 2));
-		console.log('👤 User ID:', locals.user.id);
 
 		const papersRaw = await Papers.find(paperQuery)
 			.populate("mainAuthor")
@@ -118,13 +114,6 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 			.populate("reviewers")
 			.lean()
 			.exec();
-
-		console.log('📄 Found', papersRaw.length, 'papers');
-		papersRaw.forEach(p => {
-			console.log(`  - Paper: ${p.title} (${p.id})`);
-			console.log(`    Status: ${p.status}`);
-			console.log(`    Reviewers: ${p.reviewers?.map(r => typeof r === 'object' ? r._id : r).join(', ') || 'none'}`);
-		});
 
 		// Normalizar peer_review para evitar erro de serialização
 		const papers = papersRaw.map(paper => {
@@ -161,9 +150,6 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 					);
 				});
 			
-			console.log(`  📋 Paper ${paper.id} - isAcceptedForReview: ${isAcceptedForReview}`);
-			console.log(`     Reviewer IDs: [${reviewerIds.join(', ')}]`);
-			console.log(`     User ID: ${locals.user.id}`);
 
 			return {
 				...paper,
@@ -182,10 +168,6 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		const usersData = await fetchUsers();
 		const papersData = await fetchPapers();
 		
-		console.log('🏁 Starting ReviewAssignments fetch');
-		console.log('👤 User ID:', locals.user.id);
-		console.log('🏢 Hub createdBy:', hubData.createdBy);
-		console.log('🏢 Hub createdBy type:', typeof hubData.createdBy);
 		
 		// Buscar ReviewAssignments para este hub (apenas para manager do hub)
 		const createdById = typeof hubData.createdBy === 'object' 
@@ -197,8 +179,6 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		let reviewAssignments: any[] = [];
 		let pendingPaperInvitations: Array<{ paperId: string; reviewerId: string }> = [];
 		
-		console.log('🔍 Fetching ReviewAssignments - isHubManager:', isHubManager);
-		console.log('📋 Hub ID:', params.id);
 		
 		if (isHubManager) {
 			const ReviewAssignment = (await import('$lib/db/models/ReviewAssignment')).default;
@@ -210,7 +190,6 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 				.lean()
 				.exec();
 			
-			console.log('✅ Found ReviewAssignments:', assignmentsRaw.length);
 			
 			// Converter para formato serializável (evitar objetos populados)
 			reviewAssignments = assignmentsRaw.map((ra: any) => ({
@@ -226,15 +205,6 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 				updatedAt: ra.updatedAt
 			}));
 			
-			assignmentsRaw.forEach((ra: any, idx: number) => {
-				console.log(`  - Assignment ${idx + 1}:`, {
-					_id: ra._id,
-					paperId: ra.paperId,
-					reviewerId: typeof ra.reviewerId === 'object' ? ra.reviewerId._id : ra.reviewerId,
-					deadline: ra.deadline,
-					status: ra.status
-				});
-			});
 
 			const pendingInvitesRaw = await PaperReviewInvitation.find({
 				hubId: params.id,
@@ -250,14 +220,12 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 				}))
 				.filter((invite) => invite.paperId && invite.reviewerId);
 		} else {
-			console.log('❌ User is NOT hub manager, skipping ReviewAssignments fetch');
 		}
 
 		// Buscar convites pendentes para o usuário neste hub
 		let hubInvitations = [];
 		let paperReviewInvitations = [];
 		
-		console.log('🔔 Fetching invitations for hub:', params.id, 'user:', locals.user.id);
 		
 		// Hub invitations
 		const hubInvitesRaw = await Invitation.find({ 
@@ -279,7 +247,6 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 			createdAt: inv.createdAt
 		}));
 		
-		console.log('✅ Found hub invitations:', hubInvitations.length);
 		
 		// Paper review invitations for papers in this hub
 		const paperReviewInvitesRaw = await PaperReviewInvitation.find({ 
@@ -307,7 +274,6 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 				createdAt: inv.createdAt
 			}));
 		
-		console.log('✅ Found paper review invitations:', paperReviewInvitations.length);
 
 		return {
 			hub: hubData,

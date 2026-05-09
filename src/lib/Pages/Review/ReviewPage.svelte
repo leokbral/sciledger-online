@@ -26,9 +26,6 @@
 	let reviewerInvitations = data.reviewerInvitations;
 	let reviewAssignments = data.reviewAssignments;
 
-	// console.log('Review tabs', tabs);
-	// console.log('Review papers', papers);
-	// console.log('Review data', reviews); // Verificando as revisões
 </script>
 
 <div class="container page p-4 m-auto">

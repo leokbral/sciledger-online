@@ -30,12 +30,7 @@
 		}
 		if (password != newPassword) {
 			formWarning = 'as senhas são diferentes';
-		} /* else {
-			console.log('wtf');
-			/* console.log(verificationCode);
-			console.log(password);
-			console.log(newPassword); * /
-		} */
+		}
 	}
 </script>
 

@@ -24,10 +24,8 @@ export async function load({ locals, params }) {
 			.populate('papers')
 			.lean()
 			.exec();
-		//console.log(user)
 		return toSerializable(user);
 	};
-	//console.log("chamou kkk", userCount);
 	return {
 		user: await fetchUser(),
 		loggedUser: toSerializable(user)

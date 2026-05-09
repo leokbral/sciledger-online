@@ -24,7 +24,6 @@
 	// let user = data.user;
 
 	let paper: Paper | null = $state(data.paper as Paper);
-	//console.log("www",paper?.authors)
 	let userProfiles = data.users; // Ajuste conforme necessário
 
 	let inicialValue: PaperPublishStoreData;

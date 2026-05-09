@@ -25,8 +25,6 @@ export const POST: RequestHandler = async ({ request, params }) => {
       }, { status: 400 });
     }
 
-    console.log('Updating paper with payment authorization code:', paperId, paymentAuthorizationCode);
-
     const updatedPaper = await Papers.findByIdAndUpdate(
       paperId,
       {
@@ -47,8 +45,6 @@ export const POST: RequestHandler = async ({ request, params }) => {
         error: 'Paper not found'
       }, { status: 404 });
     }
-
-    console.log('Paper updated with payment authorization:', updatedPaper.id);
 
     return json({
       success: true,

@@ -6,7 +6,6 @@ import Hubs from '$lib/db/models/Hub';
 export const GET: RequestHandler = async ({ params }) => {
     await start_mongo();
     const { hubId } = params;
-    console.log('Received hubId:', hubId);
     try {
         const hub = await Hubs.findById(hubId)
             .populate('createdBy', 'name email')

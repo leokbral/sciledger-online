@@ -28,7 +28,6 @@
 			})) ?? []
 	}));
 
-	// console.log(data)
 	let reviews = data.reviews;
 
 	let tabs = [

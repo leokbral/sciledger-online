@@ -527,11 +527,8 @@
 
 	// async function uploadFile() {
 	// 	if (!pdfFile) {
-	// 		console.log('Sem arquivos');
 	// 		return { result: 'no_file' };
 	// 	}
-
-	// 	console.log('chamou uploadFile', pdfFile);
 
 	// 	const formData = new FormData();
 	// 	formData.append('file', pdfFile);
@@ -543,12 +540,10 @@
 
 	// 	if (response.ok) {
 	// 		const data = await response.json();
-	// 		console.log(data);
 	// 		//location.reload(); descomente para atualizar a pagina depois de salvar
 	// 		return data;
 	// 	} else {
 	// 		console.error('Erro ao fazer upload do arquivo:', response.statusText);
-	// 		console.log('response -> ', response);
 	// 	}
 
 	// 	return;
@@ -1137,7 +1132,6 @@
 		$store.coAuthors = $store.authors.slice(1, $store.authors.length);
 		$store.authorAffiliations = serializeAuthorAffiliations();
 		//const uploadResult = await uploadFile();
-		//console.log(uploadResult.result);
 		// if (
 		// 	!$store.pdfUrl ||
 		// 	(uploadResult.result !== $store.pdfUrl && uploadResult.result !== 'no_file')
@@ -1482,12 +1476,10 @@
 						emptyState="Author not found."
 						regionEmpty="Não sei o que faz!!!!"
 						onSelect={(option) => {
-							// console.log('option', option.username, inputAuthorList);
 							selected = option.username;
 
 							inputAuthorList = [...inputAuthorList, option.username];
 							syncAuthorAffiliationsForUsernames(inputAuthorList);
-							// console.log('inputAuthorList', inputAuthorList);
 						}}
 					/>
 				</div>

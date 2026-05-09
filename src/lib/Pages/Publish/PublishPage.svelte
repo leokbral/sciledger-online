@@ -21,9 +21,6 @@
 
 	let user = data.user;
 
-	// console.log('Publish tabs', tabs);
-	// console.log('Publish user', user);
-	// console.log('Publish paper', publishedPapers);
 </script>
 
 <div class="container page p-4 m-auto">

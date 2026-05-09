@@ -69,8 +69,6 @@ export const POST: RequestHandler = async ({ request }) => {
         
         await user.save();
 
-        console.log(`Password updated successfully for user: ${user.email}`);
-
         return json({ 
             message: 'Password updated successfully',
             user: {

@@ -42,9 +42,6 @@ export const POST: RequestHandler = async ({ request }) => {
 
     try {
         const data = await request.json();
-        
-        // Log incoming data for debugging
-        console.log('Received data:', data);
 
         // Validate that id exists
         if (!data.id) {
@@ -98,8 +95,6 @@ export const POST: RequestHandler = async ({ request }) => {
             updatedAt: new Date().toISOString()
         };
 
-        // Log update data for debugging
-        console.log('Update data:', updateData);
 
         const paper = await Papers.findByIdAndUpdate(
             data.id,

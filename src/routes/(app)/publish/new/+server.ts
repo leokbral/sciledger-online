@@ -41,12 +41,9 @@ export const POST: RequestHandler = async ({ request }) => {
     try {
         const { paperPictures, content, mainAuthor, correspondingAuthor, title, abstract, keywords, pdfUrl, submittedBy, price, coAuthors, status, authors, authorAffiliations, hubId, isLinkedToHub, scopusArea, scopusSubArea, scopusClassifications, supplementaryMaterials, supplementaryFiles, paymentAuthorizationCode } =
             await request.json();
-        console.log("chamou server")
-        console.log(mainAuthor, correspondingAuthor, title, abstract, keywords, pdfUrl, submittedBy)
         
         // Verifica se todas as informações necessárias foram enviadas
         if (!mainAuthor || !correspondingAuthor || !title || !abstract || !keywords || !pdfUrl || !submittedBy) {
-            /* console.log(firstName, lastName, country, dob, email, password, confirmPassword) */
             return json({ error: `Todos os campos são obrigatórios. ${mainAuthor}, ${correspondingAuthor}, ${title}, ${abstract}, ${keywords}, ${pdfUrl}, ${submittedBy}` }, { status: 400 });
         }
 
@@ -93,7 +90,6 @@ export const POST: RequestHandler = async ({ request }) => {
         const _coAuthors = coAuthors.map((a: User) => a.id)
         const _authors = authors?.map((a: User) => a.id) || [];
         const normalizedAuthorAffiliations = normalizeAuthorAffiliations(authorAffiliations);
-        console.log("coAu", _coAuthors, coAuthors)
         const id = crypto.randomUUID()
         // Cria um novo paper
         const newPaper = new Papers({
@@ -119,8 +115,6 @@ export const POST: RequestHandler = async ({ request }) => {
             createdAt: new Date(),
             updatedAt: new Date()
         });
-
-        console.log("newPaper", newPaper)
         // Salva o usuário no banco de dados
         await newPaper.save();
 

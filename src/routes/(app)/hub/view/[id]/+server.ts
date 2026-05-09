@@ -106,32 +106,21 @@ export const GET: RequestHandler = async ({ params }) => {
     await start_mongo();
     try {
         const hubId = params.id;
-        console.log('Fetching hub with ID:', hubId);
 
         const hub = await Hubs.findById(hubId)
             .populate('createdBy', 'name email')
             .lean();
 
         if (!hub) {
-            console.log('Hub not found');
             return json({ error: 'Hub not found' }, { status: 404 });
         }
 
-        // Log the query we're about to make
-        console.log('Querying papers with hubId:', hubId);
-        
         const papers = await Papers.find({ 
             hubId: hubId 
         })
         .populate('submittedBy', 'name email')
         .sort({ createdAt: -1 })
         .lean();
-
-        // Log what we found
-        console.log(`Found ${papers.length} papers with hubId ${hubId}`);
-        papers.forEach(paper => {
-            console.log(`Paper ${paper._id} belongs to hub ${paper.hubId}`);
-        });
 
         return json({ hub, papers });
     } catch (error) {

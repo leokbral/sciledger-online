@@ -1,7 +1,6 @@
 <script>
 	import { enhance } from '$app/forms';
 
-	//console.log('EH NOIX AQUI', article);
 	/** @type {{paper: any, user: any}} */
 	let { paper, user } = $props();
 </script>

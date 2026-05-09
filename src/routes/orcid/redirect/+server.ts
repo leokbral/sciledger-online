@@ -17,8 +17,6 @@ import { env } from '$env/dynamic/private';
  * 5. ORCID redireciona para /orcid/callback com authorization_code
  */
 export const GET: RequestHandler = async () => {
-	console.log('🔵 ORCID Redirect - Starting...');
-	
 	// Valida que as variáveis de ambiente estão configuradas
 	if (!ORCID_CLIENT_ID || !ORCID_REDIRECT_URI) {
 		console.error('❌ ORCID credentials not configured');
@@ -40,7 +38,5 @@ export const GET: RequestHandler = async () => {
 
 	// Redireciona para página de autorização do ORCID
 	const authUrl = `${ORCID_AUTH_URL}?${params.toString()}`;
-	console.log('✅ Redirecting to ORCID', { useSandbox });
-	
 	throw redirect(302, authUrl);
 };

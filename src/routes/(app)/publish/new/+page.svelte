@@ -18,14 +18,11 @@
 	let paymentAuthorizationCodeFromUrl = $derived($page.url.searchParams.get('authorizationCode'));
 
 	async function savePaper( store: any) {
-		console.log(store);
-
 		const paper = {
 			...store,
 			...(hubId && { hubId, isLinkedToHub: true }),
 			...(paymentAuthorizationCodeFromUrl && { paymentAuthorizationCode: paymentAuthorizationCodeFromUrl })
 		};
-		console.log(paper)
 		try {
 			const response = await post(`/publish/new`, paper);
 
@@ -33,7 +30,6 @@
 				const isSubmitted = store?.status === 'reviewer assignment';
 				goto(`/publish/edit/${response.paper.id}${isSubmitted ? '?submitted=1' : ''}`);
 			} else {
-				console.log(paper);
 				alert(`Issue! ${JSON.stringify(response)}`);
 			}
 		} catch (error) {

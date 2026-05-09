@@ -68,7 +68,6 @@ export const POST: RequestHandler = async ({ params, locals }) => {
 					});
 
 					createdCount++;
-					console.log(`✅ Created ReviewAssignment for reviewer ${reviewerId} on paper ${paper.id}`);
 				}
 			}
 		}
