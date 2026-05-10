@@ -7,6 +7,7 @@ export const UserSchema: Schema = new Schema({
     firstName: { type: String, required: true, unique: false }, // First name
     lastName: { type: String, required: true, unique: false }, // Last name
     country: { type: String, required: false, unique: false, default: '' }, // Country (optional for ORCID)
+    state: { type: String, required: false, unique: false, default: '' }, // State/province (optional)
     dob: { type: String, required: false, unique: false, default: '' }, // Date of Birth (optional for ORCID)
     username: { type: String, required: true, unique: true }, // User handle, unique and required
     email: { type: String, required: true, unique: true }, // User email

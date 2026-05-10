@@ -7,11 +7,14 @@
 	import { fade } from 'svelte/transition';
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
+	import { Country, State } from 'country-state-city';
 
 	let firstName = $state('');
 	let lastName = $state('');
 	let username = $state('');
 	let country = $state('');
+	let countryIso = $state('');
+	let state = $state('');
 	let dob = $state('');
 	let email = $state('');
 	let password = $state('');
@@ -24,6 +27,25 @@
 	let inviteToken = $state('');
 	let inviteHubId = $state('');
 	let isInvite = $state(false);
+	let states = $state([] as { name: string; isoCode: string }[]);
+
+	const countries = Country.getAllCountries()
+		.map((countryItem) => ({ name: countryItem.name, isoCode: countryItem.isoCode }))
+		.sort((a, b) => a.name.localeCompare(b.name));
+
+	$effect(() => {
+		if (countryIso) {
+			const selectedCountry = countries.find((countryItem) => countryItem.isoCode === countryIso);
+			country = selectedCountry?.name ?? '';
+			states = State.getStatesOfCountry(countryIso)
+				.map((stateItem) => ({ name: stateItem.name, isoCode: stateItem.isoCode }))
+				.sort((a, b) => a.name.localeCompare(b.name));
+		} else {
+			country = '';
+			state = '';
+			states = [];
+		}
+	});
 
 	onMount(() => {
 		const params = new URLSearchParams(window.location.search);
@@ -62,6 +84,7 @@
 				lastName,
 				username: formattedUsername,
 				country,
+				state,
 				dob,
 				email,
 				password,
@@ -175,14 +198,36 @@
 					<label for="country" class="block text-sm font-medium text-surface-700"
 						>Country / Region</label
 					>
-					<input
+					<select
 						id="country"
-						type="text"
 						required
-						placeholder="Country / Region"
-						bind:value={country}
+						bind:value={countryIso}
 						class="w-full p-2 border border-surface-500 rounded-md text-surface-900"
-					/>
+					>
+						<option value="" disabled>Choose a country</option>
+						{#each countries as countryItem}
+							<option value={countryItem.isoCode}>{countryItem.name}</option>
+						{/each}
+					</select>
+				</fieldset>
+
+				<fieldset class="space-y-1">
+					<label for="state" class="block text-sm font-medium text-surface-700"
+						>State / Province</label
+					>
+					<select
+						id="state"
+						bind:value={state}
+						disabled={!states.length}
+						class="w-full p-2 border border-surface-500 rounded-md text-surface-900 disabled:bg-surface-100 disabled:cursor-not-allowed"
+					>
+						<option value="">
+							{states.length ? 'State / Province (optional)' : 'Select a country first'}
+						</option>
+						{#each states as stateItem}
+							<option value={stateItem.name}>{stateItem.name}</option>
+						{/each}
+					</select>
 				</fieldset>
 
 				<fieldset class="space-y-1">

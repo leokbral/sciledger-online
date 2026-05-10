@@ -7,6 +7,7 @@ export type User = {
     firstName: string; 
     lastName: string; 
     country: string; 
+    state?: string;
     dob: string;
     username: string; // User handle, similar to Twitter's @username
     email: string; // User email
