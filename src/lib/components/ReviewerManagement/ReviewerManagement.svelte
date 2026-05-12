@@ -46,11 +46,14 @@
 	// Load pending invites
 	async function loadPendingInvites() {
 		try {
-			const response = await fetch(`/hub/view/${hubId}/reviewer-invites`);
-			const data = await response.json();
+			const response = await fetch(`/api/reviewer-invitations?hubId=${encodeURIComponent(hubId)}`);
+			const data = await response.json().catch(() => null);
+
 			if (response.ok) {
-				pendingInvites = data.invites;
+				pendingInvites = data?.invites || [];
 				filterUsers();
+			} else {
+				console.error('Error loading pending invites:', data?.error || response.statusText);
 			}
 		} catch (error) {
 			console.error('Error loading pending invites:', error);
@@ -567,9 +570,14 @@
 					<h3 class="font-medium text-lg">Pending Invitations</h3>
 					<div class="flex flex-wrap gap-2">
 						{#each pendingInvites as invite}
+							{@const reviewer = typeof invite.reviewer === 'object'
+								? invite.reviewer
+								: users.find(
+										(u: any) => u._id === (invite as any).reviewer || u.id === (invite as any).reviewer
+									)}
 							<div class="chip variant-ghost flex items-center">
-								{users.find((u: { _id: User }) => u._id === invite.reviewer)?.firstName}
-								{users.find((u: { _id: User }) => u._id === invite.reviewer)?.lastName}
+								{reviewer?.firstName}
+								{reviewer?.lastName}
 								{#if (invite as any).role === 'vice_manager'}
 									<span class="ml-2 rounded-full bg-amber-100 text-amber-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
 										Vice

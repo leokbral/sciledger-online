@@ -95,7 +95,7 @@ export async function POST({ request, locals }) {
 	}
 }
 
-export async function GET({ locals }) {
+export async function GET({ locals, url }) {
 	await start_mongo();
 
 	try {
@@ -103,6 +103,30 @@ export async function GET({ locals }) {
 
 		if (!user) {
 			return json({ error: 'Unauthorized' }, { status: 401 });
+		}
+
+		const hubId = url.searchParams.get('hubId');
+		if (hubId) {
+			const hub = await Hubs.findById(hubId).lean();
+			if (!hub) {
+				return json({ error: 'Hub not found' }, { status: 404 });
+			}
+
+			if (!canManageHub(hub as any, user.id)) {
+				return json({ error: 'Only hub managers can view invitations' }, { status: 403 });
+			}
+
+			const invites = await Invitation.find({
+				hubId,
+				status: 'pending'
+			})
+				.populate({
+					path: 'reviewer',
+					select: '_id id firstName lastName email profilePictureUrl profilePicture'
+				})
+				.lean();
+
+			return json({ success: true, invites });
 		}
 
 		const { aliases } = await resolveUserIdentifiers(user);

@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { json } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import mongoose from 'mongoose';
@@ -6,8 +7,6 @@ import { HubSchema } from '$lib/db/schemas/HubSchema.js';
 import * as crypto from 'crypto';
 import type { RequestHandler } from './$types';
 import nodemailer from 'nodemailer';
-import { SITE_URL } from '$env/static/private';
-import { env } from '$env/dynamic/private';
 import { canManageHub } from '$lib/helpers/hubPermissions';
 
 // Clear the model cache to ensure we use the updated schema
@@ -23,21 +22,25 @@ const Hub = mongoose.models.Hub || mongoose.model('Hub', HubSchema);
 
 let transporter: nodemailer.Transporter | null = null;
 
+function getMissingSmtpConfig(): string[] {
+	return ['SMTP_USER', 'SMTP_PASS'].filter((key) => !process.env[key]?.trim());
+}
+
 function getTransporter(): nodemailer.Transporter | null {
 	if (transporter) return transporter;
 
-	const smtpUser = env.SMTP_USER;
-	const smtpPass = env.SMTP_PASS;
+	const smtpUser = process.env.SMTP_USER;
+	const smtpPass = process.env.SMTP_PASS;
 
 	if (!smtpUser || !smtpPass) {
 		return null;
 	}
 
-	const smtpPort = Number(env.SMTP_PORT || 587);
+	const smtpPort = Number(process.env.SMTP_PORT || 587);
 	transporter = nodemailer.createTransport({
-		host: env.SMTP_HOST || 'smtp.gmail.com',
+		host: process.env.SMTP_HOST || 'smtp.gmail.com',
 		port: smtpPort,
-		secure: env.SMTP_SECURE === 'true' || smtpPort === 465,
+		secure: process.env.SMTP_SECURE === 'true' || smtpPort === 465,
 		auth: {
 			user: smtpUser,
 			pass: smtpPass
@@ -45,6 +48,26 @@ function getTransporter(): nodemailer.Transporter | null {
 	});
 
 	return transporter;
+}
+
+function getSiteUrl(requestUrl: URL): string {
+	const configuredSiteUrl = process.env.SITE_URL || process.env.PUBLIC_SITE_URL;
+	const baseUrl = configuredSiteUrl?.trim() || requestUrl.origin;
+	return baseUrl.replace(/\/+$/, '');
+}
+
+function getEmailSendErrorMessage(error: unknown): string {
+	const code = typeof error === 'object' && error && 'code' in error ? String(error.code) : '';
+
+	if (code === 'EAUTH') {
+		return 'Email service authentication failed';
+	}
+
+	if (['ECONNECTION', 'ETIMEDOUT', 'ESOCKET'].includes(code)) {
+		return 'Email service could not connect to the SMTP server';
+	}
+
+	return 'Failed to send invitation';
 }
 
 function getUserId(user: any): string | null {
@@ -133,7 +156,7 @@ function generateInvitationEmailTemplate(
     `;
 }
 
-export const POST: RequestHandler = async ({ request, locals }) => {
+export const POST: RequestHandler = async ({ request, locals, url }) => {
 	try {
 		await start_mongo();
 
@@ -171,8 +194,15 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 		const smtpTransporter = getTransporter();
 		if (!smtpTransporter) {
-			console.error('SMTP credentials are not configured.');
-			return json({ error: 'Email service is not configured' }, { status: 500 });
+			const missingSmtpConfig = getMissingSmtpConfig();
+			console.error(`SMTP credentials are not configured. Missing: ${missingSmtpConfig.join(', ')}`);
+			return json(
+				{
+					error: 'Email service is not configured',
+					details: `Missing environment variables: ${missingSmtpConfig.join(', ')}`
+				},
+				{ status: 500 }
+			);
 		}
 
 		// Check if there's already a pending invitation for this email and hub
@@ -190,6 +220,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			);
 		}
 
+		// Verify SMTP before saving the invitation so failed email attempts don't block retries.
+		await smtpTransporter.verify();
+
 		// Generate invitation token
 		const token = crypto.randomBytes(32).toString('hex');
 		const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
@@ -206,21 +239,26 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		await invitation.save();
 
 		// Invitation URL
-		const invitationUrl = `${SITE_URL}/invite/register?token=${token}`;
+		const invitationUrl = `${getSiteUrl(url)}/invite/register?token=${token}`;
 
 		// Send email
-		await smtpTransporter.verify();
-
-		const info = await smtpTransporter.sendMail({
-			from: `"SciLedger Team" <${env.SMTP_USER}>`,
-			to: normalizedEmail,
-			subject: '📝 Invitation to Join as Reviewer - SciLedger',
-			html: generateInvitationEmailTemplate(
-				normalizedEmail,
-				hub.title || hub.name || 'SciLedger hub',
-				invitationUrl
-			)
-		});
+		try {
+			await smtpTransporter.sendMail({
+				from: `"SciLedger Team" <${process.env.SMTP_USER}>`,
+				to: normalizedEmail,
+				subject: '📝 Invitation to Join as Reviewer - SciLedger',
+				html: generateInvitationEmailTemplate(
+					normalizedEmail,
+					hub.title || hub.name || 'SciLedger hub',
+					invitationUrl
+				)
+			});
+		} catch (error) {
+			await EmailReviewerInvitation.deleteOne({ _id: invitation._id }).catch((cleanupError) => {
+				console.error('Failed to clean up unsent email invitation:', cleanupError);
+			});
+			throw error;
+		}
 
 		return json({
 			message: 'Invitation sent successfully',
@@ -230,7 +268,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		console.error('❌ Error sending invitation:', error);
 		return json(
 			{
-				error: 'Failed to send invitation',
+				error: getEmailSendErrorMessage(error),
 				details: error instanceof Error ? error.message : String(error)
 			},
 			{ status: 500 }
