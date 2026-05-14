@@ -128,6 +128,8 @@
 		currentUser?: User;
 		reviewAssignments?: any[];
 		isHubAdmin?: boolean;
+		canSubmitReview?: boolean;
+		canViewSubmittedReviews?: boolean;
 	}
 
 	let {
@@ -136,7 +138,9 @@
 		editable = false,
 		currentUser,
 		reviewAssignments,
-		isHubAdmin = false
+		isHubAdmin = false,
+		canSubmitReview = false,
+		canViewSubmittedReviews = false
 	}: Props = $props();
 
 	let isReviewCollapsed = $state(false);
@@ -144,16 +148,70 @@
 	let isGeneratingPdf = $state(false);
 	let generatePdfError = $state<string | null>(null);
 
-	function isUserReviewer() {
-		if (!currentUser) return false;
-		if (currentUser.roles?.reviewer) return true;
-		if (
-			Array.isArray(reviewAssignments) &&
-			reviewAssignments.some((r) => r.reviewerId === currentUser.id)
-		)
-			return true;
-		if (Array.isArray(paper?.reviewers) && paper.reviewers.includes(currentUser.id)) return true;
-		return false;
+	function getReviewRound(review: any): number {
+		const round = Number(review?.reviewRound ?? review?.round ?? 1);
+		return round === 2 || round === 3 ? 2 : 1;
+	}
+
+	function getReviewerName(review: any): string {
+		const reviewer = review?.reviewerId;
+		if (reviewer && typeof reviewer === 'object') {
+			const firstName = String(reviewer.firstName ?? '').trim();
+			const lastName = String(reviewer.lastName ?? '').trim();
+			const fullName = `${firstName} ${lastName}`.trim();
+			if (fullName) return fullName;
+			const username = String(reviewer.username ?? '').trim();
+			if (username) return username;
+			const email = String(reviewer.email ?? '').trim();
+			if (email) return email;
+		}
+		return 'Unknown reviewer';
+	}
+
+	function getRecommendationLabel(value: string): string {
+		const labels: Record<string, string> = {
+			accept_without_changes: 'Accept without changes',
+			accept_with_minor_revisions: 'Accept with minor revisions',
+			major_revision: 'Major revision',
+			reject: 'Reject'
+		};
+
+		return labels[value] || value || 'Not selected';
+	}
+
+	function getEthicsLabel(value: string): string {
+		const labels: Record<string, string> = {
+			yes: 'Yes',
+			no: 'No',
+			adequate: 'Adequate',
+			justified: 'Justified',
+			absent: 'Absent'
+		};
+
+		return labels[value] || value || 'Not provided';
+	}
+
+	const quantitativeFields = [
+		{ key: 'originality', label: 'Originality' },
+		{ key: 'clarity', label: 'Clarity' },
+		{ key: 'literatureReview', label: 'Literature review' },
+		{ key: 'theoreticalFoundation', label: 'Theoretical foundation' },
+		{ key: 'methodology', label: 'Methodology' },
+		{ key: 'reproducibility', label: 'Reproducibility' },
+		{ key: 'results', label: 'Results' },
+		{ key: 'figures', label: 'Figures' },
+		{ key: 'limitations', label: 'Limitations' },
+		{ key: 'language', label: 'Language' },
+		{ key: 'impact', label: 'Impact' }
+	];
+
+	function getReviewsForDisplay() {
+		const reviews = Array.isArray(paper?.peer_review?.reviews) ? paper.peer_review.reviews : [];
+		return [...reviews].sort((left, right) => {
+			const leftDate = new Date(left?.submissionDate ?? left?.createdAt ?? 0).getTime();
+			const rightDate = new Date(right?.submissionDate ?? right?.createdAt ?? 0).getTime();
+			return rightDate - leftDate;
+		});
 	}
 
 	function handleReviewCollapse(event: CustomEvent<{ collapsed: boolean }>) {
@@ -246,8 +304,8 @@
 			</div>
 		{/if}
 
-		<!-- Role-based rendering: reviewers get PDF + review form; others see HTML PublishedPaperView -->
-		{#if isUserReviewer()}
+		<!-- Role-based rendering: reviewers get PDF + review form; authors/editors/admins can observe submitted reviews -->
+		{#if canSubmitReview}
 			<div class="mb-8 {isHubAdmin ? 'w-full' : 'flex flex-col gap-4 w-full xl:flex-row'}">
 				<!-- PDF à esquerda -->
 				<section
@@ -332,10 +390,129 @@
 					</section>
 				{/if}
 			</div>
+		{/if}
+
+		{#if canViewSubmittedReviews}
+			{#if !canSubmitReview}
+				<div class="mb-8">
+					<PublishedPaperView {paper} showReviewedBadge={false} />
+				</div>
+			{/if}
+
+			{#if getReviewsForDisplay().length}
+				<div class="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
+					<h3 class="mb-4 text-base font-semibold text-slate-900">Reviews received so far</h3>
+					<div class="space-y-4">
+						{#each getReviewsForDisplay() as review, index (review.id || review._id || index)}
+							<div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+								<div class="flex flex-wrap items-center justify-between gap-2">
+									<div>
+										<div class="font-semibold text-slate-900">{getReviewerName(review)}</div>
+										<div class="text-xs text-slate-500">Round {getReviewRound(review)}</div>
+									</div>
+									<div class="text-xs text-slate-500">
+										{#if review?.submissionDate}
+											Submitted {new Date(review.submissionDate).toLocaleString()}
+										{/if}
+									</div>
+								</div>
+
+								<div class="mt-3 grid gap-3 md:grid-cols-2">
+									<div class="rounded-md bg-white p-3">
+										<div class="text-xs font-semibold uppercase tracking-wide text-slate-500">
+											Recommendation
+										</div>
+										<div class="mt-1 text-sm font-medium text-slate-800">
+											{getRecommendationLabel(review?.recommendation)}
+										</div>
+									</div>
+									<div class="rounded-md bg-white p-3">
+										<div class="text-xs font-semibold uppercase tracking-wide text-slate-500">Scores</div>
+										<div class="mt-1 text-sm text-slate-800">
+											Average: {review?.averageScore ?? '-'} | Weighted: {review?.weightedScore ?? '-'}
+										</div>
+									</div>
+								</div>
+
+								<div class="mt-3 grid gap-3 md:grid-cols-2">
+									<div class="rounded-md bg-white p-3 md:col-span-2">
+										<div class="text-xs font-semibold uppercase tracking-wide text-slate-500">
+											Detailed quantitative scores
+										</div>
+										<div class="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+											{#each quantitativeFields as field}
+												<div class="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+													<div class="text-xs uppercase tracking-wide text-slate-500">{field.label}</div>
+													<div class="mt-1 text-sm font-medium text-slate-900">
+														{review?.quantitativeEvaluation?.[field.key] ?? '—'}/5
+													</div>
+												</div>
+											{/each}
+										</div>
+									</div>
+
+									<div class="rounded-md bg-white p-3">
+										<div class="text-xs font-semibold uppercase tracking-wide text-slate-500">Strengths</div>
+										<p class="mt-1 whitespace-pre-wrap text-sm text-slate-700">
+											{review?.qualitativeEvaluation?.strengths || '-'}
+										</p>
+									</div>
+									<div class="rounded-md bg-white p-3">
+										<div class="text-xs font-semibold uppercase tracking-wide text-slate-500">Weaknesses</div>
+										<p class="mt-1 whitespace-pre-wrap text-sm text-slate-700">
+											{review?.qualitativeEvaluation?.weaknesses || '-'}
+										</p>
+									</div>
+								</div>
+
+								<div class="mt-3 grid gap-3 md:grid-cols-2">
+									<div class="rounded-md bg-white p-3">
+										<div class="text-xs font-semibold uppercase tracking-wide text-slate-500">Ethics - Human research</div>
+										<div class="mt-1 text-sm text-slate-800">{getEthicsLabel(review?.ethics?.involvesHumanResearch)}</div>
+									</div>
+									<div class="rounded-md bg-white p-3">
+										<div class="text-xs font-semibold uppercase tracking-wide text-slate-500">Ethics - Approval</div>
+										<div class="mt-1 text-sm text-slate-800">{getEthicsLabel(review?.ethics?.ethicsApproval ?? '')}</div>
+									</div>
+								</div>
+
+								{#if review?.reviewAttachment}
+									<div class="mt-3 rounded-md bg-white p-3">
+										<div class="text-xs font-semibold uppercase tracking-wide text-slate-500">
+											Attachment
+										</div>
+										<a
+											href={`/api/reviews/attachments/${encodeURIComponent(review.reviewAttachment.fileId || review.reviewAttachment.id)}`}
+											target="_blank"
+											rel="noreferrer"
+											class="mt-1 inline-flex text-sm font-medium text-blue-600 hover:text-blue-700"
+										>
+											Open attachment
+										</a>
+									</div>
+								{/if}
+
+								<div class="mt-3 rounded-md bg-slate-100 p-3">
+									<div class="text-xs font-semibold uppercase tracking-wide text-slate-500">Submission date</div>
+									<div class="mt-1 text-sm text-slate-800">
+										{#if review?.submissionDate}
+											{new Date(review.submissionDate).toLocaleString()}
+										{:else}
+											Not available
+										{/if}
+									</div>
+								</div>
+							</div>
+						{/each}
+					</div>
+				</div>
+			{/if}
 		{:else}
-			<div class="mb-8">
-				<PublishedPaperView {paper} showReviewedBadge={false} />
-			</div>
+			{#if !canSubmitReview}
+				<div class="mb-8">
+					<PublishedPaperView {paper} showReviewedBadge={false} />
+				</div>
+			{/if}
 		{/if}
 	</fieldset>
 </main>

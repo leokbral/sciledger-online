@@ -2,6 +2,7 @@ import MessageFeeds from '$lib/db/models/MessageFeed.js';
 import Papers from '$lib/db/models/Paper';
 import Users from '$lib/db/models/User';
 import { error, redirect } from '@sveltejs/kit';
+import { isHubViceManager } from '$lib/helpers/hubPermissions';
 
 // Type for MongoDB ObjectId
 interface ObjectId {
@@ -40,6 +41,17 @@ function getIdAliases(value: unknown): string[] {
 
 function matchesCurrentUser(value: unknown, userId: string): boolean {
 	return getIdAliases(value).includes(String(userId));
+}
+
+function isAdminUser(user: Record<string, unknown> | null | undefined): boolean {
+	return Boolean(user?.isAdmin || user?.roles && typeof user.roles === 'object' && (user.roles as Record<string, unknown>).admin);
+}
+
+function isPaperAuthor(paperDoc: Record<string, unknown>, userId: string): boolean {
+	return [paperDoc.submittedBy, paperDoc.mainAuthor, paperDoc.correspondingAuthor]
+		.some((value) => matchesCurrentUser(value, userId)) ||
+		(Array.isArray(paperDoc.coAuthors) && paperDoc.coAuthors.some((value) => matchesCurrentUser(value, userId))) ||
+		(Array.isArray(paperDoc.authors) && paperDoc.authors.some((value) => matchesCurrentUser(value, userId)));
 }
 
 function sanitize(obj: unknown): unknown {
@@ -93,7 +105,18 @@ export async function load({ locals, params }) {
 		.populate('authors')
 		.populate('mainAuthor')
 		.populate('coAuthors')
+		.populate('submittedBy')
 		.populate('hubId')
+		.populate({
+			path: 'peer_review.reviews',
+			model: 'Review',
+			sort: { submissionDate: -1 },
+			populate: {
+				path: 'reviewerId',
+				model: 'User',
+				select: 'firstName lastName username email roles isAdmin'
+			}
+		})
 		.lean()
 		.exec();
 
@@ -127,8 +150,18 @@ export async function load({ locals, params }) {
 		Array.isArray(paperDoc.hubId?.reviewers) &&
 		paperDoc.hubId?.reviewers?.some((reviewer: any) => matchesCurrentUser(reviewer, userId));
 
+	const isViceManager = typeof paperDoc.hubId === 'object' && isHubViceManager(paperDoc.hubId as any, userId);
+
+	const canViewSubmittedReviews =
+		isPaperAuthor(paperDoc as Record<string, unknown>, userId) ||
+		isAdminUser(locals.user as Record<string, unknown>) ||
+		isHubOwner ||
+		isViceManager;
+
+	const canSubmitReview = !isPaperAuthor(paperDoc as Record<string, unknown>, userId) && (isReviewerAccepted || Boolean(hasAcceptedViaQueue) || isHubOwner || isHubReviewer);
+
 	// Para REVISAR o paper: precisa ter aceitado (via responses OU ReviewQueue) OU ser dono do hub OU ser revisor do hub
-	if (!isReviewerAccepted && !hasAcceptedViaQueue && !isHubOwner && !isHubReviewer) {
+	if (!canViewSubmittedReviews && !canSubmitReview) {
 		throw error(403, 'You need to accept this review request before you can review this paper');
 	}
 
@@ -194,7 +227,9 @@ export async function load({ locals, params }) {
 		users: sanitize(users),
 		messageFeed: sanitize(messageFeed),
 		reviewAssignments: sanitize(serializedAssignments),
-		isHubOwner: isHubOwner
+		isHubOwner: isHubOwner,
+		canViewSubmittedReviews,
+		canSubmitReview
 	};
 }
 

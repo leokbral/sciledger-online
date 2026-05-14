@@ -61,6 +61,16 @@
 		return 'bg-slate-100 text-slate-700 border-slate-200';
 	}
 
+	function formatFileSize(bytes?: number): string {
+		if (!bytes) return '';
+		if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+		return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+	}
+
+	function getReviewAttachmentUrl(attachment: any): string {
+		return `/api/reviews/attachments/${encodeURIComponent(attachment.fileId || attachment.id)}`;
+	}
+
 	function reviewsByRound(roundNum: 1 | 2) {
 		const list = ((paper as any)?.peer_review?.reviews ?? []) as any[];
 		return list.filter((r: any) => {
@@ -341,6 +351,24 @@
 													</p>
 												</div>
 											</div>
+											{#if review?.reviewAttachment}
+												<div
+													class="mt-4 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm"
+												>
+													<h5 class="font-semibold text-slate-800">Attached Review File</h5>
+													<a
+														class="mt-1 inline-block font-medium text-blue-700 underline hover:text-blue-900"
+														href={getReviewAttachmentUrl(review.reviewAttachment)}
+														target="_blank"
+														rel="noreferrer"
+													>
+														{review.reviewAttachment.filename}
+														{#if review.reviewAttachment.fileSize}
+															({formatFileSize(review.reviewAttachment.fileSize)})
+														{/if}
+													</a>
+												</div>
+											{/if}
 											<div class="mt-4">
 												<h5 class="text-sm font-semibold text-slate-800">Scores</h5>
 												<div class="mt-2 grid grid-cols-2 gap-2 text-sm">
@@ -404,6 +432,24 @@
 													</p>
 												</div>
 											</div>
+											{#if review?.reviewAttachment}
+												<div
+													class="mt-4 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm"
+												>
+													<h5 class="font-semibold text-slate-800">Attached Review File</h5>
+													<a
+														class="mt-1 inline-block font-medium text-blue-700 underline hover:text-blue-900"
+														href={getReviewAttachmentUrl(review.reviewAttachment)}
+														target="_blank"
+														rel="noreferrer"
+													>
+														{review.reviewAttachment.filename}
+														{#if review.reviewAttachment.fileSize}
+															({formatFileSize(review.reviewAttachment.fileSize)})
+														{/if}
+													</a>
+												</div>
+											{/if}
 											<div class="mt-4">
 												<h5 class="text-sm font-semibold text-slate-800">Scores</h5>
 												<div class="mt-2 grid grid-cols-2 gap-2 text-sm">

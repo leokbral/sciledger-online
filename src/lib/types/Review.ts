@@ -1,9 +1,19 @@
-import type { User } from "./User";
-import type { Paper } from "./Paper";
+import type { User } from './User';
+import type { Paper } from './Paper';
+
+export type ReviewAttachment = {
+	id: string;
+	fileId: string;
+	filename: string;
+	fileSize: number;
+	mimeType: string;
+	uploadedBy?: string;
+	createdAt?: Date;
+};
 
 // ReviewType.ts
 export type Review = {
-    _id: string; // Internal MongoDB ID
+	_id: string; // Internal MongoDB ID
 	id: string; // Generated UUID for unique review identification
 
 	paperId: Paper | string; // ID of the paper being evaluated
@@ -31,14 +41,22 @@ export type Review = {
 		weaknesses: string; // Weaknesses
 	};
 
-	// Part III – Ethics
+	// Optional annotated review file
+	reviewAttachment?: ReviewAttachment | null;
+
+	// Part III - Ethics
 	ethics: {
 		involvesHumanResearch: 'yes' | 'no' | ''; // Involves human research?
 		ethicsApproval?: 'adequate' | 'justified' | 'absent' | ''; // Ethics approval
 	};
 
 	// Part IV – Recommendation
-	recommendation: 'accept_without_changes' | 'accept_with_minor_revisions' | 'major_revision' | 'reject' | '';
+	recommendation:
+		| 'accept_without_changes'
+		| 'accept_with_minor_revisions'
+		| 'major_revision'
+		| 'reject'
+		| '';
 
 	// Calculated fields
 	averageScore: number; // Average score

@@ -58,6 +58,16 @@ export async function load({ locals, params }) {
 			.populate("mainAuthor")
 			.populate("coAuthors")
 			.populate("hubId")
+			.populate({
+				path: 'peer_review.reviews',
+				model: 'Review',
+				options: { sort: { submissionDate: -1 } },
+				populate: {
+					path: 'reviewerId',
+					model: 'User',
+					select: 'firstName lastName username email roles isAdmin'
+				}
+			})
 			.lean()
 			.exec();
 
@@ -123,8 +133,10 @@ export async function load({ locals, params }) {
 		// Sanitizar antes de retornar
 		return {
 			paper: sanitize(paper),
+			user: sanitize(locals.user),
 			users: sanitize(usersRaw),
-			isHubOwner
+			isHubOwner,
+			canViewSubmittedReviews: true
 		};
 
 	} catch (err) {
