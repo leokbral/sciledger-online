@@ -32,7 +32,8 @@
 	let currentRound = $state(initialPaper?.reviewRound || 1);
 	let submittedReviewsThisRound = $state<any[]>(
 		initialPaper?.peer_review?.reviews?.filter(
-			(r: any) => r?.status === 'submitted' && (r?.reviewRound || 1) === (initialPaper?.reviewRound || 1)
+			(r: any) =>
+				r?.status === 'submitted' && (r?.reviewRound || 1) === (initialPaper?.reviewRound || 1)
 		) || []
 	);
 
@@ -44,7 +45,6 @@
 				(r: any) => r?.status === 'submitted' && (r?.reviewRound || 1) === round
 			) || [];
 	}
-
 
 	// Last refresh timestamp for manual refresh button
 	let lastRefreshTime = $state<Date | null>(null);
@@ -116,6 +116,16 @@
 		'': '—'
 	};
 
+	function formatFileSize(bytes?: number): string {
+		if (!bytes) return '';
+		if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+		return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+	}
+
+	function getReviewAttachmentUrl(attachment: any): string {
+		return `/api/reviews/attachments/${encodeURIComponent(attachment.fileId || attachment.id)}`;
+	}
+
 	let inicialValue: PaperPublishStoreData = {
 		...((data.paper as Paper) ?? {}),
 		mainAuthor: (data.paper as Paper)?.mainAuthor
@@ -163,13 +173,13 @@
 				method: 'GET',
 				headers: { 'Content-Type': 'application/json' }
 			});
-			
+
 			if (!response.ok) throw new Error('Failed to fetch paper');
-			
+
 			const updatedPaper = (await response.json()) as Paper;
 			paper = updatedPaper;
 			syncRoundReviews(updatedPaper);
-			
+
 			lastRefreshTime = new Date();
 		} catch (error) {
 			console.error('Error refreshing reviews:', error);
@@ -203,12 +213,7 @@
 {#if paper}
 	<div class="container page max-w-[700px] p-4 m-auto">
 		<div class="mb-6">
-			<CorrectionProgressBar 
-				{paper} 
-				currentUser={$page.data.user} 
-				showDetails={true} 
-				size="lg" 
-			/>
+			<CorrectionProgressBar {paper} currentUser={$page.data.user} showDetails={true} size="lg" />
 		</div>
 
 		<div class="row">
@@ -229,7 +234,9 @@
 							class="text-xs px-3 py-1 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors"
 							onclick={toggleAllReviews}
 						>
-							{expandedReviews.size === submittedReviewsThisRound.length ? 'Collapse All' : 'Expand All'}
+							{expandedReviews.size === submittedReviewsThisRound.length
+								? 'Collapse All'
+								: 'Expand All'}
 						</button>
 					{/if}
 				</div>
@@ -246,15 +253,17 @@
 			{#if paper?.peer_review?.responses}
 				{@const totalReviewers = paper.peer_review.responses.length}
 				{@const completedReviews = submittedReviewsThisRound.length}
-				<div class="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+				<div
+					class="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800"
+				>
 					<div class="flex items-center justify-between mb-2">
 						<span class="text-sm font-semibold text-blue-900 dark:text-blue-200">
 							Reviews: <strong>{completedReviews}/{totalReviewers}</strong> submitted
 						</span>
 					</div>
 					<div class="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2">
-						<div 
-							class="bg-blue-600 dark:bg-blue-400 h-2 rounded-full transition-all duration-300" 
+						<div
+							class="bg-blue-600 dark:bg-blue-400 h-2 rounded-full transition-all duration-300"
 							style="width: {(completedReviews / totalReviewers) * 100}%"
 						></div>
 					</div>
@@ -262,44 +271,61 @@
 			{/if}
 
 			{#if submittedReviewsThisRound.length === 0}
-				<div class="p-4 bg-surface-100 dark:bg-surface-800 rounded-lg text-sm text-surface-600 border border-surface-300">
+				<div
+					class="p-4 bg-surface-100 dark:bg-surface-800 rounded-lg text-sm text-surface-600 border border-surface-300"
+				>
 					<div class="flex items-center gap-2 mb-1">
 						<Icon icon="mdi:clock-outline" width="18" height="18" />
 						<span class="font-medium">Waiting for reviews...</span>
 					</div>
-					<p class="text-xs mt-2">Reviews will appear here as reviewers submit them. Refresh the page or check your notifications for new reviews.</p>
+					<p class="text-xs mt-2">
+						Reviews will appear here as reviewers submit them. Refresh the page or check your
+						notifications for new reviews.
+					</p>
 				</div>
 			{:else}
 				<div class="space-y-3">
 					{#each submittedReviewsThisRound as review, idx}
 						{@const reviewerObj = typeof review.reviewerId === 'object' ? review.reviewerId : null}
 						{@const isExpanded = expandedReviews.has(idx)}
-						<div class="rounded-lg border-2 border-green-300 bg-green-50 dark:bg-green-950/20 dark:border-green-700 animate-in fade-in-50 duration-500 overflow-hidden transition-all">
+						<div
+							class="rounded-lg border-2 border-green-300 bg-green-50 dark:bg-green-950/20 dark:border-green-700 animate-in fade-in-50 duration-500 overflow-hidden transition-all"
+						>
 							<!-- Clickable header -->
 							<button
 								class="w-full p-4 hover:bg-green-100 dark:hover:bg-green-950/40 transition-colors cursor-pointer flex items-start justify-between gap-3"
 								onclick={() => toggleReviewExpanded(idx)}
 							>
 								<div class="flex items-center gap-2 text-left flex-1">
-									<div class="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+									<div
+										class="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
+									>
 										{idx + 1}
 									</div>
 									<div class="flex-1">
 										<p class="font-semibold text-gray-900 dark:text-white">
-											{reviewerObj ? `${reviewerObj.firstName} ${reviewerObj.lastName}` : 'Reviewer'}
+											{reviewerObj
+												? `${reviewerObj.firstName} ${reviewerObj.lastName}`
+												: 'Reviewer'}
 										</p>
 										<p class="text-xs text-surface-500">
-											✓ Submitted {review.submissionDate ? new Date(review.submissionDate).toLocaleString() : 'just now'}
+											✓ Submitted {review.submissionDate
+												? new Date(review.submissionDate).toLocaleString()
+												: 'just now'}
 										</p>
 									</div>
 								</div>
 								<div class="flex items-center gap-2 flex-shrink-0">
-									<span class="inline-block px-2 py-1 bg-green-200 dark:bg-green-900/40 text-green-800 dark:text-green-200 text-xs font-semibold rounded-full">
-										{recommendationLabels[review.recommendation] || review.recommendation || 'No recommendation'}
+									<span
+										class="inline-block px-2 py-1 bg-green-200 dark:bg-green-900/40 text-green-800 dark:text-green-200 text-xs font-semibold rounded-full"
+									>
+										{recommendationLabels[review.recommendation] ||
+											review.recommendation ||
+											'No recommendation'}
 									</span>
-									<Icon 
-										icon={isExpanded ? 'mdi:chevron-up' : 'mdi:chevron-down'} 
-										width="24" 
+									<Icon
+										icon={isExpanded ? 'mdi:chevron-up' : 'mdi:chevron-down'}
+										width="24"
 										height="24"
 										class="text-surface-600 dark:text-surface-400 transition-transform duration-300"
 									/>
@@ -308,41 +334,91 @@
 
 							<!-- Expandable content -->
 							{#if isExpanded}
-								<div class="px-4 pb-4 pt-0 border-t border-green-200 dark:border-green-800 bg-white/50 dark:bg-surface-900/20 animate-in fade-in-50 duration-300">
+								<div
+									class="px-4 pb-4 pt-0 border-t border-green-200 dark:border-green-800 bg-white/50 dark:bg-surface-900/20 animate-in fade-in-50 duration-300"
+								>
 									<!-- Review content -->
 									{#if review.qualitativeEvaluation?.strengths}
-										<div class="mb-3 p-3 bg-white dark:bg-surface-800 rounded border-l-4 border-green-500">
-											<p class="text-xs font-semibold text-surface-600 dark:text-surface-400 mb-1">💡 Strengths</p>
-											<p class="text-sm whitespace-pre-wrap text-gray-700 dark:text-gray-300">{review.qualitativeEvaluation.strengths}</p>
+										<div
+											class="mb-3 p-3 bg-white dark:bg-surface-800 rounded border-l-4 border-green-500"
+										>
+											<p class="text-xs font-semibold text-surface-600 dark:text-surface-400 mb-1">
+												💡 Strengths
+											</p>
+											<p class="text-sm whitespace-pre-wrap text-gray-700 dark:text-gray-300">
+												{review.qualitativeEvaluation.strengths}
+											</p>
 										</div>
 									{/if}
 
 									{#if review.qualitativeEvaluation?.weaknesses}
-										<div class="mb-3 p-3 bg-white dark:bg-surface-800 rounded border-l-4 border-amber-500">
-											<p class="text-xs font-semibold text-surface-600 dark:text-surface-400 mb-1">⚠️ Weaknesses / Corrections needed</p>
-											<p class="text-sm whitespace-pre-wrap text-gray-700 dark:text-gray-300">{review.qualitativeEvaluation.weaknesses}</p>
+										<div
+											class="mb-3 p-3 bg-white dark:bg-surface-800 rounded border-l-4 border-amber-500"
+										>
+											<p class="text-xs font-semibold text-surface-600 dark:text-surface-400 mb-1">
+												⚠️ Weaknesses / Corrections needed
+											</p>
+											<p class="text-sm whitespace-pre-wrap text-gray-700 dark:text-gray-300">
+												{review.qualitativeEvaluation.weaknesses}
+											</p>
+										</div>
+									{/if}
+
+									{#if review.reviewAttachment}
+										<div
+											class="mb-3 p-3 bg-white dark:bg-surface-800 rounded border-l-4 border-blue-500"
+										>
+											<p class="text-xs font-semibold text-surface-600 dark:text-surface-400 mb-1">
+												Attached review file
+											</p>
+											<a
+												class="text-sm font-medium text-blue-700 dark:text-blue-300 underline hover:text-blue-900"
+												href={getReviewAttachmentUrl(review.reviewAttachment)}
+												target="_blank"
+												rel="noreferrer"
+											>
+												{review.reviewAttachment.filename}
+												{#if review.reviewAttachment.fileSize}
+													({formatFileSize(review.reviewAttachment.fileSize)})
+												{/if}
+											</a>
 										</div>
 									{/if}
 
 									{#if review.quantitativeEvaluation}
 										<div class="mt-3 pt-3 border-t border-surface-200 dark:border-surface-700">
-											<p class="text-xs font-semibold text-surface-600 dark:text-surface-400 mb-2">📊 Scores (1-5)</p>
+											<p class="text-xs font-semibold text-surface-600 dark:text-surface-400 mb-2">
+												📊 Scores (1-5)
+											</p>
 											<div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
 												{#each quantitativeFields as field}
 													<div class="bg-white dark:bg-surface-800 p-2 rounded">
-														<span class="text-surface-600 dark:text-surface-400">{field.label}:</span>
-														<span class="font-bold text-gray-900 dark:text-white ml-1">{review.quantitativeEvaluation?.[field.key] ?? '—'}/5</span>
+														<span class="text-surface-600 dark:text-surface-400"
+															>{field.label}:</span
+														>
+														<span class="font-bold text-gray-900 dark:text-white ml-1"
+															>{review.quantitativeEvaluation?.[field.key] ?? '—'}/5</span
+														>
 													</div>
 												{/each}
 											</div>
 											<div class="mt-3 grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
-												<div class="bg-blue-50 dark:bg-blue-950/20 p-2 rounded border border-blue-200 dark:border-blue-800">
+												<div
+													class="bg-blue-50 dark:bg-blue-950/20 p-2 rounded border border-blue-200 dark:border-blue-800"
+												>
 													<span class="text-surface-600 dark:text-surface-400">Average score:</span>
-													<span class="font-bold text-gray-900 dark:text-white ml-1">{review.averageScore ?? '—'}/5</span>
+													<span class="font-bold text-gray-900 dark:text-white ml-1"
+														>{review.averageScore ?? '—'}/5</span
+													>
 												</div>
-												<div class="bg-indigo-50 dark:bg-indigo-950/20 p-2 rounded border border-indigo-200 dark:border-indigo-800">
-													<span class="text-surface-600 dark:text-surface-400">Weighted score:</span>
-													<span class="font-bold text-gray-900 dark:text-white ml-1">{review.weightedScore ?? '—'}/5</span>
+												<div
+													class="bg-indigo-50 dark:bg-indigo-950/20 p-2 rounded border border-indigo-200 dark:border-indigo-800"
+												>
+													<span class="text-surface-600 dark:text-surface-400">Weighted score:</span
+													>
+													<span class="font-bold text-gray-900 dark:text-white ml-1"
+														>{review.weightedScore ?? '—'}/5</span
+													>
 												</div>
 											</div>
 										</div>
@@ -350,15 +426,25 @@
 
 									{#if review.ethics}
 										<div class="mt-3 pt-3 border-t border-surface-200 dark:border-surface-700">
-											<p class="text-xs font-semibold text-surface-600 dark:text-surface-400 mb-2">🧭 Ethics</p>
+											<p class="text-xs font-semibold text-surface-600 dark:text-surface-400 mb-2">
+												🧭 Ethics
+											</p>
 											<div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
 												<div class="bg-white dark:bg-surface-800 p-2 rounded">
-													<span class="text-surface-600 dark:text-surface-400">Human research:</span>
-													<span class="font-bold text-gray-900 dark:text-white ml-1">{ethicsHumanResearchLabel[review.ethics.involvesHumanResearch] || '—'}</span>
+													<span class="text-surface-600 dark:text-surface-400">Human research:</span
+													>
+													<span class="font-bold text-gray-900 dark:text-white ml-1"
+														>{ethicsHumanResearchLabel[review.ethics.involvesHumanResearch] ||
+															'—'}</span
+													>
 												</div>
 												<div class="bg-white dark:bg-surface-800 p-2 rounded">
-													<span class="text-surface-600 dark:text-surface-400">Ethics approval:</span>
-													<span class="font-bold text-gray-900 dark:text-white ml-1">{ethicsApprovalLabel[review.ethics.ethicsApproval ?? ''] || '—'}</span>
+													<span class="text-surface-600 dark:text-surface-400"
+														>Ethics approval:</span
+													>
+													<span class="font-bold text-gray-900 dark:text-white ml-1"
+														>{ethicsApprovalLabel[review.ethics.ethicsApproval ?? ''] || '—'}</span
+													>
 												</div>
 											</div>
 										</div>
@@ -370,7 +456,9 @@
 				</div>
 			{/if}
 
-			<div class="mt-4 p-3 rounded bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 text-sm text-blue-800 dark:text-blue-200">
+			<div
+				class="mt-4 p-3 rounded bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 text-sm text-blue-800 dark:text-blue-200"
+			>
 				<Icon icon="mdi:information" width="16" height="16" class="inline mr-2" />
 				The paper remains locked until all reviewers submit. Reviews are automatically updated.
 			</div>

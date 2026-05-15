@@ -20,12 +20,16 @@
 	let paper = $state(data.paper as Paper);
 	let currentUser = $state(data.user as User);
 	let messageFeed = $state(data.messageFeed);
-	let users: Array<{ id: string; firstName: string; lastName: string }> = data.users as Array<{ id: string; firstName: string; lastName: string }>;
+	let users: Array<{ id: string; firstName: string; lastName: string }> = data.users as Array<{
+		id: string;
+		firstName: string;
+		lastName: string;
+	}>;
 	let userProfiles = data.users; // Para o PaperPublishPage
 
 	// Initialize correction progress from paper data
 	let correctionProgress: Record<string, boolean> = $state({});
-	
+
 	// Set initial state after component mount
 	$effect(() => {
 		if (paper && !Object.keys(correctionProgress).length) {
@@ -45,21 +49,22 @@
 	// Function to get reviewer name by ID
 	function getReviewerName(reviewerId: string | any): string {
 		// Handle if reviewerId is an object with id property
-		const actualReviewerId = typeof reviewerId === 'object' ? reviewerId?.id || reviewerId?._id : reviewerId;
-		
+		const actualReviewerId =
+			typeof reviewerId === 'object' ? reviewerId?.id || reviewerId?._id : reviewerId;
+
 		const reviewer = users.find((user: any) => {
 			return user.id === actualReviewerId || user._id === actualReviewerId;
 		});
-		
+
 		if (reviewer) {
 			return `${reviewer.firstName} ${reviewer.lastName}`;
 		}
-		
+
 		// If not found, try to extract from reviewerId object if it has name properties
 		if (typeof reviewerId === 'object' && reviewerId?.firstName) {
 			return `${reviewerId.firstName} ${reviewerId.lastName}`;
 		}
-		
+
 		return `Reviewer ID: ${actualReviewerId || 'Unknown'}`;
 	}
 
@@ -72,6 +77,18 @@
 			reject: 'Reject'
 		};
 		return recommendations[recommendation] || recommendation;
+	}
+
+	function getEthicsText(value: string): string {
+		const ethics: Record<string, string> = {
+			yes: 'Yes',
+			no: 'No',
+			adequate: 'Adequate',
+			justified: 'Justified',
+			absent: 'Absent'
+		};
+
+		return ethics[value] || value || 'Not provided';
 	}
 
 	// Function to clean title from <p> tags
@@ -108,6 +125,30 @@
 		return names[key] || key;
 	}
 
+	function formatFileSize(bytes?: number): string {
+		if (!bytes) return '';
+		if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+		return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+	}
+
+	function getReviewAttachmentUrl(attachment: any): string {
+		return `/api/reviews/attachments/${encodeURIComponent(attachment.fileId || attachment.id)}`;
+	}
+
+	const detailedReviewFields = [
+		{ key: 'originality', label: 'Originality' },
+		{ key: 'clarity', label: 'Clarity' },
+		{ key: 'literatureReview', label: 'Literature Review' },
+		{ key: 'theoreticalFoundation', label: 'Theoretical Foundation' },
+		{ key: 'methodology', label: 'Methodology' },
+		{ key: 'reproducibility', label: 'Reproducibility' },
+		{ key: 'results', label: 'Results' },
+		{ key: 'figures', label: 'Figures' },
+		{ key: 'limitations', label: 'Limitations' },
+		{ key: 'language', label: 'Language' },
+		{ key: 'impact', label: 'Impact' }
+	];
+
 	// Save status tracking
 	let isSaving = $state(false);
 	let lastSaved = $state<Date | null>(null);
@@ -124,7 +165,7 @@
 
 	// Debounce function to avoid too many API calls
 	let saveTimeout: NodeJS.Timeout | null = null;
-	
+
 	// Reactive statement to auto-save progress changes
 	$effect(() => {
 		// Only auto-save if there are items in progress (not on initial load)
@@ -247,10 +288,14 @@
 	}
 
 	// Function to toggle correction completion
-	function toggleCorrection(reviewIndex: number, type: 'weaknesses' | 'criterion', identifier: string) {
+	function toggleCorrection(
+		reviewIndex: number,
+		type: 'weaknesses' | 'criterion',
+		identifier: string
+	) {
 		const key = `${reviewIndex}-${type}-${identifier}`;
 		correctionProgress[key] = !correctionProgress[key];
-		
+
 		// Force immediate save for testing
 		saveCorrectionProgress();
 	}
@@ -266,7 +311,7 @@
 	function getAllCriticalComments(): string[] {
 		const paperData = paper as Paper;
 		if (!paperData.peer_review?.reviews) return [];
-		
+
 		const comments: string[] = [];
 		paperData.peer_review.reviews.forEach((review: Review, index: number) => {
 			if (review.qualitativeEvaluation?.weaknesses) {
@@ -277,12 +322,16 @@
 	}
 
 	// Function to get lowest scoring criteria
-	function getLowestScoringCriteria(): Array<{criterion: string, scores: number[], average: number}> {
+	function getLowestScoringCriteria(): Array<{
+		criterion: string;
+		scores: number[];
+		average: number;
+	}> {
 		const paperData = paper as Paper;
 		if (!paperData.peer_review?.reviews) return [];
-		
+
 		const criteriaScores: Record<string, number[]> = {};
-		
+
 		paperData.peer_review.reviews.forEach((review: Review) => {
 			if (review.quantitativeEvaluation) {
 				Object.entries(review.quantitativeEvaluation).forEach(([criterion, score]) => {
@@ -298,7 +347,7 @@
 				scores,
 				average: scores.reduce((sum, score) => sum + score, 0) / scores.length
 			}))
-			.filter(item => item.average < 3.5) // Show criteria with average below 3.5
+			.filter((item) => item.average < 3.5) // Show criteria with average below 3.5
 			.sort((a, b) => a.average - b.average);
 	}
 
@@ -306,7 +355,7 @@
 	function getRecommendationSummary(): Record<string, number> {
 		const paperData = paper as Paper;
 		if (!paperData.peer_review?.reviews) return {};
-		
+
 		const summary: Record<string, number> = {};
 		paperData.peer_review.reviews.forEach((review: Review) => {
 			const rec = review.recommendation;
@@ -343,7 +392,7 @@
 					...response.paper,
 					mainAuthor: response.paper?.mainAuthor
 				} as PaperPublishStoreData;
-				
+
 				// Sair do modo de edição
 				isEditMode = false;
 				alert('Article updated successfully!');
@@ -411,24 +460,19 @@
 		<p class="text-gray-600">
 			Review the feedback from peer reviewers and make the necessary corrections to your article.
 		</p>
-		
+
 		<!-- Barra de Progresso do Tempo de Correção -->
 		<div class="mt-4">
-			<CorrectionProgressBar 
-				{paper} 
-				currentUser={currentUser} 
-				showDetails={true} 
-				size="lg" 
-			/>
+			<CorrectionProgressBar {paper} {currentUser} showDetails={true} size="lg" />
 		</div>
-		
+
 		<div class="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
 			<h3 class="font-semibold text-blue-800 mb-2">📋 Article Information</h3>
 			<div><strong>Title:</strong> {@html cleanTitle((paper as Paper).title)}</div>
 			<p><strong>Status:</strong> <span class="capitalize">{(paper as Paper).status}</span></p>
 			<p><strong>Submitted:</strong> {new Date((paper as Paper).createdAt).toLocaleDateString()}</p>
 		</div>
-		
+
 		<!-- Instructions for making corrections -->
 		<div class="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
 			<h3 class="font-semibold text-green-800 mb-2">🚀 How to Make Corrections</h3>
@@ -504,7 +548,7 @@
 	{#if paper && (paper as Paper)?.peer_review?.reviews?.length}
 		<div class="mb-8 bg-white rounded-lg shadow-md p-6">
 			<h2 class="text-2xl font-semibold text-gray-800 mb-4">🎯 Priority Corrections Summary</h2>
-			
+
 			<!-- Recommendation Overview -->
 			<div class="mb-6">
 				<h3 class="text-lg font-semibold text-gray-700 mb-3">📊 Reviewer Recommendations</h3>
@@ -521,10 +565,14 @@
 			<!-- Areas Needing Most Attention -->
 			{#if getLowestScoringCriteria().length > 0}
 				<div class="mb-6">
-					<h3 class="text-lg font-semibold text-gray-700 mb-3">⚠️ Areas Requiring Most Attention</h3>
+					<h3 class="text-lg font-semibold text-gray-700 mb-3">
+						⚠️ Areas Requiring Most Attention
+					</h3>
 					<div class="space-y-3">
 						{#each getLowestScoringCriteria() as { criterion, average, scores }}
-							<div class="flex justify-between items-center p-3 bg-red-50 border border-red-200 rounded-lg">
+							<div
+								class="flex justify-between items-center p-3 bg-red-50 border border-red-200 rounded-lg"
+							>
 								<div>
 									<span class="font-semibold text-red-800">{criterion}</span>
 									<span class="text-sm text-red-600 ml-2">
@@ -543,12 +591,16 @@
 			<!-- All Critical Comments -->
 			{#if getAllCriticalComments().length > 0}
 				<div class="mb-6">
-					<h3 class="text-lg font-semibold text-gray-700 mb-3">📝 All Critical Comments to Address</h3>
+					<h3 class="text-lg font-semibold text-gray-700 mb-3">
+						📝 All Critical Comments to Address
+					</h3>
 					<div class="space-y-4">
 						{#each getAllCriticalComments() as comment, index}
 							<div class="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
 								<div class="flex items-start gap-3">
-									<span class="flex-shrink-0 w-8 h-8 bg-yellow-500 text-white rounded-full flex items-center justify-center text-sm font-bold">
+									<span
+										class="flex-shrink-0 w-8 h-8 bg-yellow-500 text-white rounded-full flex items-center justify-center text-sm font-bold"
+									>
 										{index + 1}
 									</span>
 									<div class="text-yellow-800 whitespace-pre-wrap flex-1">
@@ -567,20 +619,28 @@
 	{#if paper && (paper as Paper)?.peer_review?.reviews?.length}
 		<div class="mb-8 bg-white rounded-lg shadow-md p-6">
 			<h2 class="text-2xl font-semibold text-gray-800 mb-4">
-				📋 Review Summary ({(paper as Paper).peer_review?.reviews?.length || 0} review{(paper as Paper).peer_review?.reviews?.length !== 1 ? 's' : ''})
+				📋 Review Summary ({(paper as Paper).peer_review?.reviews?.length || 0} review{(
+					paper as Paper
+				).peer_review?.reviews?.length !== 1
+					? 's'
+					: ''})
 			</h2>
-			
+
 			<!-- Overall Status -->
 			<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
 				<div class="bg-blue-50 p-4 rounded-lg">
 					<h3 class="font-semibold text-blue-800">Average Score</h3>
 					<p class="text-2xl font-bold text-blue-600">
-						{(paper as Paper).peer_review?.averageScore ? (paper as Paper).peer_review?.averageScore?.toFixed(1) : 'N/A'}/5.0
+						{(paper as Paper).peer_review?.averageScore
+							? (paper as Paper).peer_review?.averageScore?.toFixed(1)
+							: 'N/A'}/5.0
 					</p>
 				</div>
 				<div class="bg-green-50 p-4 rounded-lg">
 					<h3 class="font-semibold text-green-800">Reviews Completed</h3>
-					<p class="text-2xl font-bold text-green-600">{(paper as Paper).peer_review?.reviewCount || 0}</p>
+					<p class="text-2xl font-bold text-green-600">
+						{(paper as Paper).peer_review?.reviewCount || 0}
+					</p>
 				</div>
 				<div class="bg-purple-50 p-4 rounded-lg">
 					<h3 class="font-semibold text-purple-800">Status</h3>
@@ -598,7 +658,11 @@
 							🔍 Review #{index + 1}
 						</h3>
 						<div class="flex flex-col items-end gap-2">
-							<span class="px-3 py-1 rounded-full text-sm font-medium {getRecommendationClass(review.recommendation)}">
+							<span
+								class="px-3 py-1 rounded-full text-sm font-medium {getRecommendationClass(
+									review.recommendation
+								)}"
+							>
 								{getRecommendationText(review.recommendation)}
 							</span>
 							{#if review.averageScore}
@@ -612,7 +676,8 @@
 					<!-- Reviewer Info -->
 					<div class="mb-4 p-3 bg-white rounded border">
 						<p class="text-sm text-gray-600">
-							<strong>Reviewer:</strong> {getReviewerName(review.reviewerId)}
+							<strong>Reviewer:</strong>
+							{getReviewerName(review.reviewerId)}
 						</p>
 						<!-- Debug info - remove this after fixing
 						<p class="text-xs text-gray-400 mt-1">
@@ -620,7 +685,8 @@
 						</p> -->
 						{#if review.submissionDate}
 							<p class="text-sm text-gray-600">
-								<strong>Submitted:</strong> {new Date(review.submissionDate).toLocaleDateString()}
+								<strong>Submitted:</strong>
+								{new Date(review.submissionDate).toLocaleDateString()}
 							</p>
 						{/if}
 					</div>
@@ -632,13 +698,134 @@
 							<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
 								{#each Object.entries(review.quantitativeEvaluation) as [criterion, score]}
 									<div class="bg-white p-3 rounded border">
-										<div class="text-sm font-medium text-gray-700">{formatCriteriaName(criterion)}</div>
+										<div class="text-sm font-medium text-gray-700">
+											{formatCriteriaName(criterion)}
+										</div>
 										<div class="text-lg font-bold text-blue-600">{score}/5</div>
 										<div class="w-full bg-gray-200 rounded-full h-2 mt-1">
-											<div 
-												class="bg-blue-600 h-2 rounded-full" 
+											<div
+												class="bg-blue-600 h-2 rounded-full"
 												style="width: {((score as number) / 5) * 100}%"
 											></div>
+
+								<!-- Detailed Review Breakdown Section -->
+								{#if paper && (paper as Paper)?.peer_review?.reviews?.length}
+									<div class="mb-8 bg-white rounded-lg shadow-md p-6">
+										<h2 class="text-2xl font-semibold text-gray-800 mb-4">🔎 Detailed Review Breakdown</h2>
+										<div class="space-y-6">
+											{#each (paper as Paper).peer_review?.reviews || [] as review, reviewIndex}
+												<div class="border border-gray-200 rounded-lg p-6 bg-gray-50">
+													<div class="flex justify-between items-start gap-4 mb-4">
+														<div>
+															<h3 class="text-xl font-semibold text-gray-800">Review #{reviewIndex + 1}</h3>
+															<p class="text-sm text-gray-600">
+																Reviewer: <span class="font-medium">{getReviewerName(review.reviewerId)}</span>
+															</p>
+															{#if review.submissionDate}
+																<p class="text-sm text-gray-600">
+																	Submitted: {new Date(review.submissionDate).toLocaleString()}
+																</p>
+															{/if}
+														</div>
+														<div class="text-right">
+															<div class="inline-flex px-3 py-1 rounded-full text-sm font-medium {getRecommendationClass(
+																review.recommendation
+															)}">
+																{getRecommendationText(review.recommendation)}
+															</div>
+															<div class="mt-2 text-lg font-bold text-gray-700">
+																Score: {review.averageScore?.toFixed ? review.averageScore.toFixed(1) : review.averageScore || '0.0'}/5.0
+															</div>
+														</div>
+													</div>
+
+													<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+														<div class="bg-white rounded-lg border border-gray-200 p-4">
+															<h4 class="text-sm font-semibold text-gray-700 mb-3">Quantitative Scores</h4>
+															<div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+																{#each detailedReviewFields as field}
+																	<div class="rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
+																		<div class="text-xs uppercase tracking-wide text-gray-500">{field.label}</div>
+																		<div class="mt-1 font-medium text-gray-800">
+																			{review.quantitativeEvaluation?.[field.key] ?? '—'}/5
+																		</div>
+																	</div>
+																{/each}
+															</div>
+														</div>
+
+														<div class="bg-white rounded-lg border border-gray-200 p-4">
+															<h4 class="text-sm font-semibold text-gray-700 mb-3">Recommendation Details</h4>
+															<div class="space-y-3 text-sm text-gray-700">
+																<div>
+																	<span class="font-medium text-gray-600">Recommendation:</span>
+																	<span class="ml-1">{getRecommendationText(review.recommendation)}</span>
+																</div>
+																<div>
+																	<span class="font-medium text-gray-600">Average score:</span>
+																	<span class="ml-1">{review.averageScore?.toFixed ? review.averageScore.toFixed(1) : review.averageScore || '0.0'}/5.0</span>
+																</div>
+																<div>
+																	<span class="font-medium text-gray-600">Weighted score:</span>
+																	<span class="ml-1">{review.weightedScore?.toFixed ? review.weightedScore.toFixed(1) : review.weightedScore || '0.0'}/5.0</span>
+																</div>
+															</div>
+														</div>
+
+														<div class="bg-white rounded-lg border border-gray-200 p-4 lg:col-span-2">
+															<h4 class="text-sm font-semibold text-gray-700 mb-3">Qualitative Feedback</h4>
+															<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+																<div class="rounded-md bg-green-50 border border-green-200 p-4">
+																	<div class="text-xs font-semibold uppercase tracking-wide text-green-700 mb-2">Strengths</div>
+																	<p class="text-sm whitespace-pre-wrap text-green-900">{review.qualitativeEvaluation?.strengths || '-'}</p>
+																</div>
+																<div class="rounded-md bg-red-50 border border-red-200 p-4">
+																	<div class="text-xs font-semibold uppercase tracking-wide text-red-700 mb-2">Weaknesses / Corrections</div>
+																	<p class="text-sm whitespace-pre-wrap text-red-900">{review.qualitativeEvaluation?.weaknesses || '-'}</p>
+																</div>
+															</div>
+														</div>
+
+														<div class="bg-white rounded-lg border border-gray-200 p-4">
+															<h4 class="text-sm font-semibold text-gray-700 mb-3">Ethics Review</h4>
+															<div class="space-y-2 text-sm text-gray-700">
+																{#if review.ethics}
+																	<div>
+																		<span class="font-medium text-gray-600">Human research:</span>
+																		<span class="ml-1">{getEthicsText(review.ethics.involvesHumanResearch)}</span>
+																	</div>
+																	<div>
+																		<span class="font-medium text-gray-600">Ethics approval:</span>
+																		<span class="ml-1">{getEthicsText(review.ethics.ethicsApproval ?? '')}</span>
+																	</div>
+																{:else}
+																	<div class="text-gray-500">No ethics fields provided.</div>
+																{/if}
+															</div>
+														</div>
+
+														{#if review.reviewAttachment}
+															<div class="bg-white rounded-lg border border-gray-200 p-4 lg:col-span-2">
+																<h4 class="text-sm font-semibold text-gray-700 mb-3">Attached Review File</h4>
+																<a
+																	class="inline-flex font-medium text-blue-700 underline hover:text-blue-900"
+																	href={getReviewAttachmentUrl(review.reviewAttachment)}
+																	target="_blank"
+																	rel="noreferrer"
+																>
+																	{review.reviewAttachment.filename}
+																	{#if review.reviewAttachment.fileSize}
+																		({formatFileSize(review.reviewAttachment.fileSize)})
+																	{/if}
+																</a>
+															</div>
+														{/if}
+													</div>
+												</div>
+											{/each}
+										</div>
+									</div>
+								{/if}
 										</div>
 									</div>
 								{/each}
@@ -649,8 +836,10 @@
 					<!-- Qualitative Evaluation -->
 					{#if review.qualitativeEvaluation}
 						<div class="mb-6">
-							<h4 class="text-lg font-semibold text-gray-700 mb-3">💭 Detailed Reviewer Feedback</h4>
-							
+							<h4 class="text-lg font-semibold text-gray-700 mb-3">
+								💭 Detailed Reviewer Feedback
+							</h4>
+
 							{#if review.qualitativeEvaluation.strengths}
 								<div class="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
 									<h5 class="font-semibold text-green-800 mb-2 flex items-center gap-2">
@@ -683,6 +872,25 @@
 						</div>
 					{/if}
 
+					{#if review.reviewAttachment}
+						<div class="mb-6">
+							<h4 class="text-lg font-semibold text-gray-700 mb-3">Attached Review File</h4>
+							<div class="rounded-lg border border-blue-200 bg-blue-50 p-4">
+								<a
+									class="font-medium text-blue-700 underline hover:text-blue-900"
+									href={getReviewAttachmentUrl(review.reviewAttachment)}
+									target="_blank"
+									rel="noreferrer"
+								>
+									{review.reviewAttachment.filename}
+									{#if review.reviewAttachment.fileSize}
+										({formatFileSize(review.reviewAttachment.fileSize)})
+									{/if}
+								</a>
+							</div>
+						</div>
+					{/if}
+
 					<!-- Ethics Review -->
 					{#if review.ethics}
 						<div class="mb-6">
@@ -690,13 +898,13 @@
 							<div class="bg-white p-4 rounded border">
 								{#if review.ethics.involvesHumanResearch}
 									<p class="mb-2">
-										<strong>Involves Human Research:</strong> 
+										<strong>Involves Human Research:</strong>
 										<span class="capitalize">{review.ethics.involvesHumanResearch}</span>
 									</p>
 								{/if}
 								{#if review.ethics.ethicsApproval}
 									<p>
-										<strong>Ethics Approval:</strong> 
+										<strong>Ethics Approval:</strong>
 										<span class="capitalize">{review.ethics.ethicsApproval.replace('_', ' ')}</span>
 									</p>
 								{/if}
@@ -722,8 +930,8 @@
 		<div class="mb-8 bg-yellow-50 border border-yellow-200 rounded-lg p-6">
 			<h2 class="text-xl font-semibold text-yellow-800 mb-2">⚠️ No Reviews Available</h2>
 			<p class="text-yellow-700">
-				No peer review data is currently available for this article. 
-				Please contact the editorial team if you believe this is an error.
+				No peer review data is currently available for this article. Please contact the editorial
+				team if you believe this is an error.
 			</p>
 		</div>
 	{/if}
@@ -737,8 +945,8 @@
 					Progress: {getCompletionPercentage()}% complete
 				</div>
 				<div class="w-32 bg-gray-200 rounded-full h-2">
-					<div 
-						class="bg-green-600 h-2 rounded-full transition-all duration-300" 
+					<div
+						class="bg-green-600 h-2 rounded-full transition-all duration-300"
 						style="width: {getCompletionPercentage()}%"
 					></div>
 				</div>
@@ -746,8 +954,19 @@
 				{#if isSaving}
 					<div class="flex items-center gap-1 text-sm text-blue-600">
 						<svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-							<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-							<path class="opacity-75" fill="currentColor" d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+							<circle
+								class="opacity-25"
+								cx="12"
+								cy="12"
+								r="10"
+								stroke="currentColor"
+								stroke-width="4"
+							></circle>
+							<path
+								class="opacity-75"
+								fill="currentColor"
+								d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+							></path>
 						</svg>
 						Saving...
 					</div>
@@ -758,20 +977,20 @@
 				{/if}
 			</div>
 		</div>
-		
+
 		{#if paper && (paper as Paper)?.peer_review?.reviews?.length}
 			<div class="space-y-6">
 				{#each (paper as Paper).peer_review?.reviews || [] as review, reviewIndex}
 					<div class="border border-gray-200 rounded-lg p-4">
 						<h3 class="font-semibold text-gray-800 mb-3">Review #{reviewIndex + 1} Corrections</h3>
-						
+
 						<!-- Low-scoring criteria to address -->
 						{#if review.quantitativeEvaluation}
 							{#each Object.entries(review.quantitativeEvaluation) as [criterion, score]}
 								{#if (score as number) < 3.5}
 									<div class="flex items-center gap-3 p-2 mb-2 bg-orange-50 rounded">
-										<input 
-											type="checkbox" 
+										<input
+											type="checkbox"
 											id="criterion-{reviewIndex}-{criterion}"
 											bind:checked={correctionProgress[`${reviewIndex}-criterion-${criterion}`]}
 											class="w-4 h-4 text-blue-600"
@@ -788,8 +1007,8 @@
 						<!-- Critical comments to address -->
 						{#if review.qualitativeEvaluation?.weaknesses}
 							<div class="flex items-start gap-3 p-2 mb-2 bg-red-50 rounded">
-								<input 
-									type="checkbox" 
+								<input
+									type="checkbox"
 									id="weakness-{reviewIndex}"
 									bind:checked={correctionProgress[`${reviewIndex}-weaknesses-main`]}
 									class="w-4 h-4 text-blue-600 mt-1"
@@ -811,8 +1030,12 @@
 	</div>
 
 	<!-- Helpful Tips Section -->
-	<div class="mb-8 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg shadow-md p-6 border border-blue-200">
-		<h2 class="text-2xl font-semibold text-blue-800 mb-4">💡 Tips for Making Effective Corrections</h2>
+	<div
+		class="mb-8 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg shadow-md p-6 border border-blue-200"
+	>
+		<h2 class="text-2xl font-semibold text-blue-800 mb-4">
+			💡 Tips for Making Effective Corrections
+		</h2>
 		<div class="grid md:grid-cols-2 gap-6">
 			<div>
 				<h3 class="font-semibold text-blue-700 mb-3">📝 General Guidelines</h3>
@@ -876,21 +1099,21 @@
 				<div class="flex flex-col items-end gap-2">
 					<div class="flex gap-2">
 						{#if isEditMode}
-							<button 
+							<button
 								class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
-								onclick={() => isEditMode = false}
+								onclick={() => (isEditMode = false)}
 							>
 								❌ Cancel Edit
 							</button>
 						{:else}
-							<button 
+							<button
 								class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
 								onclick={toggleEditMode}
 							>
 								✏️ Edit Article
 							</button>
 						{/if}
-						<button 
+						<button
 							class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
 							onclick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
 						>
@@ -903,15 +1126,16 @@
 				</div>
 			</div>
 		</div>
-		
+
 		<div class="p-6">
 			{#if isEditMode}
 				<!-- Modo de edição com PaperPublishPage -->
 				<div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
 					<h3 class="font-semibold text-yellow-800 mb-2">✏️ Edit Mode Active</h3>
 					<p class="text-yellow-700 text-sm">
-						You are now editing your article. Make the necessary changes based on reviewer feedback above, 
-						then save your changes. The article will remain in corrections status until you're ready to resubmit.
+						You are now editing your article. Make the necessary changes based on reviewer feedback
+						above, then save your changes. The article will remain in corrections status until
+						you're ready to resubmit.
 					</p>
 				</div>
 				<PaperPublishPage
@@ -922,11 +1146,7 @@
 				/>
 			{:else}
 				<!-- Modo de visualização com PaperReviewPage -->
-				<PaperReviewPage
-					paper={paper as Paper}
-					currentUser={currentUser as User}
-					{messageFeed}
-				/>
+				<PaperReviewPage paper={paper as Paper} currentUser={currentUser as User} {messageFeed} />
 			{/if}
 		</div>
 	</div>

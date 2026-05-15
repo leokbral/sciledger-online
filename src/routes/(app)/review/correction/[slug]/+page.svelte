@@ -12,7 +12,7 @@
 	let { data }: Props = $props();
 
 	let paper = data.paper as Paper;
-	let currentUser = $page.data.user as User;
+	let currentUser = data.user as User;
 	let isHubOwner = (data as any).isHubOwner as boolean;
 </script>
 
@@ -22,5 +22,6 @@
 		{currentUser}
 		messageFeed={null}
 		isHubAdmin={isHubOwner}
+		canViewSubmittedReviews={(data as any).canViewSubmittedReviews === true}
 	/>
 {/if}

@@ -10,6 +10,11 @@ import {
 	getReviewerPayoutAmountCents,
 	getStripeClient
 } from '$lib/services/stripeConnect';
+import {
+	isReviewAttachmentFile,
+	saveReviewAttachmentFile,
+	validateReviewAttachmentFile
+} from '$lib/server/reviewAttachment';
 import * as crypto from 'crypto';
 import { start_mongo } from '$lib/db/mongooseConnection';
 
@@ -21,7 +26,7 @@ import { start_mongo } from '$lib/db/mongooseConnection';
 async function checkAndUpdatePaperStatusIfAllReviewsComplete(paperId: string, reviewRound: number) {
 	try {
 		const ReviewAssignment = (await import('$lib/db/models/ReviewAssignment')).default;
-		
+
 		// Buscar todos os ReviewAssignments para este paper.
 		// Importante: manter 'completed' aqui para que a 2ª rodada funcione mesmo que
 		// o assignment já tenha sido marcado como completed na 1ª rodada.
@@ -194,18 +199,123 @@ async function tryProcessReviewerPayout(
 	}
 }
 
+function getStringFormValue(formData: FormData, key: string): string {
+	const value = formData.get(key);
+	return typeof value === 'string' ? value : '';
+}
+
+function normalizeReviewForm(form: any) {
+	const corrections = String(form?.corrections ?? form?.weaknesses ?? '').trim();
+
+	return {
+		...form,
+		corrections,
+		weaknesses: corrections
+	};
+}
+
+function validateSubmittedReviewForm(form: any): string | null {
+	const scoreFields = [
+		'originality',
+		'clarity',
+		'literatureReview',
+		'theoreticalFoundation',
+		'methodology',
+		'reproducibility',
+		'results',
+		'figures',
+		'limitations',
+		'language',
+		'impact'
+	];
+
+	for (const field of scoreFields) {
+		const value = Number(form?.[field] ?? 0);
+		if (!Number.isFinite(value) || value < 1 || value > 5) {
+			return 'Please complete all quantitative scores before submitting the review.';
+		}
+	}
+
+	if (!String(form?.strengths ?? '').trim()) {
+		return 'Please describe the article strengths before submitting the review.';
+	}
+
+	if (!String(form?.weaknesses ?? form?.corrections ?? '').trim()) {
+		return 'Please describe the corrections and suggestions before submitting the review.';
+	}
+
+	if (!['yes', 'no'].includes(String(form?.involvesHumanResearch ?? ''))) {
+		return 'Please complete the ethics section before submitting the review.';
+	}
+
+	if (
+		form.involvesHumanResearch === 'yes' &&
+		!['adequate', 'justified', 'absent'].includes(String(form?.ethicsApproval ?? ''))
+	) {
+		return 'Please select the ethics approval option before submitting the review.';
+	}
+
+	if (
+		!['accept_without_changes', 'accept_with_minor_revisions', 'major_revision', 'reject'].includes(
+			String(form?.recommendation ?? '')
+		)
+	) {
+		return 'Please select a final recommendation before submitting the review.';
+	}
+
+	return null;
+}
+
+async function parseReviewSubmission(request: Request) {
+	const contentType = request.headers.get('content-type') || '';
+
+	if (contentType.includes('multipart/form-data')) {
+		const formData = await request.formData();
+		const rawForm = getStringFormValue(formData, 'form');
+		let parsedForm: any = {};
+
+		if (rawForm) {
+			try {
+				parsedForm = JSON.parse(rawForm);
+			} catch {
+				throw new Error('Invalid review form payload');
+			}
+		}
+
+		const uploadedFile =
+			formData.get('reviewAttachment') ?? formData.get('attachment') ?? formData.get('file');
+
+		return {
+			paperId: getStringFormValue(formData, 'paperId'),
+			reviewerId: getStringFormValue(formData, 'reviewerId'),
+			paperTitle: getStringFormValue(formData, 'paperTitle'),
+			reviewRound: Number(getStringFormValue(formData, 'reviewRound') || 0) || undefined,
+			form: normalizeReviewForm(parsedForm),
+			reviewAttachment:
+				isReviewAttachmentFile(uploadedFile) && uploadedFile.size > 0 ? uploadedFile : null
+		};
+	}
+
+	const reviewData = await request.json();
+	return {
+		...reviewData,
+		form: normalizeReviewForm(reviewData?.form ?? {}),
+		reviewAttachment: null
+	};
+}
+
 export const GET: RequestHandler = async ({ url }) => {
 	try {
 		await start_mongo();
-		
+
 		const paperId = url.searchParams.get('paperId');
 		const reviewerId = url.searchParams.get('reviewerId');
 		const reviewRound = url.searchParams.get('reviewRound');
-		
+
 		if (!paperId || !reviewerId || !reviewRound) {
 			return json({ error: 'Missing required parameters' }, { status: 400 });
 		}
-		
+
 		// Buscar revisão enviada nesta rodada
 		const review = await Reviews.findOne({
 			paperId,
@@ -213,7 +323,7 @@ export const GET: RequestHandler = async ({ url }) => {
 			reviewRound: parseInt(reviewRound),
 			status: 'submitted'
 		});
-		
+
 		if (review) {
 			return json({
 				hasSubmitted: true,
@@ -232,16 +342,18 @@ export const GET: RequestHandler = async ({ url }) => {
 						impact: review.quantitativeEvaluation.impact,
 						strengths: review.qualitativeEvaluation.strengths,
 						weaknesses: review.qualitativeEvaluation.weaknesses,
+						corrections: review.qualitativeEvaluation.weaknesses,
 						involvesHumanResearch: review.ethics.involvesHumanResearch,
 						ethicsApproval: review.ethics.ethicsApproval,
 						recommendation: review.recommendation
 					},
 					submissionDate: review.submissionDate,
-					weightedScore: review.weightedScore
+					weightedScore: review.weightedScore,
+					reviewAttachment: review.reviewAttachment ?? null
 				}
 			});
 		}
-		
+
 		return json({ hasSubmitted: false });
 	} catch (error) {
 		console.error('Error checking review:', error);
@@ -253,12 +365,24 @@ export const POST: RequestHandler = async ({ request }) => {
 	try {
 		await start_mongo();
 
-		const reviewData = await request.json();
-		const { paperId, reviewerId, paperTitle, form, reviewRound } = reviewData;
+		const reviewData = await parseReviewSubmission(request);
+		const { paperId, reviewerId, paperTitle, form, reviewRound, reviewAttachment } = reviewData;
 
 		// Validar dados obrigatórios
 		if (!paperId || !reviewerId || !paperTitle || !form) {
 			return json({ error: 'Missing required fields' }, { status: 400 });
+		}
+
+		const formValidationError = validateSubmittedReviewForm(form);
+		if (formValidationError) {
+			return json({ error: formValidationError }, { status: 400 });
+		}
+
+		if (reviewAttachment) {
+			const attachmentValidationError = validateReviewAttachmentFile(reviewAttachment);
+			if (attachmentValidationError) {
+				return json({ error: attachmentValidationError }, { status: 400 });
+			}
 		}
 
 		// Verificar se o paper existe
@@ -279,7 +403,10 @@ export const POST: RequestHandler = async ({ request }) => {
 		});
 
 		if (existingReview) {
-			return json({ error: `You have already submitted a review for this round (Round ${actualRound})` }, { status: 400 });
+			return json(
+				{ error: `You have already submitted a review for this round (Round ${actualRound})` },
+				{ status: 400 }
+			);
 		}
 
 		// Calcular weighted score
@@ -294,7 +421,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			figures: 0.05,
 			limitations: 0.05,
 			language: 0.05,
-			impact: 0.10
+			impact: 0.1
 		};
 
 		let weightedScore = 0;
@@ -313,6 +440,15 @@ export const POST: RequestHandler = async ({ request }) => {
 
 		// Criar nova revisão
 		const reviewId = crypto.randomUUID();
+		const savedReviewAttachment = reviewAttachment
+			? await saveReviewAttachmentFile(reviewAttachment, {
+					paperId,
+					reviewerId,
+					reviewId,
+					reviewRound: actualRound
+				})
+			: null;
+
 		const review = new Reviews({
 			_id: reviewId,
 			id: reviewId,
@@ -335,8 +471,9 @@ export const POST: RequestHandler = async ({ request }) => {
 			},
 			qualitativeEvaluation: {
 				strengths: form.strengths || '',
-				weaknesses: form.weaknesses || ''
+				weaknesses: form.weaknesses || form.corrections || ''
 			},
+			reviewAttachment: savedReviewAttachment,
 			ethics: {
 				involvesHumanResearch: form.involvesHumanResearch || '',
 				ethicsApproval: form.ethicsApproval || ''
@@ -404,8 +541,10 @@ export const POST: RequestHandler = async ({ request }) => {
 		// Buscar informações para as notificações
 		const reviewer = await Users.findOne({ id: reviewerId });
 		const reviewerName = reviewer ? `${reviewer.firstName} ${reviewer.lastName}` : 'Revisor';
-		const authorId = typeof paper.mainAuthor === 'string' ? paper.mainAuthor : String(paper.mainAuthor);
-		const submittedById = typeof paper.submittedBy === 'string' ? paper.submittedBy : String(paper.submittedBy);
+		const authorId =
+			typeof paper.mainAuthor === 'string' ? paper.mainAuthor : String(paper.mainAuthor);
+		const submittedById =
+			typeof paper.submittedBy === 'string' ? paper.submittedBy : String(paper.submittedBy);
 
 		// Criar notificações para quando revisor finaliza a revisão
 		try {
@@ -417,7 +556,11 @@ export const POST: RequestHandler = async ({ request }) => {
 				reviewerName: reviewerName,
 				authorId: authorId,
 				editorId: submittedById, // usando submittedBy como fallback para editor
-				reviewDecision: form.recommendation as 'accept' | 'reject' | 'minor_revision' | 'major_revision',
+				reviewDecision: form.recommendation as
+					| 'accept'
+					| 'reject'
+					| 'minor_revision'
+					| 'major_revision',
 				hubId: typeof paper.hubId === 'string' ? paper.hubId : undefined
 			});
 		} catch (notificationError) {
@@ -432,6 +575,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			{
 				success: true,
 				reviewId,
+				reviewAttachment: savedReviewAttachment,
 				message: 'Review submitted successfully'
 			},
 			{ status: 201 }
