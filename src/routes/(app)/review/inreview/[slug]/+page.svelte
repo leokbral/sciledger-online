@@ -97,4 +97,6 @@
 	{messageFeed}
 	{reviewAssignments}
 	isHubAdmin={isHubOwner}
+	canSubmitReview={(data as any).canSubmitReview === true}
+	canViewSubmittedReviews={(data as any).canViewSubmittedReviews === true}
 />

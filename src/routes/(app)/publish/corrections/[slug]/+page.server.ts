@@ -2,6 +2,7 @@ import MessageFeeds from '$lib/db/models/MessageFeed.js';
 import Papers from '$lib/db/models/Paper';
 import Users from '$lib/db/models/User';
 import { error, redirect } from '@sveltejs/kit';
+import { isValidObjectId } from 'mongoose';
 
 // Type for MongoDB ObjectId
 interface ObjectId {
@@ -84,7 +85,7 @@ export async function load({ locals, params }) {
 	const id = params.slug;
 
 	// Buscar o Paper baseado no ID
-	const paperDoc = await Papers.findOne({ id }, {})
+	let paperDoc = await Papers.findOne({ id }, {})
 		.populate("authors")
 		.populate("mainAuthor")
 		.populate("coAuthors")
@@ -99,6 +100,23 @@ export async function load({ locals, params }) {
 		.lean()
 		.exec();
 
+	if (!paperDoc && isValidObjectId(id)) {
+		paperDoc = await Papers.findOne({ _id: id }, {})
+			.populate("authors")
+			.populate("mainAuthor")
+			.populate("coAuthors")
+			.populate("hubId")
+			.populate({
+				path: 'peer_review.reviews',
+				populate: {
+					path: 'reviewerId',
+					model: 'User'
+				}
+			})
+			.lean()
+			.exec();
+	}
+
 	if (!paperDoc) {
 		throw error(404, 'Paper not found');
 	}
@@ -111,17 +129,12 @@ export async function load({ locals, params }) {
 	});
 
 	const hubData = typeof paperDoc.hubId === 'object' ? paperDoc.hubId : null;
-	const isHubReviewer =
-		Array.isArray(hubData?.reviewers) &&
-		hubData.reviewers.some((reviewer: any) =>
-			matchesCurrentUser(reviewer, locals.user as Record<string, unknown>)
-		);
 	const isHubOwner = matchesCurrentUser(
 		hubData?.createdBy,
 		locals.user as Record<string, unknown>
 	);
 
-	if (isReviewerAccepted || isHubReviewer || isHubOwner) {
+	if (isReviewerAccepted || isHubOwner) {
 		throw redirect(302, `/review/correction/${id}`);
 	}
 

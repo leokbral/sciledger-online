@@ -56,6 +56,16 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		.populate("mainAuthor")
 		.populate("coAuthors")
 		.populate({
+			path: 'peer_review.reviews',
+			model: 'Review',
+			options: { sort: { submissionDate: -1 } },
+			populate: {
+				path: 'reviewerId',
+				model: 'User',
+				select: 'firstName lastName username email roles isAdmin'
+			}
+		})
+		.populate({
 			path: 'hubId',
 			match: { isLinkedToHub: true }
 		})
@@ -131,7 +141,9 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 	// ✅ Retornar versão sanitizada
 	return {
 		paper: sanitize(paperDoc),
-		users: sanitize(usersDoc)
+		users: sanitize(usersDoc),
+		user: sanitize(locals.user),
+		canViewCorrections: isHubOwner || isHubVice
 	};
 }
 

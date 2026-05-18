@@ -162,6 +162,7 @@
 	let requestPublicationError = $state('');
 	let isWithdrawingPublication = $state(false);
 	let withdrawPublicationError = $state('');
+	let showPublicationConfirm = $state(false);
 
 	// Debounce function to avoid too many API calls
 	let saveTimeout: NodeJS.Timeout | null = null;
@@ -229,6 +230,14 @@
 		} finally {
 			isRequestingPublication = false;
 		}
+	}
+
+	function openPublicationConfirm() {
+		showPublicationConfirm = true;
+	}
+
+	function closePublicationConfirm() {
+		showPublicationConfirm = false;
 	}
 
 	async function withdrawFromPublication() {
@@ -456,8 +465,8 @@
 	</div> -->
 
 	<div class="mb-6">
-		<h1 class="text-3xl font-bold text-gray-900 mb-2">Article Corrections Required</h1>
-		<p class="text-gray-600">
+		<h1 class="text-3xl font-bold text-gray-900 mb-2 dark:text-slate-100">Article Corrections Required</h1>
+		<p class="text-gray-600 dark:text-slate-300">
 			Review the feedback from peer reviewers and make the necessary corrections to your article.
 		</p>
 
@@ -466,17 +475,17 @@
 			<CorrectionProgressBar {paper} {currentUser} showDetails={true} size="lg" />
 		</div>
 
-		<div class="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-			<h3 class="font-semibold text-blue-800 mb-2">📋 Article Information</h3>
-			<div><strong>Title:</strong> {@html cleanTitle((paper as Paper).title)}</div>
-			<p><strong>Status:</strong> <span class="capitalize">{(paper as Paper).status}</span></p>
-			<p><strong>Submitted:</strong> {new Date((paper as Paper).createdAt).toLocaleDateString()}</p>
+		<div class="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg dark:bg-slate-900/70 dark:border-slate-700">
+			<h3 class="font-semibold text-blue-800 mb-2 dark:text-slate-100">Article Information</h3>
+			<div class="text-slate-900 dark:text-slate-200"><strong>Title:</strong> {@html cleanTitle((paper as Paper).title)}</div>
+			<p class="text-slate-900 dark:text-slate-200"><strong>Status:</strong> <span class="capitalize">{(paper as Paper).status}</span></p>
+			<p class="text-slate-900 dark:text-slate-200"><strong>Submitted:</strong> {new Date((paper as Paper).createdAt).toLocaleDateString()}</p>
 		</div>
 
 		<!-- Instructions for making corrections -->
-		<div class="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-			<h3 class="font-semibold text-green-800 mb-2">🚀 How to Make Corrections</h3>
-			<ol class="text-green-700 text-sm space-y-1 list-decimal list-inside">
+		<div class="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-700 dark:bg-slate-900/60">
+			<h3 class="text-base font-semibold text-slate-900 mb-2 dark:text-slate-100">How to Make Corrections</h3>
+			<ol class="text-sm text-slate-700 space-y-1 list-decimal list-inside dark:text-slate-300">
 				<li>Review the feedback and recommendations from reviewers below</li>
 				<li>Click the "✏️ Edit Article" button in the article section to enter edit mode</li>
 				<li>Make the necessary changes to address reviewer concerns</li>
@@ -496,7 +505,7 @@
 						<button
 							class="btn preset-filled-primary-500"
 							disabled={isRequestingPublication}
-							onclick={submitForPublication}
+							onclick={openPublicationConfirm}
 						>
 							{#if isRequestingPublication}
 								Submitting...
@@ -544,14 +553,74 @@
 		</div>
 	</div>
 
+	{#if showPublicationConfirm}
+		<div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+			<button
+				class="absolute inset-0 bg-black/50"
+				onclick={closePublicationConfirm}
+				aria-label="Close confirmation"
+			></button>
+			<div
+				class="relative z-10 w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl"
+				role="dialog"
+				aria-modal="true"
+			>
+				<div class="flex items-start justify-between gap-4">
+					<div>
+						<h3 class="text-xl font-semibold text-gray-900">Confirm submission</h3>
+						<p class="mt-1 text-sm text-gray-600">
+							You are about to submit this paper for publication. Editing will be locked after
+							submission.
+						</p>
+					</div>
+					<button
+						class="btn-icon btn-icon-sm"
+						onclick={closePublicationConfirm}
+						aria-label="Close"
+					>
+						✕
+					</button>
+				</div>
+
+				<div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+					<ul class="list-disc list-inside space-y-1">
+						<li>Make sure all reviewer comments are addressed.</li>
+						<li>Confirm the final version is ready to publish.</li>
+						<li>This action cannot be undone.</li>
+					</ul>
+				</div>
+
+				<div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+					<button class="btn preset-tonal dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700" onclick={closePublicationConfirm}>
+						Cancel
+					</button>
+					<button
+						class="btn preset-filled-primary-500"
+						onclick={() => {
+							closePublicationConfirm();
+							submitForPublication();
+						}}
+						disabled={isRequestingPublication}
+					>
+						{#if isRequestingPublication}
+							Submitting...
+						{:else}
+							Confirm and submit
+						{/if}
+					</button>
+				</div>
+			</div>
+		</div>
+	{/if}
+
 	<!-- Critical Summary Section -->
 	{#if paper && (paper as Paper)?.peer_review?.reviews?.length}
-		<div class="mb-8 bg-white rounded-lg shadow-md p-6">
-			<h2 class="text-2xl font-semibold text-gray-800 mb-4">🎯 Priority Corrections Summary</h2>
+		<div class="mb-8 bg-white rounded-lg shadow-md p-6 dark:bg-slate-900 dark:border dark:border-slate-800">
+			<h2 class="text-2xl font-semibold text-gray-900 mb-4 dark:text-slate-100">Priority Corrections Summary</h2>
 
 			<!-- Recommendation Overview -->
 			<div class="mb-6">
-				<h3 class="text-lg font-semibold text-gray-700 mb-3">📊 Reviewer Recommendations</h3>
+				<h3 class="text-lg font-semibold text-gray-800 mb-3 dark:text-slate-200">Reviewer Recommendations</h3>
 				<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
 					{#each Object.entries(getRecommendationSummary()) as [recommendation, count]}
 						<div class="p-3 rounded-lg border {getRecommendationClass(recommendation)}">
@@ -565,8 +634,8 @@
 			<!-- Areas Needing Most Attention -->
 			{#if getLowestScoringCriteria().length > 0}
 				<div class="mb-6">
-					<h3 class="text-lg font-semibold text-gray-700 mb-3">
-						⚠️ Areas Requiring Most Attention
+					<h3 class="text-lg font-semibold text-gray-800 mb-3 dark:text-slate-200">
+						Areas Requiring Most Attention
 					</h3>
 					<div class="space-y-3">
 						{#each getLowestScoringCriteria() as { criterion, average, scores }}
@@ -591,8 +660,8 @@
 			<!-- All Critical Comments -->
 			{#if getAllCriticalComments().length > 0}
 				<div class="mb-6">
-					<h3 class="text-lg font-semibold text-gray-700 mb-3">
-						📝 All Critical Comments to Address
+					<h3 class="text-lg font-semibold text-gray-800 mb-3 dark:text-slate-200">
+						All Critical Comments to Address
 					</h3>
 					<div class="space-y-4">
 						{#each getAllCriticalComments() as comment, index}
@@ -617,9 +686,9 @@
 
 	<!-- Review Summary Section -->
 	{#if paper && (paper as Paper)?.peer_review?.reviews?.length}
-		<div class="mb-8 bg-white rounded-lg shadow-md p-6">
-			<h2 class="text-2xl font-semibold text-gray-800 mb-4">
-				📋 Review Summary ({(paper as Paper).peer_review?.reviews?.length || 0} review{(
+		<div class="mb-8 bg-white rounded-lg shadow-md p-6 dark:bg-slate-900 dark:border dark:border-slate-800">
+			<h2 class="text-2xl font-semibold text-gray-900 mb-4 dark:text-slate-100">
+					Review Summary ({(paper as Paper).peer_review?.reviews?.length || 0} review{(
 					paper as Paper
 				).peer_review?.reviews?.length !== 1
 					? 's'
@@ -652,10 +721,10 @@
 
 			<!-- Individual Reviews -->
 			{#each (paper as Paper).peer_review?.reviews || [] as review, index}
-				<div class="border border-gray-200 rounded-lg p-6 mb-6 bg-gray-50">
+				<div class="border border-gray-200 rounded-lg p-6 mb-6 bg-gray-50 dark:border-slate-700 dark:bg-slate-800/70">
 					<div class="flex justify-between items-start mb-4">
-						<h3 class="text-xl font-semibold text-gray-800">
-							🔍 Review #{index + 1}
+						<h3 class="text-xl font-semibold text-gray-800 dark:text-slate-100">
+							Review #{index + 1}
 						</h3>
 						<div class="flex flex-col items-end gap-2">
 							<span
@@ -674,8 +743,8 @@
 					</div>
 
 					<!-- Reviewer Info -->
-					<div class="mb-4 p-3 bg-white rounded border">
-						<p class="text-sm text-gray-600">
+					<div class="mb-4 p-3 bg-white rounded border dark:bg-slate-900 dark:border-slate-700">
+						<p class="text-sm text-gray-600 dark:text-slate-300">
 							<strong>Reviewer:</strong>
 							{getReviewerName(review.reviewerId)}
 						</p>
@@ -684,7 +753,7 @@
 							<strong>Debug - Reviewer ID:</strong> {JSON.stringify(review.reviewerId)}
 						</p> -->
 						{#if review.submissionDate}
-							<p class="text-sm text-gray-600">
+							<p class="text-sm text-gray-600 dark:text-slate-300">
 								<strong>Submitted:</strong>
 								{new Date(review.submissionDate).toLocaleDateString()}
 							</p>
@@ -694,138 +763,19 @@
 					<!-- Quantitative Scores -->
 					{#if review.quantitativeEvaluation}
 						<div class="mb-6">
-							<h4 class="text-lg font-semibold text-gray-700 mb-3">📊 Quantitative Evaluation</h4>
+							<h4 class="text-lg font-semibold text-gray-800 mb-3 dark:text-slate-200">Quantitative Evaluation</h4>
 							<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
 								{#each Object.entries(review.quantitativeEvaluation) as [criterion, score]}
-									<div class="bg-white p-3 rounded border">
-										<div class="text-sm font-medium text-gray-700">
+									<div class="bg-white p-3 rounded border dark:bg-slate-900 dark:border-slate-700">
+										<div class="text-sm font-medium text-gray-700 dark:text-slate-300">
 											{formatCriteriaName(criterion)}
 										</div>
-										<div class="text-lg font-bold text-blue-600">{score}/5</div>
-										<div class="w-full bg-gray-200 rounded-full h-2 mt-1">
+										<div class="text-lg font-bold text-blue-600 dark:text-blue-400">{score}/5</div>
+										<div class="w-full bg-gray-200 rounded-full h-2 mt-1 dark:bg-slate-700">
 											<div
 												class="bg-blue-600 h-2 rounded-full"
 												style="width: {((score as number) / 5) * 100}%"
 											></div>
-
-								<!-- Detailed Review Breakdown Section -->
-								{#if paper && (paper as Paper)?.peer_review?.reviews?.length}
-									<div class="mb-8 bg-white rounded-lg shadow-md p-6">
-										<h2 class="text-2xl font-semibold text-gray-800 mb-4">🔎 Detailed Review Breakdown</h2>
-										<div class="space-y-6">
-											{#each (paper as Paper).peer_review?.reviews || [] as review, reviewIndex}
-												<div class="border border-gray-200 rounded-lg p-6 bg-gray-50">
-													<div class="flex justify-between items-start gap-4 mb-4">
-														<div>
-															<h3 class="text-xl font-semibold text-gray-800">Review #{reviewIndex + 1}</h3>
-															<p class="text-sm text-gray-600">
-																Reviewer: <span class="font-medium">{getReviewerName(review.reviewerId)}</span>
-															</p>
-															{#if review.submissionDate}
-																<p class="text-sm text-gray-600">
-																	Submitted: {new Date(review.submissionDate).toLocaleString()}
-																</p>
-															{/if}
-														</div>
-														<div class="text-right">
-															<div class="inline-flex px-3 py-1 rounded-full text-sm font-medium {getRecommendationClass(
-																review.recommendation
-															)}">
-																{getRecommendationText(review.recommendation)}
-															</div>
-															<div class="mt-2 text-lg font-bold text-gray-700">
-																Score: {review.averageScore?.toFixed ? review.averageScore.toFixed(1) : review.averageScore || '0.0'}/5.0
-															</div>
-														</div>
-													</div>
-
-													<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-														<div class="bg-white rounded-lg border border-gray-200 p-4">
-															<h4 class="text-sm font-semibold text-gray-700 mb-3">Quantitative Scores</h4>
-															<div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
-																{#each detailedReviewFields as field}
-																	<div class="rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
-																		<div class="text-xs uppercase tracking-wide text-gray-500">{field.label}</div>
-																		<div class="mt-1 font-medium text-gray-800">
-																			{review.quantitativeEvaluation?.[field.key] ?? '—'}/5
-																		</div>
-																	</div>
-																{/each}
-															</div>
-														</div>
-
-														<div class="bg-white rounded-lg border border-gray-200 p-4">
-															<h4 class="text-sm font-semibold text-gray-700 mb-3">Recommendation Details</h4>
-															<div class="space-y-3 text-sm text-gray-700">
-																<div>
-																	<span class="font-medium text-gray-600">Recommendation:</span>
-																	<span class="ml-1">{getRecommendationText(review.recommendation)}</span>
-																</div>
-																<div>
-																	<span class="font-medium text-gray-600">Average score:</span>
-																	<span class="ml-1">{review.averageScore?.toFixed ? review.averageScore.toFixed(1) : review.averageScore || '0.0'}/5.0</span>
-																</div>
-																<div>
-																	<span class="font-medium text-gray-600">Weighted score:</span>
-																	<span class="ml-1">{review.weightedScore?.toFixed ? review.weightedScore.toFixed(1) : review.weightedScore || '0.0'}/5.0</span>
-																</div>
-															</div>
-														</div>
-
-														<div class="bg-white rounded-lg border border-gray-200 p-4 lg:col-span-2">
-															<h4 class="text-sm font-semibold text-gray-700 mb-3">Qualitative Feedback</h4>
-															<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-																<div class="rounded-md bg-green-50 border border-green-200 p-4">
-																	<div class="text-xs font-semibold uppercase tracking-wide text-green-700 mb-2">Strengths</div>
-																	<p class="text-sm whitespace-pre-wrap text-green-900">{review.qualitativeEvaluation?.strengths || '-'}</p>
-																</div>
-																<div class="rounded-md bg-red-50 border border-red-200 p-4">
-																	<div class="text-xs font-semibold uppercase tracking-wide text-red-700 mb-2">Weaknesses / Corrections</div>
-																	<p class="text-sm whitespace-pre-wrap text-red-900">{review.qualitativeEvaluation?.weaknesses || '-'}</p>
-																</div>
-															</div>
-														</div>
-
-														<div class="bg-white rounded-lg border border-gray-200 p-4">
-															<h4 class="text-sm font-semibold text-gray-700 mb-3">Ethics Review</h4>
-															<div class="space-y-2 text-sm text-gray-700">
-																{#if review.ethics}
-																	<div>
-																		<span class="font-medium text-gray-600">Human research:</span>
-																		<span class="ml-1">{getEthicsText(review.ethics.involvesHumanResearch)}</span>
-																	</div>
-																	<div>
-																		<span class="font-medium text-gray-600">Ethics approval:</span>
-																		<span class="ml-1">{getEthicsText(review.ethics.ethicsApproval ?? '')}</span>
-																	</div>
-																{:else}
-																	<div class="text-gray-500">No ethics fields provided.</div>
-																{/if}
-															</div>
-														</div>
-
-														{#if review.reviewAttachment}
-															<div class="bg-white rounded-lg border border-gray-200 p-4 lg:col-span-2">
-																<h4 class="text-sm font-semibold text-gray-700 mb-3">Attached Review File</h4>
-																<a
-																	class="inline-flex font-medium text-blue-700 underline hover:text-blue-900"
-																	href={getReviewAttachmentUrl(review.reviewAttachment)}
-																	target="_blank"
-																	rel="noreferrer"
-																>
-																	{review.reviewAttachment.filename}
-																	{#if review.reviewAttachment.fileSize}
-																		({formatFileSize(review.reviewAttachment.fileSize)})
-																	{/if}
-																</a>
-															</div>
-														{/if}
-													</div>
-												</div>
-											{/each}
-										</div>
-									</div>
-								{/if}
 										</div>
 									</div>
 								{/each}
@@ -836,32 +786,32 @@
 					<!-- Qualitative Evaluation -->
 					{#if review.qualitativeEvaluation}
 						<div class="mb-6">
-							<h4 class="text-lg font-semibold text-gray-700 mb-3">
-								💭 Detailed Reviewer Feedback
+							<h4 class="text-lg font-semibold text-gray-800 mb-3 dark:text-slate-200">
+								Detailed Reviewer Feedback
 							</h4>
 
 							{#if review.qualitativeEvaluation.strengths}
-								<div class="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-									<h5 class="font-semibold text-green-800 mb-2 flex items-center gap-2">
-										✅ Strengths Recognized by Reviewer
+								<div class="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg dark:bg-emerald-950/40 dark:border-emerald-900">
+									<h5 class="font-semibold text-green-800 mb-2 dark:text-emerald-200">
+										Strengths Recognized by Reviewer
 									</h5>
-									<div class="text-green-700 whitespace-pre-wrap leading-relaxed">
+									<div class="text-green-700 whitespace-pre-wrap leading-relaxed dark:text-emerald-200">
 										{review.qualitativeEvaluation.strengths}
 									</div>
 								</div>
 							{/if}
 
 							{#if review.qualitativeEvaluation.weaknesses}
-								<div class="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-									<h5 class="font-semibold text-red-800 mb-2 flex items-center gap-2">
-										⚠️ Critical Areas Requiring Attention
+								<div class="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg dark:bg-rose-950/40 dark:border-rose-900">
+									<h5 class="font-semibold text-red-800 mb-2 dark:text-rose-200">
+										Critical Areas Requiring Attention
 									</h5>
-									<div class="text-red-700 whitespace-pre-wrap leading-relaxed">
+									<div class="text-red-700 whitespace-pre-wrap leading-relaxed dark:text-rose-200">
 										{review.qualitativeEvaluation.weaknesses}
 									</div>
-									<div class="mt-3 p-3 bg-white border border-red-300 rounded">
-										<h6 class="font-medium text-red-800 text-sm mb-1">💡 Action Items:</h6>
-										<ul class="text-sm text-red-700 space-y-1">
+									<div class="mt-3 p-3 bg-white border border-red-300 rounded dark:bg-slate-900 dark:border-rose-900">
+										<h6 class="font-medium text-red-800 text-sm mb-1 dark:text-rose-200">Action Items:</h6>
+										<ul class="text-sm text-red-700 space-y-1 dark:text-rose-200">
 											<li>• Address each concern mentioned above in your revision</li>
 											<li>• Provide clear explanations for any changes made</li>
 											<li>• Consider adding supplementary information if needed</li>
@@ -894,8 +844,8 @@
 					<!-- Ethics Review -->
 					{#if review.ethics}
 						<div class="mb-6">
-							<h4 class="text-lg font-semibold text-gray-700 mb-3">🔒 Ethics Review</h4>
-							<div class="bg-white p-4 rounded border">
+							<h4 class="text-lg font-semibold text-gray-800 mb-3 dark:text-slate-200">Ethics Review</h4>
+							<div class="bg-white p-4 rounded border dark:bg-slate-900 dark:border-slate-700">
 								{#if review.ethics.involvesHumanResearch}
 									<p class="mb-2">
 										<strong>Involves Human Research:</strong>
@@ -927,8 +877,8 @@
 			{/each}
 		</div>
 	{:else}
-		<div class="mb-8 bg-yellow-50 border border-yellow-200 rounded-lg p-6">
-			<h2 class="text-xl font-semibold text-yellow-800 mb-2">⚠️ No Reviews Available</h2>
+			<div class="mb-8 bg-yellow-50 border border-yellow-200 rounded-lg p-6 dark:bg-amber-950/40 dark:border-amber-900">
+				<h2 class="text-xl font-semibold text-yellow-800 mb-2 dark:text-amber-200">No Reviews Available</h2>
 			<p class="text-yellow-700">
 				No peer review data is currently available for this article. Please contact the editorial
 				team if you believe this is an error.
@@ -937,9 +887,9 @@
 	{/if}
 
 	<!-- Action Items Section -->
-	<div class="mb-8 bg-white rounded-lg shadow-md p-6">
+	<div class="mb-8 bg-white rounded-lg shadow-md p-6 dark:bg-slate-900 dark:border dark:border-slate-800">
 		<div class="flex justify-between items-center mb-4">
-			<h2 class="text-2xl font-semibold text-gray-800">📋 Correction Checklist</h2>
+			<h2 class="text-2xl font-semibold text-gray-900 dark:text-slate-100">Correction Checklist</h2>
 			<div class="flex items-center gap-4">
 				<div class="text-sm text-gray-600">
 					Progress: {getCompletionPercentage()}% complete
@@ -1031,50 +981,50 @@
 
 	<!-- Helpful Tips Section -->
 	<div
-		class="mb-8 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg shadow-md p-6 border border-blue-200"
+		class="mb-8 rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:bg-slate-900 dark:border-slate-800"
 	>
-		<h2 class="text-2xl font-semibold text-blue-800 mb-4">
-			💡 Tips for Making Effective Corrections
+		<h2 class="text-2xl font-semibold text-slate-900 mb-4 dark:text-slate-100">
+			Tips for Making Effective Corrections
 		</h2>
 		<div class="grid md:grid-cols-2 gap-6">
 			<div>
-				<h3 class="font-semibold text-blue-700 mb-3">📝 General Guidelines</h3>
-				<ul class="space-y-2 text-blue-600 text-sm">
+				<h3 class="font-semibold text-slate-900 mb-3 dark:text-slate-100">General Guidelines</h3>
+				<ul class="space-y-2 text-slate-600 text-sm dark:text-slate-300">
 					<li class="flex items-start gap-2">
-						<span class="text-blue-500 mt-1">•</span>
+						<span class="text-slate-400 mt-1 dark:text-slate-500">•</span>
 						Address each reviewer comment systematically
 					</li>
 					<li class="flex items-start gap-2">
-						<span class="text-blue-500 mt-1">•</span>
+						<span class="text-slate-400 mt-1 dark:text-slate-500">•</span>
 						Be specific about changes made in response to feedback
 					</li>
 					<li class="flex items-start gap-2">
-						<span class="text-blue-500 mt-1">•</span>
+						<span class="text-slate-400 mt-1 dark:text-slate-500">•</span>
 						Maintain the academic tone and structure
 					</li>
 					<li class="flex items-start gap-2">
-						<span class="text-blue-500 mt-1">•</span>
+						<span class="text-slate-400 mt-1 dark:text-slate-500">•</span>
 						Double-check all citations and references
 					</li>
 				</ul>
 			</div>
 			<div>
-				<h3 class="font-semibold text-blue-700 mb-3">🎯 Priority Areas</h3>
-				<ul class="space-y-2 text-blue-600 text-sm">
+				<h3 class="font-semibold text-slate-900 mb-3 dark:text-slate-100">Priority Areas</h3>
+				<ul class="space-y-2 text-slate-600 text-sm dark:text-slate-300">
 					<li class="flex items-start gap-2">
-						<span class="text-blue-500 mt-1">•</span>
+						<span class="text-slate-400 mt-1 dark:text-slate-500">•</span>
 						Focus on criteria scored below 3.5 first
 					</li>
 					<li class="flex items-start gap-2">
-						<span class="text-blue-500 mt-1">•</span>
+						<span class="text-slate-400 mt-1 dark:text-slate-500">•</span>
 						Address all "weaknesses" comments thoroughly
 					</li>
 					<li class="flex items-start gap-2">
-						<span class="text-blue-500 mt-1">•</span>
+						<span class="text-slate-400 mt-1 dark:text-slate-500">•</span>
 						Strengthen methodology and results sections
 					</li>
 					<li class="flex items-start gap-2">
-						<span class="text-blue-500 mt-1">•</span>
+						<span class="text-slate-400 mt-1 dark:text-slate-500">•</span>
 						Improve clarity and readability where noted
 					</li>
 				</ul>
@@ -1083,11 +1033,11 @@
 	</div>
 
 	<!-- Paper Content Section -->
-	<div class="bg-white rounded-lg shadow-md">
+	<div class="bg-white rounded-lg shadow-md dark:bg-slate-900 dark:border dark:border-slate-800">
 		<div class="p-6 border-b border-gray-200">
 			<div class="flex justify-between items-center">
 				<div>
-					<h2 class="text-2xl font-semibold text-gray-800">📄 Your Article</h2>
+					<h2 class="text-2xl font-semibold text-gray-900 dark:text-slate-100">Your Article</h2>
 					<p class="text-gray-600 mt-1">
 						{#if isEditMode}
 							Edit your article content based on reviewer feedback.
@@ -1103,21 +1053,21 @@
 								class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
 								onclick={() => (isEditMode = false)}
 							>
-								❌ Cancel Edit
+								Cancel Edit
 							</button>
 						{:else}
 							<button
-								class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+								class="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
 								onclick={toggleEditMode}
 							>
-								✏️ Edit Article
+								Edit Article
 							</button>
 						{/if}
 						<button
 							class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
 							onclick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
 						>
-							📋 Back to Review Summary
+							Back to Review Summary
 						</button>
 					</div>
 					<span class="text-sm text-gray-500">
@@ -1130,9 +1080,9 @@
 		<div class="p-6">
 			{#if isEditMode}
 				<!-- Modo de edição com PaperPublishPage -->
-				<div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-					<h3 class="font-semibold text-yellow-800 mb-2">✏️ Edit Mode Active</h3>
-					<p class="text-yellow-700 text-sm">
+				<div class="rounded-lg border border-amber-200 bg-amber-50 p-4 mb-6 dark:bg-amber-950/40 dark:border-amber-900">
+					<h3 class="font-semibold text-amber-900 mb-2 dark:text-amber-200">Edit Mode Active</h3>
+					<p class="text-yellow-700 text-sm dark:text-amber-200">
 						You are now editing your article. Make the necessary changes based on reviewer feedback
 						above, then save your changes. The article will remain in corrections status until
 						you're ready to resubmit.
