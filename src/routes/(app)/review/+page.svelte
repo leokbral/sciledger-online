@@ -99,6 +99,13 @@
 		return getIdAliases(value).includes(String(userId));
 	}
 
+	function isHubViceManager(hub: unknown, userId: string | undefined): boolean {
+		if (!userId) return false;
+		if (!hub || typeof hub !== 'object') return false;
+		const managers = (hub as any).assistantManagers;
+		return Array.isArray(managers) && managers.some((manager: any) => matchesUser(manager, userId));
+	}
+
 	let papersPool = papers
 		.filter((p: Paper) => {
 			const userId = user.id?.toString();
@@ -146,6 +153,7 @@
 		
 		// Verifica se é dono do hub
 		const isHubOwner = typeof p.hubId === 'object' && matchesUser(p.hubId?.createdBy, userId);
+		const isViceManager = typeof p.hubId === 'object' && isHubViceManager(p.hubId, userId);
 		
 		// Verifica se é revisor do hub
 		const isHubReviewer =
@@ -159,7 +167,7 @@
 				matchesUser(r.reviewerId, userId) && (r.status === 'accepted' || r.status === 'completed')
 		);
 		
-		return isReviewer || isHubReviewer || isHubOwner;
+		return isReviewer || isHubReviewer || isHubOwner || isViceManager;
 	});
 	
 	// Filtrar papers "needing corrections" - APENAS revisores designados, revisores do hub ou dono do hub (autores NÃO veem aqui)
@@ -170,6 +178,7 @@
 		
 		// Verifica se é dono do hub
 		const isHubOwner = typeof p.hubId === 'object' && matchesUser(p.hubId?.createdBy, userId);
+		const isViceManager = typeof p.hubId === 'object' && isHubViceManager(p.hubId, userId);
 		
 		// Verifica se é revisor do hub
 		const isHubReviewer =
@@ -183,7 +192,7 @@
 				matchesUser(r.reviewerId, userId) && (r.status === 'accepted' || r.status === 'completed')
 		);
 		
-		return isReviewer || isHubReviewer || isHubOwner;
+		return isReviewer || isHubReviewer || isHubOwner || isViceManager;
 	});
 	
 	// Filtrar papers "published" - apenas os que o usuário revisou (incluindo papers do hub)

@@ -19,7 +19,7 @@
 	// const filteredPapers = papers?.filter((paper) => {
 	// 	return paper.hubId === hub._id && paper.status === 'published';
 	// });
-	const userId = data.user._id;
+	const userId = data.user.id ?? data.user._id;
 	const isCreator = normalizeId(data.hub.createdBy) === data.user.id;
 	const isViceManager = data.isViceManager === true ||
 		(Array.isArray(hub.assistantManagers) && hub.assistantManagers.some((m: any) => normalizeId(m) === data.user.id));
@@ -594,7 +594,7 @@
 	{isCreator}
 	isHubManager={isHubManager}
 	isHubReviewer={isReviewer}
-	userId={data.user.id}
+	userId={data.user.id ?? data.user._id}
 	{shouldHighlight}
 	reviewAssignments={data.reviewAssignments}
 	pendingPaperInvitations={data.pendingPaperInvitations}

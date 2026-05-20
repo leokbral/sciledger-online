@@ -2,6 +2,7 @@ import Papers from '$lib/db/models/Paper';
 import Users from '$lib/db/models/User';
 import { error, redirect } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongo';
+import { isHubViceManager } from '$lib/helpers/hubPermissions';
 
 // Type for MongoDB ObjectId
 interface ObjectId {
@@ -44,6 +45,46 @@ function sanitize(obj: unknown): unknown {
 	return obj;
 }
 
+function getIdAliases(value: unknown): string[] {
+	if (!value) return [];
+
+	if (typeof value === 'string') {
+		return [String(value)];
+	}
+
+	if (typeof value !== 'object') {
+		return [];
+	}
+
+	const candidate = value as {
+		id?: unknown;
+		_id?: unknown;
+		toString?: () => string;
+	};
+
+	const aliases = [candidate.id, candidate._id]
+		.filter(Boolean)
+		.map((alias) => String(alias));
+
+	const stringified = candidate.toString?.();
+	if (stringified && stringified !== '[object Object]') {
+		aliases.push(String(stringified));
+	}
+
+	return Array.from(new Set(aliases));
+}
+
+function matchesCurrentUser(value: unknown, userId: string): boolean {
+	return getIdAliases(value).includes(String(userId));
+}
+
+function isAdminUser(user: Record<string, unknown> | null | undefined): boolean {
+	return Boolean(
+		user?.isAdmin ||
+		(user?.roles && typeof user.roles === 'object' && (user.roles as Record<string, unknown>).admin)
+	);
+}
+
 export async function load({ locals, params }) {
 	if (!locals.user) redirect(302, `/login`);
 
@@ -76,18 +117,27 @@ export async function load({ locals, params }) {
 		}
 
 		// Verificar permissões: revisor aceito, revisor do hub ou dono do hub
-		const isReviewerAccepted = paperRaw.peer_review?.responses?.some(
-			(r: any) => r.reviewerId === userId && (r.status === 'accepted' || r.status === 'completed')
-		);
-		
-		const isHubReviewer = typeof paperRaw.hubId === 'object' && 
-			Array.isArray(paperRaw.hubId?.reviewers) && 
-			paperRaw.hubId?.reviewers?.includes(userId);
-		
-		const hubCreatorId = typeof paperRaw.hubId === 'object'
-			? (paperRaw.hubId?.createdBy?._id || paperRaw.hubId?.createdBy?.id || paperRaw.hubId?.createdBy)
-			: null;
+		const isReviewerAccepted = (paperRaw.peer_review?.responses ?? []).some((response: any) => {
+			return (
+				(response?.status === 'accepted' || response?.status === 'completed') &&
+				matchesCurrentUser(response?.reviewerId, userId)
+			);
+		});
+
+		const isHubReviewer =
+			typeof paperRaw.hubId === 'object' &&
+			Array.isArray(paperRaw.hubId?.reviewers) &&
+			paperRaw.hubId?.reviewers?.some((reviewer: any) => matchesCurrentUser(reviewer, userId));
+
+		const hubCreatorId =
+			typeof paperRaw.hubId === 'object'
+				? (paperRaw.hubId?.createdBy?._id ||
+						paperRaw.hubId?.createdBy?.id ||
+						paperRaw.hubId?.createdBy)
+				: null;
 		const isHubOwner = hubCreatorId?.toString() === userId;
+		const isViceManager =
+			typeof paperRaw.hubId === 'object' && isHubViceManager(paperRaw.hubId as any, userId);
 
 		// Verificar se aceitou via ReviewQueue (novo sistema)
 		const ReviewQueue = (await import('$lib/db/models/ReviewQueue')).default;
@@ -97,7 +147,13 @@ export async function load({ locals, params }) {
 			status: 'accepted'
 		}).lean();
 
-		if (!isReviewerAccepted && !isHubReviewer && !isHubOwner && !hasAcceptedViaQueue) {
+		const canSubmitReview =
+			isReviewerAccepted || Boolean(hasAcceptedViaQueue) || isHubReviewer;
+
+		const canViewSubmittedReviews =
+			!canSubmitReview && (isHubOwner || isViceManager || isAdminUser(locals.user as any));
+
+		if (!canSubmitReview && !canViewSubmittedReviews) {
 			throw error(403, 'You do not have permission to view this paper');
 		}
 
@@ -136,7 +192,8 @@ export async function load({ locals, params }) {
 			user: sanitize(locals.user),
 			users: sanitize(usersRaw),
 			isHubOwner,
-			canViewSubmittedReviews: true
+			canSubmitReview,
+			canViewSubmittedReviews
 		};
 
 	} catch (err) {

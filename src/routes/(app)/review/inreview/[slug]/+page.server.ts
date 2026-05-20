@@ -158,7 +158,9 @@ export async function load({ locals, params }) {
 		isHubOwner ||
 		isViceManager;
 
-	const canSubmitReview = !isPaperAuthor(paperDoc as Record<string, unknown>, userId) && (isReviewerAccepted || Boolean(hasAcceptedViaQueue) || isHubOwner || isHubReviewer);
+	const canSubmitReview =
+		!isPaperAuthor(paperDoc as Record<string, unknown>, userId) &&
+		(isReviewerAccepted || Boolean(hasAcceptedViaQueue) || isHubReviewer);
 
 	// Para REVISAR o paper: precisa ter aceitado (via responses OU ReviewQueue) OU ser dono do hub OU ser revisor do hub
 	if (!canViewSubmittedReviews && !canSubmitReview) {

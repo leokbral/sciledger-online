@@ -96,6 +96,18 @@
 		return false;
 	}
 
+	function isPaperAuthor(paper: Paper): boolean {
+		if (!user) return false;
+
+		if (matchesCurrentUser(paper?.mainAuthor)) return true;
+		if (matchesCurrentUser((paper as any)?.correspondingAuthor)) return true;
+		if (matchesCurrentUser((paper as any)?.submittedBy)) return true;
+
+		return Array.isArray((paper as any)?.coAuthors)
+			? (paper as any).coAuthors.some((author: unknown) => matchesCurrentUser(author))
+			: false;
+	}
+
 	function getReadMoreHref() {
 		if (readMoreHref) {
 			return readMoreHref;
@@ -104,6 +116,13 @@
 		const slug = paper?.id || paper?._id || '';
 		if (!slug) {
 			return '#';
+		}
+
+		if (
+			isPaperAuthor(paper) &&
+			(paper.status === 'needing corrections' || paper.status === 'under correction')
+		) {
+			return `/publish/corrections/${slug}`;
 		}
 
 		if (hasReviewerAccess(paper)) {

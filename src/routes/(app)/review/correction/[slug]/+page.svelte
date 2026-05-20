@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { page } from '$app/stores';
 	import PaperReviewPage from '$lib/Pages/Paper/PaperReviewPage.svelte';
 	import type { Paper } from '$lib/types/Paper';
 	import type { PageData } from './$types';
@@ -22,6 +21,7 @@
 		{currentUser}
 		messageFeed={null}
 		isHubAdmin={isHubOwner}
+		canSubmitReview={(data as any).canSubmitReview === true}
 		canViewSubmittedReviews={(data as any).canViewSubmittedReviews === true}
 	/>
 {/if}

@@ -41,6 +41,22 @@
         return (paper?.id || paper?._id || '') as string;
     }
 
+    function isPaperAuthor(paper: Paper): boolean {
+        const userAlias = String(userId);
+        const mainAuthorIds = getIdAliases(paper.mainAuthor);
+        if (mainAuthorIds.includes(userAlias)) return true;
+
+        const correspondingIds = getIdAliases(paper.correspondingAuthor);
+        if (correspondingIds.includes(userAlias)) return true;
+
+        const submittedIds = getIdAliases(paper.submittedBy);
+        if (submittedIds.includes(userAlias)) return true;
+
+        return (paper.coAuthors ?? []).some((author: any) => {
+            return getIdAliases(author).includes(userAlias);
+        });
+    }
+
     function getReadMoreHref(paper: any): string {
         const slug = getPaperSlug(paper);
         if (!slug) return '#';
@@ -54,8 +70,18 @@
             return `/review/inreview/${slug}`;
         }
 
-        // Reviewers and hub owner should land on the full review page.
-        if (canUseReviewerView(paper)) {
+        // Hub authors should see the review page with submitted reviews or corrections editor.
+        if (isPaperAuthor(paper)) {
+            if (paper?.status === 'in review') {
+                return `/review/inreview/${slug}`;
+            }
+            if (paper?.status === 'needing corrections' || paper?.status === 'under correction') {
+                return `/publish/corrections/${slug}`;
+            }
+        }
+
+        // Review routes are only for designated reviewers (non-authors).
+        if (isDesignatedReviewer(paper) && !isPaperAuthor(paper)) {
             if (paper?.status === 'in review') return `/review/inreview/${slug}`;
             if (paper?.status === 'needing corrections' || paper?.status === 'under correction') {
                 return `/review/correction/${slug}`;
@@ -119,6 +145,13 @@
         const aliases = [value.id, value._id]
             .filter(Boolean)
             .map((alias) => String(alias));
+
+        if (typeof value?.toString === 'function') {
+            const stringified = String(value.toString()).trim();
+            if (stringified && stringified !== '[object Object]') {
+                aliases.push(stringified);
+            }
+        }
 
         return Array.from(new Set(aliases));
     }
