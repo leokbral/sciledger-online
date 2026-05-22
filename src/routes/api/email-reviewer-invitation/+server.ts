@@ -101,7 +101,18 @@ function generateInvitationEmailTemplate(
 ): string {
 	const paperTitle = options?.paperTitle?.trim() || '';
 	const paperAbstract = options?.paperAbstract?.trim() || '';
-	const hasPaperContext = Boolean(paperTitle || paperAbstract);
+	// Normalize and remove HTML tags, but preserve line breaks from common tags
+	const stripHtml = (s: string) =>
+		String(s || '')
+			.replace(/<\s*(br|\/p|p)[^>]*>/gi, '\n')
+			.replace(/<[^>]+>/g, '')
+			.replace(/\r\n|\r/g, '\n')
+			.replace(/\n\s+/g, '\n')
+			.trim();
+
+	const cleanPaperTitle = stripHtml(paperTitle);
+	const cleanPaperAbstract = stripHtml(paperAbstract);
+	const hasPaperContext = Boolean(cleanPaperTitle || cleanPaperAbstract);
 
 	const safeText = (value: string) =>
 		value
@@ -109,17 +120,14 @@ function generateInvitationEmailTemplate(
 			.replace(/</g, '&lt;')
 			.replace(/>/g, '&gt;');
 
-	const truncatedAbstract = paperAbstract.length > 700
-		? `${paperAbstract.slice(0, 700)}...`
-		: paperAbstract;
-
+	// Use full abstract in email, render line breaks using CSS `white-space: pre-wrap`
 	const paperSection = hasPaperContext
 		? `
-                    <div style="background-color: #f8f9fa; border-left: 4px solid #28a745; padding: 20px; margin: 25px 0; border-radius: 4px;">
-                        <p style="margin: 0 0 8px 0;"><strong>📄 Paper:</strong> ${safeText(paperTitle || 'Untitled')}</p>
-                        ${truncatedAbstract ? `<p style="margin: 0; color: #555; font-size: 14px;">${safeText(truncatedAbstract)}</p>` : ''}
-                    </div>
-                `
+					<div style="background-color: #ffffff; border: 1px solid #e6eefc; padding: 22px; margin: 22px 0; border-radius: 8px;">
+						<h3 style="margin: 0 0 10px 0; font-size: 18px; color: #0b3d91;">📄 ${safeText(cleanPaperTitle || 'Untitled')}</h3>
+						${cleanPaperAbstract ? `<div style="margin-top:8px; color: #374151; font-size: 14px; line-height:1.5; white-space: pre-wrap;">${safeText(cleanPaperAbstract)}</div>` : ''}
+					</div>
+				`
 		: '';
 
 	return `
@@ -132,35 +140,35 @@ function generateInvitationEmailTemplate(
         </head>
         <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 20px; background-color: #f8f9fa;">
             <div style="max-width: 600px; margin: 0 auto; background-color: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); overflow: hidden;">
-                <!-- Header -->
-                <div style="background-color: #0170f3; color: white; padding: 30px 20px; text-align: center;">
-                    <h1 style="margin: 0; font-size: 32px; font-weight: bold;">SciLedger</h1>
-                    <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;">Scientific Platform</p>
-                </div>
+				<!-- Header -->
+				<div style="background-color: #07326a; color: #ffffff; padding: 28px 20px; text-align: center;">
+					<h1 style="margin: 0; font-size: 28px; font-weight: 700; color: #ffffff; letter-spacing: -0.2px;">SciLedger</h1>
+					<p style="margin: 8px 0 0 0; font-size: 13px; color: rgba(255,255,255,0.95); opacity: 0.95;">Scientific Platform</p>
+				</div>
 
                 <!-- Content -->
                 <div style="padding: 40px 30px;">
-                    <h2 style="color: #333; margin-bottom: 20px; font-size: 24px;">📝 You've Been Invited to Join as a Reviewer</h2>
+				<h2 style="color: #0f1724; margin-bottom: 14px; font-size: 20px; font-weight: 600;">You've Been Invited to Join as a Reviewer</h2>
 
-                    <p style="font-size: 16px; margin-bottom: 20px;">Hello,</p>
+				<p style="font-size: 15px; margin-bottom: 14px; color: #334155;">Hello,</p>
 
-					<p style="font-size: 16px; margin-bottom: 25px;">You have been invited to join <strong>SciLedger</strong> as a reviewer for the following hub:</p>
+				<p style="font-size: 15px; margin-bottom: 20px; color: #334155;">You have been invited to join <strong>SciLedger</strong> as a reviewer for the following hub:</p>
 
                     <!-- Hub Info Box -->
-                    <div style="background-color: #f8f9fa; border-left: 4px solid #0170f3; padding: 20px; margin: 25px 0; border-radius: 4px;">
-                        <p style="margin: 0;"><strong>🏛️ Hub:</strong> ${hubName}</p>
-                    </div>
+					<div style="background-color: #f4f8ff; border-left: 4px solid #0b63d6; padding: 16px; margin: 20px 0; border-radius: 6px;">
+						<p style="margin: 0; color: #0b3d91; font-weight: 600; font-size: 15px;"><strong>Hub:</strong> ${hubName}</p>
+					</div>
 
 					${paperSection}
 
 					<p style="font-size: 16px; margin-bottom: 25px;">To accept this invitation and create your reviewer account, please click the button below:</p>
 
                     <!-- Button -->
-                    <div style="text-align: center; margin: 40px 0;">
-                        <a href="${invitationUrl}" style="display: inline-block; background-color: #0170f3; color: white; padding: 15px 35px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; box-shadow: 0 2px 4px rgba(1, 112, 243, 0.3);">
-                            ✅ Accept Invitation & Register
-                        </a>
-                    </div>
+					<div style="text-align: center; margin: 36px 0;">
+						<a href="${invitationUrl}" style="display: inline-block; background-color: #0066cc; color: #ffffff; padding: 14px 36px; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 15px;">
+							Accept Invitation & Register
+						</a>
+					</div>
 
 					<p style="font-size: 14px; color: #666; margin-bottom: 12px;">If you are unable to review, you can decline and inform the hub manager:</p>
 					<div style="text-align: center; margin: 0 0 30px 0;">
