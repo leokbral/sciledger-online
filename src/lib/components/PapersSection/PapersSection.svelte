@@ -134,6 +134,9 @@
     let rejectionReason = $state('');
     let loading = $state(false);
     let searchTerm = $state('');
+    let inviteTab = $state<'hub' | 'email'>('hub');
+    let emailInvite = $state('');
+    let customDeadlineDays = $state(15);
 
     function getIdAliases(value: any): string[] {
         if (!value) return [];
@@ -220,6 +223,9 @@
         selectedPaper = paper;
         selectedReviewers = [];
         searchTerm = '';
+        inviteTab = 'hub';
+        emailInvite = '';
+        customDeadlineDays = 15;
         openInviteModal = true;
     }
     
@@ -374,7 +380,8 @@
                 body: JSON.stringify({
                     paperId: selectedPaper.id,
                     hubId: hub._id,
-                    reviewerIds: selectedReviewers
+                    reviewerIds: selectedReviewers,
+                    customDeadlineDays
                 })
             });
 
@@ -401,6 +408,53 @@
         } catch (error) {
             console.error(error);
             toaster.error({ title: 'Error', description: 'An error occurred' });
+        } finally {
+            loading = false;
+        }
+    }
+
+    async function sendEmailInvitation() {
+        if (!selectedPaper) return;
+
+        if (!emailInvite.trim()) {
+            toaster.warning({ title: 'Please enter an email address' });
+            return;
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(emailInvite)) {
+            toaster.error({ title: 'Invalid email', description: 'Please enter a valid email address' });
+            return;
+        }
+
+        loading = true;
+        try {
+            const response = await fetch('/api/email-reviewer-invitation', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: emailInvite,
+                    hubId: hub._id,
+                    paperId: selectedPaper.id,
+                    customDeadlineDays
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                toaster.success({
+                    title: 'Invitation sent!',
+                    description: 'The reviewer will receive an email with registration instructions.'
+                });
+                emailInvite = '';
+                openInviteModal = false;
+            } else {
+                toaster.error({ title: 'Error', description: data.error || 'Failed to send invitation' });
+            }
+        } catch (error) {
+            console.error('Error sending email invitation:', error);
+            toaster.error({ title: 'Error', description: 'An error occurred while sending the invitation' });
         } finally {
             loading = false;
         }
@@ -776,90 +830,204 @@
                 <p class="text-sm text-gray-600 dark:text-gray-400">Paper:</p>
                 <p class="font-medium text-gray-900 dark:text-white">{@html selectedPaper.title}</p>
             </div>
+
+            <div class="flex border-b border-surface-300 mb-6">
+                <button
+                    class="px-4 py-2 flex items-center gap-2 transition-colors {inviteTab === 'hub'
+                        ? 'border-b-2 border-primary-500 text-primary-500 font-semibold'
+                        : 'text-surface-600 hover:text-surface-900'}"
+                    onclick={() => (inviteTab = 'hub')}
+                >
+                    <Icon icon="mdi:account-group" class="size-5" />
+                    Hub Reviewers
+                </button>
+                <button
+                    class="px-4 py-2 flex items-center gap-2 transition-colors {inviteTab === 'email'
+                        ? 'border-b-2 border-primary-500 text-primary-500 font-semibold'
+                        : 'text-surface-600 hover:text-surface-900'}"
+                    onclick={() => (inviteTab = 'email')}
+                >
+                    <Icon icon="mdi:email-plus" class="size-5" />
+                    Invite by Email
+                </button>
+            </div>
             
-            {#if getAvailableReviewers(selectedPaper).length === 0}
-                <p class="text-center text-gray-500 dark:text-gray-400">
-                    All hub reviewers have already been invited to review this paper.
-                </p>
-            {:else}
-                <!-- Search -->
-                <div class="relative">
-                    <input
-                        type="text"
-                        bind:value={searchTerm}
-                        placeholder="Search reviewers..."
-                        class="w-full p-3 pl-10 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-surface-700 dark:text-white"
-                    />
-                    <Icon
-                        icon="mdi:magnify"
-                        class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-                    />
-                </div>
-                <div class="flex items-center justify-between mt-3 mb-1 text-sm text-gray-600 dark:text-gray-300">
-                    <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-200 font-semibold">
-                        <Icon icon="mdi:account-multiple" class="size-4" />
-                        Selected: {selectedReviewers.length}
-                    </span>
-                    <span class="text-xs text-gray-500 dark:text-gray-400">First 3 acceptances occupy slots; extra invites stay pending.</span>
-                </div>
-                
-                <!-- Lista de revisores filtrados -->
-                {#if getFilteredReviewers(selectedPaper).length > 0}
-                    <div class="max-h-64 overflow-y-auto space-y-3">
-                        {#each getFilteredReviewers(selectedPaper) as reviewer}
-                            {@const rev = typeof reviewer === 'object' ? reviewer : null}
-                            {#if rev}
-                                <label
-                                    class="flex items-center justify-between gap-4 p-3 bg-gray-50 dark:bg-surface-700 hover:bg-gray-100 dark:hover:bg-surface-600 rounded-lg cursor-pointer transition-colors"
-                                >
-                                    <div class="flex items-center gap-4">
-                                        <div
-                                            class="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-gray-200 dark:bg-surface-500"
-                                        >
-                                            {#if rev.profilePictureUrl}
-                                                <img
-                                                    src={rev.profilePictureUrl}
-                                                    alt={`${rev.firstName}'s profile`}
-                                                    class="w-full h-full object-cover"
-                                                />
-                                            {:else}
-                                                <div class="w-full h-full flex items-center justify-center">
-                                                    <Icon icon="mdi:account" class="text-2xl text-gray-500" />
-                                                </div>
-                                            {/if}
-                                        </div>
-                                        <div>
-                                            <div class="font-medium text-gray-900 dark:text-white">
-                                                {rev.firstName} {rev.lastName}
-                                            </div>
-                                            <div class="text-sm text-gray-500">{rev.email}</div>
-                                        </div>
-                                    </div>
-                                    <input
-                                        type="checkbox"
-                                        class="form-checkbox h-5 w-5 text-primary-600"
-                                        checked={selectedReviewers.includes(rev._id || rev.id)}
-                                        onchange={() => toggleReviewer(rev._id || rev.id)}
-                                    />
-                                </label>
-                            {/if}
-                        {/each}
+            {#if inviteTab === 'hub'}
+                {#if getAvailableReviewers(selectedPaper).length === 0}
+                    <p class="text-center text-gray-500 dark:text-gray-400">
+                        All hub reviewers have already been invited to review this paper.
+                    </p>
+                {:else}
+                    <div class="mb-4 p-4 bg-primary-50 dark:bg-primary-900/20 rounded-lg">
+                        <label class="block mb-2">
+                            <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">Review Deadline (days)</span>
+                            <p class="text-xs text-gray-600 dark:text-gray-400 mb-2">
+                                Set the number of days reviewers will have to complete the review after accepting
+                            </p>
+                            <div class="flex items-center gap-3">
+                                <input
+                                    type="number"
+                                    bind:value={customDeadlineDays}
+                                    min="1"
+                                    max="90"
+                                    class="input w-32 text-center"
+                                    placeholder="15"
+                                />
+                                <span class="text-sm text-gray-600 dark:text-gray-400">
+                                    days from acceptance
+                                </span>
+                            </div>
+                        </label>
+                    </div>
+
+                    <!-- Search -->
+                    <div class="relative">
+                        <input
+                            type="text"
+                            bind:value={searchTerm}
+                            placeholder="Search reviewers..."
+                            class="w-full p-3 pl-10 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-surface-700 dark:text-white"
+                        />
+                        <Icon
+                            icon="mdi:magnify"
+                            class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+                        />
+                    </div>
+                    <div class="flex items-center justify-between mt-3 mb-1 text-sm text-gray-600 dark:text-gray-300">
+                        <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-200 font-semibold">
+                            <Icon icon="mdi:account-multiple" class="size-4" />
+                            Selected: {selectedReviewers.length}
+                        </span>
+                        <span class="text-xs text-gray-500 dark:text-gray-400">First 3 acceptances occupy slots; extra invites stay pending.</span>
                     </div>
                     
-                    <!-- Botão de adicionar -->
-                    <div class="flex justify-end mt-4">
+                    <!-- Lista de revisores filtrados -->
+                    {#if getFilteredReviewers(selectedPaper).length > 0}
+                        <div class="max-h-64 overflow-y-auto space-y-3">
+                            {#each getFilteredReviewers(selectedPaper) as reviewer}
+                                {@const rev = typeof reviewer === 'object' ? reviewer : null}
+                                {#if rev}
+                                    <label
+                                        class="flex items-center justify-between gap-4 p-3 bg-gray-50 dark:bg-surface-700 hover:bg-gray-100 dark:hover:bg-surface-600 rounded-lg cursor-pointer transition-colors"
+                                    >
+                                        <div class="flex items-center gap-4">
+                                            <div
+                                                class="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-gray-200 dark:bg-surface-500"
+                                            >
+                                                {#if rev.profilePictureUrl}
+                                                    <img
+                                                        src={rev.profilePictureUrl}
+                                                        alt={`${rev.firstName}'s profile`}
+                                                        class="w-full h-full object-cover"
+                                                    />
+                                                {:else}
+                                                    <div class="w-full h-full flex items-center justify-center">
+                                                        <Icon icon="mdi:account" class="text-2xl text-gray-500" />
+                                                    </div>
+                                                {/if}
+                                            </div>
+                                            <div>
+                                                <div class="font-medium text-gray-900 dark:text-white">
+                                                    {rev.firstName} {rev.lastName}
+                                                </div>
+                                                <div class="text-sm text-gray-500">{rev.email}</div>
+                                            </div>
+                                        </div>
+                                        <input
+                                            type="checkbox"
+                                            class="form-checkbox h-5 w-5 text-primary-600"
+                                            checked={selectedReviewers.includes(rev._id || rev.id)}
+                                            onchange={() => toggleReviewer(rev._id || rev.id)}
+                                        />
+                                    </label>
+                                {/if}
+                            {/each}
+                        </div>
+                        
+                        <!-- Botão de adicionar -->
+                        <div class="flex justify-end mt-4">
+                            <button
+                                class="btn preset-filled"
+                                onclick={sendInvitations}
+                                disabled={selectedReviewers.length === 0 || loading}
+                            >
+                                <Icon icon="mdi:email-send" class="mr-2" />
+                                Send Invitations
+                            </button>
+                        </div>
+                    {:else}
+                        <p class="text-center text-gray-500 dark:text-gray-400">No reviewers found</p>
+                    {/if}
+                {/if}
+            {:else}
+                <div class="space-y-4">
+                    <div class="bg-primary-50 border-l-4 border-primary-500 p-4 rounded">
+                        <div class="flex items-start gap-3">
+                            <Icon icon="mdi:information" class="size-6 text-primary-500 flex-shrink-0 mt-0.5" />
+                            <div>
+                                <p class="font-semibold text-primary-900 mb-1">Invite a Reviewer by Email</p>
+                                <p class="text-sm text-primary-700">
+                                    Send an invitation to someone who doesn't have an account yet. They will receive an email with a registration link to join the platform as a reviewer for this hub and paper.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="email-invite" class="label mb-2">
+                            <span>Email Address <span class="text-error-500">*</span></span>
+                        </label>
+                        <input
+                            type="email"
+                            id="email-invite"
+                            bind:value={emailInvite}
+                            placeholder="reviewer@university.edu"
+                            class="input"
+                            disabled={loading}
+                        />
+                        <p class="text-xs text-surface-500 mt-1">
+                            The reviewer will receive an invitation email with a registration link
+                        </p>
+                    </div>
+
+                    <div class="p-4 bg-primary-50 dark:bg-primary-900/20 rounded-lg">
+                        <label class="block mb-2">
+                            <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">Review Deadline (days)</span>
+                            <p class="text-xs text-gray-600 dark:text-gray-400 mb-2">
+                                Set the number of days reviewers will have to complete the review after accepting
+                            </p>
+                            <div class="flex items-center gap-3">
+                                <input
+                                    type="number"
+                                    bind:value={customDeadlineDays}
+                                    min="1"
+                                    max="90"
+                                    class="input w-32 text-center"
+                                    placeholder="15"
+                                />
+                                <span class="text-sm text-gray-600 dark:text-gray-400">
+                                    days from acceptance
+                                </span>
+                            </div>
+                        </label>
+                    </div>
+
+                    <div class="flex justify-end">
                         <button
-                            class="btn preset-filled"
-                            onclick={sendInvitations}
-                            disabled={selectedReviewers.length === 0 || loading}
+                            class="btn preset-filled-primary-500"
+                            onclick={sendEmailInvitation}
+                            disabled={loading || !emailInvite.trim()}
                         >
-                            <Icon icon="mdi:email-send" class="mr-2" />
-                            Send Invitations
+                            {#if loading}
+                                <Icon icon="eos-icons:loading" class="size-5" />
+                                Sending...
+                            {:else}
+                                <Icon icon="mdi:email-send" class="size-5" />
+                                Send Email Invitation
+                            {/if}
                         </button>
                     </div>
-                {:else}
-                    <p class="text-center text-gray-500 dark:text-gray-400">No reviewers found</p>
-                {/if}
+                </div>
             {/if}
         {/if}
     {/snippet}

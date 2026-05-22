@@ -1,27 +1,31 @@
-import { redirect } from '@sveltejs/kit';
+import { isRedirect, redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ url, fetch }) => {
-    const token = url.searchParams.get('token');
-    
-    if (!token) {
-        throw redirect(302, '/login');
-    }
+	const token = url.searchParams.get('token');
 
-    try {
-        const response = await fetch(`/invite/register?token=${token}`);
-        const data = await response.json();
+	if (!token) {
+		throw redirect(302, '/login');
+	}
 
-        if (!response.ok) {
-            throw redirect(302, '/register?error=' + encodeURIComponent(data.error || 'Invalid invitation'));
-        }
+	try {
+		const response = await fetch(`/invite/register?token=${token}`);
+		const data = await response.json();
 
-        // Redireciona para o registro normal com os dados do convite
-        throw redirect(302, `/register?inviteToken=${token}&email=${encodeURIComponent(data.email)}&hubId=${data.hubId}`);
+		if (!response.ok) {
+			const reason = data?.error || 'Invalid invitation';
+			throw redirect(302, `/invite/invalid?reason=${encodeURIComponent(reason)}`);
+		}
 
-    } catch (error) {
-        if (error instanceof Response) throw error;
-        console.error('Error loading invitation:', error);
-        throw redirect(302, '/register?error=' + encodeURIComponent('Failed to load invitation'));
-    }
+		// Redireciona para o registro normal com os dados do convite
+		const paperQuery = data.paperId ? `&paperId=${encodeURIComponent(data.paperId)}` : '';
+		throw redirect(
+			302,
+			`/register?inviteToken=${token}&email=${encodeURIComponent(data.email)}&hubId=${data.hubId}${paperQuery}`
+		);
+	} catch (error) {
+		if (isRedirect(error)) throw error;
+		console.error('Error loading invitation:', error);
+		throw redirect(302, '/invite/invalid?reason=' + encodeURIComponent('Failed to load invitation'));
+	}
 };
