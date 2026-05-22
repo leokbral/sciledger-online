@@ -173,7 +173,9 @@
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					email: emailInvite,
-					hubId
+					hubId,
+					paperId,
+					customDeadlineDays
 				})
 			});
 
@@ -388,7 +390,7 @@
 							<div>
 								<p class="font-semibold text-primary-900 mb-1">Invite a Reviewer by Email</p>
 								<p class="text-sm text-primary-700">
-									Send an invitation to someone who doesn't have an account yet. They will receive an email with a registration link to join the platform as a reviewer for this hub.
+									Send an invitation to someone who doesn't have an account yet. They will receive an email with a registration link to join the platform as a reviewer for this hub and paper.
 								</p>
 							</div>
 						</div>

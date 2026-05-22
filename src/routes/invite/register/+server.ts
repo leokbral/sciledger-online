@@ -42,7 +42,8 @@ export const GET: RequestHandler = async ({ url }) => {
         return json({
             valid: true,
             email: invitation.email,
-            hubId: invitation.hubId
+            hubId: invitation.hubId,
+            paperId: invitation.paperId || null
         });
 
     } catch (error) {

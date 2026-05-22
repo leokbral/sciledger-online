@@ -26,6 +26,7 @@
 	// Parâmetros do convite (se vier de um email de convite)
 	let inviteToken = $state('');
 	let inviteHubId = $state('');
+	let invitePaperId = $state('');
 	let isInvite = $state(false);
 	let states = $state([] as { name: string; isoCode: string }[]);
 
@@ -51,6 +52,7 @@
 		const params = new URLSearchParams(window.location.search);
 		inviteToken = params.get('inviteToken') || '';
 		inviteHubId = params.get('hubId') || '';
+		invitePaperId = params.get('paperId') || '';
 		const inviteEmail = params.get('email') || '';
 		const error = params.get('error');
 		

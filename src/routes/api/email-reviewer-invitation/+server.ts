@@ -4,6 +4,7 @@ import { start_mongo } from '$lib/db/mongooseConnection';
 import mongoose from 'mongoose';
 import { EmailReviewerInvitationSchema } from '$lib/db/schemas/EmailReviewerInvitation.js';
 import { HubSchema } from '$lib/db/schemas/HubSchema.js';
+import Papers from '$lib/db/models/Paper';
 import * as crypto from 'crypto';
 import type { RequestHandler } from './$types';
 import nodemailer from 'nodemailer';
@@ -91,8 +92,36 @@ function normalizeEmail(value: unknown): string | null {
 function generateInvitationEmailTemplate(
 	email: string,
 	hubName: string,
-	invitationUrl: string
+	invitationUrl: string,
+	declineUrl: string,
+	options?: {
+		paperTitle?: string | null;
+		paperAbstract?: string | null;
+	}
 ): string {
+	const paperTitle = options?.paperTitle?.trim() || '';
+	const paperAbstract = options?.paperAbstract?.trim() || '';
+	const hasPaperContext = Boolean(paperTitle || paperAbstract);
+
+	const safeText = (value: string) =>
+		value
+			.replace(/&/g, '&amp;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;');
+
+	const truncatedAbstract = paperAbstract.length > 700
+		? `${paperAbstract.slice(0, 700)}...`
+		: paperAbstract;
+
+	const paperSection = hasPaperContext
+		? `
+                    <div style="background-color: #f8f9fa; border-left: 4px solid #28a745; padding: 20px; margin: 25px 0; border-radius: 4px;">
+                        <p style="margin: 0 0 8px 0;"><strong>📄 Paper:</strong> ${safeText(paperTitle || 'Untitled')}</p>
+                        ${truncatedAbstract ? `<p style="margin: 0; color: #555; font-size: 14px;">${safeText(truncatedAbstract)}</p>` : ''}
+                    </div>
+                `
+		: '';
+
 	return `
         <!DOCTYPE html>
         <html lang="en">
@@ -115,14 +144,16 @@ function generateInvitationEmailTemplate(
 
                     <p style="font-size: 16px; margin-bottom: 20px;">Hello,</p>
 
-                    <p style="font-size: 16px; margin-bottom: 25px;">You have been invited to join <strong>SciLedger</strong> as a reviewer for the following hub:</p>
+					<p style="font-size: 16px; margin-bottom: 25px;">You have been invited to join <strong>SciLedger</strong> as a reviewer for the following hub:</p>
 
                     <!-- Hub Info Box -->
                     <div style="background-color: #f8f9fa; border-left: 4px solid #0170f3; padding: 20px; margin: 25px 0; border-radius: 4px;">
                         <p style="margin: 0;"><strong>🏛️ Hub:</strong> ${hubName}</p>
                     </div>
 
-                    <p style="font-size: 16px; margin-bottom: 25px;">To accept this invitation and create your reviewer account, please click the button below:</p>
+					${paperSection}
+
+					<p style="font-size: 16px; margin-bottom: 25px;">To accept this invitation and create your reviewer account, please click the button below:</p>
 
                     <!-- Button -->
                     <div style="text-align: center; margin: 40px 0;">
@@ -130,6 +161,13 @@ function generateInvitationEmailTemplate(
                             ✅ Accept Invitation & Register
                         </a>
                     </div>
+
+					<p style="font-size: 14px; color: #666; margin-bottom: 12px;">If you are unable to review, you can decline and inform the hub manager:</p>
+					<div style="text-align: center; margin: 0 0 30px 0;">
+						<a href="${declineUrl}" style="display: inline-block; background-color: #f3f4f6; color: #111827; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; border: 1px solid #d1d5db;">
+							Decline Invitation
+						</a>
+					</div>
 
                     <p style="font-size: 14px; color: #666; margin-bottom: 10px;">Or copy and paste this link into your browser:</p>
                     <div style="word-break: break-all; background-color: #f8f4ff; padding: 15px; border-radius: 4px; font-family: monospace; font-size: 12px; border: 1px solid #e0e0e0;">
@@ -165,7 +203,7 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
 			return json({ error: 'Unauthorized' }, { status: 401 });
 		}
 
-		const { email, hubId } = await request.json();
+		const { email, hubId, paperId, customDeadlineDays } = await request.json();
 
 		// Validate input
 		if (!email || !hubId) {
@@ -192,6 +230,29 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
 			);
 		}
 
+		let paper: any = null;
+		let paperIdValue: string | null = null;
+		let deadlineDays: number | null = null;
+
+		if (customDeadlineDays !== undefined && customDeadlineDays !== null) {
+			const parsed = Number(customDeadlineDays);
+			if (!Number.isFinite(parsed) || parsed < 1 || parsed > 90) {
+				return json({ error: 'Invalid custom deadline days' }, { status: 400 });
+			}
+			deadlineDays = Math.round(parsed);
+		}
+		if (paperId) {
+			paperIdValue = String(paperId);
+			paper = await Papers.findOne({ id: paperIdValue }).lean();
+			if (!paper) {
+				return json({ error: 'Paper not found' }, { status: 404 });
+			}
+			const paperHubId = typeof paper.hubId === 'object' ? paper.hubId?._id || paper.hubId?.id : paper.hubId;
+			if (paperHubId && String(paperHubId) !== hubIdValue) {
+				return json({ error: 'Paper does not belong to this hub' }, { status: 400 });
+			}
+		}
+
 		const smtpTransporter = getTransporter();
 		if (!smtpTransporter) {
 			const missingSmtpConfig = getMissingSmtpConfig();
@@ -205,23 +266,18 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
 			);
 		}
 
-		// Check if there's already a pending invitation for this email and hub
-		const existingInvitation = await EmailReviewerInvitation.findOne({
-			email: normalizedEmail,
-			hubId: hubIdValue,
-			status: 'pending',
-			expiresAt: { $gt: new Date() }
-		});
-
-		if (existingInvitation) {
-			return json(
-				{ error: 'An invitation has already been sent to this email for this hub' },
-				{ status: 400 }
-			);
-		}
-
 		// Verify SMTP before saving the invitation so failed email attempts don't block retries.
 		await smtpTransporter.verify();
+
+		await EmailReviewerInvitation.updateMany(
+			{
+				email: normalizedEmail,
+				hubId: hubIdValue,
+				paperId: paperIdValue,
+				status: 'pending'
+			},
+			{ status: 'expired', updatedAt: new Date() }
+		);
 
 		// Generate invitation token
 		const token = crypto.randomBytes(32).toString('hex');
@@ -231,6 +287,10 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
 		const invitation = new EmailReviewerInvitation({
 			email: normalizedEmail,
 			hubId: hubIdValue,
+			paperId: paperIdValue,
+			invitedBy: inviterId,
+			inviteType: paperIdValue ? 'paper_review' : 'hub_reviewer',
+			customDeadlineDays: deadlineDays,
 			token,
 			expiresAt,
 			status: 'pending'
@@ -240,6 +300,7 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
 
 		// Invitation URL
 		const invitationUrl = `${getSiteUrl(url)}/invite/register?token=${token}`;
+		const declineUrl = `${getSiteUrl(url)}/invite/decline?token=${token}`;
 
 		// Send email
 		try {
@@ -250,7 +311,12 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
 				html: generateInvitationEmailTemplate(
 					normalizedEmail,
 					hub.title || hub.name || 'SciLedger hub',
-					invitationUrl
+					invitationUrl,
+						declineUrl,
+					{
+						paperTitle: paper?.title || null,
+						paperAbstract: paper?.abstract || paper?.summary || null
+					}
 				)
 			});
 		} catch (error) {
