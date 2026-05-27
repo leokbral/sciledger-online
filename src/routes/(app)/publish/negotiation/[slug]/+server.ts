@@ -5,8 +5,9 @@ import Papers from '$lib/db/models/Paper';
 import '$lib/db/models/User';
 import type { User } from '$lib/types/User';
 import Hubs from '$lib/db/models/Hub';
+import { canManageHub } from '$lib/helpers/hubPermissions';
 
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, locals }) => {
 	await start_mongo();
 
 	try {
@@ -29,6 +30,22 @@ export const POST: RequestHandler = async ({ request }) => {
 			hubId,
 			isLinkedToHub
 		} = await request.json();
+
+		const existingPaper = await Papers.findById(id).lean().exec();
+		if (!existingPaper) {
+			return json({ error: 'Paper not found' }, { status: 404 });
+		}
+
+		if (existingPaper.hubId) {
+			const hub = await Hubs.findById(existingPaper.hubId).lean().exec();
+			const currentUserId = locals.user?.id;
+			if (!hub || !currentUserId || !canManageHub(hub as any, currentUserId)) {
+				return json(
+					{ error: 'Only hub managers can update reviewer assignment for hub-linked papers.' },
+					{ status: 403 }
+				);
+			}
+		}
 
 		if (!mainAuthor || !correspondingAuthor || !title || !abstract || !keywords || !pdfUrl || !submittedBy) {
 			return json({ error: 'Todos os campos são obrigatórios.' }, { status: 400 });

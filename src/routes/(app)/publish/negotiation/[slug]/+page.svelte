@@ -24,6 +24,7 @@
 	let peer_review: string = $state('');
 	let paper: Paper | null = $state(data.paper);
 	let isHubOwner: boolean = $state(!!(data as any).isHubOwner);
+	let canManageHub: boolean = $state(!!(data as any).canManageHub);
 	let isApprovingPublication = $state(false);
 	let approvePublicationError = $state('');
 	let isStandalonePaper = $derived(!!paper && !paper.hubId);
@@ -32,6 +33,7 @@
 		(paper?.paymentHold?.status === 'authorized' || paper?.paymentHold?.status === 'captured')
 	);
 	let requiresPaymentBeforeInviting = $derived(isStandalonePaper && !hasStandalonePaymentAuthorization);
+	let canEditReviewerAssignments = $derived(!paper?.hubId || canManageHub);
 
 	interface ImageItem {
 		id?: string;
@@ -116,6 +118,10 @@
 
 	async function handleSavePaper(event: MouseEvent) {
 		if (!paper) return;
+		if (paper.hubId && !canManageHub) {
+			alert('Hub-linked papers must be managed by the hub manager or editor-in-chief.');
+			return;
+		}
 
 		try {
 			// Se o paper NÃO tem hub, exigir pagamento
@@ -191,6 +197,10 @@
 
 	async function hdlSaveDraft(event: MouseEvent) {
 		if (!paper) return;
+		if (paper.hubId && !canManageHub) {
+			alert('Hub-linked papers must be managed by the hub manager or editor-in-chief.');
+			return;
+		}
 
 		try {
 			const newImageIds = await Promise.all(
@@ -288,6 +298,10 @@
 	async function confirmHubSelection() {
 		try {
 			if (!paper || !selectedHub) return;
+			if (paper.hubId && !canManageHub) {
+				alert('Only the hub manager or editor-in-chief can change reviewer assignment for this paper.');
+				return;
+			}
 
 			const updatedPaper = {
 				...paper,
@@ -343,14 +357,14 @@
 		<button
 			class="bg-primary-500 text-white rounded-lg px-4 py-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
 			onclick={hdlSaveDraft}
-			disabled={!!paper?.hubId}
+			disabled={!!paper?.hubId && !canManageHub}
 		>
 			Save Draft
 		</button>
 		<button 
 			class="bg-primary-500 text-white rounded-lg px-4 py-2 disabled:bg-gray-400 disabled:cursor-not-allowed" 
 			onclick={handleSavePaper}
-			disabled={!!paper?.hubId || !paper?.peer_review?.responses || paper.peer_review.responses.filter(r => r.status === 'accepted').length < 3}
+			disabled={(!!paper?.hubId && !canManageHub) || !paper?.peer_review?.responses || paper.peer_review.responses.filter(r => r.status === 'accepted').length < 3}
 		>
 			Submit to Review
 		</button>
@@ -401,8 +415,13 @@
 					<div class="text-sm text-blue-900">
 						<strong>Status: Reviewer Assignment (Hub)</strong>
 						<p class="mt-1">
-							This paper is linked to a hub and is currently under review.
+							This paper is linked to a hub. Reviewer assignment is handled by the hub manager or editor-in-chief.
 						</p>
+						{#if !canManageHub}
+							<p class="mt-2 font-medium text-blue-950">
+								Please wait for the hub manager or editor-in-chief to choose the reviewers.
+							</p>
+						{/if}
 					</div>
 				</div>
 			</div>
@@ -605,6 +624,7 @@
 			</div>
 		</div> -->
 
+		{#if canEditReviewerAssignments}
 		<!-- Peer Review Options -->
 		<label for="peer_review" class="block mb-1">Peer Review Options</label>
 		<select
@@ -782,6 +802,15 @@
 					</div>
 				{/if}
 			{/if}
+		{/if}
+		{:else if paper?.hubId}
+			<div class="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-5 text-sm text-slate-700">
+				<p class="font-semibold text-slate-900">Reviewer assignment is locked</p>
+				<p class="mt-1">
+					This paper is attached to a hub. Only the hub manager or editor-in-chief can choose reviewers.
+					Please wait for them to complete the assignment.
+				</p>
+			</div>
 		{/if}
 	</div>
 {/if}

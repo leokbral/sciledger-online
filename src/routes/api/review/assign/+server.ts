@@ -6,6 +6,8 @@ import Users from '$lib/db/models/User';
 import { NotificationService } from '$lib/services/NotificationService';
 import type { RequestHandler } from './$types';
 import { randomUUID } from 'crypto';
+import Hubs from '$lib/db/models/Hub';
+import { canManageHub } from '$lib/helpers/hubPermissions';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
 	await start_mongo();
@@ -63,6 +65,17 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 		if (!isAuthor) {
 			return json({ error: 'Only paper authors can assign reviewers' }, { status: 403 });
+		}
+
+		// If the paper is linked to a hub and is in review/corrections, block authors from assigning reviewers
+		if (paper.hubId) {
+			const hub = await Hubs.findById(paper.hubId).lean().exec();
+			const paperStatus = String(paper.status || '').toLowerCase();
+			const lockedStatuses = ['in review', 'needing corrections'];
+			const userCanManage = (locals.user && ((locals.user.roles && (locals.user.roles.admin || locals.user.roles.editor)) || canManageHub(hub as any, locals.user.id)));
+			if (lockedStatuses.includes(paperStatus) && !userCanManage) {
+				return json({ error: 'Only the hub manager or Editor-in-Chief can assign reviewers for this paper.' }, { status: 403 });
+			}
 		}
 
 		// Atualizar peer_review do paper
