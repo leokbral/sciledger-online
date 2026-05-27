@@ -4,6 +4,7 @@ import PaperReviewInvitation from '$lib/db/models/PaperReviewInvitation';
 import '$lib/db/models/Review';
 import { error, redirect } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongooseConnection';
+import { canManageHub as canManageHubHelper } from '$lib/helpers/hubPermissions';
 interface ObjectId {
 	toString(): string;
 	constructor: { name: string };
@@ -121,6 +122,14 @@ export async function load({ locals, params }) {
 		Array.isArray((paperDoc.hubId as any).reviewers) &&
 		(paperDoc.hubId as any).reviewers.some((reviewer: any) => matchesCurrentUser(reviewer, userId));
 
+	// Determine whether the current user can manage hub-linked papers
+	const canManageHub = Boolean(
+		locals.user &&
+		(typeof locals.user === 'object') &&
+		((locals.user.roles && ((locals.user.roles as any).admin || (locals.user.roles as any).editor)) ||
+		(canManageHubHelper((paperDoc.hubId as any) || null, userId)))
+	);
+
 	const hasAcceptedResponse = (paperDoc.peer_review?.responses ?? []).some((response: any) => {
 		return (
 			matchesCurrentUser(response?.reviewerId, userId) &&
@@ -169,10 +178,20 @@ export async function load({ locals, params }) {
 		.map((invitation: any) => String(invitation?.reviewer || '').trim())
 		.filter(Boolean);
 
+	// Block authors from performing reviewer assignment when paper is linked to a hub
+	const paperStatus = String(paperDoc.status || '').toLowerCase();
+	const assignmentLockedForAuthor =
+		isAuthor &&
+		(Boolean(paperDoc.hubId) || Boolean((paperDoc as any).isLinkedToHub)) &&
+		(['in review', 'needing corrections'].includes(paperStatus)) &&
+		!canManageHub;
+
 	return {
 		paper: sanitize(paperDoc),
 		users: sanitize(usersDoc),
 		isHubOwner,
+		canManageHub,
+		assignmentLockedForAuthor,
 		reviewAssignments: sanitize(reviewAssignments),
 		pendingReviewerIds
 	};
