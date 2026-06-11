@@ -2,7 +2,9 @@ import { json } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import Papers from '$lib/db/models/Paper';
 import Hubs from '$lib/db/models/Hub';
+import { authorize } from '$lib/server/authorization/authorizationService';
 import type { RequestHandler } from './$types';
+import * as crypto from 'crypto';
 
 export const POST: RequestHandler = async ({ params, locals }) => {
 	await start_mongo();
@@ -21,9 +23,12 @@ export const POST: RequestHandler = async ({ params, locals }) => {
 			return json({ error: 'Hub not found' }, { status: 404 });
 		}
 
-		const hubCreatorId = hub.createdBy?.toString();
-		if (hubCreatorId !== user.id) {
-			return json({ error: 'Only hub owner can create review assignments' }, { status: 403 });
+		const authorization = await authorize(user, 'review.assign', { hub });
+		if (!authorization.allowed) {
+			return json(
+				{ error: 'Insufficient permissions', reason: authorization.reason },
+				{ status: 403 }
+			);
 		}
 
 		// Importar ReviewAssignment dinamicamente

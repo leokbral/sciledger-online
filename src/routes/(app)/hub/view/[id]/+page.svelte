@@ -1,17 +1,24 @@
 <script lang="ts">
 	import { Modal } from '@skeletonlabs/skeleton-svelte';
 	import Icon from '@iconify/svelte';
-	import { Avatar } from '@skeletonlabs/skeleton-svelte';
 	import { getInitials } from '$lib/utils/GetInitials';
 	import ReviewerManagement from '$lib/components/ReviewerManagement/ReviewerManagement.svelte';
-	import type { Paper } from '$lib/types/Paper.js';
 	import PapersSection from '$lib/components/PapersSection/PapersSection.svelte';
-	import ManageReviewerDeadline from '$lib/components/ReviewerManagement/ManageReviewerDeadline.svelte';
-	import { normalizeId } from '$lib/helpers/hubPermissions';
+	import RoleBadge from '$lib/components/Roles/RoleBadge.svelte';
+	import { getPrimaryRole } from '$lib/helpers/roleDisplay';
 
 	let { data } = $props();
 	const hub = data.hub;
-	const papers = data.papers;
+	const memberRoleDefinitions = Array.isArray(data.memberRoleDefinitions)
+		? data.memberRoleDefinitions
+		: [];
+	const effectiveHubMembers = Array.isArray(data.effectiveHubMembers)
+		? data.effectiveHubMembers
+		: [];
+	const effectiveReviewers = Array.isArray(data.effectiveReviewers)
+		? data.effectiveReviewers
+		: [];
+	const currentUserHubMember = data.currentUserHubMember ?? null;
 
 	// Enhanced debug logging
 
@@ -20,31 +27,39 @@
 	// 	return paper.hubId === hub._id && paper.status === 'published';
 	// });
 	const userId = data.user.id ?? data.user._id;
-	const isCreator = normalizeId(data.hub.createdBy) === data.user.id;
-	const isViceManager = data.isViceManager === true ||
-		(Array.isArray(hub.assistantManagers) && hub.assistantManagers.some((m: any) => normalizeId(m) === data.user.id));
-	const isHubManager = isCreator || isViceManager;
-	const isReviewer = Array.isArray(hub.reviewers)
-		? hub.reviewers.some((r: any) => normalizeId(r) === data.user.id)
-		: false;
-
-	const owner = hub.createdBy;
-	const assistantManagers = Array.isArray(hub.assistantManagers)
-		? hub.assistantManagers.filter((m: any) => normalizeId(m))
-		: [];
-	const assistantManagerIds = new Set(assistantManagers.map((m: any) => normalizeId(m)));
-	const reviewersOnly = Array.isArray(hub.reviewers)
-		? hub.reviewers.filter((r: any) => {
-			const id = normalizeId(r);
-			if (!id) return false;
-			if (assistantManagerIds.has(id)) return false;
-			if (normalizeId(owner) === id) return false;
-			return true;
-		})
-		: [];
+	const isCreator = currentUserHubMember?.primaryRoleKey === 'HubOwner';
+	const isHubManager = data.isHubManager === true;
+	const canManageRoles = data.canManageRoles === true;
+	const isReviewer = data.isHubReviewer === true;
 
 	let memberDashboardSearch = $state('');
-	let memberDashboardFilter = $state<'all' | 'owner' | 'vice' | 'reviewer'>('all');
+	let memberDashboardFilter = $state<
+		'all' | 'HubOwner' | 'EditorChief' | 'AssociateEditor' | 'Reviewer'
+	>('all');
+
+	function getValueAliases(value: any): string[] {
+		if (!value) return [];
+		if (typeof value === 'string' || typeof value === 'number') return [String(value)];
+		if (typeof value !== 'object') return [];
+
+		const aliases = [
+			...getValueAliases(value.id),
+			...getValueAliases(value._id)
+		];
+		const stringified = value.toString?.();
+		if (stringified && stringified !== '[object Object]') {
+			aliases.push(String(stringified));
+		}
+
+		return Array.from(new Set(aliases.filter(Boolean)));
+	}
+
+	function userForId(userId: string) {
+		const aliases = new Set(getValueAliases(userId));
+		return data.users?.find((user: any) =>
+			getValueAliases(user).some((alias) => aliases.has(alias))
+		);
+	}
 
 	function memberName(member: any): string {
 		if (!member) return 'Unknown user';
@@ -59,28 +74,65 @@
 		return member?.profilePictureUrl || member?.profilePicture || '';
 	}
 
+	function roleForKey(roleKey: string | null | undefined) {
+		return memberRoleDefinitions.find((role: any) => role.key === roleKey);
+	}
+
+	function decorateAssignment(assignment: any) {
+		const role = roleForKey(assignment.roleKey);
+		return {
+			...assignment,
+			roleName: role?.name,
+			priority: role?.priority
+		};
+	}
+
+	function buildEffectiveMemberRow(entry: any) {
+		const member = entry.user || userForId(entry.userId) || { _id: entry.userId, id: entry.userId };
+		const assignments = Array.isArray(entry.roles) && entry.roles.length > 0
+			? entry.roles.map((role: any) =>
+				decorateAssignment({
+					userId: entry.userId,
+					roleKey: role.roleKey,
+					roleName: role.name,
+					priority: role.priority,
+					isActive: true,
+					scopeType: 'hub',
+					scopeId: hub._id || hub.id
+				})
+			)
+			: (entry.directRoleKeys || []).map((roleKey: string) =>
+				decorateAssignment({
+					userId: entry.userId,
+					roleKey,
+					isActive: true,
+					scopeType: 'hub',
+					scopeId: hub._id || hub.id
+				})
+			);
+
+		return {
+			id: entry.userId,
+			sourceRole: 'assignment' as const,
+			member,
+			avatarUrl: memberAvatar(member),
+			assignments
+		};
+	}
+
+	function getAllHubMemberRows() {
+		return effectiveHubMembers
+			.map(buildEffectiveMemberRow)
+			.sort((a, b) => memberName(a.member).localeCompare(memberName(b.member)));
+	}
+
 	function getHubMemberRows() {
-		const rows: Array<{ id: string; role: 'owner' | 'vice' | 'reviewer'; member: any; avatarUrl: string }> = [];
-		const ownerId = normalizeId(owner) || 'owner';
-		rows.push({ id: ownerId, role: 'owner', member: owner, avatarUrl: memberAvatar(owner) });
-
-		assistantManagers.forEach((m: any) => {
-			const id = normalizeId(m);
-			if (id && id !== ownerId) {
-				rows.push({ id, role: 'vice', member: m, avatarUrl: memberAvatar(m) });
-			}
-		});
-
-		reviewersOnly.forEach((r: any) => {
-			const id = normalizeId(r);
-			if (id && id !== ownerId) {
-				rows.push({ id, role: 'reviewer', member: r, avatarUrl: memberAvatar(r) });
-			}
-		});
-
 		const term = memberDashboardSearch.trim().toLowerCase();
-		return rows
-			.filter((row) => memberDashboardFilter === 'all' || row.role === memberDashboardFilter)
+		return getAllHubMemberRows()
+			.filter((row) => {
+				if (memberDashboardFilter === 'all') return true;
+				return getPrimaryRole(row.assignments) === memberDashboardFilter;
+			})
 			.filter((row) => {
 				if (!term) return true;
 				return (
@@ -88,7 +140,18 @@
 					memberEmail(row.member).toLowerCase().includes(term)
 				);
 			})
-			.sort((a, b) => memberName(a.member).localeCompare(memberName(b.member)));
+	}
+
+	function countMembersWithRole(roleKey: string) {
+		return getAllHubMemberRows().filter((row) => getPrimaryRole(row.assignments) === roleKey).length;
+	}
+
+	function countEditorialMembers() {
+		const editorialRoles = new Set(['EditorChief', 'AssociateEditor']);
+		return getAllHubMemberRows().filter((row) => {
+			const primaryRole = getPrimaryRole(row.assignments);
+			return !!primaryRole && editorialRoles.has(primaryRole);
+		}).length;
 	}
 
 	let expandedPapers = $state<string[]>([]);
@@ -257,6 +320,15 @@
 					>
 						<Icon icon="mdi:pencil" width="20" />
 						Edit Hub
+					</a>
+				{/if}
+				{#if canManageRoles}
+					<a
+						href="/hub/view/{hub._id || hub.id}/rbac"
+						class="btn inline-flex items-center gap-2 rounded-full border border-surface-300 dark:border-surface-600 bg-white/95 dark:bg-surface-800 px-4 py-2 text-surface-800 dark:text-surface-100 shadow-sm hover:bg-surface-50 dark:hover:bg-surface-700 hover:shadow-md transition-all"
+					>
+						<Icon icon="mdi:account-key-outline" width="20" />
+						Manage Roles
 					</a>
 				{/if}
 			</div>
@@ -491,33 +563,34 @@
 			<p class="text-sm text-gray-500">Structured overview of all people with access to this hub.</p>
 		</div>
 		<div class="text-sm font-medium text-gray-600 bg-gray-100 rounded-full px-3 py-1">
-			Total: {1 + assistantManagers.length + reviewersOnly.length}
+			Total: {getAllHubMemberRows().length}
 		</div>
 	</div>
 
 	<div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
 		<div class="rounded-xl border border-violet-200 bg-violet-50 p-4">
-			<div class="text-xs uppercase tracking-wide font-semibold text-violet-800 mb-1">Owner</div>
-			<div class="text-2xl font-bold text-violet-900">1</div>
+			<div class="text-xs uppercase tracking-wide font-semibold text-violet-800 mb-1">Hub owners</div>
+			<div class="text-2xl font-bold text-violet-900">{countMembersWithRole('HubOwner')}</div>
 		</div>
 		<div class="rounded-xl border border-amber-200 bg-amber-50 p-4">
-			<div class="text-xs uppercase tracking-wide font-semibold text-amber-800 mb-1">Editors-in-chief</div>
-			<div class="text-2xl font-bold text-amber-900">{assistantManagers.length}</div>
+			<div class="text-xs uppercase tracking-wide font-semibold text-amber-800 mb-1">Editorial roles</div>
+			<div class="text-2xl font-bold text-amber-900">{countEditorialMembers()}</div>
 		</div>
 		<div class="rounded-xl border border-blue-200 bg-blue-50 p-4">
 			<div class="text-xs uppercase tracking-wide font-semibold text-blue-800 mb-1">Reviewers</div>
-			<div class="text-2xl font-bold text-blue-900">{reviewersOnly.length}</div>
+			<div class="text-2xl font-bold text-blue-900">{countMembersWithRole('Reviewer')}</div>
 		</div>
 	</div>
 
 	<div class="rounded-xl border border-surface-200 p-4">
-		<div class="flex flex-wrap items-center gap-2 justify-between mb-3">
-			<div class="flex items-center gap-2">
-				<button class="btn btn-xs {memberDashboardFilter === 'all' ? 'preset-filled' : 'preset-outlined'}" onclick={() => (memberDashboardFilter = 'all')}>All</button>
-				<button class="btn btn-xs {memberDashboardFilter === 'owner' ? 'preset-filled' : 'preset-outlined'}" onclick={() => (memberDashboardFilter = 'owner')}>Owner</button>
-				<button class="btn btn-xs {memberDashboardFilter === 'vice' ? 'preset-filled' : 'preset-outlined'}" onclick={() => (memberDashboardFilter = 'vice')}>Vice</button>
-				<button class="btn btn-xs {memberDashboardFilter === 'reviewer' ? 'preset-filled' : 'preset-outlined'}" onclick={() => (memberDashboardFilter = 'reviewer')}>Reviewer</button>
-			</div>
+			<div class="flex flex-wrap items-center gap-2 justify-between mb-3">
+				<div class="flex items-center gap-2">
+					<button class="btn btn-xs {memberDashboardFilter === 'all' ? 'preset-filled' : 'preset-outlined'}" onclick={() => (memberDashboardFilter = 'all')}>All</button>
+					<button class="btn btn-xs {memberDashboardFilter === 'HubOwner' ? 'preset-filled' : 'preset-outlined'}" onclick={() => (memberDashboardFilter = 'HubOwner')}>Hub Owner</button>
+					<button class="btn btn-xs {memberDashboardFilter === 'EditorChief' ? 'preset-filled' : 'preset-outlined'}" onclick={() => (memberDashboardFilter = 'EditorChief')}>Editor Chief</button>
+					<button class="btn btn-xs {memberDashboardFilter === 'AssociateEditor' ? 'preset-filled' : 'preset-outlined'}" onclick={() => (memberDashboardFilter = 'AssociateEditor')}>Associate Editor</button>
+					<button class="btn btn-xs {memberDashboardFilter === 'Reviewer' ? 'preset-filled' : 'preset-outlined'}" onclick={() => (memberDashboardFilter = 'Reviewer')}>Reviewer</button>
+				</div>
 			<div class="relative min-w-[240px] w-full sm:w-auto">
 				<input
 					type="text"
@@ -549,13 +622,7 @@
 							<div class="text-sm font-medium text-gray-900 truncate">{memberName(row.member)}</div>
 						</div>
 						<div>
-							{#if row.role === 'owner'}
-								<span class="inline-flex rounded-full bg-violet-100 text-violet-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">Owner</span>
-							{:else if row.role === 'vice'}
-								<span class="inline-flex rounded-full bg-amber-100 text-amber-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">Editor-in-chief</span>
-							{:else}
-								<span class="inline-flex rounded-full bg-blue-100 text-blue-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">Reviewer</span>
-							{/if}
+							<RoleBadge assignments={row.assignments} />
 						</div>
 						<div class="text-xs text-gray-500 truncate">{memberEmail(row.member)}</div>
 					</div>
@@ -570,19 +637,26 @@
 </div>
 
 <!-- Hub Management Section -->
-{#if isHubManager}
+{#if isHubManager || canManageRoles}
 	<div class="flex justify-between items-center mb-4">
 		<h2 class="text-xl font-semibold text-gray-800">Hub Management</h2>
 
 		<div class="flex gap-2">
 			<!-- <ReviewerManagement reviewer={data.user} hubId={hub._id} {isCreator} /> -->
-			<ReviewerManagement
-				hubId={hub._id}
-				canManageHub={isHubManager}
-				canInviteVice={isCreator}
-				assistantManagerIds={(hub.assistantManagers || []).map((m: any) => normalizeId(m)).filter(Boolean) as string[]}
-				users={data.users as any[]}
-			/>
+			{#if isHubManager}
+				<ReviewerManagement
+					hubId={hub._id}
+					canManageHub={isHubManager}
+					canInviteVice={canManageRoles}
+					users={data.users as any[]}
+					effectiveReviewers={effectiveReviewers}
+				/>
+			{/if}
+			{#if canManageRoles}
+				<a href="/hub/view/{hub._id || hub.id}/rbac" class="btn preset-tonal">
+					Manage Roles
+				</a>
+			{/if}
 		</div>
 	</div>
 {/if}
@@ -594,6 +668,7 @@
 	{isCreator}
 	isHubManager={isHubManager}
 	isHubReviewer={isReviewer}
+	effectiveReviewers={effectiveReviewers}
 	userId={data.user.id ?? data.user._id}
 	{shouldHighlight}
 	reviewAssignments={data.reviewAssignments}
@@ -604,7 +679,6 @@
 <!-- <div class="mt-6 bg-white shadow rounded-xl p-4 space-y-2">
 	<h2 class="text-xl font-semibold text-gray-800">Informações Gerais</h2>
 	<p><strong>Status:</strong> {hub.status}</p>
-	<p><strong>Criado por:</strong> {hub.createdBy}</p>
 </div> -->
 
 <!-- Revisão e Visibilidade -->

@@ -3,6 +3,10 @@ import Users from '$lib/db/models/User';
 import '$lib/db/models/Review'; // ensure Review schema is registered for populate
 import { error, redirect } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongooseConnection';
+import {
+	getEffectiveHubMemberForUser,
+	resolveEffectiveHubRoles
+} from '$lib/server/authorization/effectiveHubRoles';
 
 // Type for MongoDB ObjectId
 interface ObjectId {
@@ -111,15 +115,10 @@ export async function load({ locals, params }) {
 	});
 
 	const hubData = typeof paperDoc.hubId === 'object' ? paperDoc.hubId : null;
-	const isHubReviewer =
-		Array.isArray(hubData?.reviewers) &&
-		hubData.reviewers.some((reviewer: any) =>
-			matchesCurrentUser(reviewer, locals.user as Record<string, unknown>)
-		);
-	const isHubOwner = matchesCurrentUser(
-		hubData?.createdBy,
-		locals.user as Record<string, unknown>
-	);
+	const effectiveHubRoles = hubData ? await resolveEffectiveHubRoles(hubData) : null;
+	const currentUserHubMember = getEffectiveHubMemberForUser(effectiveHubRoles, locals.user);
+	const isHubReviewer = currentUserHubMember?.canReview === true;
+	const isHubOwner = currentUserHubMember?.primaryRoleKey === 'HubOwner';
 
 	if (isReviewerAccepted || isHubReviewer || isHubOwner) {
 		throw redirect(302, `/review/inreview/${params.slug}`);

@@ -15,6 +15,12 @@ import {
 	saveReviewAttachmentFile,
 	validateReviewAttachmentFile
 } from '$lib/server/reviewAttachment';
+import { authorize } from '$lib/server/authorization/authorizationService';
+import {
+	EditorialTransitionError,
+	transitionPaperStatus
+} from '$lib/server/authorization/editorialTransitionService';
+import { getUserIdAliases } from '$lib/server/authorization/roleResolver';
 import * as crypto from 'crypto';
 import { start_mongo } from '$lib/db/mongooseConnection';
 
@@ -61,8 +67,25 @@ async function checkAndUpdatePaperStatusIfAllReviewsComplete(paperId: string, re
 			}
 
 			if (newStatus) {
-				paper.status = newStatus;
-				await paper.save();
+				try {
+					await transitionPaperStatus({
+						paperId,
+						action: 'paper.autoRequestCorrections',
+						expectedStatus: paper.status,
+						system: true,
+						metadata: {
+							reviewRound,
+							submittedReviews: submittedReviews.length,
+							assignedReviewers: assignedReviewers.length
+						}
+					});
+				} catch (transitionError) {
+					if (transitionError instanceof EditorialTransitionError) {
+						console.warn('Review completion transition skipped:', transitionError.message);
+						return;
+					}
+					throw transitionError;
+				}
 			}
 		}
 	} catch (error) {
@@ -304,9 +327,14 @@ async function parseReviewSubmission(request: Request) {
 	};
 }
 
-export const GET: RequestHandler = async ({ url }) => {
+export const GET: RequestHandler = async ({ url, locals }) => {
 	try {
 		await start_mongo();
+
+		const user = locals.user;
+		if (!user) {
+			return json({ error: 'User not authenticated' }, { status: 401 });
+		}
 
 		const paperId = url.searchParams.get('paperId');
 		const reviewerId = url.searchParams.get('reviewerId');
@@ -314,6 +342,19 @@ export const GET: RequestHandler = async ({ url }) => {
 
 		if (!paperId || !reviewerId || !reviewRound) {
 			return json({ error: 'Missing required parameters' }, { status: 400 });
+		}
+
+		const userAliases = getUserIdAliases(user);
+		if (!userAliases.includes(String(reviewerId))) {
+			return json({ error: 'Reviewer mismatch' }, { status: 403 });
+		}
+
+		const authorization = await authorize(user, 'review.submit', { paperId });
+		if (!authorization.allowed) {
+			return json(
+				{ error: 'Insufficient permissions', reason: authorization.reason },
+				{ status: 403 }
+			);
 		}
 
 		// Buscar revisão enviada nesta rodada
@@ -361,17 +402,30 @@ export const GET: RequestHandler = async ({ url }) => {
 	}
 };
 
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, locals }) => {
 	try {
 		await start_mongo();
 
+		const user = locals.user;
+		if (!user) {
+			return json({ error: 'User not authenticated' }, { status: 401 });
+		}
+
 		const reviewData = await parseReviewSubmission(request);
-		const { paperId, reviewerId, paperTitle, form, reviewRound, reviewAttachment } = reviewData;
+		const { paperId, paperTitle, form, reviewRound, reviewAttachment } = reviewData;
+		const requestedReviewerId = reviewData.reviewerId;
+		const userAliases = getUserIdAliases(user);
 
 		// Validar dados obrigatórios
-		if (!paperId || !reviewerId || !paperTitle || !form) {
+		if (!paperId || !requestedReviewerId || !paperTitle || !form) {
 			return json({ error: 'Missing required fields' }, { status: 400 });
 		}
+
+		if (!userAliases.includes(String(requestedReviewerId))) {
+			return json({ error: 'Reviewer mismatch' }, { status: 403 });
+		}
+
+		const reviewerId = String(user.id);
 
 		const formValidationError = validateSubmittedReviewForm(form);
 		if (formValidationError) {
@@ -389,6 +443,14 @@ export const POST: RequestHandler = async ({ request }) => {
 		const paper = await Papers.findOne({ id: paperId });
 		if (!paper) {
 			return json({ error: 'Paper not found' }, { status: 404 });
+		}
+
+		const authorization = await authorize(user, 'review.submit', { paper });
+		if (!authorization.allowed) {
+			return json(
+				{ error: 'Insufficient permissions', reason: authorization.reason },
+				{ status: 403 }
+			);
 		}
 
 		// Determinar a rodada baseada no paper.reviewRound ou no reviewRound enviado

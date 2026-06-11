@@ -62,6 +62,16 @@ export type Paper = {
      }; */
     createdAt: Date;
     updatedAt: Date;
+    statusHistory?: Array<{
+        action: string;
+        permissionKey?: string;
+        previousStatus?: string;
+        newStatus?: string;
+        userId?: string | null;
+        roleKeys?: string[];
+        metadata?: Record<string, unknown>;
+        createdAt?: Date;
+    }>;
     submittedBy: User; // User who submitted the paper
     hubId?: string | Hub| null;
     isLinkedToHub?: boolean;

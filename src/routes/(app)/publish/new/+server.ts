@@ -9,6 +9,9 @@ import Hubs from '$lib/db/models/Hub';
 import type { User } from '$lib/types/User';
 import Stripe from 'stripe';
 import { PaperLifecycleEmailService } from '$lib/services/PaperLifecycleEmailService';
+import { can } from '$lib/server/authorization/authorizationService';
+import { getUserIdAliases } from '$lib/server/authorization/roleResolver';
+import { resolveEffectiveHubRoles } from '$lib/server/authorization/effectiveHubRoles';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
   apiVersion: '2026-02-25.preview'
@@ -34,17 +37,31 @@ function normalizeAuthorAffiliations(input: unknown) {
         .filter(Boolean);
 }
 
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, locals }) => {
 
     await start_mongo(); // Não necessário mais
 
     try {
+        const user = locals.user;
+        if (!user) {
+            return json({ error: 'User not authenticated' }, { status: 401 });
+        }
+
         const { paperPictures, content, mainAuthor, correspondingAuthor, title, abstract, keywords, pdfUrl, submittedBy, price, coAuthors, status, authors, authorAffiliations, hubId, isLinkedToHub, scopusArea, scopusSubArea, scopusClassifications, supplementaryMaterials, supplementaryFiles, paymentAuthorizationCode } =
             await request.json();
         
         // Verifica se todas as informações necessárias foram enviadas
         if (!mainAuthor || !correspondingAuthor || !title || !abstract || !keywords || !pdfUrl || !submittedBy) {
             return json({ error: `Todos os campos são obrigatórios. ${mainAuthor}, ${correspondingAuthor}, ${title}, ${abstract}, ${keywords}, ${pdfUrl}, ${submittedBy}` }, { status: 400 });
+        }
+
+        if (!getUserIdAliases(user).includes(String(submittedBy.id || submittedBy._id || submittedBy))) {
+            return json({ error: 'submittedBy must match the authenticated user' }, { status: 403 });
+        }
+
+        const canSubmit = await can(user, 'paper.submit');
+        if (!canSubmit) {
+            return json({ error: 'Insufficient permissions' }, { status: 403 });
         }
 
         const isStandaloneSubmission = !hubId && !isLinkedToHub;
@@ -159,20 +176,25 @@ export const POST: RequestHandler = async ({ request }) => {
 
             if (newPaper.hubId) {
                 try {
-                    const hub = await Hubs.findById(String(newPaper.hubId))
-                        .select('title createdBy')
-                        .lean();
+                    const hub = await Hubs.findById(String(newPaper.hubId)).lean();
+                    const effectiveHubRoles = hub ? await resolveEffectiveHubRoles(hub) : null;
+                    const hubOwnerIds =
+                        effectiveHubRoles?.members
+                            .filter((member) => member.primaryRoleKey === 'HubOwner')
+                            .map((member) => member.userId)
+                            .filter(Boolean) ?? [];
 
-                    const hubAdminId = hub?.createdBy ? String(hub.createdBy) : '';
-                    if (hubAdminId) {
-                        await PaperLifecycleEmailService.sendHubAdminSubmissionEmail({
-                            hubAdminId,
-                            hubName: String(hub?.title || 'Hub'),
-                            paperId: String(newPaper.id),
-                            paperTitle: String(newPaper.title || 'Untitled paper'),
-                            submittedByName: submitterName || undefined
-                        });
-                    }
+                    await Promise.all(
+                        hubOwnerIds.map((hubAdminId) =>
+                            PaperLifecycleEmailService.sendHubAdminSubmissionEmail({
+                                hubAdminId,
+                                hubName: String(hub?.title || 'Hub'),
+                                paperId: String(newPaper.id),
+                                paperTitle: String(newPaper.title || 'Untitled paper'),
+                                submittedByName: submitterName || undefined
+                            })
+                        )
+                    );
                 } catch (adminEmailError) {
                     console.error('Failed to send hub admin submission email:', adminEmailError);
                 }

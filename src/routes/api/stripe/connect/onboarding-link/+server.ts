@@ -9,6 +9,7 @@ import {
 	getStripeClient
 } from '$lib/services/stripeConnect';
 import { env } from '$env/dynamic/private';
+import { hasReviewerCapability } from '$lib/server/authorization/reviewerCapability';
 
 function isConnectNotEnabledError(error: unknown): boolean {
 	if (!(error instanceof Error)) {
@@ -32,7 +33,7 @@ export const POST: RequestHandler = async ({ locals, url }) => {
 			return json({ error: 'User not authenticated' }, { status: 401 });
 		}
 
-		if (!user.roles?.reviewer) {
+		if (!(await hasReviewerCapability(user))) {
 			return json({ error: 'Only reviewers can connect Stripe accounts' }, { status: 403 });
 		}
 

@@ -8,6 +8,11 @@ import ReviewAssignment from '$lib/db/models/ReviewAssignment';
 import { NotificationService } from '$lib/services/NotificationService';
 import type { User } from '$lib/types/User';
 import * as crypto from 'crypto';
+import {
+    EditorialTransitionError,
+    transitionPaperStatus
+} from '$lib/server/authorization/editorialTransitionService';
+import { getUserIdAliases } from '$lib/server/authorization/roleResolver';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
     await start_mongo();
@@ -22,6 +27,10 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
         if (!user) {
             return json({ error: 'User not authenticated' }, { status: 401 });
+        }
+
+        if (!getUserIdAliases(user).includes(String(reviewerId))) {
+            return json({ error: 'Reviewer mismatch' }, { status: 403 });
         }
 
         const paper = await Papers.findOne({ id: paperId });
@@ -127,15 +136,32 @@ export const POST: RequestHandler = async ({ request, locals }) => {
             r => r.status === 'accepted' || r.status === 'completed'
         ).length;
 
-        // Mudar status do paper para "in review" se tiver pelo menos 1 revisor aceito
-        // (permite acesso individual imediato)
-        if (acceptedCount >= 1 && paper.status === 'reviewer assignment') {
-            paper.status = 'in review';
-            paper.peer_review.reviewStatus = 'in_progress';
-        }
+        const shouldSendToReview = acceptedCount >= 1 && paper.status === 'reviewer assignment';
 
         paper.updatedAt = new Date();
         await paper.save();
+
+        if (shouldSendToReview) {
+            try {
+                await transitionPaperStatus({
+                    paperId,
+                    action: 'paper.sendToReview',
+                    expectedStatus: 'reviewer assignment',
+                    system: true,
+                    metadata: {
+                        endpoint: '/review/paperspool/[slug]',
+                        trigger: 'legacy_reviewer_acceptance'
+                    }
+                });
+                paper.status = 'in review';
+            } catch (transitionError) {
+                if (transitionError instanceof EditorialTransitionError) {
+                    console.warn('Paperspool status transition skipped:', transitionError.message);
+                } else {
+                    throw transitionError;
+                }
+            }
+        }
 
         // Buscar informações do revisor 
         const reviewer = await Users.findOne({ id: reviewerId });

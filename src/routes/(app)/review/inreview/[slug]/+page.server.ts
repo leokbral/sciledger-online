@@ -2,7 +2,11 @@ import MessageFeeds from '$lib/db/models/MessageFeed.js';
 import Papers from '$lib/db/models/Paper';
 import Users from '$lib/db/models/User';
 import { error, redirect } from '@sveltejs/kit';
-import { isHubViceManager } from '$lib/helpers/hubPermissions';
+import {
+	getEffectiveHubMemberForUser,
+	resolveEffectiveHubRoles
+} from '$lib/server/authorization/effectiveHubRoles';
+import { can } from '$lib/server/authorization/authorizationService';
 
 // Type for MongoDB ObjectId
 interface ObjectId {
@@ -41,10 +45,6 @@ function getIdAliases(value: unknown): string[] {
 
 function matchesCurrentUser(value: unknown, userId: string): boolean {
 	return getIdAliases(value).includes(String(userId));
-}
-
-function isAdminUser(user: Record<string, unknown> | null | undefined): boolean {
-	return Boolean(user?.isAdmin || user?.roles && typeof user.roles === 'object' && (user.roles as Record<string, unknown>).admin);
 }
 
 function isPaperAuthor(paperDoc: Record<string, unknown>, userId: string): boolean {
@@ -139,22 +139,19 @@ export async function load({ locals, params }) {
 	}).lean();
 	
 	// Dono do hub pode ver (mas não necessariamente revisar)
-	const hubCreatorId = typeof paperDoc.hubId === 'object'
-		? (paperDoc.hubId?.createdBy?._id || paperDoc.hubId?.createdBy?.id || paperDoc.hubId?.createdBy)
-		: null;
-	const isHubOwner = hubCreatorId?.toString() === userId;
-
-	// Verificar se é revisor do hub
-	const isHubReviewer =
-		typeof paperDoc.hubId === 'object' &&
-		Array.isArray(paperDoc.hubId?.reviewers) &&
-		paperDoc.hubId?.reviewers?.some((reviewer: any) => matchesCurrentUser(reviewer, userId));
-
-	const isViceManager = typeof paperDoc.hubId === 'object' && isHubViceManager(paperDoc.hubId as any, userId);
+	const effectiveHubRoles =
+		typeof paperDoc.hubId === 'object' && paperDoc.hubId
+			? await resolveEffectiveHubRoles(paperDoc.hubId)
+			: null;
+	const currentUserHubMember = getEffectiveHubMemberForUser(effectiveHubRoles, locals.user);
+	const isHubOwner = currentUserHubMember?.primaryRoleKey === 'HubOwner';
+	const isHubReviewer = currentUserHubMember?.canReview === true;
+	const isViceManager = currentUserHubMember?.canAssignReviewers === true;
+	const isPlatformAdmin = await can(locals.user, 'rbac.manage');
 
 	const canViewSubmittedReviews =
 		isPaperAuthor(paperDoc as Record<string, unknown>, userId) ||
-		isAdminUser(locals.user as Record<string, unknown>) ||
+		isPlatformAdmin ||
 		isHubOwner ||
 		isViceManager;
 

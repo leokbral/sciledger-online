@@ -6,6 +6,12 @@ import Hubs from '$lib/db/models/Hub';
 import '$lib/db/models/User';
 import type { User } from '$lib/types/User';
 import { PaperLifecycleEmailService } from '$lib/services/PaperLifecycleEmailService';
+import { authorize } from '$lib/server/authorization/authorizationService';
+import { resolveEffectiveHubRoles } from '$lib/server/authorization/effectiveHubRoles';
+import {
+    EditorialTransitionError,
+    transitionPaperStatus
+} from '$lib/server/authorization/editorialTransitionService';
 
 function normalizeId(input: any): string | undefined {
     if (!input) return undefined;
@@ -37,10 +43,15 @@ function normalizeAuthorAffiliations(input: unknown) {
         .filter(Boolean);
 }
 
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, locals }) => {
     await start_mongo();
 
     try {
+        const user = locals.user;
+        if (!user) {
+            return json({ error: 'User not authenticated' }, { status: 401 });
+        }
+
         const data = await request.json();
 
         // Validate that id exists
@@ -51,6 +62,14 @@ export const POST: RequestHandler = async ({ request }) => {
         const existingPaper = await Papers.findById(data.id).lean().exec();
         if (!existingPaper) {
             return json({ error: 'Paper not found' }, { status: 404 });
+        }
+
+        const authorization = await authorize(user, 'paper.edit', { paper: existingPaper });
+        if (!authorization.allowed) {
+            return json(
+                { error: 'Insufficient permissions', reason: authorization.reason },
+                { status: 403 }
+            );
         }
 
         // Validate required fields
@@ -70,6 +89,16 @@ export const POST: RequestHandler = async ({ request }) => {
         const normalizedMainAuthorId = normalizeId(data.mainAuthor);
         const normalizedCorrespondingAuthorId = normalizeId(data.correspondingAuthor);
         const normalizedSubmittedById = normalizeId(data.submittedBy);
+        const previousStatus = String((existingPaper as any).status || '');
+        const requestedStatus = String(data.status || previousStatus);
+        const shouldSubmit = previousStatus === 'draft' && requestedStatus === 'reviewer assignment';
+
+        if (requestedStatus !== previousStatus && !shouldSubmit && requestedStatus !== 'draft') {
+            return json(
+                { error: 'Status changes must use the editorial transition endpoints.' },
+                { status: 400 }
+            );
+        }
 
         const updateData = {
             mainAuthor: normalizedMainAuthorId,
@@ -78,7 +107,7 @@ export const POST: RequestHandler = async ({ request }) => {
             correspondingAuthor: normalizedCorrespondingAuthorId,
             coAuthors: _coAuthors,
             authorAffiliations: normalizedAuthorAffiliations,
-            status: data.status,//'draft', //'reviewer assignment'
+            status: shouldSubmit ? previousStatus : requestedStatus,
             content: data.content,
             title: data.title,
             abstract: data.abstract,
@@ -96,7 +125,7 @@ export const POST: RequestHandler = async ({ request }) => {
         };
 
 
-        const paper = await Papers.findByIdAndUpdate(
+        let paper: any = await Papers.findByIdAndUpdate(
             data.id,
             updateData,
             { 
@@ -111,7 +140,19 @@ export const POST: RequestHandler = async ({ request }) => {
         }
 
         // Disparar comprovante de submissao quando sair de draft para reviewer assignment.
-        const previousStatus = String((existingPaper as any).status || '');
+        if (shouldSubmit) {
+            paper = await transitionPaperStatus({
+                user,
+                paperId: data.id,
+                action: 'paper.submit',
+                expectedStatus: previousStatus,
+                metadata: {
+                    endpoint: '/publish/edit/[slug]',
+                    submittedFromDraft: true
+                }
+            });
+        }
+
         const nextStatus = String((paper as any).status || '');
         if (nextStatus === 'reviewer assignment' && previousStatus !== 'reviewer assignment') {
             const authorIds = [
@@ -137,20 +178,25 @@ export const POST: RequestHandler = async ({ request }) => {
             const hubId = String((paper as any).hubId || '');
             if (hubId) {
                 try {
-                    const hub = await Hubs.findById(hubId)
-                        .select('title createdBy')
-                        .lean();
+                    const hub = await Hubs.findById(hubId).lean();
+                    const effectiveHubRoles = hub ? await resolveEffectiveHubRoles(hub) : null;
+                    const hubOwnerIds =
+                        effectiveHubRoles?.members
+                            .filter((member) => member.primaryRoleKey === 'HubOwner')
+                            .map((member) => member.userId)
+                            .filter(Boolean) ?? [];
 
-                    const hubAdminId = hub?.createdBy ? String(hub.createdBy) : '';
-                    if (hubAdminId) {
-                        await PaperLifecycleEmailService.sendHubAdminSubmissionEmail({
-                            hubAdminId,
-                            hubName: String(hub?.title || 'Hub'),
-                            paperId: String((paper as any).id || data.id),
-                            paperTitle: String((paper as any).title || 'Untitled paper'),
-                            submittedByName: submitterName || undefined
-                        });
-                    }
+                    await Promise.all(
+                        hubOwnerIds.map((hubAdminId) =>
+                            PaperLifecycleEmailService.sendHubAdminSubmissionEmail({
+                                hubAdminId,
+                                hubName: String(hub?.title || 'Hub'),
+                                paperId: String((paper as any).id || data.id),
+                                paperTitle: String((paper as any).title || 'Untitled paper'),
+                                submittedByName: submitterName || undefined
+                            })
+                        )
+                    );
                 } catch (adminEmailError) {
                     console.error('Failed to send hub admin submission email on edit:', adminEmailError);
                 }
@@ -160,6 +206,16 @@ export const POST: RequestHandler = async ({ request }) => {
         return json({ paper }, { status: 200 });
         
     } catch (error) {
+        if (error instanceof EditorialTransitionError) {
+            return json(
+                {
+                    error: error.message,
+                    code: error.code,
+                    currentStatus: error.currentStatus
+                },
+                { status: error.status }
+            );
+        }
         console.error('Error updating paper:', error);
         return json({ 
             error: 'Internal server error', 

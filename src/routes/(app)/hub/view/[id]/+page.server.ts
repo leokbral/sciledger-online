@@ -6,8 +6,14 @@ import Papers from '$lib/db/models/Paper';
 import Hubs from '$lib/db/models/Hub';
 import Invitation from '$lib/db/models/Invitation';
 import PaperReviewInvitation from '$lib/db/models/PaperReviewInvitation';
+import Role from '$lib/db/models/Role';
+import UserRoleAssignment from '$lib/db/models/UserRoleAssignment';
 import { sanitizePaper } from '$lib/helpers/sanitizePaper';
-import { canManageHub, isHubViceManager } from '$lib/helpers/hubPermissions';
+import { authorize } from '$lib/server/authorization/authorizationService';
+import {
+	getEffectiveHubMemberForUser,
+	resolveEffectiveHubRoles
+} from '$lib/server/authorization/effectiveHubRoles';
 
 function getIdAliases(value: unknown): string[] {
 	if (!value) return [];
@@ -49,9 +55,6 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 
 	const fetchHub = async () => {
 		const hub = await Hubs.findById(params.id)
-			.populate('createdBy', 'firstName lastName name email profilePictureUrl')
-			.populate('assistantManagers', '_id firstName lastName email profilePictureUrl')
-			.populate('reviewers', '_id firstName lastName email profilePictureUrl')
 			.lean();
 
 		if (!hub) {
@@ -66,19 +69,11 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		return users;
 	};
 
-	const fetchPapers = async () => {
-		const hub = await Hubs.findById(params.id).lean();
-		if (!hub) {
-			throw error(404, 'Hub not found');
-		}
-		const isManager = canManageHub(hub as any, locals.user.id);
-		const isHubReviewer = hub.reviewers?.includes(locals.user.id);
-
-
+	const fetchPapers = async (canViewAllHubPapers: boolean) => {
 		let paperQuery;
 
-		if (isManager) {
-			// Managers do hub (owner/vice): veem todos os papers exceto drafts
+		if (canViewAllHubPapers) {
+			// Usuários com permissão editorial efetiva no hub veem todos os papers exceto drafts.
 			paperQuery = { 
 				hubId: params.id,
 				status: { $ne: 'draft' }
@@ -165,17 +160,39 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 
 	try {
 		const hubData = await fetchHub();
+		const effectiveHubRoles = await resolveEffectiveHubRoles(hubData);
+		const currentUserHubMember = getEffectiveHubMemberForUser(effectiveHubRoles, locals.user);
+		const assignmentAuthorization = await authorize(locals.user, 'paper.assignReviewers', {
+			hub: hubData
+		});
+		const canManageEditorialFlow = assignmentAuthorization.allowed;
+		const canReviewHub = currentUserHubMember?.canReview === true;
 		const usersData = await fetchUsers();
-		const papersData = await fetchPapers();
+		const papersData = await fetchPapers(canManageEditorialFlow || canReviewHub);
+		const hubId = getIdAliases(hubData)[0] || params.id;
+		const roleManagementAuthorization = await authorize(locals.user, 'hub.manageRoles', {
+			hub: hubData
+		});
+		const memberRoleAssignments = await UserRoleAssignment.find({
+			scopeType: 'hub',
+			scopeId: hubId,
+			isActive: true
+		})
+			.select('id _id userId roleKey scopeType scopeId isActive')
+			.lean();
+		const memberRoleDefinitions = await Role.find({
+			scopeType: 'hub',
+			scopeId: hubId,
+			isActive: true
+		})
+			.select('key name priority')
+			.lean();
 		
 		
 		// Buscar ReviewAssignments para este hub (apenas para manager do hub)
-		const createdById = typeof hubData.createdBy === 'object' 
-			? (hubData.createdBy._id || hubData.createdBy.id || hubData.createdBy)
-			: hubData.createdBy;
-		const isCreator = createdById.toString() === locals.user.id;
-		const isViceManager = isHubViceManager(hubData as any, locals.user.id);
-		const isHubManager = isCreator || isViceManager;
+		const isCreator = currentUserHubMember?.primaryRoleKey === 'HubOwner';
+		const isViceManager = currentUserHubMember?.primaryRoleKey === 'EditorChief';
+		const isHubManager = canManageEditorialFlow;
 		let reviewAssignments: any[] = [];
 		let pendingPaperInvitations: Array<{ paperId: string; reviewerId: string }> = [];
 		
@@ -282,6 +299,25 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 			isCreator,
 			isViceManager,
 			isHubManager,
+			isHubReviewer: currentUserHubMember?.canReview === true,
+			canManageRoles: roleManagementAuthorization.allowed,
+			currentUserHubMember,
+			effectiveHubMembers: effectiveHubRoles.members,
+			effectiveReviewers: effectiveHubRoles.reviewers,
+			memberRoleAssignments: memberRoleAssignments.map((assignment: any) => ({
+				id: String(assignment.id || ''),
+				_id: String(assignment._id || ''),
+				userId: String(assignment.userId || ''),
+				roleKey: String(assignment.roleKey || ''),
+				scopeType: assignment.scopeType,
+				scopeId: assignment.scopeId ? String(assignment.scopeId) : null,
+				isActive: assignment.isActive !== false
+			})),
+			memberRoleDefinitions: memberRoleDefinitions.map((role: any) => ({
+				key: String(role.key || ''),
+				name: String(role.name || role.key || ''),
+				priority: typeof role.priority === 'number' ? role.priority : null
+			})),
 			reviewAssignments: reviewAssignments,
 			pendingPaperInvitations,
 			hubInvitations: hubInvitations,

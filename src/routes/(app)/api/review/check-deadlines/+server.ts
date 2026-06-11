@@ -1,11 +1,17 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { checkReviewDeadlines, sendReviewReminders } from '$lib/helpers/reviewDeadlineHelper';
+import { can } from '$lib/server/authorization/authorizationService';
+import { hasReviewerCapability } from '$lib/server/authorization/reviewerCapability';
+import { getUserIdAliases } from '$lib/server/authorization/roleResolver';
 
 export const GET: RequestHandler = async ({ url, locals }) => {
     try {
         // Permitir acesso para admins e revisores (para ver seus próprios deadlines)
-        if (!locals.user?.roles?.admin && !locals.user?.roles?.reviewer) {
+        const isAdmin = locals.user ? await can(locals.user, 'rbac.manage') : false;
+        const isReviewer = locals.user ? await hasReviewerCapability(locals.user) : false;
+
+        if (!isAdmin && !isReviewer) {
             return json({ error: 'Unauthorized' }, { status: 401 });
         }
 
@@ -15,20 +21,23 @@ export const GET: RequestHandler = async ({ url, locals }) => {
         const deadlineStatuses = await checkReviewDeadlines();
 
         // Se sendReminders for true e for admin, enviar lembretes
-        if (sendReminders && locals.user?.roles?.admin) {
+        if (sendReminders && isAdmin) {
             await sendReviewReminders();
         }
 
         // Filtrar por reviewerId se especificado
         let filteredStatuses = deadlineStatuses;
-        if (reviewerId) {
+        const userAliases = locals.user ? getUserIdAliases(locals.user) : [];
+        if (reviewerId && isAdmin) {
             filteredStatuses = deadlineStatuses.filter(
                 status => status.assignment.reviewerId === reviewerId
             );
-        } else if (!locals.user?.roles?.admin) {
+        } else if (reviewerId && !userAliases.includes(reviewerId)) {
+            return json({ error: 'Unauthorized reviewerId filter' }, { status: 403 });
+        } else if (!isAdmin) {
             // Se não for admin, mostrar apenas os próprios deadlines
             filteredStatuses = deadlineStatuses.filter(
-                status => status.assignment.reviewerId === locals.user._id
+                status => userAliases.includes(String(status.assignment.reviewerId))
             );
         }
 
@@ -58,7 +67,7 @@ export const GET: RequestHandler = async ({ url, locals }) => {
                 remindersSent: status.assignment.remindersSent,
                 lastReminderAt: status.assignment.lastReminderAt
             })),
-            remindersEnabled: sendReminders && locals.user?.roles?.admin
+            remindersEnabled: sendReminders && isAdmin
         });
 
     } catch (error) {
@@ -74,7 +83,8 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 export const POST: RequestHandler = async ({ locals }) => {
     try {
         // Verificar se é admin ou sistema
-        if (!locals.user?.roles?.admin) {
+        const isAdmin = locals.user ? await can(locals.user, 'rbac.manage') : false;
+        if (!isAdmin) {
             return json({ error: 'Unauthorized - Admin access required' }, { status: 401 });
         }
 

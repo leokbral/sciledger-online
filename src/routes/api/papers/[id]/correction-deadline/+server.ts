@@ -2,11 +2,17 @@ import type { RequestHandler } from './$types';
 import { json } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import Papers from '$lib/db/models/Paper';
+import { authorize } from '$lib/server/authorization/authorizationService';
 
-export const PATCH: RequestHandler = async ({ request, params }) => {
+export const PATCH: RequestHandler = async ({ request, params, locals }) => {
     await start_mongo();
 
     try {
+        const user = locals.user;
+        if (!user) {
+            return json({ error: 'User not authenticated' }, { status: 401 });
+        }
+
         const { correctionDeadline, correctionAcceptedAt } = await request.json();
         const paperId = params.id;
 
@@ -14,6 +20,14 @@ export const PATCH: RequestHandler = async ({ request, params }) => {
         const currentPaper = await Papers.findOne({ id: paperId }).lean().exec();
         if (!currentPaper) {
             return json({ error: 'Paper not found.' }, { status: 404 });
+        }
+
+        const authorization = await authorize(user, 'paper.requestCorrections', { paper: currentPaper });
+        if (!authorization.allowed) {
+            return json(
+                { error: 'Insufficient permissions', reason: authorization.reason },
+                { status: 403 }
+            );
         }
 
         // Prepare update object
@@ -68,19 +82,31 @@ export const PATCH: RequestHandler = async ({ request, params }) => {
     }
 };
 
-export const GET: RequestHandler = async ({ params }) => {
+export const GET: RequestHandler = async ({ params, locals }) => {
     await start_mongo();
 
     try {
+        const user = locals.user;
+        if (!user) {
+            return json({ error: 'User not authenticated' }, { status: 401 });
+        }
+
         const paperId = params.id;
 
         const paper = await Papers.findOne({ id: paperId })
-            .select('correctionAcceptedAt correctionDeadline correctionRequestedAt status')
+            .select('correctionAcceptedAt correctionDeadline correctionRequestedAt status mainAuthor correspondingAuthor submittedBy coAuthors authors hubId peer_review.responses')
             .lean()
             .exec();
 
         if (!paper) {
             return json({ error: 'Paper not found.' }, { status: 404 });
+        }
+
+        const canEdit = await authorize(user, 'paper.edit', { paper });
+        const canRequestCorrections = await authorize(user, 'paper.requestCorrections', { paper });
+        const canReview = await authorize(user, 'review.submit', { paper });
+        if (!canEdit.allowed && !canRequestCorrections.allowed && !canReview.allowed) {
+            return json({ error: 'Insufficient permissions' }, { status: 403 });
         }
 
         // Calculate deadline info if paper is in correction status

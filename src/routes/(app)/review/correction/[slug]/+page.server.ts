@@ -2,7 +2,11 @@ import Papers from '$lib/db/models/Paper';
 import Users from '$lib/db/models/User';
 import { error, redirect } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongo';
-import { isHubViceManager } from '$lib/helpers/hubPermissions';
+import {
+	getEffectiveHubMemberForUser,
+	resolveEffectiveHubRoles
+} from '$lib/server/authorization/effectiveHubRoles';
+import { can } from '$lib/server/authorization/authorizationService';
 
 // Type for MongoDB ObjectId
 interface ObjectId {
@@ -78,13 +82,6 @@ function matchesCurrentUser(value: unknown, userId: string): boolean {
 	return getIdAliases(value).includes(String(userId));
 }
 
-function isAdminUser(user: Record<string, unknown> | null | undefined): boolean {
-	return Boolean(
-		user?.isAdmin ||
-		(user?.roles && typeof user.roles === 'object' && (user.roles as Record<string, unknown>).admin)
-	);
-}
-
 export async function load({ locals, params }) {
 	if (!locals.user) redirect(302, `/login`);
 
@@ -124,20 +121,15 @@ export async function load({ locals, params }) {
 			);
 		});
 
-		const isHubReviewer =
-			typeof paperRaw.hubId === 'object' &&
-			Array.isArray(paperRaw.hubId?.reviewers) &&
-			paperRaw.hubId?.reviewers?.some((reviewer: any) => matchesCurrentUser(reviewer, userId));
-
-		const hubCreatorId =
-			typeof paperRaw.hubId === 'object'
-				? (paperRaw.hubId?.createdBy?._id ||
-						paperRaw.hubId?.createdBy?.id ||
-						paperRaw.hubId?.createdBy)
+		const effectiveHubRoles =
+			typeof paperRaw.hubId === 'object' && paperRaw.hubId
+				? await resolveEffectiveHubRoles(paperRaw.hubId)
 				: null;
-		const isHubOwner = hubCreatorId?.toString() === userId;
-		const isViceManager =
-			typeof paperRaw.hubId === 'object' && isHubViceManager(paperRaw.hubId as any, userId);
+		const currentUserHubMember = getEffectiveHubMemberForUser(effectiveHubRoles, locals.user);
+		const isHubReviewer = currentUserHubMember?.canReview === true;
+		const isHubOwner = currentUserHubMember?.primaryRoleKey === 'HubOwner';
+		const isViceManager = currentUserHubMember?.canAssignReviewers === true;
+		const isPlatformAdmin = await can(locals.user, 'rbac.manage');
 
 		// Verificar se aceitou via ReviewQueue (novo sistema)
 		const ReviewQueue = (await import('$lib/db/models/ReviewQueue')).default;
@@ -151,7 +143,7 @@ export async function load({ locals, params }) {
 			isReviewerAccepted || Boolean(hasAcceptedViaQueue) || isHubReviewer;
 
 		const canViewSubmittedReviews =
-			!canSubmitReview && (isHubOwner || isViceManager || isAdminUser(locals.user as any));
+			!canSubmitReview && (isHubOwner || isViceManager || isPlatformAdmin);
 
 		if (!canSubmitReview && !canViewSubmittedReviews) {
 			throw error(403, 'You do not have permission to view this paper');

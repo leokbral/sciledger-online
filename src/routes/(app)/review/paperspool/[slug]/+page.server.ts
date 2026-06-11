@@ -1,6 +1,11 @@
 import Papers from '$lib/db/models/Paper';
 import Users from '$lib/db/models/User';
 import { error, redirect } from '@sveltejs/kit';
+import {
+	getEffectiveHubMemberForUser,
+	resolveEffectiveHubRoles
+} from '$lib/server/authorization/effectiveHubRoles';
+import { hasReviewerCapability } from '$lib/server/authorization/reviewerCapability';
 
 export async function load({ locals, params }) {
 	if (!locals.user) redirect(302, `/login`);
@@ -26,20 +31,12 @@ export async function load({ locals, params }) {
 		
 		if (paperRaw.hubId && typeof paperRaw.hubId === 'object') {
 			// Verificar se é revisor do hub - suporta IDs como objetos ou strings
-			if (Array.isArray(paperRaw.hubId.reviewers)) {
-				isHubReviewer = paperRaw.hubId.reviewers.some((reviewerId: any) => {
-					const id = reviewerId?._id || reviewerId?.id || reviewerId;
-					return id?.toString() === userId;
-				});
-			}
+			const effectiveHubRoles = await resolveEffectiveHubRoles(paperRaw.hubId);
+			const currentUserHubMember = getEffectiveHubMemberForUser(effectiveHubRoles, locals.user);
+			isHubReviewer = currentUserHubMember?.canReview === true;
 			
 			// Verificar se é dono do hub
-			const hubCreatorId = paperRaw.hubId.createdBy?._id || 
-								 paperRaw.hubId.createdBy?.id || 
-								 paperRaw.hubId.createdBy;
-			if (hubCreatorId) {
-				isHubOwner = hubCreatorId.toString() === userId;
-			}
+			isHubOwner = currentUserHubMember?.primaryRoleKey === 'HubOwner';
 		}
 
 		// Verificar se aceitou via ReviewQueue (novo sistema)
@@ -50,8 +47,8 @@ export async function load({ locals, params }) {
 			status: 'accepted'
 		}).lean();
 
-		// Para papers "reviewer assignment" sem hub, qualquer revisor pode ver
-		const isOpenReviewer = !paperRaw.hubId && locals.user.roles?.reviewer === true;
+		// Para papers "reviewer assignment" sem hub, qualquer usuario com role efetiva de revisor pode ver
+		const isOpenReviewer = !paperRaw.hubId && (await hasReviewerCapability(locals.user));
 
 
 		if (!isHubReviewer && !isHubOwner && !isOpenReviewer && !hasAcceptedViaQueue) {
@@ -63,7 +60,7 @@ export async function load({ locals, params }) {
 		? {
 			reviewType: paperRaw.peer_review.reviewType,
 			assignedReviewers: paperRaw.peer_review.assignedReviewers ?? [],
-			responses: (paperRaw.peer_review.responses ?? []).map((r) => ({
+			responses: (paperRaw.peer_review.responses ?? []).map((r: any) => ({
 				reviewerId: r.reviewerId,
 				status: r.status,
 				responseDate: r.responseDate,

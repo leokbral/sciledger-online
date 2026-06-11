@@ -3,7 +3,14 @@ import type { RequestHandler } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import Hubs from '$lib/db/models/Hub';
 import Users from '$lib/db/models/User';
-import { canManageHub, normalizeId } from '$lib/helpers/hubPermissions';
+import { normalizeId } from '$lib/helpers/hubPermissions';
+import { authorize } from '$lib/server/authorization/authorizationService';
+import { resolveEffectiveHubRoles } from '$lib/server/authorization/effectiveHubRoles';
+import {
+	assignHighestHubRole,
+	HubRoleRevocationError,
+	revokeHubRoleAssignments
+} from '$lib/server/authorization/roleAssignmentService';
 
 export const POST: RequestHandler = async ({ request, locals, params }) => {
     if (!locals.user) {
@@ -12,6 +19,9 @@ export const POST: RequestHandler = async ({ request, locals, params }) => {
 
     await start_mongo();
     const hubId = params.id;
+    if (!hubId) {
+        return json({ error: 'Hub id is required' }, { status: 400 });
+    }
 
     try {
         const hub = await Hubs.findById(hubId);
@@ -20,8 +30,8 @@ export const POST: RequestHandler = async ({ request, locals, params }) => {
             return json({ error: 'Hub not found' }, { status: 404 });
         }
 
-        // Hub owner and Editor-in-chief can manage reviewers
-        if (!canManageHub(hub, locals.user.id)) {
+        const authorization = await authorize(locals.user, 'hub.manageMembers', { hub });
+        if (!authorization.allowed) {
             return json({ error: 'Only hub managers can manage reviewers' }, { status: 403 });
         }
 
@@ -52,20 +62,32 @@ export const POST: RequestHandler = async ({ request, locals, params }) => {
 
         const currentUserId = normalizeId(locals.user.id);
         let removedViceManagers: string[] = [];
+        let revokedAssignments: any[] = [];
 
         switch (action) {
             case 'add':
-                // Add new reviewers
-                hub.reviewers = [...new Set([...(hub.reviewers || []), ...Array.from(targetIdSet)])];
+                await Promise.all(
+                    targetIds.map((targetId) =>
+                        assignHighestHubRole(targetId, hubId, 'Reviewer', locals.user.id, {
+                            auditUser: locals.user
+                        })
+                    )
+                );
                 break;
             case 'remove':
-                // Remove reviewers
+                revokedAssignments = await revokeHubRoleAssignments(
+                    Array.from(targetIdSet),
+                    hubId,
+                    locals.user.id,
+                    { auditUser: locals.user }
+                );
+
+                // Keep legacy mirrors clean while RBAC assignments remain the source of truth.
                 hub.reviewers = (hub.reviewers || []).filter((r: any) => {
                     const id = normalizeId(r);
                     return !id || !targetIdSet.has(id);
                 });
 
-                // Keep manager roles in sync: if a removed member is Editor-in-chief, drop this role too.
                 hub.assistantManagers = (hub.assistantManagers || []).filter((manager: any) => {
                     const id = normalizeId(manager);
                     if (id && targetIdSet.has(id)) {
@@ -83,11 +105,23 @@ export const POST: RequestHandler = async ({ request, locals, params }) => {
         const removedCurrentUserAsVice =
             action === 'remove' &&
             !!currentUserId &&
-            removedViceManagers.includes(currentUserId);
+            (removedViceManagers.includes(currentUserId) ||
+                revokedAssignments.some((assignment: any) => normalizeId(assignment.userId) === currentUserId));
 
-        return json({ success: true, reviewers: hub.reviewers, removedCurrentUserAsVice, removedViceManagers });
+        const effectiveRoles = await resolveEffectiveHubRoles(hub);
+
+        return json({
+            success: true,
+            reviewers: effectiveRoles.reviewers,
+            revokedAssignments,
+            removedCurrentUserAsVice,
+            removedViceManagers
+        });
 
     } catch (error) {
+        if (error instanceof HubRoleRevocationError) {
+            return json({ error: error.message, code: error.code }, { status: error.status });
+        }
         console.error('Error managing reviewers:', error);
         return json({ error: 'Failed to manage reviewers' }, { status: 500 });
     }
@@ -102,15 +136,16 @@ export const GET: RequestHandler = async ({ locals, params }) => {
     const hubId = params.id;
 
     try {
-        const hub = await Hubs.findById(hubId).populate('reviewers', 'firstName lastName email');
+        const hub = await Hubs.findById(hubId);
         
         if (!hub) {
             return json({ error: 'Hub not found' }, { status: 404 });
         }
 
-        // Hub owner and Editor-in-chief can see the full reviewer list
-        if (canManageHub(hub, locals.user.id)) {
-            return json({ reviewers: hub.reviewers });
+        const authorization = await authorize(locals.user, 'hub.manageMembers', { hub });
+        if (authorization.allowed) {
+            const effectiveRoles = await resolveEffectiveHubRoles(hub);
+            return json({ reviewers: effectiveRoles.reviewers });
         }
 
         return json({ error: 'Unauthorized to view reviewers' }, { status: 403 });

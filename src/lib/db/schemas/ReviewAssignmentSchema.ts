@@ -8,7 +8,7 @@ export const ReviewAssignmentSchema: Schema = new Schema({
     reviewerId: { type: String, required: true, ref: 'User' },
     status: { 
         type: String, 
-        enum: ['pending', 'accepted', 'declined', 'completed', 'expired', 'overdue'], 
+        enum: ['pending', 'accepted', 'declined', 'completed', 'expired', 'overdue', 'removed'], 
         default: 'pending' 
     },
     assignedAt: { type: Date, required: true, default: Date.now },

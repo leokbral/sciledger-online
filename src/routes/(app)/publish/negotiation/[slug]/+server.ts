@@ -5,7 +5,11 @@ import Papers from '$lib/db/models/Paper';
 import '$lib/db/models/User';
 import type { User } from '$lib/types/User';
 import Hubs from '$lib/db/models/Hub';
-import { canManageHub } from '$lib/helpers/hubPermissions';
+import { authorize } from '$lib/server/authorization/authorizationService';
+import {
+	EditorialTransitionError,
+	transitionPaperStatus
+} from '$lib/server/authorization/editorialTransitionService';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
 	await start_mongo();
@@ -36,15 +40,17 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			return json({ error: 'Paper not found' }, { status: 404 });
 		}
 
-		if (existingPaper.hubId) {
-			const hub = await Hubs.findById(existingPaper.hubId).lean().exec();
-			const currentUserId = locals.user?.id;
-			if (!hub || !currentUserId || !canManageHub(hub as any, currentUserId)) {
-				return json(
-					{ error: 'Only hub managers can update reviewer assignment for hub-linked papers.' },
-					{ status: 403 }
-				);
-			}
+		const user = locals.user;
+		if (!user) {
+			return json({ error: 'User not authenticated' }, { status: 401 });
+		}
+
+		const authorization = await authorize(user, 'paper.assignReviewers', { paper: existingPaper });
+		if (!authorization.allowed) {
+			return json(
+				{ error: 'Insufficient permissions', reason: authorization.reason },
+				{ status: 403 }
+			);
 		}
 
 		if (!mainAuthor || !correspondingAuthor || !title || !abstract || !keywords || !pdfUrl || !submittedBy) {
@@ -53,15 +59,26 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 		const _coAuthors = coAuthors.map((a: User) => a.id);
 		const _authors = authors.map((a: User) => a.id);
+		const previousStatus = String((existingPaper as any).status || '');
+		const requestedStatus = String(status || previousStatus);
+		const shouldSendToReview =
+			previousStatus === 'reviewer assignment' && requestedStatus === 'in review';
 
-		const paper = await Papers.findByIdAndUpdate(
+		if (requestedStatus !== previousStatus && !shouldSendToReview) {
+			return json(
+				{ error: 'Status changes must use the editorial transition endpoints.' },
+				{ status: 400 }
+			);
+		}
+
+		let paper: any = await Papers.findByIdAndUpdate(
 			id,
 			{
 				mainAuthor: mainAuthor.id,
 				authors: _authors,
 				correspondingAuthor,
 				coAuthors: _coAuthors,
-				status,
+				status: shouldSendToReview ? previousStatus : requestedStatus,
 				title,
 				abstract,
 				keywords,
@@ -84,6 +101,18 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			throw new Error('Paper not found');
 		}
 
+		if (shouldSendToReview) {
+			paper = await transitionPaperStatus({
+				user,
+				paperId: id,
+				action: 'paper.sendToReview',
+				expectedStatus: previousStatus,
+				metadata: {
+					endpoint: '/publish/negotiation/[slug]'
+				}
+			});
+		}
+
 		// Se foi vinculado a um hub, atualiza o hub também
 		if (hubId && isLinkedToHub === true) {
 			await Hubs.findByIdAndUpdate(
@@ -95,6 +124,16 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 		return json({ paper }, { status: 201 });
 	} catch (error) {
+		if (error instanceof EditorialTransitionError) {
+			return json(
+				{
+					error: error.message,
+					code: error.code,
+					currentStatus: error.currentStatus
+				},
+				{ status: error.status }
+			);
+		}
 		console.error('Erro ao registrar paper:', error);
 		return json({ error: 'Erro interno do servidor.' }, { status: 500 });
 	}

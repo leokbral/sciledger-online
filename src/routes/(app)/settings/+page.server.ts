@@ -2,6 +2,7 @@ import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import Users from '$lib/db/models/User';
 import { start_mongo } from '$lib/db/mongooseConnection';
+import { hasReviewerCapability } from '$lib/server/authorization/reviewerCapability';
 
 export const load: PageServerLoad = async ({ locals }) => {
 	const user = locals.user;
@@ -12,8 +13,9 @@ export const load: PageServerLoad = async ({ locals }) => {
 	await start_mongo();
 
 	const userDoc = await Users.findOne({ id: user.id })
-		.select('roles reviewerPayments firstName lastName email username')
+		.select('reviewerPayments firstName lastName email username')
 		.lean();
+	const isReviewer = await hasReviewerCapability(user);
 
 	const reviewerPayments = userDoc?.reviewerPayments
 		? {
@@ -40,7 +42,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 			email: user.email,
 			username: user.username
 		},
-		isReviewer: !!userDoc?.roles?.reviewer,
+		isReviewer,
 		reviewerPayments
 	};
 };

@@ -6,16 +6,16 @@
 	import type { ReviewQueue } from '$lib/types/ReviewQueue';
 
 	// Props
-	const { hubId, canManageHub, canInviteVice, assistantManagerIds, users }: {
+	const { hubId, canManageHub, canInviteVice, users, effectiveReviewers = [] }: {
 		hubId: string;
 		canManageHub: boolean;
 		canInviteVice: boolean;
-		assistantManagerIds: string[];
 		users: any[];
+		effectiveReviewers?: any[];
 	} = $props();
 
 	// State
-	let reviewers = $state<typeof users>([]);
+	let reviewers = $state<typeof users>(effectiveReviewers);
 	let selectedUsers = $state<string[]>([]);
 	let openModal = $state(false);
 	let loading = $state(false);
@@ -61,11 +61,18 @@
 	}
 
 	// Filtra usuários com base no input e removendo quem já é revisor
+	function idAliases(value: any): string[] {
+		if (!value) return [];
+		if (typeof value === 'string' || typeof value === 'number') return [String(value)];
+		if (typeof value !== 'object') return [];
+		return [value.id, value._id].filter(Boolean).map((id) => String(id));
+	}
+
 	function filterUsers() {
-		const reviewerIds = new Set(reviewers.map((r: { _id: any }) => r._id));
+		const reviewerIds = new Set(reviewers.flatMap((reviewer: any) => idAliases(reviewer)));
 		filteredUsers = users.filter((user: User) => {
 			const fullName = `${user.firstName} ${user.lastName}`.toLowerCase();
-			const notReviewer = !reviewerIds.has(user.id);
+			const notReviewer = !idAliases(user).some((id) => reviewerIds.has(id));
 			return notReviewer && fullName.includes(searchTerm.toLowerCase());
 		});
 	}
@@ -158,16 +165,24 @@
 		manageReviewers('remove', [reviewerId]);
 	}
 
-	function isViceManager(userId: string): boolean {
-		return assistantManagerIds.includes(userId);
+	function getPrimaryHubRole(user: any): string {
+		return user?.effectiveHubRole?.primaryRoleKey || 'Reviewer';
+	}
+
+	function getManagedRole(user: any): 'chief' | 'associate' | 'owner' | 'reviewer' {
+		const roleKey = getPrimaryHubRole(user);
+		if (roleKey === 'HubOwner') return 'owner';
+		if (roleKey === 'EditorChief') return 'chief';
+		if (roleKey === 'AssociateEditor') return 'associate';
+		return 'reviewer';
 	}
 
 	function getViceReviewers() {
-		return reviewers.filter((reviewer: any) => isViceManager(reviewer._id));
+		return reviewers.filter((reviewer: any) => getManagedRole(reviewer) === 'chief');
 	}
 
 	function getRegularReviewers() {
-		return reviewers.filter((reviewer: any) => !isViceManager(reviewer._id));
+		return reviewers.filter((reviewer: any) => getManagedRole(reviewer) === 'reviewer');
 	}
 
 	function getUserAvatar(user: any): string {
@@ -185,7 +200,7 @@
 					fullName,
 					email: reviewer.email || '',
 					avatarUrl: getUserAvatar(reviewer),
-					role: isViceManager(reviewer._id) ? 'vice' : 'reviewer'
+					role: getManagedRole(reviewer)
 				};
 			})
 			.sort((a, b) => a.fullName.localeCompare(b.fullName));
@@ -205,7 +220,10 @@
 	function getFilteredManagedMembers() {
 		const term = memberSearch.trim().toLowerCase();
 		return getManagedMembers().filter((member) => {
-			const roleMatch = memberRoleFilter === 'all' || member.role === memberRoleFilter;
+			const roleMatch =
+				memberRoleFilter === 'all' ||
+				(memberRoleFilter === 'vice' && ['owner', 'chief', 'associate'].includes(member.role)) ||
+				(memberRoleFilter === 'reviewer' && member.role === 'reviewer');
 			if (!roleMatch) return false;
 			if (!term) return true;
 			return member.fullName.toLowerCase().includes(term) || member.email.toLowerCase().includes(term);
@@ -486,12 +504,12 @@
 						<div class="flex flex-wrap items-center justify-between gap-2">
 							<div class="text-sm text-gray-600 dark:text-gray-300">
 								Total: <strong>{reviewers.length}</strong>
-								<span class="ml-2 text-amber-700">Vice: {getViceReviewers().length}</span>
+								<span class="ml-2 text-amber-700">Editorial: {reviewers.length - getRegularReviewers().length}</span>
 								<span class="ml-2 text-blue-700">Reviewer: {getRegularReviewers().length}</span>
 							</div>
 							<div class="flex items-center gap-2">
 								<button class="btn btn-xs {memberRoleFilter === 'all' ? 'preset-filled' : 'preset-outlined'}" onclick={() => (memberRoleFilter = 'all')}>All</button>
-								<button class="btn btn-xs {memberRoleFilter === 'vice' ? 'preset-filled' : 'preset-outlined'}" onclick={() => (memberRoleFilter = 'vice')}>Vice</button>
+								<button class="btn btn-xs {memberRoleFilter === 'vice' ? 'preset-filled' : 'preset-outlined'}" onclick={() => (memberRoleFilter = 'vice')}>Editorial</button>
 								<button class="btn btn-xs {memberRoleFilter === 'reviewer' ? 'preset-filled' : 'preset-outlined'}" onclick={() => (memberRoleFilter = 'reviewer')}>Reviewer</button>
 							</div>
 						</div>
@@ -531,8 +549,12 @@
 											</div>
 										</div>
 										<div>
-											{#if member.role === 'vice'}
+											{#if member.role === 'owner'}
+												<span class="inline-flex rounded-full bg-amber-100 text-amber-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">Hub Owner</span>
+											{:else if member.role === 'chief'}
 												<span class="inline-flex rounded-full bg-amber-100 text-amber-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">Editor-in-chief</span>
+											{:else if member.role === 'associate'}
+												<span class="inline-flex rounded-full bg-orange-100 text-orange-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">Associate Editor</span>
 											{:else}
 												<span class="inline-flex rounded-full bg-blue-100 text-blue-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">Reviewer</span>
 											{/if}

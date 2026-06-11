@@ -25,7 +25,9 @@ export const UserSchema: Schema = new Schema({
     darkMode: { type: Boolean, default: false }, // Dark mode
     roles: { // User roles definition
         author: { type: Boolean, default: true },
-        reviewer: { type: Boolean, default: false }
+        reviewer: { type: Boolean, default: false },
+        admin: { type: Boolean, default: false },
+        editor: { type: Boolean, default: false }
     },
     bio: { type: String, default: '' }, // User biography with default value
     profilePictureUrl: { type: String, default: '' }, // Profile picture URL with default value

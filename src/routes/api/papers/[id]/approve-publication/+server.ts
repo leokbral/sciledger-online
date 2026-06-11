@@ -5,6 +5,10 @@ import Hubs from '$lib/db/models/Hub';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import { NotificationService } from '$lib/services/NotificationService';
 import { PaperLifecycleEmailService } from '$lib/services/PaperLifecycleEmailService';
+import {
+	EditorialTransitionError,
+	transitionPaperStatus
+} from '$lib/server/authorization/editorialTransitionService';
 
 export const POST: RequestHandler = async ({ params, locals, request }) => {
 	try {
@@ -34,11 +38,6 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 			return json({ error: 'Hub not found' }, { status: 404 });
 		}
 
-		const hubOwnerId = hubDoc.createdBy?._id || hubDoc.createdBy?.id || hubDoc.createdBy;
-		if (hubOwnerId?.toString?.() !== user.id) {
-			return json({ error: 'Only the hub owner can approve publication' }, { status: 403 });
-		}
-
 		if (paperDoc.reviewRound !== 2) {
 			return json({ error: 'Publication approval is only valid after round 2' }, { status: 400 });
 		}
@@ -50,12 +49,19 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 		const body = await request.json().catch(() => ({}));
 		const doi = typeof body?.doi === 'string' ? body.doi.trim() : undefined;
 
-		paperDoc.status = 'published';
-		if (doi) {
-			paperDoc.doi = doi;
-		}
-		paperDoc.updatedAt = new Date().toISOString();
-		await paperDoc.save();
+		const updatedPaper: any = await transitionPaperStatus({
+			user,
+			paperId,
+			action: 'paper.publish',
+			expectedStatus: body.expectedStatus || paperDoc.status,
+			extraSet: doi ? { doi } : {},
+			metadata: {
+				endpoint: '/api/papers/[id]/approve-publication',
+				doi: doi || null
+			}
+		});
+		paperDoc.status = updatedPaper.status;
+		if (doi) paperDoc.doi = doi;
 
 		try {
 			await NotificationService.createNotification({
@@ -99,6 +105,16 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 			message: 'Paper approved and published'
 		});
 	} catch (error) {
+		if (error instanceof EditorialTransitionError) {
+			return json(
+				{
+					error: error.message,
+					code: error.code,
+					currentStatus: error.currentStatus
+				},
+				{ status: error.status }
+			);
+		}
 		console.error('Error approving publication:', error);
 		return json({ error: 'Internal server error' }, { status: 500 });
 	}

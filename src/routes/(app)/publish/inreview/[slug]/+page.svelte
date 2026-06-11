@@ -7,8 +7,6 @@
 	import type { PageData } from './$types';
 	import PaperPreview from '$lib/PaperList/PaperPreview.svelte';
 	import { page } from '$app/stores';
-	import AvailableReviewers from '$lib/AvailableReviewers.svelte';
-	import type { User } from '$lib/types/User';
 	import { Progress } from '@skeletonlabs/skeleton-svelte';
 	import CorrectionProgressBar from '$lib/components/CorrectionProgressBar/CorrectionProgressBar.svelte';
 	import { onMount } from 'svelte';
@@ -19,10 +17,8 @@
 	}
 
 	let { data }: Props = $props();
-	let reviewers = (data.users as User[]).filter((u: User) => u.roles.reviewer === true);
 	// State for peer review option
 	let peer_review: string = '';
-	// let reviewers: User;
 
 	// let user = data.user;
 

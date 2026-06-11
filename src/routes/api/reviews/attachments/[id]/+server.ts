@@ -6,7 +6,12 @@ import {
 	buildReviewAttachmentResponse,
 	findReviewAttachmentGridFsFile
 } from '$lib/server/reviewAttachment';
-import { canManageHub, normalizeId } from '$lib/helpers/hubPermissions';
+import { normalizeId } from '$lib/helpers/hubPermissions';
+import {
+	getEffectiveHubMemberForUser,
+	resolveEffectiveHubRoles
+} from '$lib/server/authorization/effectiveHubRoles';
+import { can } from '$lib/server/authorization/authorizationService';
 
 function getIdAliases(value: unknown): string[] {
 	if (!value) return [];
@@ -41,12 +46,12 @@ function listContainsUserAlias(values: unknown, userAliases: Set<string>): boole
 	return Array.isArray(values) && values.some((value) => matchesAnyUserAlias(value, userAliases));
 }
 
-function canDownloadReviewAttachment(review: any, paper: any, user: any): boolean {
+async function canDownloadReviewAttachment(review: any, paper: any, user: any): Promise<boolean> {
 	const userAliases = new Set(getIdAliases(user));
 	const userId = normalizeId(user?.id ?? user?._id);
 
 	if (!userAliases.size || !userId) return false;
-	if (user?.roles?.admin || user?.roles?.editor) return true;
+	if (await can(user, 'rbac.manage')) return true;
 	if (matchesAnyUserAlias(review?.reviewerId, userAliases)) return true;
 	if (matchesAnyUserAlias(paper?.mainAuthor, userAliases)) return true;
 	if (matchesAnyUserAlias(paper?.correspondingAuthor, userAliases)) return true;
@@ -63,9 +68,11 @@ function canDownloadReviewAttachment(review: any, paper: any, user: any): boolea
 	if (isAssignedReviewer) return true;
 
 	const hub = typeof paper?.hubId === 'object' ? paper.hubId : null;
-	if (canManageHub(hub, userId)) return true;
-	if (listContainsUserAlias(hub?.reviewers, userAliases)) return true;
-
+	if (hub) {
+		const effectiveHubRoles = await resolveEffectiveHubRoles(hub);
+		const currentUserHubMember = getEffectiveHubMemberForUser(effectiveHubRoles, user);
+		if (currentUserHubMember?.canReview || currentUserHubMember?.canAssignReviewers) return true;
+	}
 	return false;
 }
 
@@ -103,7 +110,7 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 			return json({ error: 'Paper not found' }, { status: 404 });
 		}
 
-		if (!canDownloadReviewAttachment(review, paper, user)) {
+		if (!(await canDownloadReviewAttachment(review, paper, user))) {
 			return json({ error: 'Forbidden' }, { status: 403 });
 		}
 

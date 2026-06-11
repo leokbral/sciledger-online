@@ -2,6 +2,9 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import Hubs from '$lib/db/models/Hub';
+import { authorize } from '$lib/server/authorization/authorizationService';
+import { resolveEffectiveHubRoles } from '$lib/server/authorization/effectiveHubRoles';
+import { assignHighestHubRole } from '$lib/server/authorization/roleAssignmentService';
 
 export const GET: RequestHandler = async ({ params }) => {
     await start_mongo();
@@ -25,8 +28,13 @@ export const GET: RequestHandler = async ({ params }) => {
     }
 };
 
-export async function POST({ params, request }) {
+export async function POST({ params, request, locals }) {
     try {
+        await start_mongo();
+        if (!locals.user) {
+            return json({ error: 'User not authenticated' }, { status: 401 });
+        }
+
         const { hubId } = params;
         const { reviewerId } = await request.json();
 
@@ -35,19 +43,24 @@ export async function POST({ params, request }) {
             return json({ error: 'Hub not found' }, { status: 404 });
         }
 
-        // Check if reviewer is already in the array
-        if (!Array.isArray(hub.reviewers)) {
-            hub.reviewers = [];
+        const authorization = await authorize(locals.user, 'hub.manageMembers', { hub });
+        if (!authorization.allowed) {
+            return json(
+                { error: 'Insufficient permissions', reason: authorization.reason },
+                { status: 403 }
+            );
         }
-        if (!hub.reviewers.includes(reviewerId)) {
-            hub.reviewers.push(reviewerId);
-            await hub.save();
-        }
+
+        await assignHighestHubRole(reviewerId, hubId, 'Reviewer', locals.user.id, {
+            auditUser: locals.user
+        });
+
+        const effectiveRoles = await resolveEffectiveHubRoles(hub);
 
         return json({ 
             success: true, 
             message: 'Reviewer added successfully',
-            reviewers: hub.reviewers 
+            reviewers: effectiveRoles.reviewers 
         });
 
     } catch (error) {

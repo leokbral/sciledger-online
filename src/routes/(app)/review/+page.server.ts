@@ -5,6 +5,10 @@ import Invitations from '$lib/db/models/Invitation';
 import { start_mongo } from '$lib/db/mongo';
 import { redirect } from '@sveltejs/kit';
 import { sanitizePaper } from '$lib/helpers/sanitizePaper';
+import {
+	getEffectiveHubMemberForUser,
+	resolveEffectiveHubRoles
+} from '$lib/server/authorization/effectiveHubRoles';
 
 interface ObjectId {
 	toString(): string;
@@ -145,7 +149,39 @@ export async function load({ locals }) {
 				};
 			});
 
-			const filteredPapers = normalizedPapers.filter((paper: any) => {
+			const hubRoleContexts = new Map<string, any>();
+			await Promise.all(
+				normalizedPapers
+					.map((paper: any) => paper.hubId)
+					.filter((hub: any) => hub && typeof hub === 'object')
+					.map(async (hub: any) => {
+						const hubId = getIdAliases(hub)[0];
+						if (!hubId || hubRoleContexts.has(hubId)) return;
+						hubRoleContexts.set(hubId, await resolveEffectiveHubRoles(hub));
+					})
+			);
+
+			const papersWithEffectiveRoles = normalizedPapers.map((paper: any) => {
+				const hubId = getIdAliases(paper.hubId)[0];
+				const effectiveRoles = hubId ? hubRoleContexts.get(hubId) : null;
+				const member = getEffectiveHubMemberForUser(effectiveRoles, user);
+				return {
+					...paper,
+					currentUserHubRole: member
+						? {
+								primaryRoleKey: member.primaryRoleKey,
+								directRoleKeys: member.directRoleKeys,
+								effectiveRoleKeys: member.effectiveRoleKeys,
+								canReview: member.canReview,
+								canAssignReviewers: member.canAssignReviewers,
+								canManageMembers: member.canManageMembers,
+								canManageRoles: member.canManageRoles
+							}
+						: null
+				};
+			});
+
+			const filteredPapers = papersWithEffectiveRoles.filter((paper: any) => {
 				try {
 					const userId = user.id;
 					const responses = paper.peer_review?.responses ?? [];
@@ -163,11 +199,8 @@ export async function load({ locals }) {
 					const isPaperAuthor =
 						isMainAuthor || isCorrespondingAuthor || isSubmitter || isCoAuthor;
 
-					const isHubOwner = matchesUser(paper.hubId?.createdBy, userId);
-					const isHubReviewer =
-						typeof paper.hubId === 'object' &&
-						Array.isArray(paper.hubId?.reviewers) &&
-						paper.hubId.reviewers.some((reviewer: any) => matchesUser(reviewer, userId));
+					const isHubOwner = paper.currentUserHubRole?.primaryRoleKey === 'HubOwner';
+					const isHubReviewer = paper.currentUserHubRole?.canReview === true;
 
 					const isReviewer = acceptedOrCompleted.some((response: any) =>
 						matchesUser(response.reviewerId, userId)

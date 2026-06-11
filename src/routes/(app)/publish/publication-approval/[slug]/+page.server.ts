@@ -2,7 +2,10 @@ import Papers from '$lib/db/models/Paper';
 import { error, redirect } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import type { PageServerLoad } from './$types';
-import { isHubViceManager } from '$lib/helpers/hubPermissions';
+import {
+	getEffectiveHubMemberForUser,
+	resolveEffectiveHubRoles
+} from '$lib/server/authorization/effectiveHubRoles';
 
 // Type for MongoDB ObjectId
 interface ObjectId {
@@ -80,17 +83,16 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		throw error(404, 'Paper not found');
 	}
 
-	const userId = locals.user.id;
 
 	// Verificar se é dono do hub
-	const hubCreatorId = typeof paperDoc.hubId === 'object'
-		? (paperDoc.hubId?.createdBy?._id || paperDoc.hubId?.createdBy?.id || paperDoc.hubId?.createdBy)
-		: null;
-	const isHubOwner = hubCreatorId?.toString() === userId;
-	const isViceManager = typeof paperDoc.hubId === 'object' && isHubViceManager(paperDoc.hubId as any, userId);
-
-	// Verificar se é revisor do hub
-	const isHubReviewer = typeof paperDoc.hubId === 'object' && paperDoc.hubId?.reviewers?.includes(userId);
+	const effectiveHubRoles =
+		typeof paperDoc.hubId === 'object' && paperDoc.hubId
+			? await resolveEffectiveHubRoles(paperDoc.hubId)
+			: null;
+	const currentUserHubMember = getEffectiveHubMemberForUser(effectiveHubRoles, locals.user);
+	const isHubOwner = currentUserHubMember?.primaryRoleKey === 'HubOwner';
+	const isViceManager = currentUserHubMember?.canAssignReviewers === true;
+	const isHubReviewer = currentUserHubMember?.canReview === true;
 
 	// Dono, Editor-in-chief e revisores do hub podem acessar esta página
 	if (!isHubOwner && !isHubReviewer && !isViceManager) {

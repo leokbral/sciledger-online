@@ -8,7 +8,7 @@ import Papers from '$lib/db/models/Paper';
 import * as crypto from 'crypto';
 import type { RequestHandler } from './$types';
 import nodemailer from 'nodemailer';
-import { canManageHub } from '$lib/helpers/hubPermissions';
+import { authorize } from '$lib/server/authorization/authorizationService';
 
 // Clear the model cache to ensure we use the updated schema
 if (mongoose.models.EmailReviewerInvitation) {
@@ -231,9 +231,10 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
 			return json({ error: 'Hub not found' }, { status: 404 });
 		}
 
-		if (!canManageHub(hub, inviterId)) {
+		const hubAuthorization = await authorize(locals.user, 'hub.manageMembers', { hub });
+		if (!hubAuthorization.allowed) {
 			return json(
-				{ error: 'Only hub managers can send reviewer email invitations' },
+				{ error: 'Insufficient permissions', reason: hubAuthorization.reason },
 				{ status: 403 }
 			);
 		}
@@ -258,6 +259,14 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
 			const paperHubId = typeof paper.hubId === 'object' ? paper.hubId?._id || paper.hubId?.id : paper.hubId;
 			if (paperHubId && String(paperHubId) !== hubIdValue) {
 				return json({ error: 'Paper does not belong to this hub' }, { status: 400 });
+			}
+
+			const paperAuthorization = await authorize(locals.user, 'paper.assignReviewers', { paper });
+			if (!paperAuthorization.allowed) {
+				return json(
+					{ error: 'Insufficient permissions', reason: paperAuthorization.reason },
+					{ status: 403 }
+				);
 			}
 		}
 

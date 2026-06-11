@@ -20,7 +20,7 @@
 	}
 
 	let { data }: Props = $props();
-	let reviewers = (data.users ?? []).filter((u: User) => u.roles.reviewer === true);
+	let reviewers = Array.isArray(data.effectiveReviewers) ? data.effectiveReviewers : [];
 	let peer_review: string = $state('');
 	let paper: Paper | null = $state(data.paper);
 	let isHubOwner: boolean = $state(!!(data as any).isHubOwner);
@@ -47,6 +47,8 @@
 	let availableHubs: Hub[] = $state([]);
 	let isLoadingHubs: boolean = $state(false);
 	let selectedHub: string | null = $state(null);
+	let showSendToReviewConfirm = $state(false);
+	let sendToReviewConfirmation = $state('');
 
 	$effect(() => {
 		if (paper?.paperPictures) {
@@ -116,7 +118,7 @@
 		}
 	}
 
-	async function handleSavePaper(event: MouseEvent) {
+	async function handleSavePaper() {
 		if (!paper) return;
 		if (paper.hubId && !canManageHub) {
 			alert('Hub-linked papers must be managed by the hub manager or editor-in-chief.');
@@ -182,6 +184,8 @@
 				]);
 
 				if (poolResponse.success && reviewAssignments.success) {
+					showSendToReviewConfirm = false;
+					sendToReviewConfirmation = '';
 					goto(`/publish/`);
 				} else {
 					alert('Failed to update price or assign reviewers');
@@ -348,6 +352,11 @@
 		if (!paper?.id) return;
 		await goto(`/publish/payment-hold?paperId=${paper.id}`);
 	}
+
+	function openSendToReviewConfirm() {
+		sendToReviewConfirmation = '';
+		showSendToReviewConfirm = true;
+	}
 </script>
 
 <!-- UI HTML -->
@@ -363,7 +372,7 @@
 		</button>
 		<button 
 			class="bg-primary-500 text-white rounded-lg px-4 py-2 disabled:bg-gray-400 disabled:cursor-not-allowed" 
-			onclick={handleSavePaper}
+			onclick={openSendToReviewConfirm}
 			disabled={(!!paper?.hubId && !canManageHub) || !paper?.peer_review?.responses || paper.peer_review.responses.filter(r => r.status === 'accepted').length < 3}
 		>
 			Submit to Review
@@ -371,6 +380,45 @@
 	</div>
 	<div></div>
 </div>
+
+{#if showSendToReviewConfirm}
+	<div class="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4">
+		<div class="w-full max-w-md rounded border border-slate-200 bg-white p-5 shadow-xl">
+			<h2 class="text-lg font-semibold text-slate-950">Confirm Review Start</h2>
+			<p class="mt-3 text-sm text-slate-700">
+				Após enviar para revisão o artigo iniciará o fluxo editorial. Deseja continuar?
+			</p>
+			<p class="mt-2 text-sm font-semibold text-red-700">This operation is irreversible.</p>
+			<label class="mt-4 block text-sm font-medium text-slate-700" for="send-review-confirmation">
+				Type ENVIAR to confirm
+			</label>
+			<input
+				id="send-review-confirmation"
+				class="mt-2 w-full rounded border border-slate-300 px-3 py-2 text-sm"
+				bind:value={sendToReviewConfirmation}
+				autocomplete="off"
+			/>
+			<div class="mt-5 flex justify-end gap-2">
+				<button
+					class="rounded border border-slate-300 px-3 py-2 text-sm text-slate-700"
+					onclick={() => {
+						showSendToReviewConfirm = false;
+						sendToReviewConfirmation = '';
+					}}
+				>
+					Cancel
+				</button>
+				<button
+					class="rounded bg-slate-900 px-3 py-2 text-sm font-semibold text-white disabled:bg-slate-400"
+					disabled={sendToReviewConfirmation !== 'ENVIAR'}
+					onclick={handleSavePaper}
+				>
+					Confirm
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}
 
 {#if paper}
 	<div class="container page max-w-[700px] p-4 m-auto">
@@ -656,12 +704,12 @@
 			{/if}
 			
 			<!-- Invite Hub Reviewers (Only for hub owners) -->
-			{#if !requiresPaymentBeforeInviting && data.isHubOwner && paper.hubId && typeof paper.hubId === 'object' && paper.hubId.reviewers}
+			{#if !requiresPaymentBeforeInviting && canManageHub && paper.hubId && typeof paper.hubId === 'object'}
 				<div class="mt-4">
 					<PaperReviewerInvite
 						paperId={paper.id}
 						hubId={typeof paper.hubId === 'object' ? paper.hubId._id || paper.hubId.id : paper.hubId}
-						hubReviewers={paper.hubId.reviewers as User[]}
+						hubReviewers={reviewers as User[]}
 						currentAssignedReviewers={paper.peer_review?.assignedReviewers?.map(r => typeof r === 'object' ? r._id || r.id : r) || []}
 						currentPendingReviewers={data.pendingReviewerIds || []}
 						reviewSlots={paper.reviewSlots as { slotNumber: number; reviewerId: string | null; status: 'pending' | 'declined' | 'available' | 'occupied'; }[] || []}

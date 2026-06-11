@@ -8,6 +8,7 @@ import Hubs from '$lib/db/models/Hub';
 import Users from '$lib/db/models/User';
 import nodemailer from 'nodemailer';
 import { env } from '$env/dynamic/private';
+import { resolveEffectiveHubRoles } from '$lib/server/authorization/effectiveHubRoles';
 
 if (mongoose.models.EmailReviewerInvitation) {
 	delete mongoose.models.EmailReviewerInvitation;
@@ -164,7 +165,13 @@ export const actions: Actions = {
 		await invitation.save();
 
 		const hub = await Hubs.findById(String(invitation.hubId)).lean();
-		const managerId = String(invitation.invitedBy || hub?.createdBy || '');
+		let managerId = String(invitation.invitedBy || '');
+		if (!managerId && hub) {
+			const effectiveHubRoles = await resolveEffectiveHubRoles(hub);
+			managerId =
+				effectiveHubRoles.members.find((member) => member.primaryRoleKey === 'HubOwner')?.userId ||
+				'';
+		}
 		const manager = await findUserByAnyId(managerId);
 
 		if (managerId) {

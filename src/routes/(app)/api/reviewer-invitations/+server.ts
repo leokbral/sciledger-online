@@ -5,8 +5,8 @@ import { resolveUserIdentifiers } from '$lib/helpers/userIdentifiers';
 import { json } from '@sveltejs/kit';
 import crypto from 'crypto';
 import { NotificationService } from '$lib/services/NotificationService';
-import { canManageHub, isHubOwner } from '$lib/helpers/hubPermissions';
 import { start_mongo } from '$lib/db/mongooseConnection';
+import { authorize } from '$lib/server/authorization/authorizationService';
 
 export async function POST({ request, locals }) {
 	await start_mongo();
@@ -15,7 +15,7 @@ export async function POST({ request, locals }) {
 		const { hubId, reviewerId, role } = await request.json();
 		const inviteRole = role === 'vice_manager' ? 'vice_manager' : 'reviewer';
 
-		const hub = await Hubs.findById(hubId).populate('createdBy');
+		const hub = await Hubs.findById(hubId);
 		if (!hub) {
 			return json({ error: 'Hub not found' }, { status: 404 });
 		}
@@ -25,12 +25,13 @@ export async function POST({ request, locals }) {
 			return json({ error: 'Unauthorized' }, { status: 401 });
 		}
 
-		if (!canManageHub(hub, inviter.id)) {
-			return json({ error: 'Only hub managers can send invitations' }, { status: 403 });
-		}
-
-		if (inviteRole === 'vice_manager' && !isHubOwner(hub, inviter.id)) {
-			return json({ error: 'Only the hub owner can invite an Editor-in-chief' }, { status: 403 });
+		const requiredPermission = inviteRole === 'vice_manager' ? 'hub.manageEditors' : 'hub.manageMembers';
+		const authorization = await authorize(inviter, requiredPermission, { hub });
+		if (!authorization.allowed) {
+			return json(
+				{ error: 'Insufficient permissions', reason: authorization.reason },
+				{ status: 403 }
+			);
 		}
 
 		const reviewer = await Users.findOne({ $or: [{ id: reviewerId }, { _id: reviewerId }] })
@@ -112,8 +113,12 @@ export async function GET({ locals, url }) {
 				return json({ error: 'Hub not found' }, { status: 404 });
 			}
 
-			if (!canManageHub(hub as any, user.id)) {
-				return json({ error: 'Only hub managers can view invitations' }, { status: 403 });
+			const authorization = await authorize(user, 'hub.manageMembers', { hub });
+			if (!authorization.allowed) {
+				return json(
+					{ error: 'Insufficient permissions', reason: authorization.reason },
+					{ status: 403 }
+				);
 			}
 
 			const invites = await Invitation.find({
@@ -138,16 +143,21 @@ export async function GET({ locals, url }) {
 		})
 			.populate({
 				path: 'hubId',
-				select: 'title type description logoUrl createdBy assistantManagers'
+				select: 'title type description logoUrl'
 			})
 			.lean();
 
-		const filteredInvitations = invitations.filter((inv: any) => {
-			const hub = inv.hubId;
-			const role = inv.role || 'reviewer';
-			if (!hub || role !== 'vice_manager') return true;
-			return !canManageHub(hub as any, user.id);
-		});
+		const filteredInvitations = (
+			await Promise.all(
+				invitations.map(async (inv: any) => {
+					const hub = inv.hubId;
+					const role = inv.role || 'reviewer';
+					if (!hub || role !== 'vice_manager') return inv;
+					const authorization = await authorize(user, 'hub.manageEditors', { hub });
+					return authorization.allowed ? null : inv;
+				})
+			)
+		).filter(Boolean);
 
 		return json({ success: true, reviewerInvitations: filteredInvitations });
 	} catch (error) {

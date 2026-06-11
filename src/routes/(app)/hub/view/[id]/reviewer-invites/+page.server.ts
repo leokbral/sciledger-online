@@ -2,10 +2,13 @@ import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import Hubs from '$lib/db/models/Hub';
-import Users from '$lib/db/models/User';
 import PaperReviewInvitation from '$lib/db/models/PaperReviewInvitation';
 import { sanitizePaper } from '$lib/helpers/sanitizePaper';
-import { canManageHub } from '$lib/helpers/hubPermissions';
+import { authorize } from '$lib/server/authorization/authorizationService';
+import {
+	getEffectiveHubMemberForUser,
+	resolveEffectiveHubRoles
+} from '$lib/server/authorization/effectiveHubRoles';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
 	await start_mongo();
@@ -24,7 +27,8 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 	}
 
 	// Verificar se o usuário é manager do hub (owner ou vice)
-	const isManager = canManageHub(hub as any, user.id);
+	const authorization = await authorize(user, 'hub.manageMembers', { hub });
+	const isManager = authorization.allowed;
 	if (!isManager) {
 		redirect(302, `/hub/view/${hubId}`);
 	}
@@ -45,13 +49,13 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 	}));
 
 	// Carregar revisores do hub
-	const reviewerIds = hub.reviewers || [];
-	const reviewers = await Users.find({ _id: { $in: reviewerIds } }).lean();
+	const effectiveRoles = await resolveEffectiveHubRoles(hub);
+	const currentUserHubMember = getEffectiveHubMemberForUser(effectiveRoles, user);
 
 	return {
 		hub,
-		isCreator: hub.createdBy === user.id || (typeof hub.createdBy === 'object' && hub.createdBy._id === user.id),
+		isCreator: currentUserHubMember?.primaryRoleKey === 'HubOwner',
 		invitations: sanitizedInvitations || [],
-		reviewers: reviewers || []
+		reviewers: effectiveRoles.reviewers || []
 	};
 };
