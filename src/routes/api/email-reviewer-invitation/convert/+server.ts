@@ -15,6 +15,12 @@ import { checkReviewerEligibility } from '$lib/helpers/reviewerEligibility';
 import Stripe from 'stripe';
 import { env } from '$env/dynamic/private';
 import nodemailer from 'nodemailer';
+import { assignHighestHubRole } from '$lib/server/authorization/roleAssignmentService';
+import { resolveEffectiveHubRoles } from '$lib/server/authorization/effectiveHubRoles';
+import {
+    EditorialTransitionError,
+    transitionPaperStatus
+} from '$lib/server/authorization/editorialTransitionService';
 
 // Clear cache to ensure we get the updated schema
 delete mongoose.models.EmailReviewerInvitation;
@@ -144,9 +150,13 @@ async function acceptPaperReviewInvite(options: {
         return { ok: false, status: 404, error: 'Hub not found' };
     }
 
-    const hubReviewerIds: string[] = Array.isArray(hubDoc.reviewers)
-        ? hubDoc.reviewers.map((r: any) => String(r))
-        : [];
+    let effectiveReviewerIds: string[] = [];
+    try {
+        const effectiveRoles = await resolveEffectiveHubRoles(hubDoc);
+        effectiveReviewerIds = effectiveRoles.reviewerIds;
+    } catch (error) {
+        console.error('Failed to resolve effective hub reviewers for email invitation:', error);
+    }
     const alreadyAssignedIds: string[] = (paper.peer_review?.assignedReviewers || []).map((r: any) => String(r));
     const activeAssignmentsCount =
         typeof MAX_ACTIVE_REVIEW_ASSIGNMENTS === 'number'
@@ -157,7 +167,7 @@ async function acceptPaperReviewInvite(options: {
             : 0;
 
     const eligibility = checkReviewerEligibility(paper as any, user as any, {
-        hubReviewerIds,
+        hubReviewerIds: effectiveReviewerIds,
         alreadyAssignedIds,
         activeAssignmentsCount,
         maxActiveAssignments: MAX_ACTIVE_REVIEW_ASSIGNMENTS,
@@ -179,13 +189,13 @@ async function acceptPaperReviewInvite(options: {
 
     const inviteId = existingInvitation?._id || crypto.randomUUID();
     const invitation = existingInvitation
-        ? existingInvitation
-        : new PaperReviewInvitation({
+            ? existingInvitation
+            : new PaperReviewInvitation({
                 _id: inviteId,
                 id: inviteId,
                 paper: paperId,
                 reviewer: userId,
-                invitedBy: inviterId || hubDoc.createdBy || userId,
+                invitedBy: inviterId || userId,
                 hubId,
                 status: 'pending',
                 customDeadlineDays: customDeadlineDays || 15,
@@ -261,6 +271,14 @@ async function acceptPaperReviewInvite(options: {
     });
     await reviewAssignment.save();
 
+    await assignHighestHubRole(
+        userId,
+        hubId,
+        'Reviewer',
+        String(inviterId || userId || 'system-review-invitation'),
+        { auditUser: inviterId || userId || undefined }
+    );
+
     invitation.reviewAssignmentId = assignmentId;
     await invitation.save();
 
@@ -310,10 +328,8 @@ async function acceptPaperReviewInvite(options: {
             (r: any) => r.status === 'accepted' || r.status === 'completed'
         ).length;
 
-        if (acceptedCount >= REQUIRED_REVIEWERS && paperDoc.status === 'reviewer assignment') {
-            paperDoc.status = 'in review';
-            paperDoc.peer_review.reviewStatus = 'in_progress';
-        }
+        const shouldSendToReview =
+            acceptedCount >= REQUIRED_REVIEWERS && paperDoc.status === 'reviewer assignment';
 
         if (
             acceptedCount >= REQUIRED_REVIEWERS &&
@@ -336,6 +352,29 @@ async function acceptPaperReviewInvite(options: {
         }
 
         await paperDoc.save();
+
+        if (shouldSendToReview) {
+            try {
+                await transitionPaperStatus({
+                    paperId: String(paperDoc.id),
+                    action: 'paper.sendToReview',
+                    expectedStatus: 'reviewer assignment',
+                    system: true,
+                    metadata: {
+                        endpoint: '/api/email-reviewer-invitation/convert',
+                        trigger: 'required_email_reviewers_accepted',
+                        requiredReviewers: REQUIRED_REVIEWERS
+                    }
+                });
+                paperDoc.status = 'in review';
+            } catch (transitionError) {
+                if (transitionError instanceof EditorialTransitionError) {
+                    console.warn('Email reviewer transition skipped:', transitionError.message);
+                } else {
+                    throw transitionError;
+                }
+            }
+        }
     }
 
     if (inviterId) {
@@ -382,7 +421,7 @@ export async function POST({ request }) {
         }
 
         // Get hub information
-        const hub = await Hub.findById(emailInvitation.hubId).populate('createdBy');
+        const hub = await Hub.findById(emailInvitation.hubId);
         if (!hub) {
             console.error('Hub not found:', emailInvitation.hubId);
             return json({ error: 'Hub not found' }, { status: 404 });
@@ -393,19 +432,21 @@ export async function POST({ request }) {
         const reviewerName = reviewerUser
             ? `${reviewerUser.firstName || ''} ${reviewerUser.lastName || ''}`.trim() || reviewerUser.email || normalizedUserId
             : normalizedUserId;
-        const managerId = String(emailInvitation.invitedBy || hub.createdBy?._id || hub.createdBy?.id || hub.createdBy || '');
+        const managerId = String(emailInvitation.invitedBy || '');
         const managerUser = await findUserByAnyId(managerId);
 
-        // Ensure user is part of the hub reviewers list
         const hubDoc = await Hubs.findById(emailInvitation.hubId);
         if (!hubDoc) {
             return json({ error: 'Hub not found' }, { status: 404 });
         }
-        if (!hubDoc.reviewers) hubDoc.reviewers = [];
-        if (!hubDoc.reviewers.includes(normalizedUserId)) {
-            hubDoc.reviewers.push(normalizedUserId);
-            await hubDoc.save();
-        }
+
+        await assignHighestHubRole(
+            normalizedUserId,
+            String(emailInvitation.hubId),
+            'Reviewer',
+            managerId || normalizedUserId,
+            { auditUser: managerId || normalizedUserId }
+        );
 
         // Check if reviewer invitation already exists
         const existingInvitation = await Invitation.findOne({
@@ -430,7 +471,7 @@ export async function POST({ request }) {
             if (emailInvitation.paperId) {
                 const acceptanceResult = await acceptPaperReviewInvite({
                     userId: normalizedUserId,
-                    inviterId: emailInvitation.invitedBy || String(hub.createdBy?._id || hub.createdBy?.id || ''),
+                    inviterId: emailInvitation.invitedBy || null,
                     paperId: String(emailInvitation.paperId),
                     hubId: String(emailInvitation.hubId),
                     customDeadlineDays: emailInvitation.customDeadlineDays
@@ -487,8 +528,8 @@ export async function POST({ request }) {
         await hubInvitation.save();
 
         // Create notification for the user
-        const inviterName = hub.createdBy?.firstName 
-            ? `${hub.createdBy.firstName} ${hub.createdBy.lastName}`.trim() 
+        const inviterName = managerUser
+            ? `${managerUser.firstName || ''} ${managerUser.lastName || ''}`.trim() || managerUser.email || 'Hub Admin'
             : 'Hub Admin';
         
         let notification: any = null;
@@ -505,7 +546,7 @@ export async function POST({ request }) {
         if (emailInvitation.paperId) {
             const acceptanceResult = await acceptPaperReviewInvite({
                 userId: normalizedUserId,
-                inviterId: emailInvitation.invitedBy || String(hub.createdBy?._id || hub.createdBy?.id || ''),
+                inviterId: emailInvitation.invitedBy || null,
                 paperId: String(emailInvitation.paperId),
                 hubId: String(emailInvitation.hubId),
                 customDeadlineDays: emailInvitation.customDeadlineDays

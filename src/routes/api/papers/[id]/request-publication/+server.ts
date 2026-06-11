@@ -5,6 +5,11 @@ import Hubs from '$lib/db/models/Hub';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import { NotificationService } from '$lib/services/NotificationService';
 import { PaperLifecycleEmailService } from '$lib/services/PaperLifecycleEmailService';
+import {
+	EditorialTransitionError,
+	transitionPaperStatus
+} from '$lib/server/authorization/editorialTransitionService';
+import { resolveEffectiveHubRoles } from '$lib/server/authorization/effectiveHubRoles';
 
 function isAuthorOfPaper(paper: any, userId: string): boolean {
 	if (!paper || !userId) return false;
@@ -17,7 +22,7 @@ function isAuthorOfPaper(paper: any, userId: string): boolean {
 	return false;
 }
 
-export const POST: RequestHandler = async ({ params, locals }) => {
+export const POST: RequestHandler = async ({ params, locals, request }) => {
 	try {
 		await start_mongo();
 
@@ -48,11 +53,21 @@ export const POST: RequestHandler = async ({ params, locals }) => {
 			return json({ error: 'Paper is not in the author correction phase' }, { status: 400 });
 		}
 
+		const body = await request.json().catch(() => ({}));
+
 		// If there is no hub, publish immediately
 		if (!paperDoc.hubId) {
-			paperDoc.status = 'published';
-			paperDoc.updatedAt = new Date().toISOString();
-			await paperDoc.save();
+			const updatedPaper: any = await transitionPaperStatus({
+				user,
+				paperId,
+				action: 'paper.publishStandalone',
+				expectedStatus: body.expectedStatus || paperDoc.status,
+				metadata: {
+					endpoint: '/api/papers/[id]/request-publication',
+					standalone: true
+				}
+			});
+			paperDoc.status = updatedPaper.status;
 
 			try {
 				await NotificationService.createNotification({
@@ -97,30 +112,47 @@ export const POST: RequestHandler = async ({ params, locals }) => {
 		}
 
 		// Hub paper: request approval from hub admin (hub owner)
-		paperDoc.status = 'reviewer assignment';
-		paperDoc.updatedAt = new Date().toISOString();
-		await paperDoc.save();
+		const updatedPaper: any = await transitionPaperStatus({
+			user,
+			paperId,
+			action: 'paper.requestPublication',
+			expectedStatus: body.expectedStatus || paperDoc.status,
+			metadata: {
+				endpoint: '/api/papers/[id]/request-publication',
+				hubId: String(paperDoc.hubId)
+			}
+		});
+		paperDoc.status = updatedPaper.status;
 
 		const hubDoc: any = await Hubs.findById(paperDoc.hubId).lean();
-		const hubOwnerId = hubDoc?.createdBy?._id || hubDoc?.createdBy?.id || hubDoc?.createdBy;
+		const effectiveHubRoles = hubDoc ? await resolveEffectiveHubRoles(hubDoc) : null;
+		const hubOwnerIds =
+			effectiveHubRoles?.members
+				.filter((member) => member.primaryRoleKey === 'HubOwner')
+				.map((member) => member.userId)
+				.filter(Boolean) ?? [];
 
-		if (hubOwnerId) {
+		if (hubOwnerIds.length > 0) {
 			try {
-				await NotificationService.createNotification({
-					user: hubOwnerId.toString(),
-					type: 'hub_paper_pending',
-					title: 'Publication Approval Requested',
-					content: `The author requested publication approval for the paper "${paperDoc.title}".`,
-					relatedPaperId: paperDoc.id,
-					relatedHubId: paperDoc.hubId,
-					actionUrl: `/publish/publication-approval/${paperDoc.id}`,
-					priority: 'high',
-					metadata: {
-						paperTitle: paperDoc.title,
-						reviewRound: paperDoc.reviewRound,
-						requestType: 'publication'
-					}
-				});
+				await Promise.all(
+					hubOwnerIds.map((hubOwnerId) =>
+						NotificationService.createNotification({
+							user: hubOwnerId.toString(),
+							type: 'hub_paper_pending',
+							title: 'Publication Approval Requested',
+							content: `The author requested publication approval for the paper "${paperDoc.title}".`,
+							relatedPaperId: paperDoc.id,
+							relatedHubId: paperDoc.hubId,
+							actionUrl: `/publish/publication-approval/${paperDoc.id}`,
+							priority: 'high',
+							metadata: {
+								paperTitle: paperDoc.title,
+								reviewRound: paperDoc.reviewRound,
+								requestType: 'publication'
+							}
+						})
+					)
+				);
 			} catch (notificationError) {
 				console.error('Failed to create hub approval notification:', notificationError);
 			}
@@ -132,6 +164,16 @@ export const POST: RequestHandler = async ({ params, locals }) => {
 			message: 'Publication request sent to hub admin'
 		});
 	} catch (error) {
+		if (error instanceof EditorialTransitionError) {
+			return json(
+				{
+					error: error.message,
+					code: error.code,
+					currentStatus: error.currentStatus
+				},
+				{ status: error.status }
+			);
+		}
 		console.error('Error requesting publication:', error);
 		return json({ error: 'Internal server error' }, { status: 500 });
 	}

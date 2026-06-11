@@ -99,36 +99,32 @@
 		return getIdAliases(value).includes(String(userId));
 	}
 
-	function isHubViceManager(hub: unknown, userId: string | undefined): boolean {
-		if (!userId) return false;
-		if (!hub || typeof hub !== 'object') return false;
-		const managers = (hub as any).assistantManagers;
-		return Array.isArray(managers) && managers.some((manager: any) => matchesUser(manager, userId));
+	function currentUserHubRole(paper: any) {
+		return paper?.currentUserHubRole || null;
+	}
+
+	function hasEffectiveHubReviewCapability(paper: any) {
+		return currentUserHubRole(paper)?.canReview === true;
 	}
 
 	let papersPool = papers
 		.filter((p: Paper) => {
 			const userId = user.id?.toString();
-			const isReviewerRole = user.roles?.reviewer === true; // ← check if the user is really a reviewer
-
-			if (!isReviewerRole) return false; // ← if not a reviewer, cannot see any paper
 
 			const isAuthor = matchesUser(p.correspondingAuthor, userId);
 			const isMainAuthor = matchesUser(p.mainAuthor, userId);
 			const isCoAuthor = (p.coAuthors ?? []).some((author) => matchesUser(author, userId));
 
-			const isHubReviewer =
-				typeof p.hubId === 'object' &&
-				Array.isArray(p.hubId?.reviewers) &&
-				p.hubId.reviewers.some((reviewer) => matchesUser(reviewer, userId));
-			const isHubOwner = typeof p.hubId === 'object' && matchesUser(p.hubId?.createdBy, userId);
+			const isHubReviewer = hasEffectiveHubReviewCapability(p);
+			const isHubOwner = currentUserHubRole(p)?.primaryRoleKey === 'HubOwner';
 			const isPaperInHub = !!p.hubId;
 			const isAcceptedForReview = p.isAcceptedForReview === true;
 
 			const isUnderNegotiation = p.status === 'reviewer assignment';
 			const isInvolved = isAuthor || isCoAuthor || isMainAuthor;
 
-			const canSeeWithoutHub = !isPaperInHub && isUnderNegotiation && !isInvolved;
+			const canSeeWithoutHub =
+				!isPaperInHub && isUnderNegotiation && !isInvolved;
 			const canSeeWithHub =
 				isPaperInHub &&
 				isUnderNegotiation &&
@@ -139,10 +135,7 @@
 		})
 		.map((paper) => ({
 			...paper,
-			isHubPaper:
-				typeof paper.hubId === 'object' &&
-				Array.isArray(paper.hubId?.reviewers) &&
-				paper.hubId.reviewers.some((reviewer) => matchesUser(reviewer, user.id))
+			isHubPaper: hasEffectiveHubReviewCapability(paper)
 		}));
 	
 	// Filtrar papers "in review" - APENAS revisores designados, revisores do hub ou dono do hub (autores NÃO veem aqui)
@@ -152,14 +145,11 @@
 		const userId = user.id?.toString();
 		
 		// Verifica se é dono do hub
-		const isHubOwner = typeof p.hubId === 'object' && matchesUser(p.hubId?.createdBy, userId);
-		const isViceManager = typeof p.hubId === 'object' && isHubViceManager(p.hubId, userId);
+		const isHubOwner = currentUserHubRole(p)?.primaryRoleKey === 'HubOwner';
+		const isViceManager = currentUserHubRole(p)?.canAssignReviewers === true;
 		
 		// Verifica se é revisor do hub
-		const isHubReviewer =
-			typeof p.hubId === 'object' &&
-			Array.isArray(p.hubId?.reviewers) &&
-			p.hubId.reviewers.some((reviewer) => matchesUser(reviewer, userId));
+		const isHubReviewer = hasEffectiveHubReviewCapability(p);
 		
 		// Verifica se é revisor designado
 		const isReviewer = p.peer_review?.responses?.some(
@@ -177,14 +167,11 @@
 		const userId = user.id?.toString();
 		
 		// Verifica se é dono do hub
-		const isHubOwner = typeof p.hubId === 'object' && matchesUser(p.hubId?.createdBy, userId);
-		const isViceManager = typeof p.hubId === 'object' && isHubViceManager(p.hubId, userId);
+		const isHubOwner = currentUserHubRole(p)?.primaryRoleKey === 'HubOwner';
+		const isViceManager = currentUserHubRole(p)?.canAssignReviewers === true;
 		
 		// Verifica se é revisor do hub
-		const isHubReviewer =
-			typeof p.hubId === 'object' &&
-			Array.isArray(p.hubId?.reviewers) &&
-			p.hubId.reviewers.some((reviewer) => matchesUser(reviewer, userId));
+		const isHubReviewer = hasEffectiveHubReviewCapability(p);
 		
 		// Verifica se é revisor designado
 		const isReviewer = p.peer_review?.responses?.some(

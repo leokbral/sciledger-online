@@ -6,12 +6,16 @@ import Papers from '$lib/db/models/Paper';
 import Users from '$lib/db/models/User';
 import ReviewQueue from '$lib/db/models/ReviewQueue';
 import ReviewAssignment from '$lib/db/models/ReviewAssignment';
-import Hubs from '$lib/db/models/Hub';
 import { MAX_ACTIVE_REVIEW_ASSIGNMENTS } from '$lib/constants/reviewerLimits';
 import { checkReviewerEligibility } from '$lib/helpers/reviewerEligibility';
-import { canManageHub } from '$lib/helpers/hubPermissions';
 import { resolveUserIdentifiers } from '$lib/helpers/userIdentifiers';
 import { NotificationService } from '$lib/services/NotificationService';
+import { authorize } from '$lib/server/authorization/authorizationService';
+import { resolveEffectiveHubRoles } from '$lib/server/authorization/effectiveHubRoles';
+import {
+	EditorialTransitionError,
+	transitionPaperStatus
+} from '$lib/server/authorization/editorialTransitionService';
 import type { RequestHandler } from './$types';
 import Stripe from 'stripe';
 import { env } from '$env/dynamic/private';
@@ -76,17 +80,15 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 			let paymentCaptured = false;
 			let capturedPaymentIntentId: string | null = null;
 
-			const hubReviewerIds: string[] = [];
+			let effectiveReviewerIds: string[] = [];
 			const isHubPaper = !!invitation.hubId && !!paper.hubId;
 
 			if (isHubPaper) {
 				try {
-					const hubDoc = await Hubs.findById(String(invitation.hubId)).lean();
-					if (hubDoc?.reviewers && Array.isArray(hubDoc.reviewers)) {
-						hubReviewerIds.push(...hubDoc.reviewers.map((r: any) => String(r)));
-					}
+					const effectiveRoles = await resolveEffectiveHubRoles(String(invitation.hubId));
+					effectiveReviewerIds = effectiveRoles.reviewerIds;
 				} catch (e) {
-					console.error('Failed to load hub reviewers during invitation acceptance:', e);
+					console.error('Failed to resolve effective hub reviewers during invitation acceptance:', e);
 				}
 			}
 
@@ -102,7 +104,7 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 					: 0;
 
 			const eligibility = checkReviewerEligibility(paper as any, user as any, {
-				hubReviewerIds,
+				hubReviewerIds: effectiveReviewerIds,
 				alreadyAssignedIds,
 				activeAssignmentsCount,
 				maxActiveAssignments: MAX_ACTIVE_REVIEW_ASSIGNMENTS,
@@ -246,10 +248,8 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 					(r: any) => r.status === 'accepted' || r.status === 'completed'
 				).length;
 
-				if (acceptedCount >= REQUIRED_REVIEWERS && paperDoc.status === 'reviewer assignment') {
-					paperDoc.status = 'in review';
-					paperDoc.peer_review.reviewStatus = 'in_progress';
-				}
+				const shouldSendToReview =
+					acceptedCount >= REQUIRED_REVIEWERS && paperDoc.status === 'reviewer assignment';
 
 				if (
 					acceptedCount >= REQUIRED_REVIEWERS &&
@@ -276,6 +276,28 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 				}
 
 				await paperDoc.save();
+
+				if (shouldSendToReview) {
+					try {
+						await transitionPaperStatus({
+							paperId: String(paperDoc.id),
+							action: 'paper.sendToReview',
+							expectedStatus: 'reviewer assignment',
+							system: true,
+							metadata: {
+								endpoint: '/api/paper-reviewer-invitations/[inviteId]',
+								trigger: 'required_reviewers_accepted',
+								requiredReviewers: REQUIRED_REVIEWERS
+							}
+						});
+					} catch (transitionError) {
+						if (transitionError instanceof EditorialTransitionError) {
+							console.warn('Reviewer invitation status transition skipped:', transitionError.message);
+						} else {
+							throw transitionError;
+						}
+					}
+				}
 			} else {
 				console.error('Paper not found for ID:', typeof paper === 'object' ? paper.id : paper);
 			}
@@ -429,8 +451,16 @@ export const DELETE: RequestHandler = async ({ params, locals }) => {
 			return json({ error: 'Invitation not found' }, { status: 404 });
 		}
 
-		if (!canManageHub(invitation.hubId as any, user.id)) {
-			return json({ error: 'Only hub managers can cancel invitations' }, { status: 403 });
+		const paper = typeof invitation.paper === 'object' ? invitation.paper : null;
+		const authorization = await authorize(user, 'paper.assignReviewers', {
+			paper: paper ?? undefined,
+			hubId: String(invitation.hubId || '')
+		});
+		if (!authorization.allowed) {
+			return json(
+				{ error: 'Insufficient permissions', reason: authorization.reason },
+				{ status: 403 }
+			);
 		}
 
 		await PaperReviewInvitation.deleteOne({ _id: inviteId });
@@ -443,8 +473,6 @@ export const DELETE: RequestHandler = async ({ params, locals }) => {
 			(typeof invitation.reviewer === 'object'
 				? String((invitation.reviewer as any)._id || (invitation.reviewer as any).id || '')
 				: String(invitation.reviewer || ''));
-		const paper = typeof invitation.paper === 'object' ? invitation.paper : null;
-
 		if (reviewerId) {
 			await NotificationService.createNotification({
 				user: reviewerId,

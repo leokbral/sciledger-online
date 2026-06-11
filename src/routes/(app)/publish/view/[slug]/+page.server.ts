@@ -3,7 +3,10 @@ import Users from '$lib/db/models/User';
 import { error, redirect } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import type { PageServerLoad, Actions } from './$types';
-import { isHubViceManager } from '$lib/helpers/hubPermissions';
+import {
+	getEffectiveHubMemberForUser,
+	resolveEffectiveHubRoles
+} from '$lib/server/authorization/effectiveHubRoles';
 
 // Type for MongoDB ObjectId
 interface ObjectId {
@@ -100,13 +103,14 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 	const isPaperAuthor = isMainAuthor || isCorrespondingAuthor || isSubmitter || isCoAuthor;
 
 	// Verificar se é dono do hub ou revisor do hub
-	const hubCreatorId = typeof paperDoc.hubId === 'object'
-		? (paperDoc.hubId?.createdBy?._id || paperDoc.hubId?.createdBy?.id || paperDoc.hubId?.createdBy)
-		: null;
-	const isHubOwner = hubCreatorId?.toString() === userId;
-	const isHubVice = typeof paperDoc.hubId === 'object' && isHubViceManager(paperDoc.hubId as any, userId);
-	
-	const isHubReviewer = typeof paperDoc.hubId === 'object' && paperDoc.hubId?.reviewers?.includes(userId);
+	const effectiveHubRoles =
+		typeof paperDoc.hubId === 'object' && paperDoc.hubId
+			? await resolveEffectiveHubRoles(paperDoc.hubId)
+			: null;
+	const currentUserHubMember = getEffectiveHubMemberForUser(effectiveHubRoles, locals.user);
+	const isHubOwner = currentUserHubMember?.primaryRoleKey === 'HubOwner';
+	const isHubVice = currentUserHubMember?.canAssignReviewers === true;
+	const isHubReviewer = currentUserHubMember?.canReview === true;
 
 	// Verificar se é revisor designado do paper
 	const isReviewer = paperDoc.peer_review?.responses?.some((r: any) => 

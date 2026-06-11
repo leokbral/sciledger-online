@@ -27,7 +27,23 @@ export const PaperSchema: Schema = new Schema({
     likes: [{ type: String }], // List of users who liked as UUIDs
     comments: [{ type: String }], // List of comments as UUIDs
     tags: [{ type: String }],
-    status: { type: String, required: true, enum: ['draft', 'reviewer assignment', 'in review', 'needing corrections', 'published', 'rejected'], default: 'draft' },
+    status: {
+        type: String,
+        required: true,
+        enum: [
+            'draft',
+            'reviewer assignment',
+            'in review',
+            'needing corrections',
+            'under correction',
+            'under final review',
+            'awaiting final decision',
+            'accepted',
+            'published',
+            'rejected'
+        ],
+        default: 'draft'
+    },
     price: { type: Number, required: true }, // Publication price field
     score: { type: Number, default: 0, min: 0, max: 5 }, // Publication score field, default 0, range 0 to 5
     authors: [{ type: String, ref: 'User' }],
@@ -80,6 +96,17 @@ export const PaperSchema: Schema = new Schema({
     }, */
     createdAt: { type: String, default: () => new Date().toISOString() },
     updatedAt: { type: String, default: () => new Date().toISOString() },
+    statusHistory: [{
+        _id: false,
+        action: { type: String, required: true },
+        permissionKey: { type: String },
+        previousStatus: { type: String },
+        newStatus: { type: String },
+        userId: { type: String, ref: 'User' },
+        roleKeys: [{ type: String }],
+        metadata: { type: Schema.Types.Mixed, default: {} },
+        createdAt: { type: Date, default: () => new Date() }
+    }],
     submittedBy: { type: String, required: true, ref: 'User' }, // Field for who submitted the paper
     hubId: { type: String, ref: 'Hub', required: false },
     isLinkedToHub: { type: Boolean, default: false },

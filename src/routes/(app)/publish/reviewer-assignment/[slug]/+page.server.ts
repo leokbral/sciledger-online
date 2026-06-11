@@ -4,7 +4,11 @@ import PaperReviewInvitation from '$lib/db/models/PaperReviewInvitation';
 import '$lib/db/models/Review';
 import { error, redirect } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongooseConnection';
-import { canManageHub as canManageHubHelper } from '$lib/helpers/hubPermissions';
+import { authorize } from '$lib/server/authorization/authorizationService';
+import {
+	getEffectiveHubMemberForUser,
+	resolveEffectiveHubRoles
+} from '$lib/server/authorization/effectiveHubRoles';
 interface ObjectId {
 	toString(): string;
 	constructor: { name: string };
@@ -112,23 +116,18 @@ export async function load({ locals, params }) {
 	const isSubmitter = matchesCurrentUser((paperDoc as any).submittedBy, userId);
 	const isAuthor = isMainAuthor || isCoAuthor || isSubmitter;
 
-	const isHubOwner =
-		typeof paperDoc.hubId === 'object' &&
-		paperDoc.hubId &&
-		matchesCurrentUser((paperDoc.hubId as any).createdBy, userId);
-	const isHubReviewer =
-		typeof paperDoc.hubId === 'object' &&
-		paperDoc.hubId &&
-		Array.isArray((paperDoc.hubId as any).reviewers) &&
-		(paperDoc.hubId as any).reviewers.some((reviewer: any) => matchesCurrentUser(reviewer, userId));
+	const effectiveHubRoles =
+		typeof paperDoc.hubId === 'object' && paperDoc.hubId
+			? await resolveEffectiveHubRoles(paperDoc.hubId)
+			: null;
+	const currentUserHubMember = getEffectiveHubMemberForUser(effectiveHubRoles, locals.user);
+	const isHubOwner = currentUserHubMember?.primaryRoleKey === 'HubOwner';
+	const isHubReviewer = currentUserHubMember?.canReview === true;
 
-	// Determine whether the current user can manage hub-linked papers
-	const canManageHub = Boolean(
-		locals.user &&
-		(typeof locals.user === 'object') &&
-		((locals.user.roles && ((locals.user.roles as any).admin || (locals.user.roles as any).editor)) ||
-		(canManageHubHelper((paperDoc.hubId as any) || null, userId)))
-	);
+	const assignmentAuthorization = await authorize(locals.user, 'paper.assignReviewers', {
+		paper: paperDoc
+	});
+	const canManageHub = assignmentAuthorization.allowed;
 
 	const hasAcceptedResponse = (paperDoc.peer_review?.responses ?? []).some((response: any) => {
 		return (
@@ -158,7 +157,7 @@ export async function load({ locals, params }) {
 	const usersDoc = await Users.find({}, {}).lean().exec();
 
 	let reviewAssignments: unknown[] = [];
-	if (isHubOwner) {
+	if (canManageHub) {
 		const ReviewAssignment = (await import('$lib/db/models/ReviewAssignment')).default;
 		reviewAssignments = await ReviewAssignment.find({ paperId: params.slug })
 			.populate('reviewerId')
@@ -191,6 +190,8 @@ export async function load({ locals, params }) {
 		users: sanitize(usersDoc),
 		isHubOwner,
 		canManageHub,
+		currentUserHubMember: sanitize(currentUserHubMember),
+		effectiveReviewers: sanitize(effectiveHubRoles?.reviewers ?? []),
 		assignmentLockedForAuthor,
 		reviewAssignments: sanitize(reviewAssignments),
 		pendingReviewerIds

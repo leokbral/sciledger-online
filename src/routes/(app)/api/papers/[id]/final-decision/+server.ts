@@ -1,134 +1,127 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { db } from '$lib/db/mongo';
+import Papers from '$lib/db/models/Paper';
+import Users from '$lib/db/models/User';
+import { start_mongo } from '$lib/db/mongooseConnection';
 import { NotificationService } from '$lib/services/NotificationService';
-import { ObjectId } from 'mongodb';
+import {
+	EditorialTransitionError,
+	transitionPaperStatus
+} from '$lib/server/authorization/editorialTransitionService';
 
 export const POST: RequestHandler = async ({ request, params, locals }) => {
-    try {
-        const user = locals.user;
+	try {
+		await start_mongo();
 
-        if (!user) {
-            return json({ error: 'Unauthorized' }, { status: 401 });
-        }
+		const user = locals.user;
+		if (!user) {
+			return json({ error: 'Unauthorized' }, { status: 401 });
+		}
 
-        const { decision, rejectionReason } = await request.json();
-        const paperId = params.id;
+		const { decision, rejectionReason, expectedStatus } = await request.json();
+		const paperId = params.id;
 
-        if (!paperId) {
-            return json({ error: 'Paper ID is required' }, { status: 400 });
-        }
+		if (!paperId) {
+			return json({ error: 'Paper ID is required' }, { status: 400 });
+		}
 
-        if (!decision || !['accept', 'reject'].includes(decision)) {
-            return json({ error: 'Valid decision (accept/reject) is required' }, { status: 400 });
-        }
+		if (!decision || !['accept', 'reject'].includes(decision)) {
+			return json({ error: 'Valid decision (accept/reject) is required' }, { status: 400 });
+		}
 
-        // Verificar se o usuário tem permissão para tomar decisões finais
-        if (!user.roles?.admin && !user.roles?.editor) {
-            return json({ error: 'Insufficient permissions' }, { status: 403 });
-        }
+		const paper: any = await Papers.findOne({
+			$or: [{ id: paperId }, { _id: paperId }]
+		}).lean();
 
-        // Validar e converter o paperId para ObjectId
-        let paperObjectId: ObjectId;
-        try {
-            if (typeof paperId === 'string' && paperId.length === 24) {
-                paperObjectId = new ObjectId(paperId);
-            } else {
-                // Buscar pelo campo 'id' customizado
-                const paperByCustomId = await db.collection('papers').findOne({ id: paperId });
-                if (paperByCustomId) {
-                    paperObjectId = paperByCustomId._id;
-                } else {
-                    return json({ error: 'Invalid paper ID format' }, { status: 400 });
-                }
-            }
-        } catch (error) {
-            console.error('Error converting paperId to ObjectId:', error);
-            return json({ error: 'Invalid paper ID format' }, { status: 400 });
-        }
+		if (!paper) {
+			return json({ error: 'Paper not found' }, { status: 404 });
+		}
 
-        // Buscar informações do paper
-        const paper = await db.collection('papers').findOne({ 
-            _id: paperObjectId 
-        });
-        
-        if (!paper) {
-            return json({ error: 'Paper not found' }, { status: 404 });
-        }
+		const finalDecisionAt = new Date();
+		const action = decision === 'accept' ? 'paper.accept' : 'paper.reject';
+		const updatedPaper: any = await transitionPaperStatus({
+			user,
+			paperId: String(paper.id || paper._id),
+			action,
+			expectedStatus: expectedStatus || String(paper.status),
+			extraSet: {
+				finalDecision: decision,
+				finalDecisionAt,
+				finalDecisionBy: user.id,
+				...(decision === 'reject' ? { rejectionReason } : {})
+			},
+			metadata: {
+				endpoint: '/api/papers/[id]/final-decision',
+				decision,
+				rejectionReason: decision === 'reject' ? rejectionReason : undefined
+			}
+		});
 
-        const newStatus = decision === 'accept' ? 'accepted' : 'rejected';
-        const finalDecisionAt = new Date();
+		const editor = await Users.findOne({ id: user.id }).lean();
+		const editorName = `${editor?.firstName || ''} ${editor?.lastName || ''}`.trim();
+		const paperTitle = paper.title;
+		const authorId = String(paper.author || paper.mainAuthor || paper.createdBy);
+		const authorName = paper.authorName || 'Autor';
+		const reviewerIds =
+			paper.peer_review?.assignedReviewers?.map((id: string | object) => String(id)) || [];
 
-        // Atualizar status do paper
-        await db.collection('papers').updateOne(
-            { _id: paperObjectId },
-            { 
-                $set: { 
-                    status: newStatus,
-                    finalDecision: decision,
-                    finalDecisionAt: finalDecisionAt,
-                    finalDecisionBy: user.id,
-                    rejectionReason: decision === 'reject' ? rejectionReason : undefined,
-                    updatedAt: new Date()
-                }
-            }
-        );
+		if (decision === 'accept') {
+			await NotificationService.createPaperFinalAcceptanceNotifications({
+				paperId: String(paper.id || paper._id),
+				paperTitle,
+				authorId,
+				authorName,
+				editorId: String(user.id),
+				editorName,
+				reviewerIds,
+				hubId: paper.hubId ? String(paper.hubId) : undefined,
+				hubName: paper.hubName,
+				publicationDate: finalDecisionAt
+			});
+		} else {
+			await NotificationService.createPaperFinalRejectionNotifications({
+				paperId: String(paper.id || paper._id),
+				paperTitle,
+				authorId,
+				authorName,
+				editorId: String(user.id),
+				editorName,
+				reviewerIds,
+				rejectionReason,
+				hubId: paper.hubId ? String(paper.hubId) : undefined,
+				hubName: paper.hubName
+			});
+		}
 
-        // Buscar informações para as notificações
-        const editor = await db.collection('users').findOne({ id: user.id });
-        const editorName = `${editor?.firstName || ''} ${editor?.lastName || ''}`.trim();
-        
-        const paperTitle = paper.title;
-        const authorId = String(paper.author || paper.mainAuthor || paper.createdBy);
-        const authorName = paper.authorName || 'Autor';
-        
-        // Buscar revisores
-        const reviewerIds = paper.peer_review?.assignedReviewers?.map((id: string | object) => String(id)) || [];
+		return json({
+			success: true,
+			message: `Paper ${decision === 'accept' ? 'accepted' : 'rejected'} successfully`,
+			paperId: String(paper.id || paper._id),
+			status: updatedPaper.status,
+			finalDecision: decision,
+			finalDecisionAt
+		});
+	} catch (error) {
+		if (error instanceof EditorialTransitionError) {
+			return json(
+				{
+					success: false,
+					error: error.message,
+					code: error.code,
+					currentStatus: error.currentStatus
+				},
+				{ status: error.status }
+			);
+		}
 
-        // Criar notificações baseadas na decisão
-        if (decision === 'accept') {
-            await NotificationService.createPaperFinalAcceptanceNotifications({
-                paperId: String(paperObjectId),
-                paperTitle: paperTitle,
-                authorId: authorId,
-                authorName: authorName,
-                editorId: String(user.id),
-                editorName: editorName,
-                reviewerIds: reviewerIds,
-                hubId: paper.hubId ? String(paper.hubId) : undefined,
-                hubName: paper.hubName,
-                publicationDate: finalDecisionAt
-            });
-        } else {
-            await NotificationService.createPaperFinalRejectionNotifications({
-                paperId: String(paperObjectId),
-                paperTitle: paperTitle,
-                authorId: authorId,
-                authorName: authorName,
-                editorId: String(user.id),
-                editorName: editorName,
-                reviewerIds: reviewerIds,
-                rejectionReason: rejectionReason,
-                hubId: paper.hubId ? String(paper.hubId) : undefined,
-                hubName: paper.hubName
-            });
-        }
-
-        return json({ 
-            success: true, 
-            message: `Paper ${decision === 'accept' ? 'accepted' : 'rejected'} successfully`,
-            paperId: String(paperObjectId),
-            status: newStatus,
-            finalDecision: decision,
-            finalDecisionAt: finalDecisionAt
-        });
-
-    } catch (error) {
-        console.error('Error making final decision:', error);
-        return json({ 
-            success: false, 
-            error: 'Failed to make final decision',
-            details: error instanceof Error ? error.message : String(error)
-        }, { status: 500 });
-    }
+		console.error('Error making final decision:', error);
+		return json(
+			{
+				success: false,
+				error: 'Failed to make final decision',
+				details: error instanceof Error ? error.message : String(error)
+			},
+			{ status: 500 }
+		);
+	}
 };

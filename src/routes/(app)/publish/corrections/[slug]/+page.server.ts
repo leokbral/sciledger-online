@@ -3,6 +3,10 @@ import Papers from '$lib/db/models/Paper';
 import Users from '$lib/db/models/User';
 import { error, redirect } from '@sveltejs/kit';
 import { isValidObjectId } from 'mongoose';
+import {
+	getEffectiveHubMemberForUser,
+	resolveEffectiveHubRoles
+} from '$lib/server/authorization/effectiveHubRoles';
 
 // Type for MongoDB ObjectId
 interface ObjectId {
@@ -129,10 +133,9 @@ export async function load({ locals, params }) {
 	});
 
 	const hubData = typeof paperDoc.hubId === 'object' ? paperDoc.hubId : null;
-	const isHubOwner = matchesCurrentUser(
-		hubData?.createdBy,
-		locals.user as Record<string, unknown>
-	);
+	const effectiveHubRoles = hubData ? await resolveEffectiveHubRoles(hubData) : null;
+	const currentUserHubMember = getEffectiveHubMemberForUser(effectiveHubRoles, locals.user);
+	const isHubOwner = currentUserHubMember?.primaryRoleKey === 'HubOwner';
 
 	if (isReviewerAccepted || isHubOwner) {
 		throw redirect(302, `/review/correction/${id}`);

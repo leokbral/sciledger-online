@@ -4,8 +4,12 @@ import Papers from '$lib/db/models/Paper';
 import Hubs from '$lib/db/models/Hub';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import { NotificationService } from '$lib/services/NotificationService';
+import {
+	EditorialTransitionError,
+	transitionPaperStatus
+} from '$lib/server/authorization/editorialTransitionService';
 
-export const POST: RequestHandler = async ({ params, locals }) => {
+export const POST: RequestHandler = async ({ params, locals, request }) => {
 	try {
 		await start_mongo();
 
@@ -33,11 +37,6 @@ export const POST: RequestHandler = async ({ params, locals }) => {
 			return json({ error: 'Hub not found' }, { status: 404 });
 		}
 
-		const hubOwnerId = hubDoc.createdBy?._id || hubDoc.createdBy?.id || hubDoc.createdBy;
-		if (hubOwnerId?.toString?.() !== user.id) {
-			return json({ error: 'Only the hub owner can reject publication' }, { status: 403 });
-		}
-
 		if (paperDoc.reviewRound !== 2) {
 			return json({ error: 'Publication decision is only valid after round 2' }, { status: 400 });
 		}
@@ -46,10 +45,19 @@ export const POST: RequestHandler = async ({ params, locals }) => {
 			return json({ error: 'Paper is not pending publication approval' }, { status: 400 });
 		}
 
-		// Return the paper to author correction state
-		paperDoc.status = 'needing corrections';
-		paperDoc.updatedAt = new Date().toISOString();
-		await paperDoc.save();
+		const body = await request.json().catch(() => ({}));
+
+		const updatedPaper: any = await transitionPaperStatus({
+			user,
+			paperId,
+			action: 'paper.rejectPublication',
+			expectedStatus: body.expectedStatus || paperDoc.status,
+			metadata: {
+				endpoint: '/api/papers/[id]/reject-publication',
+				rejectionReason: body.rejectionReason || null
+			}
+		});
+		paperDoc.status = updatedPaper.status;
 
 		try {
 			await NotificationService.createNotification({
@@ -72,6 +80,16 @@ export const POST: RequestHandler = async ({ params, locals }) => {
 			message: 'Publication rejected'
 		});
 	} catch (error) {
+		if (error instanceof EditorialTransitionError) {
+			return json(
+				{
+					error: error.message,
+					code: error.code,
+					currentStatus: error.currentStatus
+				},
+				{ status: error.status }
+			);
+		}
 		console.error('Error rejecting publication:', error);
 		return json({ error: 'Internal server error' }, { status: 500 });
 	}

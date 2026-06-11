@@ -3,8 +3,9 @@ import { start_mongo } from '$lib/db/mongooseConnection';
 import PaperReviewInvitation from '$lib/db/models/PaperReviewInvitation';
 import Papers from '$lib/db/models/Paper';
 import { NotificationService } from '$lib/services/NotificationService';
-import { canManageHub } from '$lib/helpers/hubPermissions';
+import { authorize } from '$lib/server/authorization/authorizationService';
 import type { RequestHandler } from './$types';
+import * as crypto from 'crypto';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
 	await start_mongo();
@@ -34,9 +35,12 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			return json({ error: 'Paper not found' }, { status: 404 });
 		}
 
-		// Verificar se o usuário é manager do hub (owner ou vice)
-		if (!canManageHub(paper.hubId as any, user.id)) {
-			return json({ error: 'Only hub managers can manage review deadlines' }, { status: 403 });
+		const authorization = await authorize(user, 'review.manageDeadlines', { paper });
+		if (!authorization.allowed) {
+			return json(
+				{ error: 'Insufficient permissions', reason: authorization.reason },
+				{ status: 403 }
+			);
 		}
 
 		// Calcular nova deadline

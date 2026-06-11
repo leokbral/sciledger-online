@@ -55,6 +55,10 @@
 	}
 
 	function hasReviewerAccess(paper: Paper): boolean {
+		if ((paper as any).currentUserHubRole?.canReview === true) {
+			return true;
+		}
+
 		if (paper.isAcceptedForReview) {
 			return true;
 		}
@@ -76,21 +80,6 @@
 
 		if ((paper.peer_review?.assignedReviewers ?? []).some((reviewer) => matchesCurrentUser(reviewer))) {
 			return true;
-		}
-
-		if (paper.hubId && typeof paper.hubId === 'object') {
-			const hub = paper.hubId as {
-				createdBy?: unknown;
-				reviewers?: unknown[];
-			};
-
-			if (matchesCurrentUser(hub.createdBy)) {
-				return true;
-			}
-
-			if (Array.isArray(hub.reviewers) && hub.reviewers.some((reviewer) => matchesCurrentUser(reviewer))) {
-				return true;
-			}
 		}
 
 		return false;

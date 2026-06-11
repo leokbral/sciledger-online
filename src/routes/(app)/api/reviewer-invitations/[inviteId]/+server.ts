@@ -5,6 +5,8 @@ import { resolveUserIdentifiers } from '$lib/helpers/userIdentifiers';
 import { json } from '@sveltejs/kit';
 import { NotificationService } from '$lib/services/NotificationService';
 import { start_mongo } from '$lib/db/mongooseConnection';
+import { assignHighestHubRole } from '$lib/server/authorization/roleAssignmentService';
+import { resolveEffectiveHubRoles } from '$lib/server/authorization/effectiveHubRoles';
 
 export async function POST({ params, request, locals }) {
 	await start_mongo();
@@ -58,53 +60,59 @@ export async function POST({ params, request, locals }) {
 
 		const reviewerName =
 			`${reviewer.firstName || ''} ${reviewer.lastName || ''}`.trim() || reviewer.email;
+		const effectiveHubRoles = await resolveEffectiveHubRoles(hub);
+		const hubOwnerIds = effectiveHubRoles.members
+			.filter((member) => member.primaryRoleKey === 'HubOwner')
+			.map((member) => member.userId);
 
 		if (action === 'accept') {
-			if (!hub.reviewers) hub.reviewers = [];
-			if (!hub.reviewers.includes(normalizedReviewerId)) {
-				hub.reviewers.push(normalizedReviewerId);
-			}
+			await assignHighestHubRole(
+				normalizedReviewerId,
+				String(hub.id || hub._id),
+				acceptedRole === 'vice_manager' ? 'EditorChief' : 'Reviewer',
+				String(user.id || user._id || 'hub-invitation'),
+				{ auditUser: user }
+			);
 
-			if (acceptedRole === 'vice_manager') {
-				if (!hub.assistantManagers) hub.assistantManagers = [];
-				if (!hub.assistantManagers.includes(normalizedReviewerId)) {
-					hub.assistantManagers.push(normalizedReviewerId);
-				}
-			}
-
-			await hub.save();
-
-			await NotificationService.createNotification({
-				user: String(hub.createdBy),
-				type: 'hub_reviewer_accepted',
-				title: 'Reviewer Accepted Invitation',
-				content: `${reviewerName} accepted the invitation as ${acceptedRole === 'vice_manager' ? 'Editor-in-chief' : 'reviewer'} for "${hub.title}"`,
-				relatedHubId: String(invitation.hubId),
-				actionUrl: `/notifications`,
-				priority: 'medium',
-				metadata: {
-					reviewerName,
-					reviewerId: normalizedReviewerId,
-					hubName: hub.title,
-					role: acceptedRole
-				}
-			});
+			await Promise.all(
+				hubOwnerIds.map((hubOwnerId) =>
+					NotificationService.createNotification({
+						user: hubOwnerId,
+						type: 'hub_reviewer_accepted',
+						title: 'Reviewer Accepted Invitation',
+						content: `${reviewerName} accepted the invitation as ${acceptedRole === 'vice_manager' ? 'Editor-in-chief' : 'reviewer'} for "${hub.title}"`,
+						relatedHubId: String(invitation.hubId),
+						actionUrl: `/notifications`,
+						priority: 'medium',
+						metadata: {
+							reviewerName,
+							reviewerId: normalizedReviewerId,
+							hubName: hub.title,
+							role: acceptedRole
+						}
+					})
+				)
+			);
 		} else {
-			await NotificationService.createNotification({
-				user: String(hub.createdBy),
-				type: 'hub_reviewer_declined',
-				title: 'Reviewer Declined Invitation',
-				content: `${reviewerName} has declined the invitation to review for "${hub.title}"`,
-				relatedHubId: String(invitation.hubId),
-				actionUrl: `/notifications`,
-				priority: 'low',
-				metadata: {
-					reviewerName,
-					reviewerId: normalizedReviewerId,
-					hubName: hub.title,
-					role: acceptedRole
-				}
-			});
+			await Promise.all(
+				hubOwnerIds.map((hubOwnerId) =>
+					NotificationService.createNotification({
+						user: hubOwnerId,
+						type: 'hub_reviewer_declined',
+						title: 'Reviewer Declined Invitation',
+						content: `${reviewerName} has declined the invitation to review for "${hub.title}"`,
+						relatedHubId: String(invitation.hubId),
+						actionUrl: `/notifications`,
+						priority: 'low',
+						metadata: {
+							reviewerName,
+							reviewerId: normalizedReviewerId,
+							hubName: hub.title,
+							role: acceptedRole
+						}
+					})
+				)
+			);
 		}
 
 		await Invitation.findByIdAndDelete(inviteId);

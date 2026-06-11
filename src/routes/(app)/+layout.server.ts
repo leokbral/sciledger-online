@@ -2,6 +2,8 @@ import Notifications, { type INotification } from '$lib/db/models/Notification';
 import Users from '$lib/db/models/User';
 import { resolveUserIdentifiers } from '$lib/helpers/userIdentifiers';
 import { start_mongo } from '$lib/db/mongooseConnection';
+import { can } from '$lib/server/authorization/authorizationService';
+import { hasReviewerCapability } from '$lib/server/authorization/reviewerCapability';
 import type { LayoutServerLoad } from './$types';
 import type { Notification } from '$lib/types/Notification'; // ajuste se necessário
 
@@ -13,7 +15,8 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 	if (!sessionUser) {
 		return {
 			user: sessionUser,
-			notifications: []
+			notifications: [],
+			canManageRbac: false
 		};
 	}
 
@@ -37,6 +40,10 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 	}
 
 	let notifications: Notification[] = [];
+	let canManageRbac = false;
+	let isAuthor = false;
+	let isReviewer = false;
+	let isAdmin = false;
 
 	try {
 		const { aliases: userAliases } = await resolveUserIdentifiers(user);
@@ -74,6 +81,15 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 		console.error('Erro ao buscar notificações:', error);
 	}
 
+	try {
+		canManageRbac = await can(user, 'rbac.manage');
+		isAdmin = canManageRbac;
+		isAuthor = await can(user, 'paper.submit');
+		isReviewer = await hasReviewerCapability(user);
+	} catch (error) {
+		console.error('Erro ao resolver permissao RBAC:', error);
+	}
+
 	return {
 		user: {
 			_id: user.id,
@@ -87,8 +103,10 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 			dob: user.dob,
 			darkMode: user.darkMode,
 			roles: {
-				author: user.roles?.author ?? false,
-				reviewer: user.roles?.reviewer ?? false
+				author: isAuthor,
+				reviewer: isReviewer,
+				admin: isAdmin,
+				editor: false
 			},
 			profilePictureUrl: user.profilePictureUrl,
 			institution: user.institution,
@@ -106,6 +124,7 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 			createdAt: user.createdAt,
 			updatedAt: user.updatedAt
 		},
-		notifications
+		notifications,
+		canManageRbac
 	};
 };

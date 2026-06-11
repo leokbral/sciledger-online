@@ -2,19 +2,12 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import Papers from '$lib/db/models/Paper';
 import { start_mongo } from '$lib/db/mongooseConnection';
+import {
+	EditorialTransitionError,
+	transitionPaperStatus
+} from '$lib/server/authorization/editorialTransitionService';
 
-function isAuthorOfPaper(paper: any, userId: string): boolean {
-	if (!paper || !userId) return false;
-	if (paper.mainAuthor?.toString?.() === userId) return true;
-	if (paper.correspondingAuthor?.toString?.() === userId) return true;
-	if (paper.submittedBy?.toString?.() === userId) return true;
-	if (Array.isArray(paper.coAuthors) && paper.coAuthors.some((id: any) => id?.toString?.() === userId)) {
-		return true;
-	}
-	return false;
-}
-
-export const POST: RequestHandler = async ({ params, locals }) => {
+export const POST: RequestHandler = async ({ params, locals, request }) => {
 	try {
 		await start_mongo();
 
@@ -33,10 +26,6 @@ export const POST: RequestHandler = async ({ params, locals }) => {
 			return json({ error: 'Paper not found' }, { status: 404 });
 		}
 
-		if (!isAuthorOfPaper(paperDoc, user.id)) {
-			return json({ error: 'You do not have permission to withdraw this paper' }, { status: 403 });
-		}
-
 		if (paperDoc.reviewRound !== 2) {
 			return json({ error: 'Withdraw is only available after round 2' }, { status: 400 });
 		}
@@ -45,19 +34,37 @@ export const POST: RequestHandler = async ({ params, locals }) => {
 			return json({ error: 'Paper cannot be withdrawn in its current status' }, { status: 400 });
 		}
 
-		// Withdraw back to draft and unlink from hub (if any)
-		paperDoc.status = 'draft';
-		paperDoc.hubId = null;
-		paperDoc.isLinkedToHub = false;
-		paperDoc.updatedAt = new Date().toISOString();
-		await paperDoc.save();
+		const body = await request.json().catch(() => ({}));
+		const updatedPaper: any = await transitionPaperStatus({
+			user,
+			paperId,
+			action: 'paper.withdraw',
+			expectedStatus: body.expectedStatus || paperDoc.status,
+			extraSet: {
+				hubId: null,
+				isLinkedToHub: false
+			},
+			metadata: {
+				endpoint: '/api/papers/[id]/withdraw-publication'
+			}
+		});
 
 		return json({
 			success: true,
-			status: paperDoc.status,
+			status: updatedPaper.status,
 			message: 'Paper withdrawn from publication'
 		});
 	} catch (error) {
+		if (error instanceof EditorialTransitionError) {
+			return json(
+				{
+					error: error.message,
+					code: error.code,
+					currentStatus: error.currentStatus
+				},
+				{ status: error.status }
+			);
+		}
 		console.error('Error withdrawing publication:', error);
 		return json({ error: 'Internal server error' }, { status: 500 });
 	}

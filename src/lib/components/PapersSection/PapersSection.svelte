@@ -21,6 +21,7 @@
             paperId: string;
             reviewerId: string;
         }>;
+        effectiveReviewers?: Array<User | any>;
     }
 
     let {
@@ -32,10 +33,12 @@
         userId,
         shouldHighlight,
         reviewAssignments,
-        pendingPaperInvitations = []
+        pendingPaperInvitations = [],
+        effectiveReviewers = []
     }: Props = $props();
     
     let hubId = $derived(hub._id);
+    let reviewerDirectory = $derived(effectiveReviewers);
 
     function getPaperSlug(paper: any): string {
         return (paper?.id || paper?._id || '') as string;
@@ -166,7 +169,7 @@
     // Filtrar revisores disponíveis que ainda não foram convidados
     // Excluir também autores, co-autores e submitter
     function getAvailableReviewers(paper: Paper): Array<User | string> {
-        if (!hub.reviewers || !Array.isArray(hub.reviewers)) return [];
+        if (!reviewerDirectory || !Array.isArray(reviewerDirectory)) return [];
         
         const paperId = String(paper?.id || paper?._id || '');
         const assignedIds = new Set<string>(
@@ -188,7 +191,7 @@
                 .flatMap((invite) => getIdAliases(invite.reviewerId))
         );
         
-        return hub.reviewers.filter((reviewer: any) => {
+        return reviewerDirectory.filter((reviewer: any) => {
             const reviewerId = getIdAliases(reviewer);
             // Excluir se já foi atribuído
             if (reviewerId.some((alias) => assignedIds.has(alias))) {
@@ -534,7 +537,7 @@
                                 <div
                                     class="mb-3 p-2 bg-yellow-100 border border-yellow-300 rounded text-yellow-800 text-sm font-medium"
                                 >
-                                    {#if isHubManager || hub.reviewers?.includes(userId)}
+                                    {#if isHubManager || isHubReviewer}
                                             This article has <strong>not been published</strong> yet and is visible to you as a hub {isCreator ? 'owner' : isHubManager ? 'Editor-in-chief' : 'reviewer'}.
                                     {:else}
                                         This article has <strong>not been published</strong> yet and is visible only to you and the authors involved.
@@ -769,7 +772,7 @@
                         <div class="space-y-2">
                             {#each selectedPaper.reviewers as reviewer}
                                 {@const reviewerId = typeof reviewer === 'object' ? (reviewer._id || reviewer.id) : reviewer}
-                                {@const rev = typeof reviewer === 'object' ? reviewer : hub.reviewers?.find(r => {
+                                {@const rev = typeof reviewer === 'object' ? reviewer : reviewerDirectory?.find((r: any) => {
                                     const rId = typeof r === 'object' ? (r._id || r.id) : r;
                                     return rId === reviewer;
                                 })}
@@ -798,7 +801,7 @@
                                 {:else}
                                     <div class="p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
                                         <p class="text-sm text-yellow-800 dark:text-yellow-200">
-                                            Reviewer ID: {reviewerId} (not found in hub reviewers)
+                                            Reviewer ID: {reviewerId} (not found in effective hub reviewers)
                                         </p>
                                     </div>
                                 {/if}
@@ -1062,7 +1065,7 @@
                 {#if selectedPaper.reviewers && selectedPaper.reviewers.length > 0}
                     <div class="space-y-3">
                         {#each selectedPaper.reviewers as reviewerRef, idx}
-                            {@const reviewer = typeof reviewerRef === 'object' ? reviewerRef : hub.reviewers?.find((r: any) => {
+                            {@const reviewer = typeof reviewerRef === 'object' ? reviewerRef : reviewerDirectory?.find((r: any) => {
                                 const rId = typeof r === 'object' ? (r._id || r.id) : r;
                                 return rId === reviewerRef;
                             })}

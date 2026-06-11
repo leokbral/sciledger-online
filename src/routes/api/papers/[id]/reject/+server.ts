@@ -4,6 +4,10 @@ import { start_mongo } from '$lib/db/mongooseConnection';
 import Papers from '$lib/db/models/Paper';
 import Hubs from '$lib/db/models/Hub';
 import { NotificationService } from '$lib/services/NotificationService';
+import {
+    EditorialTransitionError,
+    transitionPaperStatus
+} from '$lib/server/authorization/editorialTransitionService';
 
 export const POST: RequestHandler = async ({ request, locals, params }) => {
     if (!locals.user) {
@@ -13,7 +17,7 @@ export const POST: RequestHandler = async ({ request, locals, params }) => {
     await start_mongo();
 
     try {
-        const { rejectionReason } = await request.json();
+        const { rejectionReason, expectedStatus } = await request.json();
 
         if (!rejectionReason || rejectionReason.trim().length === 0) {
             return json({ error: 'Rejection reason is required' }, { status: 400 });
@@ -35,17 +39,24 @@ export const POST: RequestHandler = async ({ request, locals, params }) => {
             return json({ error: 'Hub not found' }, { status: 404 });
         }
 
-        if (hub.createdBy.toString() !== locals.user.id) {
-            return json({ error: 'Only hub administrator can reject papers' }, { status: 403 });
-        }
-
-        // Update paper with rejection
-        paper.status = 'rejected';
-        paper.rejectedByHub = true;
+        const updatedPaper: any = await transitionPaperStatus({
+            user: locals.user,
+            paperId: String(paper.id || paper._id),
+            action: 'paper.reject',
+            expectedStatus: expectedStatus || paper.status,
+            extraSet: {
+                rejectedByHub: true,
+                rejectionReason,
+                rejectedAt: new Date(),
+                rejectedBy: locals.user.id
+            },
+            metadata: {
+                endpoint: '/api/papers/[id]/reject',
+                rejectionReason
+            }
+        });
+        paper.status = updatedPaper.status;
         paper.rejectionReason = rejectionReason;
-        paper.rejectedAt = new Date();
-        paper.rejectedBy = locals.user.id;
-        await paper.save();
 
         // Create notification for the paper author
         const submitterId = typeof paper.submittedBy === 'object' 
@@ -89,6 +100,16 @@ export const POST: RequestHandler = async ({ request, locals, params }) => {
             }
         });
     } catch (error) {
+        if (error instanceof EditorialTransitionError) {
+            return json(
+                {
+                    error: error.message,
+                    code: error.code,
+                    currentStatus: error.currentStatus
+                },
+                { status: error.status }
+            );
+        }
         console.error('Error rejecting paper:', error);
         return json({ 
             error: 'Failed to reject paper',

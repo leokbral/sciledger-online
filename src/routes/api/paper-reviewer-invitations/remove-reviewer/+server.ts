@@ -4,7 +4,7 @@ import Papers from '$lib/db/models/Paper';
 import Users from '$lib/db/models/User';
 import ReviewQueue from '$lib/db/models/ReviewQueue';
 import { NotificationService } from '$lib/services/NotificationService';
-import { canManageHub } from '$lib/helpers/hubPermissions';
+import { authorize } from '$lib/server/authorization/authorizationService';
 import type { RequestHandler } from './$types';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
@@ -28,9 +28,12 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			return json({ error: 'Paper not found' }, { status: 404 });
 		}
 
-		// Verificar se o usuário é manager do hub (owner ou vice)
-		if (!canManageHub(paper.hubId as any, user.id)) {
-			return json({ error: 'Only hub managers can remove reviewers' }, { status: 403 });
+		const authorization = await authorize(user, 'paper.assignReviewers', { paper });
+		if (!authorization.allowed) {
+			return json(
+				{ error: 'Insufficient permissions', reason: authorization.reason },
+				{ status: 403 }
+			);
 		}
 
 		// Encontrar o slot do revisor

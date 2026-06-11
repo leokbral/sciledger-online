@@ -1,9 +1,17 @@
 import { json } from '@sveltejs/kit';
-import { db } from '$lib/db/mongo';
+import { start_mongo } from '$lib/db/mongooseConnection';
+import Papers from '$lib/db/models/Paper';
+import { authorize } from '$lib/server/authorization/authorizationService';
 import type { RequestHandler } from './$types';
 
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, locals }) => {
     try {
+        await start_mongo();
+        const user = locals.user;
+        if (!user) {
+            return json({ error: 'User not authenticated' }, { status: 401 });
+        }
+
         const { paperId, statusChangedToCorrectionsAt } = await request.json();
         
         if (!paperId || !statusChangedToCorrectionsAt) {
@@ -12,12 +20,28 @@ export const POST: RequestHandler = async ({ request }) => {
                 error: 'Missing paperId or statusChangedToCorrectionsAt' 
             }, { status: 400 });
         }
+
+        const paper = await Papers.findOne({
+            $or: [{ id: String(paperId) }, { _id: String(paperId) }]
+        }).lean();
+
+        if (!paper) {
+            return json({ success: false, error: 'Paper not found' }, { status: 404 });
+        }
+
+        const authorization = await authorize(user, 'paper.requestCorrections', { paper });
+        if (!authorization.allowed) {
+            return json(
+                { error: 'Insufficient permissions', reason: authorization.reason },
+                { status: 403 }
+            );
+        }
         
         // Update the paper with the fixed date when status changed to "needing corrections"
         // This date should NEVER be updated again, even if the paper is modified
-        const result = await db.collection('papers').updateOne(
+        const result = await Papers.updateOne(
             { 
-                _id: paperId,
+                $or: [{ id: String(paperId) }, { _id: String(paperId) }],
                 // Only set this date if it hasn't been set before (prevent overwriting) 
                 statusChangedToCorrectionsAt: { $exists: false }
             },

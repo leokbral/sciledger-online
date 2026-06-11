@@ -20,6 +20,8 @@ export type User = {
     roles: {
         author: boolean; // Whether the user is an author
         reviewer: boolean; // Whether the user is a reviewer
+        admin?: boolean; // Legacy admin flag mapped to Admin role
+        editor?: boolean; // Legacy editor flag mapped to EditorChief role
     };
     bio?: string; // User biography
     profilePictureUrl?: string; // Profile picture URL

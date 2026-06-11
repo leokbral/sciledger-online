@@ -10,11 +10,6 @@ export const GET: RequestHandler = async ({ url, locals }) => {
             return json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // Verificar se o usuário é revisor
-        if (!user.roles?.reviewer) {
-            return json({ error: 'Access denied. Reviewer role required.' }, { status: 403 });
-        }
-
         // Buscar assignments de revisão para este usuário
         // Incluir apenas papers onde:
         // 1. O status é 'pending' (ainda não aceitou) OU 'accepted' (já aceitou)

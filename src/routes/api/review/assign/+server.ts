@@ -6,8 +6,7 @@ import Users from '$lib/db/models/User';
 import { NotificationService } from '$lib/services/NotificationService';
 import type { RequestHandler } from './$types';
 import { randomUUID } from 'crypto';
-import Hubs from '$lib/db/models/Hub';
-import { canManageHub } from '$lib/helpers/hubPermissions';
+import { authorize } from '$lib/server/authorization/authorizationService';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
 	await start_mongo();
@@ -48,34 +47,12 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		}
 
 		// Verificar se é o autor do paper
-		const mainAuthorId = typeof paper.mainAuthor === 'object' 
-			? (paper.mainAuthor._id || paper.mainAuthor.id) 
-			: paper.mainAuthor;
-		const correspondingAuthorId = typeof paper.correspondingAuthor === 'object'
-			? (paper.correspondingAuthor._id || paper.correspondingAuthor.id)
-			: paper.correspondingAuthor;
-		const submittedById = typeof paper.submittedBy === 'object'
-			? (paper.submittedBy._id || paper.submittedBy.id)
-			: paper.submittedBy;
-		
-		const isAuthor = 
-			mainAuthorId?.toString() === user.id ||
-			correspondingAuthorId?.toString() === user.id ||
-			submittedById?.toString() === user.id;
-
-		if (!isAuthor) {
-			return json({ error: 'Only paper authors can assign reviewers' }, { status: 403 });
-		}
-
-		// If the paper is linked to a hub and is in review/corrections, block authors from assigning reviewers
-		if (paper.hubId) {
-			const hub = await Hubs.findById(paper.hubId).lean().exec();
-			const paperStatus = String(paper.status || '').toLowerCase();
-			const lockedStatuses = ['in review', 'needing corrections'];
-			const userCanManage = (locals.user && ((locals.user.roles && (locals.user.roles.admin || locals.user.roles.editor)) || canManageHub(hub as any, locals.user.id)));
-			if (lockedStatuses.includes(paperStatus) && !userCanManage) {
-				return json({ error: 'Only the hub manager or Editor-in-Chief can assign reviewers for this paper.' }, { status: 403 });
-			}
+		const authorization = await authorize(user, 'paper.assignReviewers', { paper });
+		if (!authorization.allowed) {
+			return json(
+				{ error: 'Insufficient permissions', reason: authorization.reason },
+				{ status: 403 }
+			);
 		}
 
 		// Atualizar peer_review do paper

@@ -6,11 +6,21 @@ import '$lib/db/models/MessageFeed';
 import Papers from '$lib/db/models/Paper';
 
 import MessageFeeds from '$lib/db/models/MessageFeed';
+import { authorize } from '$lib/server/authorization/authorizationService';
+import {
+    EditorialTransitionError,
+    transitionPaperStatus
+} from '$lib/server/authorization/editorialTransitionService';
+import { getUserIdAliases } from '$lib/server/authorization/roleResolver';
 
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, locals }) => {
 
     await start_mongo();
     try {
+        if (!locals.user) {
+            return json({ error: 'User not authenticated' }, { status: 401 });
+        }
+
         const { newMessage, id } = await request.json();
         if (!newMessage) {
             return json({ error: 'Todos os campos são obrigatórios.' }, { status: 400 });
@@ -40,10 +50,15 @@ export const POST: RequestHandler = async ({ request }) => {
     }
 };
 
-export const PATCH: RequestHandler = async ({ request, params }) => {
+export const PATCH: RequestHandler = async ({ request, params, locals }) => {
     await start_mongo();
 
     try {
+        const user = locals.user;
+        if (!user) {
+            return json({ error: 'User not authenticated' }, { status: 401 });
+        }
+
         const { reviewerId } = await request.json();
         const paperId = params.slug;
 
@@ -51,10 +66,22 @@ export const PATCH: RequestHandler = async ({ request, params }) => {
             return json({ error: 'Reviewer ID is required.' }, { status: 400 });
         }
 
+        if (!getUserIdAliases(user).includes(String(reviewerId))) {
+            return json({ error: 'Reviewer mismatch' }, { status: 403 });
+        }
+
         // Atualiza o status da revisão individual para 'completed'
         const paper = await Papers.findOne({ id: paperId }).lean().exec();
         if (!paper) {
             return json({ error: 'Paper not found.' }, { status: 404 });
+        }
+
+        const authorization = await authorize(user, 'review.submit', { paper });
+        if (!authorization.allowed) {
+            return json(
+                { error: 'Insufficient permissions', reason: authorization.reason },
+                { status: 403 }
+            );
         }
 
         // Atualiza a resposta do revisor para 'completed'
@@ -70,20 +97,38 @@ export const PATCH: RequestHandler = async ({ request, params }) => {
         const completedReviewers = responses.filter(r => r.status === 'completed');
         const allAcceptedCompleted = acceptedReviewers.length > 0 && acceptedReviewers.length === completedReviewers.length;
 
-        // Atualiza o status do artigo se todos que aceitaram completaram
-        const newStatus = allAcceptedCompleted ? 'needing corrections' : paper.status;
-
         const updatedPaper = await Papers.findOneAndUpdate(
             { id: paperId },
             {
                 'peer_review.responses': responses,
-                status: newStatus,
                 updatedAt: new Date()
             },
             { new: true, runValidators: true }
         ).lean().exec();
 
-        return json({ success: true, paper: updatedPaper }, { status: 200 });
+        let responsePaper = updatedPaper;
+        if (allAcceptedCompleted && paper.status === 'in review') {
+            try {
+                responsePaper = await transitionPaperStatus({
+                    paperId,
+                    action: 'paper.autoRequestCorrections',
+                    expectedStatus: 'in review',
+                    system: true,
+                    metadata: {
+                        endpoint: '/review/inreview/[slug]',
+                        trigger: 'all_accepted_reviewers_completed'
+                    }
+                });
+            } catch (transitionError) {
+                if (transitionError instanceof EditorialTransitionError) {
+                    console.warn('In-review completion transition skipped:', transitionError.message);
+                } else {
+                    throw transitionError;
+                }
+            }
+        }
+
+        return json({ success: true, paper: responsePaper }, { status: 200 });
     } catch (error) {
         console.error('Error updating paper status:', error);
         return json({ error: 'Internal server error.' }, { status: 500 });

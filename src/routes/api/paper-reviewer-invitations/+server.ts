@@ -5,12 +5,12 @@ import Papers from '$lib/db/models/Paper';
 import Users from '$lib/db/models/User';
 import PaperReviewInvitation from '$lib/db/models/PaperReviewInvitation';
 import ReviewAssignment from '$lib/db/models/ReviewAssignment';
-import Hubs from '$lib/db/models/Hub';
 import { MAX_ACTIVE_REVIEW_ASSIGNMENTS } from '$lib/constants/reviewerLimits';
 import { checkReviewerEligibility } from '$lib/helpers/reviewerEligibility';
-import { canManageHub } from '$lib/helpers/hubPermissions';
 import { resolveUserIdentifiers } from '$lib/helpers/userIdentifiers';
 import { NotificationService } from '$lib/services/NotificationService';
+import { authorize } from '$lib/server/authorization/authorizationService';
+import { resolveEffectiveHubRoles } from '$lib/server/authorization/effectiveHubRoles';
 import type { RequestHandler } from './$types';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
@@ -50,8 +50,12 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			);
 		}
 
-		if (!canManageHub(paper.hubId as any, user.id)) {
-			return json({ error: 'Only hub managers can invite reviewers' }, { status: 403 });
+		const authorization = await authorize(user, 'paper.assignReviewers', { paper });
+		if (!authorization.allowed) {
+			return json(
+				{ error: 'Insufficient permissions', reason: authorization.reason },
+				{ status: 403 }
+			);
 		}
 
 		if (!paper.reviewSlots || paper.reviewSlots.length === 0) {
@@ -70,27 +74,14 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		);
 		const availableSlotsCount = availableSlotsList.length;
 
-		const hubReviewerIds: string[] = [];
+		let effectiveReviewerIds: string[] = [];
 		try {
-			if (typeof paper.hubId === 'object' && (paper.hubId as any)?.reviewers) {
-				hubReviewerIds.push(
-					...(paper.hubId as any).reviewers.map((r: any) => String(r?._id || r?.id || r))
-				);
-			} else {
-				const hubIdValue =
-					typeof paper.hubId === 'object'
-						? String((paper.hubId as any)._id || (paper.hubId as any).id)
-						: String(paper.hubId);
-				let hubDoc = await Hubs.findById(hubIdValue).lean();
-				if (!hubDoc) {
-					hubDoc = await Hubs.findOne({ id: hubIdValue }).lean();
-				}
-				if (hubDoc?.reviewers && Array.isArray(hubDoc.reviewers)) {
-					hubReviewerIds.push(...hubDoc.reviewers.map((r: any) => String(r?._id || r?.id || r)));
-				}
-			}
+			const effectiveRoles = await resolveEffectiveHubRoles(
+				typeof paper.hubId === 'object' ? paper.hubId : hubId
+			);
+			effectiveReviewerIds = effectiveRoles.reviewerIds;
 		} catch (e) {
-			console.error('Failed to load hub reviewers for invitation eligibility:', e);
+			console.error('Failed to resolve effective hub reviewers for invitation eligibility:', e);
 		}
 
 		const alreadyAssignedIds: string[] = (paper.peer_review?.assignedReviewers || []).map(
@@ -123,7 +114,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 					: 0;
 
 			const eligibility = checkReviewerEligibility(paper as any, reviewer as any, {
-				hubReviewerIds,
+				hubReviewerIds: effectiveReviewerIds,
 				alreadyAssignedIds,
 				activeAssignmentsCount,
 				maxActiveAssignments: MAX_ACTIVE_REVIEW_ASSIGNMENTS,

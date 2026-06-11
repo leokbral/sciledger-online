@@ -4,6 +4,7 @@ import * as crypto from 'crypto';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import Hubs from '$lib/db/models/Hub';
 import Users from '$lib/db/models/User';
+import { ensureHubOwnerAssignment, ensureHubRoles } from '$lib/server/authorization/bootstrapRbac';
 
 export const POST: RequestHandler = async ({ request }) => {
     await start_mongo();
@@ -119,6 +120,8 @@ export const POST: RequestHandler = async ({ request }) => {
         });
 
         await newHub.save();
+        await ensureHubRoles(newHub.id);
+        await ensureHubOwnerAssignment(newHub);
 
         // Atualiza o usuário com o Hub criado
         user.hubs = user.hubs || [];

@@ -4,6 +4,11 @@ import Papers from '$lib/db/models/Paper';
 import Invitations from '$lib/db/models/Invitation';
 import type { RequestHandler } from './$types';
 import type { User } from '$lib/types/User';
+import * as crypto from 'crypto';
+import {
+	EditorialTransitionError,
+	transitionPaperStatus
+} from '$lib/server/authorization/editorialTransitionService';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
 	await start_mongo();
@@ -88,13 +93,32 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			(r: any) => r.status === 'accepted' || r.status === 'completed'
 		).length;
 
-		if (acceptedCount >= 3 && paper.status === 'reviewer assignment') {
-			paper.status = 'in review';
-			paper.peer_review.reviewStatus = 'in_progress';
-		}
+		const shouldSendToReview = acceptedCount >= 3 && paper.status === 'reviewer assignment';
 
 		paper.updatedAt = new Date();
 		await paper.save();
+
+		if (shouldSendToReview) {
+			try {
+				await transitionPaperStatus({
+					paperId: String(paper.id),
+					action: 'paper.sendToReview',
+					expectedStatus: 'reviewer assignment',
+					system: true,
+					metadata: {
+						endpoint: '/api/paper-reviewer-invitations/accept',
+						trigger: 'legacy_invitation_acceptance'
+					}
+				});
+				paper.status = 'in review';
+			} catch (transitionError) {
+				if (transitionError instanceof EditorialTransitionError) {
+					console.warn('Legacy invitation status transition skipped:', transitionError.message);
+				} else {
+					throw transitionError;
+				}
+			}
+		}
 
 		// TODO: Criar notificações
 		// await NotificationService.createReviewerAcceptedNotifications({...});
