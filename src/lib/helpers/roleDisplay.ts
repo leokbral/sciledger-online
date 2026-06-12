@@ -48,13 +48,13 @@ export const DEFAULT_ROLE_DISPLAY_CONFIG: Record<string, RoleDisplayConfig> = {
 	Reviewer: {
 		label: 'Reviewer',
 		priority: 20,
-		icon: '',
+		icon: '🔵',
 		badgeClass: 'border-blue-200 bg-blue-50 text-blue-900'
 	},
 	Author: {
 		label: 'Author',
 		priority: 10,
-		icon: '',
+		icon: '✍️',
 		badgeClass: 'border-slate-200 bg-slate-50 text-slate-700'
 	}
 };

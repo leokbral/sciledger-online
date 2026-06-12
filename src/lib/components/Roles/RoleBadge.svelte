@@ -34,7 +34,7 @@
 	function badgeClass(roleKey: string | null, primary = false) {
 		const tone = getRoleBadgeClass(roleKey);
 		const base =
-			'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide';
+			'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold';
 		return primary ? `${base} ${tone} shadow-sm` : `${base} ${tone}`;
 	}
 

@@ -2,6 +2,11 @@
 	import type { PageData } from './$types';
 	import RoleBadge from '$lib/components/Roles/RoleBadge.svelte';
 	import { getRoleLabel } from '$lib/helpers/roleDisplay';
+	import {
+		getPermissionLabel,
+		getRoleCapabilityProfile,
+		groupPermissionsForDisplay
+	} from '$lib/helpers/permissionDisplay';
 
 	interface Props {
 		data: PageData;
@@ -43,6 +48,14 @@
 		return role?.name || getRoleLabel(roleKey);
 	}
 
+	function roleProfile(role: any) {
+		return getRoleCapabilityProfile(role);
+	}
+
+	function permissionGroups() {
+		return groupPermissionsForDisplay(data.permissions);
+	}
+
 	function roleForKey(roleKey: string | null | undefined) {
 		return data.roles.find((item: any) => item.key === roleKey);
 	}
@@ -65,7 +78,16 @@
 	}
 
 	function displayAssignmentsForUser(assignments: any[]) {
-		return assignments.map(decorateAssignment);
+		return assignments
+			.map(decorateAssignment)
+			.sort((left, right) => {
+				const priorityDifference = (right.priority ?? 0) - (left.priority ?? 0);
+				return priorityDifference || roleName(left.roleKey).localeCompare(roleName(right.roleKey));
+			});
+	}
+
+	function effectiveAssignment(assignments: any[]) {
+		return displayAssignmentsForUser(assignments)[0] ?? null;
 	}
 
 	function groupedAssignments() {
@@ -82,7 +104,8 @@
 		return Array.from(groups.values())
 			.map((group) => ({
 				...group,
-				displayAssignments: displayAssignmentsForUser(group.assignments)
+				displayAssignments: displayAssignmentsForUser(group.assignments),
+				effectiveAssignment: effectiveAssignment(group.assignments)
 			}))
 			.sort((left, right) => userLabel(left.userId).localeCompare(userLabel(right.userId)));
 	}
@@ -114,7 +137,7 @@
 			</div>
 			<form method="POST" action="?/restoreDefaultEditorialRoles" class="rounded border border-slate-200 bg-white p-3 shadow-sm">
 				<p class="mb-2 text-xs text-slate-500">
-					Restore Editor Chief, Associate Editor and Reviewer defaults.
+					Restore default editorial roles.
 				</p>
 				<button class="rounded bg-slate-900 px-3 py-2 text-sm font-semibold text-white">
 					Restore Default Roles
@@ -126,16 +149,28 @@
 			<h2 class="text-lg font-semibold text-slate-900">Roles</h2>
 			<div class="grid gap-4 xl:grid-cols-2">
 				{#each activeRoles() as role}
+					{@const profile = roleProfile(role)}
 					<form
 						method="POST"
 						action="?/updateRolePermissions"
 						class="rounded border border-slate-200 bg-white p-4 shadow-sm"
 					>
 						<input type="hidden" name="roleId" value={role.id || role._id} />
-						<div class="mb-3 flex items-start justify-between gap-3">
-							<div>
-								<h3 class="text-base font-semibold text-slate-900">{role.name}</h3>
-								<p class="text-xs text-slate-500">{role.key} · Priority {role.priority ?? 0}</p>
+						<div class="mb-4 flex items-start justify-between gap-3">
+							<div class="space-y-2">
+								<RoleBadge
+									assignments={[
+										{
+											roleKey: role.key,
+											roleName: role.name,
+											priority: role.priority,
+											isActive: role.isActive !== false
+										}
+									]}
+									roleLabels={roleLabels()}
+								/>
+								<h3 class="text-base font-semibold text-slate-950">{profile.title}</h3>
+								<p class="text-sm text-slate-600">{profile.summary}</p>
 								{#if role.inheritsFrom?.length}
 									<p class="text-xs text-slate-500">
 										Inherits {role.inheritsFrom.map((roleKey: string) => roleName(roleKey)).join(', ')}
@@ -152,19 +187,41 @@
 								</span>
 							{/if}
 						</div>
-						<div class="grid gap-2 sm:grid-cols-2">
-							{#each data.permissions as permission}
-								<label class="flex items-center gap-2 text-sm text-slate-700">
-									<input
-										type="checkbox"
-										name="permissions"
-										value={permission}
-										checked={role.permissions?.includes(permission)}
-										disabled={role.isProtected}
-										class="rounded border-slate-300"
-									/>
-									<span>{permission}</span>
-								</label>
+						<div class="mb-4 rounded border border-slate-100 bg-slate-50 p-3">
+							<p class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+								Editorial capabilities
+							</p>
+							<div class="grid gap-2 sm:grid-cols-2">
+								{#each profile.capabilities as capability}
+									<div class="flex items-center gap-2 text-sm text-slate-700">
+										<span class="text-green-700" aria-hidden="true">✓</span>
+										<span>{capability}</span>
+									</div>
+								{/each}
+							</div>
+						</div>
+						<div class="space-y-4">
+							{#each permissionGroups() as group}
+								<div class="space-y-2">
+									<p class="text-xs font-semibold uppercase tracking-wide text-slate-500">
+										{group.label}
+									</p>
+									<div class="grid gap-2 sm:grid-cols-2">
+										{#each group.permissions as permission}
+											<label class="flex items-center gap-2 text-sm text-slate-700">
+												<input
+													type="checkbox"
+													name="permissions"
+													value={permission}
+													checked={role.permissions?.includes(permission)}
+													disabled={role.isProtected}
+													class="rounded border-slate-300"
+												/>
+												<span>{getPermissionLabel(permission)}</span>
+											</label>
+										{/each}
+									</div>
+								</div>
 							{/each}
 						</div>
 						<div class="mt-4 flex flex-wrap gap-2">
@@ -195,15 +252,27 @@
 				action="?/createRole"
 				class="grid gap-3 rounded border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-3"
 			>
-				<input name="key" placeholder="RoleKey" class="rounded border border-slate-300 px-3 py-2 text-sm" />
+				<input name="key" placeholder="Role key" class="rounded border border-slate-300 px-3 py-2 text-sm" />
 				<input name="name" placeholder="Role name" class="rounded border border-slate-300 px-3 py-2 text-sm" />
 				<input name="description" placeholder="Description" class="rounded border border-slate-300 px-3 py-2 text-sm" />
-				<div class="grid gap-2 sm:grid-cols-3 lg:grid-cols-4 md:col-span-3">
-					{#each data.permissions as permission}
-						<label class="flex items-center gap-2 text-sm text-slate-700">
-							<input type="checkbox" name="permissions" value={permission} class="rounded border-slate-300" />
-							<span>{permission}</span>
-						</label>
+				<div class="space-y-4 md:col-span-3">
+					{#each permissionGroups() as group}
+						<div class="space-y-2">
+							<p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{group.label}</p>
+							<div class="grid gap-2 sm:grid-cols-3 lg:grid-cols-4">
+								{#each group.permissions as permission}
+									<label class="flex items-center gap-2 text-sm text-slate-700">
+										<input
+											type="checkbox"
+											name="permissions"
+											value={permission}
+											class="rounded border-slate-300"
+										/>
+										<span>{getPermissionLabel(permission)}</span>
+									</label>
+								{/each}
+							</div>
+						</div>
 					{/each}
 				</div>
 				<button class="rounded bg-slate-900 px-3 py-2 text-sm font-semibold text-white md:w-fit">
