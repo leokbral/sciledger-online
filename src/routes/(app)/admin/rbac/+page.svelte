@@ -1,5 +1,10 @@
 <script lang="ts">
 	import type { PageData } from './$types';
+	import {
+		getPermissionLabel,
+		getRoleCapabilityProfile,
+		groupPermissionsForDisplay
+	} from '$lib/helpers/permissionDisplay';
 
 	interface Props {
 		data: PageData;
@@ -18,6 +23,15 @@
 		if (!hubId) return 'Global';
 		const hub = data.hubs.find((item: any) => item.id === hubId || item._id === hubId);
 		return hub ? `${hub.title} (${hub.type})` : hubId;
+	}
+
+	function roleName(roleKey: string | null | undefined) {
+		const role = data.roles.find((item: any) => item.key === roleKey);
+		return role?.name || roleKey || 'Role';
+	}
+
+	function permissionGroups() {
+		return groupPermissionsForDisplay(data.permissions);
 	}
 </script>
 
@@ -41,6 +55,7 @@
 			<h2 class="text-lg font-semibold text-slate-900">Roles</h2>
 			<div class="grid gap-4 xl:grid-cols-2">
 				{#each data.roles as role}
+					{@const profile = getRoleCapabilityProfile(role)}
 					<form
 						method="POST"
 						action="?/updateRolePermissions"
@@ -50,24 +65,33 @@
 						<div class="mb-3 flex items-start justify-between gap-3">
 							<div>
 								<h3 class="text-base font-semibold text-slate-900">{role.name}</h3>
-								<p class="text-xs text-slate-500">{role.key}</p>
+								<p class="text-sm text-slate-600">{profile.summary}</p>
 							</div>
 							<span class="rounded border border-slate-200 px-2 py-1 text-xs text-slate-600">
 								{role.isActive ? 'Active' : 'Inactive'}
 							</span>
 						</div>
-						<div class="grid gap-2 sm:grid-cols-2">
-							{#each data.permissions as permission}
-								<label class="flex items-center gap-2 text-sm text-slate-700">
-									<input
-										type="checkbox"
-										name="permissions"
-										value={permission}
-										checked={role.permissions?.includes(permission)}
-										class="rounded border-slate-300"
-									/>
-									<span>{permission}</span>
-								</label>
+						<div class="space-y-4">
+							{#each permissionGroups() as group}
+								<div class="space-y-2">
+									<p class="text-xs font-semibold uppercase tracking-wide text-slate-500">
+										{group.label}
+									</p>
+									<div class="grid gap-2 sm:grid-cols-2">
+										{#each group.permissions as permission}
+											<label class="flex items-center gap-2 text-sm text-slate-700">
+												<input
+													type="checkbox"
+													name="permissions"
+													value={permission}
+													checked={role.permissions?.includes(permission)}
+													class="rounded border-slate-300"
+												/>
+												<span>{getPermissionLabel(permission)}</span>
+											</label>
+										{/each}
+									</div>
+								</div>
 							{/each}
 						</div>
 						<button class="mt-4 rounded bg-slate-900 px-3 py-2 text-sm font-semibold text-white">
@@ -81,15 +105,27 @@
 		<section class="space-y-4">
 			<h2 class="text-lg font-semibold text-slate-900">Create Role</h2>
 			<form method="POST" action="?/createRole" class="grid gap-3 rounded border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-3">
-				<input name="key" placeholder="RoleKey" class="rounded border border-slate-300 px-3 py-2 text-sm" />
+				<input name="key" placeholder="Role key" class="rounded border border-slate-300 px-3 py-2 text-sm" />
 				<input name="name" placeholder="Role name" class="rounded border border-slate-300 px-3 py-2 text-sm" />
 				<input name="description" placeholder="Description" class="rounded border border-slate-300 px-3 py-2 text-sm" />
-				<div class="md:col-span-3 grid gap-2 sm:grid-cols-3 lg:grid-cols-4">
-					{#each data.permissions as permission}
-						<label class="flex items-center gap-2 text-sm text-slate-700">
-							<input type="checkbox" name="permissions" value={permission} class="rounded border-slate-300" />
-							<span>{permission}</span>
-						</label>
+				<div class="space-y-4 md:col-span-3">
+					{#each permissionGroups() as group}
+						<div class="space-y-2">
+							<p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{group.label}</p>
+							<div class="grid gap-2 sm:grid-cols-3 lg:grid-cols-4">
+								{#each group.permissions as permission}
+									<label class="flex items-center gap-2 text-sm text-slate-700">
+										<input
+											type="checkbox"
+											name="permissions"
+											value={permission}
+											class="rounded border-slate-300"
+										/>
+										<span>{getPermissionLabel(permission)}</span>
+									</label>
+								{/each}
+							</div>
+						</div>
 					{/each}
 				</div>
 				<button class="rounded bg-slate-900 px-3 py-2 text-sm font-semibold text-white md:w-fit">
@@ -130,7 +166,7 @@
 						{#each data.assignments as assignment}
 							<tr class="border-b border-slate-100">
 								<td class="px-3 py-2">{userLabel(assignment.userId)}</td>
-								<td class="px-3 py-2">{assignment.roleKey}</td>
+								<td class="px-3 py-2">{roleName(assignment.roleKey)}</td>
 								<td class="px-3 py-2">{assignment.scopeType}: {hubLabel(assignment.scopeId)}</td>
 								<td class="px-3 py-2">
 									<form method="POST" action="?/revokeAssignment">
