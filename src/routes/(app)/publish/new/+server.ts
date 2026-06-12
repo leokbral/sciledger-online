@@ -136,12 +136,12 @@ export const POST: RequestHandler = async ({ request, locals }) => {
         await newPaper.save();
 
         // Buscar e atualizar o autor principal
-        const user = await Users.findById(mainAuthor.id);
-        if (!user) {
+        const mainAuthorUser = await Users.findById(mainAuthor.id);
+        if (!mainAuthorUser) {
             return json({ error: 'Autor principal não encontrado.' }, { status: 404 });
         }
-        user.papers.push(newPaper.id);
-        await user.save();
+        mainAuthorUser.papers.push(newPaper.id);
+        await mainAuthorUser.save();
 
         // Buscar e atualizar os coautores
         for (const coAuthorId of _coAuthors) {
