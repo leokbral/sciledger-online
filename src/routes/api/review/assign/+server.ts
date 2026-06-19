@@ -1,12 +1,18 @@
 import { json } from '@sveltejs/kit';
+import { randomUUID } from 'crypto';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import Papers from '$lib/db/models/Paper';
 import PaperReviewInvitation from '$lib/db/models/PaperReviewInvitation';
 import Users from '$lib/db/models/User';
 import { NotificationService } from '$lib/services/NotificationService';
-import type { RequestHandler } from './$types';
-import { randomUUID } from 'crypto';
 import { authorize } from '$lib/server/authorization/authorizationService';
+import {
+	buildDuplicateInvitationDetails,
+	findActiveReviewInvitation,
+	getIdAliases,
+	selectInvitationRole
+} from '$lib/server/reviewInvitations';
+import type { RequestHandler } from './$types';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
 	await start_mongo();
@@ -28,7 +34,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			return json({ error: 'Invalid request data' }, { status: 400 });
 		}
 
-		// Buscar o paper
 		const paper = await Papers.findOne({ $or: [{ id: paperId }, { _id: paperId }] });
 		if (!paper) {
 			return json({ error: 'Paper not found' }, { status: 404 });
@@ -46,7 +51,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			);
 		}
 
-		// Verificar se é o autor do paper
 		const authorization = await authorize(user, 'paper.assignReviewers', { paper });
 		if (!authorization.allowed) {
 			return json(
@@ -55,7 +59,12 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			);
 		}
 
-		// Atualizar peer_review do paper
+		const invitedByRole = selectInvitationRole(authorization.roleKeys);
+		const normalizedPaperId = String(paper.id || paper._id);
+		const paperAliases = [
+			...new Set([String(paperId), normalizedPaperId, String(paper._id || '')].filter(Boolean))
+		];
+
 		if (!paper.peer_review) {
 			paper.peer_review = {
 				reviewType: peerReviewType || 'selected',
@@ -70,54 +79,84 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			paper.peer_review.reviewType = peerReviewType || paper.peer_review.reviewType;
 		}
 
-		// Criar convites para cada revisor
 		const invitations = [];
+		const skipped = [];
+		const duplicates = [];
+
 		for (const rawReviewerId of normalizedReviewerIds) {
-			// Verificar se o revisor existe
 			const reviewer = await Users.findOne({ $or: [{ id: rawReviewerId }, { _id: rawReviewerId }] });
 			if (!reviewer) {
 				console.warn(`Reviewer ${rawReviewerId} not found`);
+				skipped.push({ reviewerId: rawReviewerId, reasons: ['Reviewer not found'] });
 				continue;
 			}
 
 			const normalizedReviewerId = String(reviewer.id || reviewer._id);
-			const normalizedPaperId = String(paper.id || paper._id);
+			const reviewerAliases = [
+				...new Set([rawReviewerId, normalizedReviewerId, ...getIdAliases(reviewer)].filter(Boolean))
+			];
+			const existingInvite = await findActiveReviewInvitation(paperAliases, reviewerAliases);
 
-			// Verificar se já existe convite pendente
-			const existingInvite = await PaperReviewInvitation.findOne({
-				paper: normalizedPaperId,
-				reviewer: normalizedReviewerId,
-				status: 'pending'
-			});
-
-			if (!existingInvite) {
-				const invitationId = randomUUID();
-				const invitation = new PaperReviewInvitation({
-					_id: invitationId,
-					id: invitationId,
+			if (existingInvite) {
+				const duplicateId = randomUUID();
+				const duplicateInvitation = new PaperReviewInvitation({
+					_id: duplicateId,
+					id: duplicateId,
+					paperId: normalizedPaperId,
 					paper: normalizedPaperId,
+					reviewerId: normalizedReviewerId,
 					reviewer: normalizedReviewerId,
-					invitedBy: user.id,
-					status: 'pending',
+					invitedBy: {
+						userId: user.id,
+						role: invitedByRole
+					},
+					status: 'duplicate',
+					duplicateOf: String(existingInvite.id || existingInvite._id),
 					invitedAt: new Date(),
+					createdAt: new Date(),
 					hubId: paper.hubId || null
 				});
+				await duplicateInvitation.save();
 
-				await invitation.save();
-				invitations.push(invitation);
+				const duplicateDetails = await buildDuplicateInvitationDetails(existingInvite);
+				duplicates.push(duplicateDetails);
+				skipped.push({
+					reviewerId: rawReviewerId,
+					reasons: ['Reviewer already invited for this paper'],
+					existingInvitation: duplicateDetails
+				});
+				continue;
+			}
 
-				// Criar notificação para o revisor
-				try {
-					await NotificationService.createPaperReviewRequest({
-						reviewerId: normalizedReviewerId,
-						paperId: normalizedPaperId,
-						paperTitle: paper.title,
-						authorName: `${user.firstName} ${user.lastName}`
-					});
-				} catch (notifyError) {
-					console.error('Failed to create notification:', notifyError);
-					// Não falha se notificação não puder ser criada
-				}
+			const invitationId = randomUUID();
+			const invitation = new PaperReviewInvitation({
+				_id: invitationId,
+				id: invitationId,
+				paperId: normalizedPaperId,
+				paper: normalizedPaperId,
+				reviewerId: normalizedReviewerId,
+				reviewer: normalizedReviewerId,
+				invitedBy: {
+					userId: user.id,
+					role: invitedByRole
+				},
+				status: 'pending',
+				invitedAt: new Date(),
+				hubId: paper.hubId || null
+			});
+
+			await invitation.save();
+			invitations.push(invitation);
+
+			try {
+				await NotificationService.createPaperReviewRequest({
+					reviewerId: normalizedReviewerId,
+					paperId: normalizedPaperId,
+					paperTitle: paper.title,
+					authorName: `${user.firstName} ${user.lastName}`
+				});
+			} catch (notifyError) {
+				console.error('Failed to create notification:', notifyError);
 			}
 		}
 
@@ -125,9 +164,14 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		await paper.save();
 
 		return json({
-			success: true,
-			message: `Successfully sent ${invitations.length} invitation(s)`,
-			invitations: invitations.length
+			success: invitations.length > 0,
+			message:
+				invitations.length > 0
+					? `Successfully sent ${invitations.length} invitation(s)`
+					: 'Reviewer already invited for this paper',
+			invitations: invitations.length,
+			skipped,
+			duplicates
 		});
 	} catch (error) {
 		console.error('Error assigning reviewers:', error);

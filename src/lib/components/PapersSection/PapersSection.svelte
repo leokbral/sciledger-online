@@ -364,7 +364,38 @@
         return list;
     }
 
-    function formatInvitationIssues(skipped: Array<{ reviewerId: string; reasons: string[] }> = []) {
+    function formatInvitationDate(value: string | null | undefined) {
+        if (!value) return '';
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return '';
+        return date.toLocaleString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    }
+
+    function formatInvitationIssues(skipped: Array<{ reviewerId: string; reasons: string[]; existingInvitation?: any }> = []) {
+        const duplicate = skipped.find((entry) => entry.existingInvitation?.invitation);
+        if (duplicate?.existingInvitation) {
+            const details = duplicate.existingInvitation;
+            const invitedBy = details.invitedBy?.name || 'Unknown user';
+            const role = details.invitedBy?.roleLabel || details.invitedBy?.role || 'Member';
+            const status = details.statusLabel || details.status || 'Unknown';
+            const invitedAt = formatInvitationDate(details.invitedAt);
+            return [
+                'Reviewer already invited for this paper',
+                `Invited by: ${invitedBy}`,
+                `Role: ${role}`,
+                invitedAt ? `Date: ${invitedAt}` : '',
+                `Status: ${status}`
+            ]
+                .filter(Boolean)
+                .join(' | ');
+        }
+
         return skipped
             .flatMap((entry) => entry.reasons || [])
             .filter(Boolean)
@@ -453,7 +484,13 @@
                 emailInvite = '';
                 openInviteModal = false;
             } else {
-                toaster.error({ title: 'Error', description: data.error || 'Failed to send invitation' });
+                toaster.warning({
+                    title: data.error === 'Reviewer already invited for this paper' ? 'Reviewer already invited' : 'Error',
+                    description:
+                        formatInvitationIssues(data.skipped) ||
+                        data.error ||
+                        'Failed to send invitation'
+                });
             }
         } catch (error) {
             console.error('Error sending email invitation:', error);

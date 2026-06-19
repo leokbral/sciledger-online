@@ -1,10 +1,11 @@
 import Papers from '$lib/db/models/Paper';
 import Users from '$lib/db/models/User';
 import Reviews from '$lib/db/models/Review';
-import Invitations from '$lib/db/models/Invitation';
+import PaperReviewInvitation from '$lib/db/models/PaperReviewInvitation';
 import { start_mongo } from '$lib/db/mongo';
 import { redirect } from '@sveltejs/kit';
 import { sanitizePaper } from '$lib/helpers/sanitizePaper';
+import { serializeReviewInvitations } from '$lib/server/reviewInvitations';
 import {
 	getEffectiveHubMemberForUser,
 	resolveEffectiveHubRoles
@@ -244,9 +245,28 @@ export async function load({ locals }) {
 			return await Reviews.find({ reviewer: reviewerId }).lean().exec();
 		};
 
-		const fetchReviewInvitation = async (reviewerId: string) => {
-			const invitations = await Invitations.find({ reviewer: reviewerId }).lean().exec();
-			return invitations;
+		const fetchReviewInvitation = async () => {
+			const reviewerAliases = getIdAliases(user);
+			const invitations = await PaperReviewInvitation.find({
+				$or: [
+					{ reviewerId: { $in: reviewerAliases } },
+					{ reviewer: { $in: reviewerAliases } }
+				],
+				status: { $ne: 'duplicate' }
+			})
+				.populate({
+					path: 'paper',
+					select: 'id title abstract hubId'
+				})
+				.populate({
+					path: 'hubId',
+					select: 'title type'
+				})
+				.sort({ createdAt: -1, invitedAt: -1 })
+				.lean()
+				.exec();
+
+			return serializeReviewInvitations(invitations as any[]);
 		};
 
 		const fetchReviewerAssignments = async (reviewerId: string) => {
@@ -277,7 +297,7 @@ export async function load({ locals }) {
 			papers: sanitize(await fetchPapers()),
 			reviews: sanitize(await fetchReviews(user.id)),
 			user: sanitize(user),
-			reviewerInvitations: sanitize(await fetchReviewInvitation(user.id)),
+			reviewerInvitations: sanitize(await fetchReviewInvitation()),
 			reviewAssignments: sanitize(await fetchReviewerAssignments(user.id))
 		};
 	} catch (err) {

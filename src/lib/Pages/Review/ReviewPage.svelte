@@ -1,15 +1,11 @@
 <script lang="ts">
 	import ReviewDashboard from '$lib/ReviewDashboard.svelte';
-	import ReviewerInvitations from '$lib/components/ReviewerInvitations/ReviewerInvitations.svelte';
+	import PaperReviewInvitations from '$lib/components/PaperReviewInvitations/PaperReviewInvitations.svelte';
 	import MyPapers from '$lib/MyPapers.svelte';
 	import { Tabs } from '@skeletonlabs/skeleton-svelte';
 	import Icon from '@iconify/svelte';
-	import Notifications from '$lib/components/Notifications/Notifications.svelte';
-	import NotificationBadge from '$lib/components/Notifications/NotificationBadge.svelte';
 
 	let tabSet = $state('tab0');
-
-	let initialNotifications: never[] = [];
 
 	interface Props {
 		data: any;
@@ -31,9 +27,7 @@
 <div class="container page p-4 m-auto">
 	<div>
 		<ReviewDashboard {reviews} {user}></ReviewDashboard>
-		<!-- <ReviewerInvitations {reviewerInvitations} /> -->
-		<!-- <Notifications notifications={initialNotifications} /> -->
-		<!-- <NotificationBadge unreadCount={initialNotifications.length} /> -->
+		<PaperReviewInvitations {reviewerInvitations} />
 		<!--TEM QUE PASSAR OS DADOS DO REVISOR AQUI-->
 	</div>
 	<div class="text-xl font-bold mb-6">Your Activities</div>

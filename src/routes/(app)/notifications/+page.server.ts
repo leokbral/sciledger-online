@@ -4,6 +4,7 @@ import Invitation from '$lib/db/models/Invitation';
 import PaperReviewInvitation from '$lib/db/models/PaperReviewInvitation';
 import { resolveUserIdentifiers } from '$lib/helpers/userIdentifiers';
 import { start_mongo } from '$lib/db/mongooseConnection';
+import { serializeReviewInvitations } from '$lib/server/reviewInvitations';
 
 export const load: PageServerLoad = async ({ parent, locals }) => {
 	await start_mongo();
@@ -12,8 +13,8 @@ export const load: PageServerLoad = async ({ parent, locals }) => {
 	const { notifications } = await parent();
 
 	// Buscar convites de hub pendentes do usuário
-	let hubInvitations = [];
-	let paperReviewInvitations = [];
+	let hubInvitations: any[] = [];
+	let paperReviewInvitations: any[] = [];
 
 	if (locals.user) {
 		const { aliases: userAliases } = await resolveUserIdentifiers(locals.user);
@@ -30,8 +31,11 @@ export const load: PageServerLoad = async ({ parent, locals }) => {
 			.lean();
 
 		// Buscar convites de revisão de papers pendentes
-		paperReviewInvitations = await PaperReviewInvitation.find({
-			reviewer: { $in: reviewerQueryIds },
+		const paperReviewInvitationsRaw = await PaperReviewInvitation.find({
+			$or: [
+				{ reviewerId: { $in: reviewerQueryIds } },
+				{ reviewer: { $in: reviewerQueryIds } }
+			],
 			status: 'pending'
 		})
 			.populate({
@@ -39,14 +43,17 @@ export const load: PageServerLoad = async ({ parent, locals }) => {
 				select: 'id title abstract authors'
 			})
 			.populate({
-				path: 'invitedBy',
-				select: 'firstName lastName email'
-			})
-			.populate({
 				path: 'hubId',
 				select: 'title'
 			})
 			.lean();
+		const serializedPaperReviewInvitations =
+			await serializeReviewInvitations(paperReviewInvitationsRaw);
+		paperReviewInvitations = serializedPaperReviewInvitations.map((invite) => ({
+			...invite,
+			invitedBy: invite.invitedBy.user,
+			invitedByRole: invite.invitedBy.roleLabel
+		}));
 	}
 
 	return {

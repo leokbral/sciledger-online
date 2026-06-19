@@ -5,18 +5,21 @@ export const PaperReviewInvitationSchema: Schema = new Schema(
 	{
 		_id: { type: String, required: true },
 		id: { type: String, default: () => crypto.randomUUID(), unique: true },
+		paperId: { type: String, ref: 'Paper', required: true },
 		paper: { type: String, ref: 'Paper', required: true },
+		reviewerId: { type: String, ref: 'User', required: true },
 		reviewer: { type: String, ref: 'User', required: true },
-		invitedBy: { type: String, ref: 'User', required: true },
-		hubId: { type: String, ref: 'Hub', default: null }, // Optional for direct paper invites
+		invitedBy: { type: Schema.Types.Mixed, required: true },
+		hubId: { type: String, ref: 'Hub', default: null },
 		status: {
 			type: String,
-			enum: ['pending', 'accepted', 'declined'],
+			enum: ['pending', 'accepted', 'declined', 'duplicate'],
 			default: 'pending',
 			required: true
 		},
-		customDeadlineDays: { type: Number, default: 15 }, // Prazo customizado em dias (padrão 15)
-		reviewAssignmentId: { type: String, ref: 'ReviewAssignment' }, // Referência ao ReviewAssignment criado ao aceitar
+		duplicateOf: { type: String, ref: 'PaperReviewInvitation', default: null },
+		customDeadlineDays: { type: Number, default: 15 },
+		reviewAssignmentId: { type: String, ref: 'ReviewAssignment' },
 		invitedAt: { type: Date, default: Date.now, required: true },
 		respondedAt: { type: Date },
 		createdAt: { type: Date, default: Date.now },
@@ -25,7 +28,8 @@ export const PaperReviewInvitationSchema: Schema = new Schema(
 	{ collection: 'paperreviewinvitations' }
 );
 
-// Index for frequent queries
 PaperReviewInvitationSchema.index({ paper: 1, reviewer: 1 });
+PaperReviewInvitationSchema.index({ paperId: 1, reviewerId: 1, status: 1 });
 PaperReviewInvitationSchema.index({ reviewer: 1, status: 1 });
+PaperReviewInvitationSchema.index({ reviewerId: 1, status: 1 });
 PaperReviewInvitationSchema.index({ hubId: 1 });

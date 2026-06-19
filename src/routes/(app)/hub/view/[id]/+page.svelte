@@ -325,7 +325,7 @@
 				{#if canManageRoles}
 					<a
 						href="/hub/view/{hub._id || hub.id}/rbac"
-						class="btn inline-flex items-center gap-2 rounded-full border border-surface-300 dark:border-surface-600 bg-white/95 dark:bg-surface-800 px-4 py-2 text-surface-800 dark:text-surface-100 shadow-sm hover:bg-surface-50 dark:hover:bg-surface-700 hover:shadow-md transition-all"
+						class="btn preset-tonal-primary inline-flex items-center gap-2 rounded-full border border-primary-500 px-4 py-2 text-sm font-semibold"
 					>
 						<Icon icon="mdi:account-key-outline" width="20" />
 						Manage Roles
@@ -643,19 +643,21 @@
 
 		<div class="flex gap-2">
 			<!-- <ReviewerManagement reviewer={data.user} hubId={hub._id} {isCreator} /> -->
-			{#if isHubManager}
-				<ReviewerManagement
-					hubId={hub._id}
-					canManageHub={isHubManager}
+				{#if isHubManager}
+					<a
+						href="/hub/view/{hub._id || hub.id}/reviewer-invites"
+						class="btn preset-tonal-primary inline-flex items-center gap-2 rounded-full border border-primary-500 px-4 py-2 text-sm font-semibold"
+					>
+						<Icon icon="mdi:email-search-outline" class="size-5" />
+						Review Invitations
+					</a>
+					<ReviewerManagement
+						hubId={hub._id}
+						canManageHub={isHubManager}
 					canInviteVice={canManageRoles}
 					users={data.users as any[]}
 					effectiveReviewers={effectiveReviewers}
 				/>
-			{/if}
-			{#if canManageRoles}
-				<a href="/hub/view/{hub._id || hub.id}/rbac" class="btn preset-tonal">
-					Manage Roles
-				</a>
 			{/if}
 		</div>
 	</div>

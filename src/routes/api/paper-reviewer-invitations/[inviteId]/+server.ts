@@ -13,6 +13,12 @@ import { NotificationService } from '$lib/services/NotificationService';
 import { authorize } from '$lib/server/authorization/authorizationService';
 import { resolveEffectiveHubRoles } from '$lib/server/authorization/effectiveHubRoles';
 import {
+	getInvitationInviterId,
+	getInvitationInviterRole,
+	getInvitationPaperId,
+	getInvitationReviewerId
+} from '$lib/server/reviewInvitations';
+import {
 	EditorialTransitionError,
 	transitionPaperStatus
 } from '$lib/server/authorization/editorialTransitionService';
@@ -50,11 +56,14 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 			$or: [{ _id: inviteId }, { id: inviteId }]
 		})
 			.populate('paper')
-			.populate('invitedBy')
 			.populate('reviewer');
 
 		if (!invitation) {
 			return json({ error: 'Invitation not found' }, { status: 404 });
+		}
+
+		if (invitation.status !== 'pending') {
+			return json({ error: 'Invitation already processed' }, { status: 400 });
 		}
 
 		const { canonicalId: canonicalReviewerId, aliases: invitationReviewerAliases } =
@@ -71,10 +80,17 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 			typeof invitation.paper === 'object'
 				? invitation.paper
 				: await Papers.findOne({ id: invitation.paper });
-		const invitedBy =
-			typeof invitation.invitedBy === 'object'
-				? invitation.invitedBy
-				: await Users.findOne({ id: invitation.invitedBy });
+		const inviterId = getInvitationInviterId(invitation);
+		const invitedBy = inviterId
+			? await Users.findOne({ $or: [{ id: inviterId }, { _id: inviterId }] })
+			: null;
+
+		invitation.paperId = invitation.paperId || getInvitationPaperId(invitation);
+		invitation.reviewerId = invitation.reviewerId || actingReviewerId;
+		invitation.invitedBy = {
+			userId: inviterId || actingReviewerId,
+			role: getInvitationInviterRole(invitation)
+		};
 
 		if (action === 'accept') {
 			let paymentCaptured = false;
@@ -141,14 +157,14 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 			}
 
 			const availableSlot = paper.reviewSlots.find(
-				(slot) => slot.status === 'available' || slot.status === 'declined'
+				(slot: any) => slot.status === 'available' || slot.status === 'declined'
 			);
 
 			if (!availableSlot) {
 				return json(
 					{
 						error: 'No available review slots. All 3 reviewer slots are already occupied.',
-						slotsOccupied: paper.reviewSlots.filter((s) => s.status === 'occupied').length,
+						slotsOccupied: paper.reviewSlots.filter((s: any) => s.status === 'occupied').length,
 						maxSlots: paper.maxReviewSlots || 3
 					},
 					{ status: 400 }
@@ -160,7 +176,7 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 			availableSlot.acceptedAt = new Date();
 
 			paper.availableSlots = paper.reviewSlots.filter(
-				(slot) => slot.status === 'available' || slot.status === 'declined'
+				(slot: any) => slot.status === 'available' || slot.status === 'declined'
 			).length;
 			await paper.save();
 
@@ -381,7 +397,7 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 			await invitation.save();
 
 			const reviewerSlot = paper.reviewSlots?.find(
-				(slot) => slot.reviewerId?.toString() === actingReviewerId && slot.status === 'pending'
+				(slot: any) => slot.reviewerId?.toString() === actingReviewerId && slot.status === 'pending'
 			);
 
 			if (reviewerSlot) {
@@ -390,7 +406,7 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 				reviewerSlot.reviewerId = null;
 
 				paper.availableSlots = paper.reviewSlots.filter(
-					(slot) => slot.status === 'available' || slot.status === 'declined'
+					(slot: any) => slot.status === 'available' || slot.status === 'declined'
 				).length;
 
 				await paper.save();
@@ -444,7 +460,6 @@ export const DELETE: RequestHandler = async ({ params, locals }) => {
 			$or: [{ _id: inviteId }, { id: inviteId }]
 		})
 			.populate('paper')
-			.populate('invitedBy')
 			.populate('hubId');
 
 		if (!invitation) {
@@ -463,16 +478,9 @@ export const DELETE: RequestHandler = async ({ params, locals }) => {
 			);
 		}
 
-		await PaperReviewInvitation.deleteOne({ _id: inviteId });
+		await PaperReviewInvitation.deleteOne({ $or: [{ _id: inviteId }, { id: inviteId }] });
 
-		const { canonicalId: canonicalInvitationReviewerId } = await resolveUserIdentifiers(
-			invitation.reviewer as any
-		);
-		const reviewerId =
-			canonicalInvitationReviewerId ||
-			(typeof invitation.reviewer === 'object'
-				? String((invitation.reviewer as any)._id || (invitation.reviewer as any).id || '')
-				: String(invitation.reviewer || ''));
+		const reviewerId = getInvitationReviewerId(invitation);
 		if (reviewerId) {
 			await NotificationService.createNotification({
 				user: reviewerId,

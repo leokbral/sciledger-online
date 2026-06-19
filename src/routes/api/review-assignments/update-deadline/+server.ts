@@ -122,7 +122,12 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 				// Atualizar PaperReviewInvitation com a referência
 				await PaperReviewInvitation.findOneAndUpdate(
-					{ paper: paperId, reviewer: reviewerId },
+					{
+						$or: [
+							{ paperId, reviewerId },
+							{ paper: paperId, reviewer: reviewerId }
+						]
+					},
 					{ reviewAssignmentId: assignmentId }
 				);
 			}
