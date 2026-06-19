@@ -38,7 +38,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 		// Encontrar o slot do revisor
 		const reviewerSlot = paper.reviewSlots?.find(
-			slot => slot.reviewerId?.toString() === reviewerId
+			(slot: any) => slot.reviewerId?.toString() === reviewerId
 		);
 
 		if (!reviewerSlot) {
@@ -55,7 +55,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		// Atualizar contador de slots disponíveis
 		if (paper.reviewSlots) {
 			paper.availableSlots = paper.reviewSlots.filter(
-				slot => slot.status === 'available' || slot.status === 'declined'
+				(slot: any) => slot.status === 'available' || slot.status === 'declined'
 			).length;
 		}
 

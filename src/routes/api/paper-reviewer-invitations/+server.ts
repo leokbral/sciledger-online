@@ -11,6 +11,12 @@ import { resolveUserIdentifiers } from '$lib/helpers/userIdentifiers';
 import { NotificationService } from '$lib/services/NotificationService';
 import { authorize } from '$lib/server/authorization/authorizationService';
 import { resolveEffectiveHubRoles } from '$lib/server/authorization/effectiveHubRoles';
+import {
+	buildDuplicateInvitationDetails,
+	findActiveReviewInvitation,
+	getIdAliases,
+	selectInvitationRole
+} from '$lib/server/reviewInvitations';
 import type { RequestHandler } from './$types';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
@@ -57,6 +63,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				{ status: 403 }
 			);
 		}
+		const invitedByRole = selectInvitationRole(authorization.roleKeys);
+		const paperAliases = [...new Set([String(paperId), ...getIdAliases(paper)].filter(Boolean))];
 
 		if (!paper.reviewSlots || paper.reviewSlots.length === 0) {
 			paper.reviewSlots = [
@@ -70,7 +78,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		}
 
 		const availableSlotsList = paper.reviewSlots.filter(
-			(slot) => slot.status === 'available' || slot.status === 'declined'
+			(slot: any) => slot.status === 'available' || slot.status === 'declined'
 		);
 		const availableSlotsCount = availableSlotsList.length;
 
@@ -89,7 +97,12 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		);
 
 		const invitations = [] as any[];
-		const skipped = [] as { reviewerId: string; reasons: string[] }[];
+		const skipped = [] as {
+			reviewerId: string;
+			reasons: string[];
+			existingInvitation?: Awaited<ReturnType<typeof buildDuplicateInvitationDetails>>;
+		}[];
+		const duplicates = [] as Awaited<ReturnType<typeof buildDuplicateInvitationDetails>>[];
 
 		for (const reviewerId of reviewerIds) {
 			const reviewer = await Users.findOne({ $or: [{ id: reviewerId }, { _id: reviewerId }] });
@@ -126,31 +139,52 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				continue;
 			}
 
-			const existingInvites = await PaperReviewInvitation.find({
-				paper: paperId,
-				reviewer: { $in: reviewerIdAliases }
-			});
+			const existingInvite = await findActiveReviewInvitation(paperAliases, reviewerIdAliases);
 
-			if (existingInvites.length > 0) {
-				const pendingInvite = existingInvites.find((inv) => inv.status === 'pending');
-				if (pendingInvite) {
-					skipped.push({ reviewerId: String(reviewerId), reasons: ['Already invited (pending)'] });
-					continue;
-				}
-
-				await PaperReviewInvitation.deleteMany({
+			if (existingInvite) {
+				const duplicateId = crypto.randomUUID();
+				const duplicateInvitation = new PaperReviewInvitation({
+					_id: duplicateId,
+					id: duplicateId,
+					paperId,
 					paper: paperId,
-					reviewer: { $in: reviewerIdAliases }
+					reviewerId: normalizedReviewerId,
+					reviewer: normalizedReviewerId,
+					invitedBy: {
+						userId: user.id,
+						role: invitedByRole
+					},
+					hubId,
+					status: 'duplicate',
+					duplicateOf: String(existingInvite.id || existingInvite._id),
+					customDeadlineDays: deadlineDays,
+					invitedAt: new Date(),
+					createdAt: new Date()
 				});
+				await duplicateInvitation.save();
+
+				const duplicateDetails = await buildDuplicateInvitationDetails(existingInvite);
+				duplicates.push(duplicateDetails);
+				skipped.push({
+					reviewerId: String(reviewerId),
+					reasons: ['Reviewer already invited for this paper'],
+					existingInvitation: duplicateDetails
+				});
+				continue;
 			}
 
 			const inviteId = crypto.randomUUID();
 			const invitation = new PaperReviewInvitation({
 				_id: inviteId,
 				id: inviteId,
+				paperId,
 				paper: paperId,
+				reviewerId: normalizedReviewerId,
 				reviewer: normalizedReviewerId,
-				invitedBy: user.id,
+				invitedBy: {
+					userId: user.id,
+					role: invitedByRole
+				},
 				hubId,
 				status: 'pending',
 				customDeadlineDays: deadlineDays,
@@ -181,13 +215,19 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		}
 
 		if (invitations.length === 0) {
+			const duplicateOnly = duplicates.length > 0 && skipped.length === duplicates.length;
 			return json({
 				success: false,
-				error: 'No reviewer invitations were created',
+				error: duplicateOnly
+					? 'Reviewer already invited for this paper'
+					: 'No reviewer invitations were created',
 				invitations: 0,
 				skipped,
+				duplicates,
 				message:
-					'No reviewer invitations were created. Check the skipped reasons and try again.',
+					duplicateOnly
+						? 'Reviewer already invited for this paper'
+						: 'No reviewer invitations were created. Check the skipped reasons and try again.',
 				availableSlots: availableSlotsCount,
 				maxSlots: paper.maxReviewSlots || 3
 			});
@@ -197,7 +237,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			success: true,
 			invitations: invitations.length,
 			skipped,
-			message: `Invited ${invitations.length} reviewer(s). Skipped ${skipped.length} due to ineligibility. The first 3 to accept will occupy the review slots.`,
+			duplicates,
+			message: `Invited ${invitations.length} reviewer(s). Skipped ${skipped.length} due to duplicates or ineligibility. The first 3 to accept will occupy the review slots.`,
 			availableSlots: availableSlotsCount,
 			maxSlots: paper.maxReviewSlots || 3
 		});

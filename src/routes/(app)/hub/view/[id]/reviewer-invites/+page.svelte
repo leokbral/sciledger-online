@@ -1,7 +1,5 @@
 <script lang="ts">
-	import { page } from '$app/stores';
 	import Icon from '@iconify/svelte';
-	import { Modal } from '@skeletonlabs/skeleton-svelte';
 	import { toaster } from '$lib/toaster-svelte';
 	import type { PageData } from './$types';
 
@@ -9,22 +7,169 @@
 		data: PageData;
 	}
 
+	type StatusFilter = 'all' | 'pending' | 'accepted' | 'declined' | 'duplicate';
+
 	let { data }: Props = $props();
-	const { hub, invitations, reviewers } = data;
+	const { hub, invitations } = data;
 
-	let expandedInvites = $state<string[]>([]);
 	let loadingInviteId = $state<string | null>(null);
+	let statusFilter = $state<StatusFilter>('all');
+	let searchTerm = $state('');
 
-	function toggleExpanded(inviteId: string) {
-		if (expandedInvites.includes(inviteId)) {
-			expandedInvites = expandedInvites.filter((id) => id !== inviteId);
-		} else {
-			expandedInvites = [...expandedInvites, inviteId];
+	let pendingCount = $derived(invitations.filter((invite) => invite.status === 'pending').length);
+	let duplicateCount = $derived(
+		invitations.filter((invite) => invite.status === 'duplicate').length
+	);
+	let respondedCount = $derived(
+		invitations.filter((invite) => invite.status === 'accepted' || invite.status === 'declined')
+			.length
+	);
+
+	let filteredInvitations = $derived(
+		invitations.filter((invite) => {
+			const matchesStatus = statusFilter === 'all' || invite.status === statusFilter;
+			if (!matchesStatus) return false;
+
+			const term = searchTerm.trim().toLowerCase();
+			if (!term) return true;
+
+			return getSearchText(invite).includes(term);
+		})
+	);
+	let paperGroups = $derived(buildPaperGroups(filteredInvitations));
+
+	function filterButtonClass(filter: StatusFilter) {
+		return statusFilter === filter
+			? 'bg-primary-700 text-white hover:bg-primary-800 dark:bg-primary-600 dark:hover:bg-primary-500'
+			: 'bg-white text-surface-800 hover:bg-surface-100 dark:bg-surface-700 dark:text-surface-100 dark:hover:bg-surface-600';
+	}
+
+	function personName(user: any, fallback = 'Unknown user') {
+		if (!user) return fallback;
+		return `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || fallback;
+	}
+
+	function editorName(invite: any) {
+		return invite?.invitedBy?.name || personName(invite?.invitedBy?.user);
+	}
+
+	function reviewerName(invite: any) {
+		return personName(invite?.reviewer, 'Unknown reviewer');
+	}
+
+	// function paperTitle(paper: any) {
+	// 	return paper?.title || 'Unknown paper';
+	// }
+	function stripHtml(html: string) {
+		if (!html) return '';
+
+		return html.replace(/<[^>]*>/g, '');
+	}
+
+	function paperTitle(paper: any) {
+		return stripHtml(paper?.title || 'Unknown paper');
+	}
+
+	function originalInvite(invite: any) {
+		return invite?.duplicateOfInvitation || null;
+	}
+
+	function originalEditorName(invite: any) {
+		const original = originalInvite(invite);
+		if (!original?.invitedBy) return editorName(invite);
+		return original.invitedBy.name || personName(original.invitedBy.user);
+	}
+
+	function originalEditorRole(invite: any) {
+		const original = originalInvite(invite);
+		return (
+			original?.invitedBy?.role ||
+			original?.invitedBy?.roleLabel ||
+			invite?.invitedBy?.role ||
+			'Member'
+		);
+	}
+
+	function formatDate(value: string | null | undefined) {
+		if (!value) return '-';
+		const date = new Date(value);
+		if (Number.isNaN(date.getTime())) return '-';
+		return date.toLocaleDateString('en-GB', {
+			day: '2-digit',
+			month: 'short',
+			year: 'numeric'
+		});
+	}
+
+	function statusClass(status: string) {
+		switch (status) {
+			case 'pending':
+				return 'bg-amber-50 text-amber-800 border-amber-200';
+			case 'accepted':
+				return 'bg-emerald-50 text-emerald-800 border-emerald-200';
+			case 'declined':
+				return 'bg-rose-50 text-rose-800 border-rose-200';
+			case 'duplicate':
+				return 'bg-slate-100 text-slate-700 border-slate-300';
+			default:
+				return 'bg-surface-100 text-surface-700 border-surface-200';
 		}
 	}
 
+	function roleClass(role: string | null | undefined) {
+		switch (role) {
+			case 'HubOwner':
+				return 'border-yellow-300 bg-yellow-50 text-yellow-900';
+			case 'EditorChief':
+				return 'border-slate-300 bg-slate-100 text-slate-800';
+			case 'AssociateEditor':
+				return 'border-orange-300 bg-orange-50 text-orange-900';
+			case 'Reviewer':
+				return 'border-blue-200 bg-blue-50 text-blue-900';
+			default:
+				return 'border-surface-200 bg-surface-50 text-surface-700';
+		}
+	}
+
+	function roleLabel(invite: any) {
+		return invite?.invitedBy?.roleLabel || invite?.invitedBy?.role || 'Member';
+	}
+
+	function rawRole(invite: any) {
+		return invite?.invitedBy?.role || roleLabel(invite);
+	}
+
+	function getSearchText(invite: any) {
+		return [
+			paperTitle(invite.paper),
+			reviewerName(invite),
+			editorName(invite),
+			originalEditorName(invite),
+			roleLabel(invite),
+			invite.statusLabel,
+			invite.status
+		]
+			.filter(Boolean)
+			.join(' ')
+			.toLowerCase();
+	}
+
+	function buildPaperGroups(list: any[]) {
+		const groups = new Map<string, { key: string; title: string; invitations: any[] }>();
+
+		for (const invite of list) {
+			const title = paperTitle(invite.paper);
+			const key = invite.paperId || title;
+			const current = groups.get(key) || { key, title, invitations: [] as any[] };
+			current.invitations.push(invite);
+			groups.set(key, current);
+		}
+
+		return [...groups.values()].sort((left, right) => left.title.localeCompare(right.title));
+	}
+
 	async function cancelInvitation(inviteId: string) {
-		if (!confirm('Are you sure you want to cancel this invitation?')) {
+		if (!confirm('Cancel this invitation?')) {
 			return;
 		}
 
@@ -39,8 +184,8 @@
 				toaster.success({ title: 'Invitation cancelled' });
 				window.location.reload();
 			} else {
-				const data = await response.json();
-				toaster.error({ title: 'Error', description: data.error });
+				const result = await response.json();
+				toaster.error({ title: 'Error', description: result.error });
 			}
 		} catch (error) {
 			console.error('Error cancelling invitation:', error);
@@ -52,187 +197,195 @@
 </script>
 
 <div class="container mx-auto px-4 py-8">
-	<div class="max-w-6xl mx-auto">
-		<!-- Header -->
-		<div class="mb-8">
-			<div class="flex items-center gap-3 mb-4">
-				<a href="/hub/view/{hub._id || hub.id}" class="text-primary-600 hover:text-primary-700 flex items-center gap-2">
-					<Icon icon="mdi:arrow-left" class="size-5" />
-					Back to Hub
-				</a>
-			</div>
-			<h1 class="text-4xl font-bold text-gray-900 dark:text-white">Pending Reviewer Invitations</h1>
-			<p class="text-gray-600 dark:text-gray-400 mt-2">Manage paper review invitations for {hub.title}</p>
+	<div class="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+		<div>
+			<a
+				href="/hub/view/{hub._id || hub.id}"
+				class="inline-flex items-center gap-2 text-sm text-primary-700 hover:text-primary-800"
+			>
+				<Icon icon="mdi:arrow-left" class="size-5" />
+				Back to Hub
+			</a>
+			<h1 class="mt-3 text-3xl font-bold text-gray-950">Review Invitations Dashboard</h1>
+			<p class="mt-1 text-sm text-gray-500">{hub.title}</p>
 		</div>
 
-		<!-- Stats -->
-		<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-			<div class="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-				<div class="text-sm text-gray-600 dark:text-gray-400">Pending Invitations</div>
-				<div class="text-3xl font-bold text-primary-600">{invitations.length}</div>
-			</div>
-			<div class="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-				<div class="text-sm text-gray-600 dark:text-gray-400">Hub Reviewers</div>
-				<div class="text-3xl font-bold text-blue-600">{reviewers.length}</div>
-			</div>
-			<div class="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-				<div class="text-sm text-gray-600 dark:text-gray-400">Response Rate</div>
-				<div class="text-3xl font-bold text-green-600">
-					{invitations.length > 0 ? '0%' : '-'}
-				</div>
-			</div>
+		<div
+			class="flex flex-wrap gap-2 rounded-xl border border-surface-300 bg-surface-50 p-1.5 dark:border-surface-600 dark:bg-surface-800"
+		>
+			<button
+				type="button"
+				class="btn btn-sm text-sm font-semibold {filterButtonClass('all')}"
+				onclick={() => (statusFilter = 'all')}>All invitations</button
+			>
+			<button
+				type="button"
+				class="btn btn-sm text-sm font-semibold {filterButtonClass('pending')}"
+				onclick={() => (statusFilter = 'pending')}>Pending</button
+			>
+			<button
+				type="button"
+				class="btn btn-sm text-sm font-semibold {filterButtonClass('accepted')}"
+				onclick={() => (statusFilter = 'accepted')}>Accepted</button
+			>
+			<button
+				type="button"
+				class="btn btn-sm text-sm font-semibold {filterButtonClass('declined')}"
+				onclick={() => (statusFilter = 'declined')}>Declined</button
+			>
+			<button
+				type="button"
+				class="btn btn-sm text-sm font-semibold {filterButtonClass('duplicate')}"
+				onclick={() => (statusFilter = 'duplicate')}>Duplicate</button
+			>
 		</div>
-
-		<!-- Invitations List -->
-		{#if invitations.length === 0}
-			<div class="bg-white dark:bg-gray-800 rounded-lg p-12 text-center border border-gray-200 dark:border-gray-700">
-				<Icon icon="mdi:inbox-multiple" class="size-16 text-gray-400 mx-auto mb-4" />
-				<h2 class="text-2xl font-semibold text-gray-900 dark:text-white mb-2">No pending invitations</h2>
-				<p class="text-gray-600 dark:text-gray-400">All invitations have been responded to or there are none yet.</p>
-			</div>
-		{:else}
-			<div class="space-y-4">
-				{#each invitations as invite (invite._id || invite.id)}
-					<div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-						<!-- Header -->
-						<div
-							class="p-6 flex items-start justify-between gap-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-							onclick={() => toggleExpanded(invite._id || invite.id)}
-						>
-							<div class="flex-1 min-w-0">
-								<div class="flex items-center gap-2 mb-2">
-									<h3 class="text-lg font-semibold text-gray-900 dark:text-white">
-										{invite.paper ? (typeof invite.paper === 'object' ? invite.paper.title : 'Unknown Paper') : 'Unknown Paper'}
-									</h3>
-									<span class="px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 text-xs rounded-full font-medium">
-										Pending Response
-									</span>
-								</div>
-								<div class="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
-									<div class="flex items-center gap-1">
-										<Icon icon="mdi:account" class="size-4" />
-										{typeof invite.reviewer === 'object'
-											? `${invite.reviewer.firstName} ${invite.reviewer.lastName}`
-											: 'Unknown Reviewer'}
-									</div>
-									<div class="flex items-center gap-1">
-										<Icon icon="mdi:calendar" class="size-4" />
-										{new Date(invite.invitedAt).toLocaleDateString()}
-									</div>
-								</div>
-							</div>
-							<div class="flex-shrink-0">
-								<Icon
-									icon={expandedInvites.includes(invite._id || invite.id) ? 'mdi:chevron-up' : 'mdi:chevron-down'}
-									class="size-6 text-gray-400"
-								/>
-							</div>
-						</div>
-
-						<!-- Expanded Content -->
-						{#if expandedInvites.includes(invite._id || invite.id)}
-							<div class="px-6 py-4 bg-gray-50 dark:bg-gray-700/30 border-t border-gray-200 dark:border-gray-700 space-y-4">
-								<!-- Paper Details -->
-								{#if typeof invite.paper === 'object' && invite.paper}
-									<div>
-										<h4 class="font-semibold text-gray-900 dark:text-white mb-2">Paper Details</h4>
-										<div class="space-y-2 text-sm text-gray-700 dark:text-gray-300">
-											{#if invite.paper.abstract}
-												<p>
-													<span class="font-medium">Abstract:</span>
-													<span class="line-clamp-3">{invite.paper.abstract}</span>
-												</p>
-											{/if}
-											{#if invite.paper.keywords}
-												<p>
-													<span class="font-medium">Keywords:</span>
-													<span>{invite.paper.keywords?.join(', ') || '-'}</span>
-												</p>
-											{/if}
-										</div>
-									</div>
-								{/if}
-
-								<!-- Reviewer Details -->
-								{#if typeof invite.reviewer === 'object' && invite.reviewer}
-									<div>
-										<h4 class="font-semibold text-gray-900 dark:text-white mb-2">Reviewer Details</h4>
-										<div class="space-y-2 text-sm text-gray-700 dark:text-gray-300">
-											<p>
-												<span class="font-medium">Email:</span>
-												<span>{invite.reviewer.email}</span>
-											</p>
-											{#if invite.reviewer.institution}
-												<p>
-													<span class="font-medium">Institution:</span>
-													<span>{invite.reviewer.institution}</span>
-												</p>
-											{/if}
-										</div>
-									</div>
-								{/if}
-
-								<!-- Invitation Details -->
-								<div>
-									<h4 class="font-semibold text-gray-900 dark:text-white mb-2">Invitation Details</h4>
-									<div class="space-y-2 text-sm text-gray-700 dark:text-gray-300">
-										<p>
-											<span class="font-medium">Status:</span>
-											<span class="text-yellow-600 dark:text-yellow-400">Pending Response</span>
-										</p>
-										<p>
-											<span class="font-medium">Invited At:</span>
-											<span>{new Date(invite.invitedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
-										</p>
-										{#if invite.customDeadlineDays}
-											<p>
-												<span class="font-medium">Deadline:</span>
-												<span>{invite.customDeadlineDays} days</span>
-											</p>
-										{/if}
-									</div>
-								</div>
-
-								<!-- Actions -->
-								<div class="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-600">
-									<button
-										class="btn btn-sm preset-outlined"
-										onclick={() => {
-											const paperId = typeof invite.paper === 'object' ? invite.paper.id : invite.paper;
-											window.location.href = `/review/paperspool/${paperId}`;
-										}}
-									>
-										<Icon icon="mdi:book-open-page-variant" class="size-4 mr-1" />
-										View Paper
-									</button>
-									<button
-										class="btn btn-sm preset-filled-error-500"
-										disabled={loadingInviteId === (invite._id || invite.id)}
-										onclick={() => cancelInvitation(invite._id || invite.id)}
-									>
-										{#if loadingInviteId === (invite._id || invite.id)}
-											<Icon icon="eos-icons:loading" class="size-4 mr-1" />
-										{:else}
-											<Icon icon="mdi:delete" class="size-4 mr-1" />
-										{/if}
-										Cancel Invitation
-									</button>
-								</div>
-							</div>
-						{/if}
-					</div>
-				{/each}
-			</div>
-		{/if}
 	</div>
-</div>
 
-<style>
-	:global(body) {
-		--color-surface-900: #1e293b;
-		--color-surface-800: #334155;
-		--color-surface-700: #475569;
-		--color-surface-600: #64748b;
-		--color-surface-500: #78909c;
-	}
-</style>
+	<div class="grid grid-cols-1 gap-3 md:grid-cols-4 mb-6">
+		<div class="rounded-lg border border-surface-200 bg-white p-4">
+			<div class="text-xs font-semibold uppercase text-gray-500">Total</div>
+			<div class="mt-1 text-2xl font-bold text-gray-950">{invitations.length}</div>
+		</div>
+		<div class="rounded-lg border border-amber-200 bg-amber-50 p-4">
+			<div class="text-xs font-semibold uppercase text-amber-700">Pending</div>
+			<div class="mt-1 text-2xl font-bold text-amber-900">{pendingCount}</div>
+		</div>
+		<div class="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+			<div class="text-xs font-semibold uppercase text-emerald-700">Responded</div>
+			<div class="mt-1 text-2xl font-bold text-emerald-900">{respondedCount}</div>
+		</div>
+		<div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+			<div class="text-xs font-semibold uppercase text-slate-600">Duplicate</div>
+			<div class="mt-1 text-2xl font-bold text-slate-900">{duplicateCount}</div>
+		</div>
+	</div>
+
+	<div class="mb-5 max-w-xl">
+		<label for="invitation-search" class="sr-only">Search invitations</label>
+		<div class="relative">
+			<Icon
+				icon="mdi:magnify"
+				class="absolute left-3 top-1/2 size-5 -translate-y-1/2 text-gray-400"
+			/>
+			<input
+				id="invitation-search"
+				type="search"
+				bind:value={searchTerm}
+				placeholder="Search paper, reviewer, or invited by"
+				class="w-full rounded-lg border border-surface-300 bg-white py-2.5 pl-10 pr-3 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
+			/>
+		</div>
+	</div>
+
+	{#if paperGroups.length === 0}
+		<div class="rounded-lg border border-surface-200 bg-white px-4 py-12 text-center text-gray-500">
+			No invitations found.
+		</div>
+	{:else}
+		<div class="space-y-5">
+			{#each paperGroups as group}
+				<section class="overflow-hidden rounded-lg border border-surface-200 bg-white">
+					<div class="border-b border-surface-200 bg-surface-50 px-4 py-4">
+						<div class="text-xs font-semibold uppercase text-gray-500">Paper</div>
+						<h2 class="mt-1 text-lg font-semibold text-gray-950">{group.title}</h2>
+					</div>
+
+					<div class="overflow-x-auto">
+						<table class="min-w-full divide-y divide-surface-200 text-sm">
+							<thead class="bg-white text-left text-xs font-semibold uppercase text-gray-500">
+								<tr>
+									<th class="px-4 py-3">Reviewer name</th>
+									<th class="px-4 py-3">Editor name</th>
+									<th class="px-4 py-3">Role badge</th>
+									<th class="px-4 py-3">Status badge</th>
+									<th class="px-4 py-3">Date</th>
+									<th class="px-4 py-3 text-right">Actions</th>
+								</tr>
+							</thead>
+							<tbody class="divide-y divide-surface-100">
+								{#each group.invitations as invite (invite._id || invite.id)}
+									<tr class="align-top hover:bg-surface-50">
+										<td class="px-4 py-3">
+											<div class="font-medium text-gray-950">{reviewerName(invite)}</div>
+											{#if invite.status === 'duplicate'}
+												<div
+													class="mt-2 rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700"
+												>
+													<div class="font-semibold text-slate-900">
+														Duplicate invitation attempt
+													</div>
+													<div class="mt-1">
+														Reviewer already invited by:
+														<span class="font-medium">{originalEditorName(invite)}</span>
+													</div>
+													<div class="mt-1">
+														<span
+															class="inline-flex items-center rounded-full border px-2 py-0.5 font-semibold {roleClass(
+																originalEditorRole(invite)
+															)}"
+														>
+															{originalInvite(invite)?.invitedBy?.roleLabel ||
+																originalInvite(invite)?.invitedBy?.role ||
+																roleLabel(invite)}
+														</span>
+													</div>
+												</div>
+											{/if}
+										</td>
+										<td class="px-4 py-3 text-gray-800">{editorName(invite)}</td>
+										<td class="px-4 py-3">
+											<span
+												class="inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold {roleClass(
+													rawRole(invite)
+												)}"
+											>
+												{roleLabel(invite)}
+											</span>
+										</td>
+										<td class="px-4 py-3">
+											<span
+												class="inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold {statusClass(
+													invite.status
+												)}"
+											>
+												{invite.statusLabel}
+											</span>
+										</td>
+										<td class="px-4 py-3 text-gray-600"
+											>{formatDate(invite.createdAt || invite.invitedAt)}</td
+										>
+										<td class="px-4 py-3">
+											<div class="flex justify-end gap-2">
+												{#if invite.paperId}
+													<a href="/publish/view/{invite.paperId}" class="btn btn-sm preset-tonal">
+														<Icon icon="mdi:book-open-page-variant" class="size-4" />
+														View
+													</a>
+												{/if}
+												{#if invite.status === 'pending'}
+													<button
+														class="btn btn-sm preset-filled-error-500"
+														disabled={loadingInviteId === (invite._id || invite.id)}
+														onclick={() => cancelInvitation(invite._id || invite.id)}
+													>
+														{#if loadingInviteId === (invite._id || invite.id)}
+															<Icon icon="eos-icons:loading" class="size-4" />
+															Cancelling
+														{:else}
+															<Icon icon="mdi:close" class="size-4" />
+															Cancel
+														{/if}
+													</button>
+												{/if}
+											</div>
+										</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+				</section>
+			{/each}
+		</div>
+	{/if}
+</div>

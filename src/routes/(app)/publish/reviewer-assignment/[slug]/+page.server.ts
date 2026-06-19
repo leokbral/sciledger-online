@@ -166,15 +166,15 @@ export async function load({ locals, params }) {
 	}
 
 	const pendingPaperReviewInvitations = await PaperReviewInvitation.find({
-		paper: params.slug,
+		$or: [{ paperId: params.slug }, { paper: params.slug }],
 		status: 'pending'
 	})
-		.select('reviewer')
+		.select('reviewer reviewerId')
 		.lean()
 		.exec();
 
 	const pendingReviewerIds = pendingPaperReviewInvitations
-		.map((invitation: any) => String(invitation?.reviewer || '').trim())
+		.map((invitation: any) => String(invitation?.reviewerId || invitation?.reviewer || '').trim())
 		.filter(Boolean);
 
 	// Block authors from performing reviewer assignment when paper is linked to a hub

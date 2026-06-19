@@ -1,8 +1,9 @@
 import mongoose from 'mongoose';
-import type { PaperReviewInvitation } from '$lib/types/PaperReviewInvitation';
 import { PaperReviewInvitationSchema } from '../schemas/PaperReviewInvitation';
 
-export interface IPaperReviewInvitation extends PaperReviewInvitation, mongoose.Document {}
+export interface IPaperReviewInvitation extends mongoose.Document {
+	[key: string]: any;
+}
 
 // Delete existing model to force reload with updated schema
 if (mongoose.models.PaperReviewInvitation) {

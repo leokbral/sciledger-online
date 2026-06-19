@@ -5,10 +5,18 @@ import mongoose from 'mongoose';
 import { EmailReviewerInvitationSchema } from '$lib/db/schemas/EmailReviewerInvitation.js';
 import { HubSchema } from '$lib/db/schemas/HubSchema.js';
 import Papers from '$lib/db/models/Paper';
+import PaperReviewInvitation from '$lib/db/models/PaperReviewInvitation';
+import Users from '$lib/db/models/User';
 import * as crypto from 'crypto';
 import type { RequestHandler } from './$types';
 import nodemailer from 'nodemailer';
 import { authorize } from '$lib/server/authorization/authorizationService';
+import {
+	buildDuplicateInvitationDetails,
+	findActiveReviewInvitation,
+	getIdAliases,
+	selectInvitationRole
+} from '$lib/server/reviewInvitations';
 
 // Clear the model cache to ensure we use the updated schema
 if (mongoose.models.EmailReviewerInvitation) {
@@ -242,6 +250,7 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
 		let paper: any = null;
 		let paperIdValue: string | null = null;
 		let deadlineDays: number | null = null;
+		let invitedByRole = 'Member';
 
 		if (customDeadlineDays !== undefined && customDeadlineDays !== null) {
 			const parsed = Number(customDeadlineDays);
@@ -267,6 +276,55 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
 					{ error: 'Insufficient permissions', reason: paperAuthorization.reason },
 					{ status: 403 }
 				);
+			}
+			invitedByRole = selectInvitationRole(paperAuthorization.roleKeys);
+
+			const existingReviewer = await Users.findOne({ email: normalizedEmail }).lean();
+			if (existingReviewer) {
+				const reviewerAliases = getIdAliases(existingReviewer);
+				const normalizedPaperId = String(paperIdValue);
+				const existingInvite = await findActiveReviewInvitation([normalizedPaperId], reviewerAliases);
+				if (existingInvite) {
+					const duplicateId = crypto.randomUUID();
+					const normalizedReviewerId = String(existingReviewer.id || existingReviewer._id);
+					const duplicateInvitation = new PaperReviewInvitation({
+						_id: duplicateId,
+						id: duplicateId,
+						paperId: normalizedPaperId,
+						paper: normalizedPaperId,
+						reviewerId: normalizedReviewerId,
+						reviewer: normalizedReviewerId,
+						invitedBy: {
+							userId: inviterId,
+							role: invitedByRole
+						},
+						hubId: hubIdValue,
+						status: 'duplicate',
+						duplicateOf: String(existingInvite.id || existingInvite._id),
+						customDeadlineDays: deadlineDays || 15,
+						invitedAt: new Date(),
+						createdAt: new Date()
+					});
+					await duplicateInvitation.save();
+
+					const duplicateDetails = await buildDuplicateInvitationDetails(existingInvite);
+					return json(
+						{
+							success: false,
+							error: 'Reviewer already invited for this paper',
+							message: 'Reviewer already invited for this paper',
+							duplicates: [duplicateDetails],
+							skipped: [
+								{
+									reviewerId: normalizedReviewerId,
+									reasons: ['Reviewer already invited for this paper'],
+									existingInvitation: duplicateDetails
+								}
+							]
+						},
+						{ status: 409 }
+					);
+				}
 			}
 		}
 

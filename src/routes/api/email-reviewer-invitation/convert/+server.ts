@@ -18,6 +18,13 @@ import nodemailer from 'nodemailer';
 import { assignHighestHubRole } from '$lib/server/authorization/roleAssignmentService';
 import { resolveEffectiveHubRoles } from '$lib/server/authorization/effectiveHubRoles';
 import {
+	findActiveReviewInvitation,
+	getIdAliases,
+	getInvitationInviterId,
+	getInvitationInviterRole,
+	selectInvitationRole
+} from '$lib/server/reviewInvitations';
+import {
     EditorialTransitionError,
     transitionPaperStatus
 } from '$lib/server/authorization/editorialTransitionService';
@@ -151,9 +158,15 @@ async function acceptPaperReviewInvite(options: {
     }
 
     let effectiveReviewerIds: string[] = [];
+    let inviterRole = 'Member';
     try {
         const effectiveRoles = await resolveEffectiveHubRoles(hubDoc);
         effectiveReviewerIds = effectiveRoles.reviewerIds;
+        if (inviterId) {
+            inviterRole = selectInvitationRole([
+                effectiveRoles.membersByUserId?.[String(inviterId)]?.primaryRoleKey
+            ]);
+        }
     } catch (error) {
         console.error('Failed to resolve effective hub reviewers for email invitation:', error);
     }
@@ -182,10 +195,10 @@ async function acceptPaperReviewInvite(options: {
         return { ok: false, status: 403, error: 'Not eligible to accept this review', reasons: hardStopReasons };
     }
 
-    const existingInvitation = await PaperReviewInvitation.findOne({
-        paper: paperId,
-        reviewer: userId
-    });
+    const existingInvitation = await findActiveReviewInvitation(
+        [paperId],
+        [...new Set([userId, ...getIdAliases(user)].filter(Boolean))]
+    );
 
     const inviteId = existingInvitation?._id || crypto.randomUUID();
     const invitation = existingInvitation
@@ -193,15 +206,29 @@ async function acceptPaperReviewInvite(options: {
             : new PaperReviewInvitation({
                 _id: inviteId,
                 id: inviteId,
+                paperId,
                 paper: paperId,
+                reviewerId: userId,
                 reviewer: userId,
-                invitedBy: inviterId || userId,
+                invitedBy: {
+                    userId: inviterId || userId,
+                    role: inviterRole
+                },
                 hubId,
                 status: 'pending',
                 customDeadlineDays: customDeadlineDays || 15,
                 invitedAt: new Date()
             });
 
+    invitation.paperId = invitation.paperId || paperId;
+    invitation.paper = invitation.paper || paperId;
+    invitation.reviewerId = invitation.reviewerId || userId;
+    invitation.reviewer = invitation.reviewer || userId;
+    const storedInviterRole = getInvitationInviterRole(invitation);
+    invitation.invitedBy = {
+        userId: getInvitationInviterId(invitation) || inviterId || userId,
+        role: storedInviterRole === 'Member' ? inviterRole : storedInviterRole
+    };
     invitation.status = 'accepted';
     invitation.respondedAt = new Date();
     invitation.customDeadlineDays = customDeadlineDays || invitation.customDeadlineDays || 15;

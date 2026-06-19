@@ -14,6 +14,7 @@ import {
 	getEffectiveHubMemberForUser,
 	resolveEffectiveHubRoles
 } from '$lib/server/authorization/effectiveHubRoles';
+import { serializeReviewInvitations } from '$lib/server/reviewInvitations';
 
 function getIdAliases(value: unknown): string[] {
 	if (!value) return [];
@@ -227,13 +228,13 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 				hubId: params.id,
 				status: 'pending'
 			})
-				.select('paper reviewer')
+				.select('paper paperId reviewer reviewerId')
 				.lean();
 
 			pendingPaperInvitations = pendingInvitesRaw
 				.map((invite: any) => ({
-					paperId: String(invite?.paper || '').trim(),
-					reviewerId: String(invite?.reviewer || '').trim()
+					paperId: String(invite?.paperId || invite?.paper || '').trim(),
+					reviewerId: String(invite?.reviewerId || invite?.reviewer || '').trim()
 				}))
 				.filter((invite) => invite.paperId && invite.reviewerId);
 		} else {
@@ -266,8 +267,12 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		
 		
 		// Paper review invitations for papers in this hub
+		const userAliases = getIdAliases(locals.user);
 		const paperReviewInvitesRaw = await PaperReviewInvitation.find({ 
-			reviewer: locals.user.id,
+			$or: [
+				{ reviewerId: { $in: userAliases } },
+				{ reviewer: { $in: userAliases } }
+			],
 			hubId: params.id,
 			status: 'pending'
 		})
@@ -275,18 +280,16 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 			path: 'paper',
 			select: 'title hubId'
 		})
-		.populate({
-			path: 'invitedBy',
-			select: 'firstName lastName'
-		})
 		.lean();
 		
-		paperReviewInvitations = (paperReviewInvitesRaw as any[])
+		const serializedPaperReviewInvites = await serializeReviewInvitations(paperReviewInvitesRaw as any[]);
+		paperReviewInvitations = serializedPaperReviewInvites
 			.filter(inv => inv.paper) // Filter out invites for deleted papers
 			.map(inv => ({
 				_id: String(inv._id),
 				paperId: typeof inv.paper === 'object' ? inv.paper : null,
-				invitedBy: typeof inv.invitedBy === 'object' ? inv.invitedBy : null,
+				invitedBy: inv.invitedBy.user,
+				invitedByRole: inv.invitedBy.roleLabel,
 				status: inv.status,
 				createdAt: inv.createdAt
 			}));
