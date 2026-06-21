@@ -4,117 +4,110 @@ import { start_mongo } from '$lib/db/mongooseConnection';
 import '$lib/db/models/User';
 import '$lib/db/models/MessageFeed';
 import '$lib/db/models/Paper';
-import { NotificationService } from '$lib/services/NotificationService';
-
+import { emitPaperLifecycleEvent } from '$lib/server/paperLifecycleEvents';
 import MessageFeeds from '$lib/db/models/MessageFeed';
 import Papers from '$lib/db/models/Paper';
-import Users from '$lib/db/models/User';
 
-export const POST: RequestHandler = async ({ request, params }) => {
-    await start_mongo();
-    
-    try {
-        const body = await request.json();
-        
-        // Verificar se é para salvar progresso de correções
-        if (body.action === 'saveCorrectionProgress') {
-            const { correctionProgress } = body;
-            const paperId = params.slug;
-            
-            if (!correctionProgress || !paperId) {
-                return json({ error: 'correctionProgress e paperId são obrigatórios.' }, { status: 400 });
-            }
-            
-            // Atualizar o progresso das correções no paper
-            const updatedPaper = await Papers.findOneAndUpdate(
-                { id: paperId },
-                {
-                    correctionProgress: new Map(Object.entries(correctionProgress)),
-                    updatedAt: new Date().toISOString()
-                },
-                {
-                    new: true,
-                    runValidators: true
-                }
-            ).lean().exec();
-            
-            if (!updatedPaper) {
-                return json({ error: 'Paper não encontrado.' }, { status: 404 });
-            }
+export const POST: RequestHandler = async ({ request, params, locals }) => {
+	await start_mongo();
 
-            // Verificar se é uma nova versão com correções significativas
-            const existingProgress = updatedPaper.correctionProgress || {};
-            const newProgressEntries = Object.entries(correctionProgress);
-            const completedCorrections = newProgressEntries.filter(([, completed]) => completed).length;
-            const hasSignificantProgress = completedCorrections > Object.keys(existingProgress).length * 0.5;
+	try {
+		const body = await request.json();
 
-            // Se houver progresso significativo, criar notificações
-            if (hasSignificantProgress) {
-                try {
-                    // Buscar informações do autor
-                    const author = await Users.findOne({ id: updatedPaper.mainAuthor || updatedPaper.submittedBy });
-                    const authorName = author ? `${author.firstName} ${author.lastName}` : 'Autor';
-                    const authorId = typeof updatedPaper.mainAuthor === 'string' ? updatedPaper.mainAuthor : String(updatedPaper.mainAuthor);
-                    const submittedById = typeof updatedPaper.submittedBy === 'string' ? updatedPaper.submittedBy : String(updatedPaper.submittedBy);
+		if (body.action === 'saveCorrectionProgress') {
+			const { correctionProgress } = body;
+			const paperId = params.slug;
 
-                    // Buscar revisores se houver
-                    const reviewerIds = updatedPaper.peer_review?.assignedReviewers?.map((r: string | object) => String(r)) || [];
+			if (!correctionProgress || !paperId) {
+				return json({ error: 'correctionProgress e paperId sao obrigatorios.' }, { status: 400 });
+			}
 
-                    await NotificationService.createCorrectionsSubmittedNotifications({
-                        paperId: updatedPaper.id,
-                        paperTitle: updatedPaper.title,
-                        authorId: authorId,
-                        authorName: authorName,
-                        editorId: submittedById, // usando submittedBy como fallback para editor
-                        reviewerIds: reviewerIds,
-                        correctionVersion: 1, // pode ser melhorado para rastrear versões
-                        requiresNewReview: completedCorrections > 0.8 * newProgressEntries.length, // se > 80% completado
-                        hubId: typeof updatedPaper.hubId === 'string' ? updatedPaper.hubId : undefined
-                    });
-                } catch (notificationError) {
-                    console.error('Error creating correction notifications:', notificationError);
-                    // Não falhar a operação principal por causa das notificações
-                }
-            }
-            
-            const responseProgress = updatedPaper.correctionProgress instanceof Map 
-                ? Object.fromEntries(updatedPaper.correctionProgress)
-                : updatedPaper.correctionProgress || {};
-                
-            return json({ 
-                success: true, 
-                correctionProgress: responseProgress
-            }, { status: 200 });
-        }
-        
-        // Lógica original para mensagens
-        const { newMessage, id } = body;
-        if (!newMessage) {
-            return json({ error: 'Todos os campos são obrigatórios.' }, { status: 400 });
-        }
-        
-        const updMessageFeed = await MessageFeeds.findByIdAndUpdate(
-            id,
-            {
-                currentMessage: '',
-                $push: {
-                    messages: newMessage
-                }
-            },
-            {
-                new: true,
-                runValidators: true
-            }
-        ).populate('messages.sender').lean().exec();
+			const updatedPaper = await Papers.findOneAndUpdate(
+				{ id: paperId },
+				{
+					correctionProgress: new Map(Object.entries(correctionProgress)),
+					updatedAt: new Date().toISOString()
+				},
+				{
+					new: true,
+					runValidators: true
+				}
+			)
+				.lean()
+				.exec();
 
-        if (!updMessageFeed) {
-            throw new Error('newMessage not found');
-        }
-        
-        return json({ updMessageFeed }, { status: 201 });
+			if (!updatedPaper) {
+				return json({ error: 'Paper nao encontrado.' }, { status: 404 });
+			}
 
-    } catch (error) {
-        console.error('Erro ao processar requisição:', error);
-        return json({ error: 'Erro interno do servidor.' }, { status: 500 });
-    }
+			const existingProgress = updatedPaper.correctionProgress || {};
+			const newProgressEntries = Object.entries(correctionProgress);
+			const completedCorrections = newProgressEntries.filter(([, completed]) => completed).length;
+			const hasSignificantProgress =
+				completedCorrections > Object.keys(existingProgress).length * 0.5;
+
+			if (hasSignificantProgress) {
+				try {
+					const requiresNewReview = completedCorrections > 0.8 * newProgressEntries.length;
+					await emitPaperLifecycleEvent('paper.corrections_submitted', updatedPaper, {
+						actorId: locals.user?.id || null,
+						metadata: {
+							endpoint: '/publish/corrections/[slug]',
+							correctionVersion: 1,
+							completedCorrections,
+							totalCorrections: newProgressEntries.length,
+							requiresNewReview,
+							correctionReason: requiresNewReview ? 'new_review_required' : undefined
+						}
+					});
+				} catch (eventError) {
+					console.error('Error emitting correction event:', eventError);
+				}
+			}
+
+			const responseProgress =
+				updatedPaper.correctionProgress instanceof Map
+					? Object.fromEntries(updatedPaper.correctionProgress)
+					: updatedPaper.correctionProgress || {};
+
+			return json(
+				{
+					success: true,
+					correctionProgress: responseProgress
+				},
+				{ status: 200 }
+			);
+		}
+
+		const { newMessage, id } = body;
+		if (!newMessage) {
+			return json({ error: 'Todos os campos sao obrigatorios.' }, { status: 400 });
+		}
+
+		const updMessageFeed = await MessageFeeds.findByIdAndUpdate(
+			id,
+			{
+				currentMessage: '',
+				$push: {
+					messages: newMessage
+				}
+			},
+			{
+				new: true,
+				runValidators: true
+			}
+		)
+			.populate('messages.sender')
+			.lean()
+			.exec();
+
+		if (!updMessageFeed) {
+			throw new Error('newMessage not found');
+		}
+
+		return json({ updMessageFeed }, { status: 201 });
+	} catch (error) {
+		console.error('Erro ao processar requisicao:', error);
+		return json({ error: 'Erro interno do servidor.' }, { status: 500 });
+	}
 };

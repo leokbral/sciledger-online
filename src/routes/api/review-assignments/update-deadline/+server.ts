@@ -2,7 +2,7 @@ import { json } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import PaperReviewInvitation from '$lib/db/models/PaperReviewInvitation';
 import Papers from '$lib/db/models/Paper';
-import { NotificationService } from '$lib/services/NotificationService';
+import { emitEvent } from '$lib/services/EventService';
 import { authorize } from '$lib/server/authorization/authorizationService';
 import type { RequestHandler } from './$types';
 import * as crypto from 'crypto';
@@ -143,21 +143,33 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		});
 
 		// Notificar o revisor sobre a mudança de deadline
-		await NotificationService.createNotification({
-			user: String(reviewerId),
-			type: 'system',
-			title: 'Review Deadline Updated',
-			content: `The deadline for reviewing "${paper.title}" has been updated to ${newDeadline.toLocaleDateString()}`,
-			relatedPaperId: paperId,
-			relatedHubId: typeof paper.hubId === 'object' && paper.hubId ? String(paper.hubId._id || paper.hubId.id) : (paper.hubId ? String(paper.hubId) : undefined),
-			actionUrl: `/review/inreview/${paperId}`,
-			priority: 'medium',
-			metadata: {
-				paperTitle: paper.title,
-				newDeadline: newDeadline.toISOString(),
-				deadlineDays: newDeadlineDays
-			}
-		});
+		try {
+			await emitEvent({
+				type: 'review.assignment.deadline_updated',
+				actorId: user.id,
+				recipients: [String(reviewerId)],
+				entityType: 'review',
+				entityId: String(finalCheck?.id || finalCheck?._id || reviewAssignment.id || reviewAssignment._id),
+				metadata: {
+					paperId,
+					paperTitle: paper.title,
+					hubId:
+						typeof paper.hubId === 'object' && paper.hubId
+							? String(paper.hubId._id || paper.hubId.id)
+							: paper.hubId
+								? String(paper.hubId)
+								: null,
+					reviewerId: String(reviewerId),
+					deadline: newDeadline.toISOString(),
+					deadlineDays: newDeadlineDays,
+					recipientRoles: {
+						[String(reviewerId)]: 'reviewer'
+					}
+				}
+			});
+		} catch (eventError) {
+			console.error('Failed to emit review deadline updated event:', eventError);
+		}
 
 		return json({
 			success: true,

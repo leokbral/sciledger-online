@@ -11,6 +11,7 @@ import { ensureHubRoles } from '$lib/server/authorization/bootstrapRbac';
 import { DEFAULT_HUB_ROLES, PERMISSIONS } from '$lib/server/authorization/permissions';
 import { createRbacAuditLog } from '$lib/server/authorization/rbacAudit';
 import { assignHighestHubRole } from '$lib/server/authorization/roleAssignmentService';
+import { emitEvent } from '$lib/services/EventService';
 
 const HUB_CONFIGURABLE_PERMISSIONS = PERMISSIONS.filter(
 	(permission) => permission !== 'rbac.manage' && permission !== 'paper.submit'
@@ -57,6 +58,62 @@ async function countActiveHubOwners(hubId: string) {
 		scopeId: hubId,
 		isActive: true
 	});
+}
+
+async function getRoleConfigurationRecipients(hubId: string, actorId?: string) {
+	const managerAssignments = await UserRoleAssignment.find({
+		roleKey: { $in: ['HubOwner', 'EditorChief'] },
+		scopeType: 'hub',
+		scopeId: hubId,
+		isActive: true
+	})
+		.select('userId')
+		.lean();
+
+	const recipientIds = [
+		actorId,
+		...managerAssignments.map((assignment: any) => String(assignment.userId || ''))
+	].filter((recipientId): recipientId is string => !!recipientId);
+
+	return [...new Set(recipientIds)];
+}
+
+async function emitRoleConfigurationEvent(input: {
+	type: 'role.created' | 'role.updated';
+	user: any;
+	hubId: string;
+	role: any;
+	metadata?: Record<string, unknown>;
+}) {
+	try {
+		const actorId = normalizeId(input.user);
+		const recipients = await getRoleConfigurationRecipients(input.hubId, actorId);
+
+		await emitEvent({
+			type: input.type,
+			actorId,
+			recipients,
+			entityType: 'role',
+			entityId: normalizeId(input.role) || String(input.role.key),
+			metadata: {
+				hubId: input.hubId,
+				roleKey: input.role.key,
+				roleName: input.role.name,
+				actorName:
+					`${input.user?.firstName || ''} ${input.user?.lastName || ''}`.trim() ||
+					input.user?.email,
+				recipientRoles: Object.fromEntries(
+					recipients.map((recipientId) => [
+						recipientId,
+						recipientId === actorId ? 'actor' : 'manager'
+					])
+				),
+				...input.metadata
+			}
+		});
+	} catch (eventError) {
+		console.error(`Failed to emit ${input.type} event:`, eventError);
+	}
 }
 
 export const load: PageServerLoad = async ({ params, locals, url }) => {
@@ -176,6 +233,18 @@ export const actions: Actions = {
 					scope: 'default-editorial-roles'
 				}
 			});
+
+			await emitRoleConfigurationEvent({
+				type: 'role.updated',
+				user: locals.user,
+				hubId,
+				role,
+				metadata: {
+					action: 'role.defaults.restored',
+					previousPermissions,
+					newPermissions: [...defaultRole.permissions]
+				}
+			});
 		}
 
 		return { success: true, restoredRoles };
@@ -236,6 +305,16 @@ export const actions: Actions = {
 			newPermissions: permissions
 		});
 
+		await emitRoleConfigurationEvent({
+			type: 'role.created',
+			user: locals.user,
+			hubId,
+			role,
+			metadata: {
+				newPermissions: permissions
+			}
+		});
+
 		return { success: true };
 	},
 
@@ -277,6 +356,18 @@ export const actions: Actions = {
 			roleId: normalizeId(role),
 			previousPermissions,
 			newPermissions: permissions
+		});
+
+		await emitRoleConfigurationEvent({
+			type: 'role.updated',
+			user: locals.user,
+			hubId,
+			role,
+			metadata: {
+				action: 'role.permissions.updated',
+				previousPermissions,
+				newPermissions: permissions
+			}
 		});
 
 		return { success: true };
@@ -328,6 +419,17 @@ export const actions: Actions = {
 			roleKey: role.key,
 			roleId: normalizeId(role),
 			previousPermissions: role.permissions ?? []
+		});
+
+		await emitRoleConfigurationEvent({
+			type: 'role.updated',
+			user: locals.user,
+			hubId,
+			role,
+			metadata: {
+				action: 'role.removed',
+				previousPermissions: role.permissions ?? []
+			}
 		});
 
 		return { success: true };
@@ -422,6 +524,27 @@ export const actions: Actions = {
 			roleKey: assignment.roleKey,
 			targetUserId: assignment.userId
 		});
+
+		try {
+			await emitEvent({
+				type: 'role.revoked',
+				actorId: locals.user.id,
+				recipients: [String(assignment.userId)],
+				entityType: 'role',
+				entityId: String(assignment._id || assignment.id || assignment.roleKey),
+				metadata: {
+					hubId,
+					roleKey: assignment.roleKey,
+					targetUserId: String(assignment.userId),
+					revokedBy: locals.user.id,
+					recipientRoles: {
+						[String(assignment.userId)]: 'target'
+					}
+				}
+			});
+		} catch (eventError) {
+			console.error('Failed to emit role revoked event:', eventError);
+		}
 
 		throw redirect(303, `/hub/view/${params.id}/rbac?revoked=1`);
 	}

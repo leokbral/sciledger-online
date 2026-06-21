@@ -5,6 +5,7 @@ import Papers from '$lib/db/models/Paper';
 import Reviews from '$lib/db/models/Review';
 import Users from '$lib/db/models/User';
 import type { User } from '$lib/types/User';
+import { emitEvent } from '$lib/services/EventService';
 import {
 	createReviewerTransfer,
 	getConnectedAccountStatus,
@@ -186,6 +187,30 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		payments.defaultCurrency = accountStatus.defaultCurrency;
 		reviewerDoc.reviewerPayments = payments;
 		await reviewerDoc.save();
+
+		try {
+			await emitEvent({
+				type: 'reviewer.payout.paid',
+				actorId: user.id,
+				recipients: [reviewerId],
+				entityType: 'review',
+				entityId: String(finalReview.id || finalReview._id),
+				metadata: {
+					paperId,
+					paperTitle: paperDoc.title,
+					reviewId: String(finalReview.id || finalReview._id),
+					reviewerId,
+					amount: payoutAmount,
+					currency: 'brl',
+					transferId: transfer.id,
+					recipientRoles: {
+						[reviewerId]: 'reviewer'
+					}
+				}
+			});
+		} catch (eventError) {
+			console.error('Failed to emit reviewer payout paid event:', eventError);
+		}
 
 		return json({
 			success: true,

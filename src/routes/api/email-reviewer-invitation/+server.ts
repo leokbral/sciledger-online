@@ -11,6 +11,7 @@ import * as crypto from 'crypto';
 import type { RequestHandler } from './$types';
 import nodemailer from 'nodemailer';
 import { authorize } from '$lib/server/authorization/authorizationService';
+import { emitPaperReviewInvitationEvent } from '$lib/server/reviewInvitationLifecycle';
 import {
 	buildDuplicateInvitationDetails,
 	findActiveReviewInvitation,
@@ -123,10 +124,7 @@ function generateInvitationEmailTemplate(
 	const hasPaperContext = Boolean(cleanPaperTitle || cleanPaperAbstract);
 
 	const safeText = (value: string) =>
-		value
-			.replace(/&/g, '&amp;')
-			.replace(/</g, '&lt;')
-			.replace(/>/g, '&gt;');
+		value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 	// Use full abstract in email, render line breaks using CSS `white-space: pre-wrap`
 	const paperSection = hasPaperContext
@@ -265,7 +263,8 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
 			if (!paper) {
 				return json({ error: 'Paper not found' }, { status: 404 });
 			}
-			const paperHubId = typeof paper.hubId === 'object' ? paper.hubId?._id || paper.hubId?.id : paper.hubId;
+			const paperHubId =
+				typeof paper.hubId === 'object' ? paper.hubId?._id || paper.hubId?.id : paper.hubId;
 			if (paperHubId && String(paperHubId) !== hubIdValue) {
 				return json({ error: 'Paper does not belong to this hub' }, { status: 400 });
 			}
@@ -283,7 +282,10 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
 			if (existingReviewer) {
 				const reviewerAliases = getIdAliases(existingReviewer);
 				const normalizedPaperId = String(paperIdValue);
-				const existingInvite = await findActiveReviewInvitation([normalizedPaperId], reviewerAliases);
+				const existingInvite = await findActiveReviewInvitation(
+					[normalizedPaperId],
+					reviewerAliases
+				);
 				if (existingInvite) {
 					const duplicateId = crypto.randomUUID();
 					const normalizedReviewerId = String(existingReviewer.id || existingReviewer._id);
@@ -306,6 +308,13 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
 						createdAt: new Date()
 					});
 					await duplicateInvitation.save();
+					await emitPaperReviewInvitationEvent('review.invitation.duplicate', duplicateInvitation, {
+						actorId: inviterId,
+						metadata: {
+							duplicateOf: String(existingInvite.id || existingInvite._id),
+							source: 'email_reviewer_invitation'
+						}
+					});
 
 					const duplicateDetails = await buildDuplicateInvitationDetails(existingInvite);
 					return json(
@@ -331,7 +340,9 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
 		const smtpTransporter = getTransporter();
 		if (!smtpTransporter) {
 			const missingSmtpConfig = getMissingSmtpConfig();
-			console.error(`SMTP credentials are not configured. Missing: ${missingSmtpConfig.join(', ')}`);
+			console.error(
+				`SMTP credentials are not configured. Missing: ${missingSmtpConfig.join(', ')}`
+			);
 			return json(
 				{
 					error: 'Email service is not configured',
@@ -387,7 +398,7 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
 					normalizedEmail,
 					hub.title || hub.name || 'SciLedger hub',
 					invitationUrl,
-						declineUrl,
+					declineUrl,
 					{
 						paperTitle: paper?.title || null,
 						paperAbstract: paper?.abstract || paper?.summary || null

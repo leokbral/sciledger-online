@@ -3,7 +3,6 @@ import type { RequestHandler } from './$types';
 import Papers from '$lib/db/models/Paper';
 import Hubs from '$lib/db/models/Hub';
 import { start_mongo } from '$lib/db/mongooseConnection';
-import { NotificationService } from '$lib/services/NotificationService';
 import {
 	EditorialTransitionError,
 	transitionPaperStatus
@@ -58,21 +57,6 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 			}
 		});
 		paperDoc.status = updatedPaper.status;
-
-		try {
-			await NotificationService.createNotification({
-				user: paperDoc.mainAuthor,
-				type: 'paper_final_rejection',
-				title: 'Publication Rejected',
-				content: `The hub admin rejected publication for your paper "${paperDoc.title}". You can make further corrections or withdraw.`,
-				relatedPaperId: paperDoc.id,
-				relatedHubId: paperDoc.hubId,
-				actionUrl: `/publish/corrections/${paperDoc.id}`,
-				priority: 'high'
-			});
-		} catch (notificationError) {
-			console.error('Failed to create publication rejected notification:', notificationError);
-		}
 
 		return json({
 			success: true,

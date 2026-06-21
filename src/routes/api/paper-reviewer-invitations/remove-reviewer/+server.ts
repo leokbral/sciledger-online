@@ -1,9 +1,8 @@
 import { json } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import Papers from '$lib/db/models/Paper';
-import Users from '$lib/db/models/User';
 import ReviewQueue from '$lib/db/models/ReviewQueue';
-import { NotificationService } from '$lib/services/NotificationService';
+import { emitEvent } from '$lib/services/EventService';
 import { authorize } from '$lib/server/authorization/authorizationService';
 import type { RequestHandler } from './$types';
 
@@ -98,26 +97,41 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			}
 		);
 
-		// Notificar o revisor que foi removido
-		const reviewer = await Users.findOne({ id: reviewerId });
-		if (reviewer) {
-			await NotificationService.createNotification({
-				user: String(reviewerId),
-				type: 'paper_accepted_for_review',
-				title: 'Removed from Paper Review',
-				content: `You have been removed from reviewing the paper "${paper.title}"`,
-				relatedPaperId: paperId,
-				actionUrl: `/review`,
-				priority: 'medium',
+		const recipients = [...new Set([String(reviewerId), String(user.id)].filter(Boolean))];
+		const hubId =
+			typeof paper.hubId === 'object' && paper.hubId
+				? String(paper.hubId._id || paper.hubId.id)
+				: paper.hubId
+					? String(paper.hubId)
+					: null;
+
+		try {
+			await emitEvent({
+				type: 'review.assignment.removed',
+				actorId: user.id,
+				recipients,
+				entityType: 'review',
+				entityId: paperId,
 				metadata: {
+					paperId,
 					paperTitle: paper.title,
+					hubId,
+					reviewerId: String(reviewerId),
 					removedBy: user.id,
-					removedByName: `${user.firstName} ${user.lastName}`
+					removedByName: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email,
+					recipientRoles: Object.fromEntries(
+						recipients.map((recipientId) => [
+							recipientId,
+							recipientId === String(reviewerId) ? 'reviewer' : 'editor'
+						])
+					)
 				}
 			});
+		} catch (eventError) {
+			console.error('Failed to emit review assignment removed event:', eventError);
 		}
 
-		return json({ 
+		return json({
 			success: true,
 			message: 'Reviewer removed and slot freed successfully',
 			availableSlots: paper.availableSlots,

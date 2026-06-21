@@ -7,8 +7,12 @@ const initMongo = async () => {
 	if (mongoStarted) return;
 	mongoStarted = true;
 	try {
-		const { start_mongo } = await import("$lib/db/mongo");
+		const { start_mongo } = await import('$lib/db/mongo');
 		await start_mongo();
+		const { startReviewInvitationExpirationJob } = await import(
+			'$lib/server/jobs/reviewInvitationExpirationJob'
+		);
+		startReviewInvitationExpirationJob();
 	} catch (e) {
 		console.error('Failed to start MongoDB:', e);
 	}
@@ -35,11 +39,14 @@ export const handle: Handle = async ({ event, resolve }) => {
 	}
 
 	const response = await resolve(event);
-	
-	response.headers.set('Access-Control-Allow-Origin', '*');  // Allows all origins, you can restrict to a specific domain
+
+	response.headers.set('Access-Control-Allow-Origin', '*'); // Allows all origins, you can restrict to a specific domain
 	response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-    response.headers.set('Access-Control-Allow-Credentials', 'true');
-	
+	response.headers.set(
+		'Access-Control-Allow-Headers',
+		'Content-Type, Authorization, X-Requested-With'
+	);
+	response.headers.set('Access-Control-Allow-Credentials', 'true');
+
 	return response;
 };

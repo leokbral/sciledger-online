@@ -4,6 +4,7 @@ import type { RequestHandler } from './$types';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import Papers from '$lib/db/models/Paper';
 import { env } from '$env/dynamic/private';
+import { emitEvent } from '$lib/services/EventService';
 
 function getStripe() {
   const stripeSecretKey = env.STRIPE_SECRET_KEY;
@@ -17,6 +18,28 @@ function getReceiptUrl(paymentIntent: Stripe.PaymentIntent): string | null {
     return (latestCharge as Stripe.Charge).receipt_url ?? null;
   }
   return null;
+}
+
+function normalizeUserId(value: any): string {
+  if (!value) return '';
+  if (typeof value === 'string') return value;
+  if (value.id) return String(value.id);
+  if (value._id) return String(value._id);
+  return String(value);
+}
+
+function getPaperRecipients(paper: any) {
+  return [
+    ...new Set(
+      [
+        normalizeUserId(paper.mainAuthor),
+        normalizeUserId(paper.correspondingAuthor),
+        normalizeUserId(paper.submittedBy),
+        ...(paper.coAuthors || []).map(normalizeUserId),
+        ...(paper.authors || []).map(normalizeUserId)
+      ].filter(Boolean)
+    )
+  ];
 }
 
 export const POST: RequestHandler = async ({ request }) => {
@@ -67,6 +90,31 @@ export const POST: RequestHandler = async ({ request }) => {
     paper.paymentHold.capturedAt = new Date();
     paper.paymentHold.receiptUrl = receiptUrl;
     await paper.save();
+
+    const recipients = getPaperRecipients(paper);
+    if (recipients.length > 0) {
+      try {
+        await emitEvent({
+          type: 'payment.hold.captured',
+          actorId: null,
+          recipients,
+          entityType: 'paper',
+          entityId: String(paper.id || paper._id),
+          metadata: {
+            paperId: String(paper.id || paper._id),
+            paperTitle: paper.title,
+            amount: paymentIntent.amount || paper.paymentHold.amount,
+            currency: paymentIntent.currency || paper.paymentHold.currency || 'brl',
+            paymentStatus: paper.paymentHold.status,
+            stripePaymentIntentId: paymentIntent.id,
+            receiptUrl,
+            recipientRoles: Object.fromEntries(recipients.map((recipientId) => [recipientId, 'author']))
+          }
+        });
+      } catch (eventError) {
+        console.error('Failed to emit payment hold captured event:', eventError);
+      }
+    }
 
     return json({
       success: true,

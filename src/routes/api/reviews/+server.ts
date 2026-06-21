@@ -3,7 +3,6 @@ import type { RequestHandler } from './$types';
 import Reviews from '$lib/db/models/Review';
 import Papers from '$lib/db/models/Paper';
 import Users from '$lib/db/models/User';
-import { NotificationService } from '$lib/services/NotificationService';
 import {
 	createReviewerTransfer,
 	getConnectedAccountStatus,
@@ -21,6 +20,8 @@ import {
 	transitionPaperStatus
 } from '$lib/server/authorization/editorialTransitionService';
 import { getUserIdAliases } from '$lib/server/authorization/roleResolver';
+import { emitReviewSubmittedEvent } from '$lib/server/paperLifecycleEvents';
+import { emitEvent } from '$lib/services/EventService';
 import * as crypto from 'crypto';
 import { start_mongo } from '$lib/db/mongooseConnection';
 
@@ -210,6 +211,30 @@ async function tryProcessReviewerPayout(
 
 		await reviewerDoc.save();
 		await paper.save();
+
+		try {
+			await emitEvent({
+				type: 'reviewer.payout.paid',
+				actorId: null,
+				recipients: [reviewerId],
+				entityType: 'review',
+				entityId: reviewId,
+				metadata: {
+					paperId: String(paper.id || paper._id),
+					paperTitle: paper.title,
+					reviewId,
+					reviewerId,
+					amount: payoutAmount,
+					currency: 'brl',
+					transferId: transfer.id,
+					recipientRoles: {
+						[reviewerId]: 'reviewer'
+					}
+				}
+			});
+		} catch (eventError) {
+			console.error('Failed to emit reviewer payout paid event:', eventError);
+		}
 	} catch (error: unknown) {
 		reviewerResponse.payoutStatus = 'failed';
 		reviewerResponse.payoutFailureReason =
@@ -600,33 +625,18 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 		await tryProcessReviewerPayout(paper, reviewerId, reviewId, actualRound);
 
-		// Buscar informações para as notificações
-		const reviewer = await Users.findOne({ id: reviewerId });
-		const reviewerName = reviewer ? `${reviewer.firstName} ${reviewer.lastName}` : 'Revisor';
-		const authorId =
-			typeof paper.mainAuthor === 'string' ? paper.mainAuthor : String(paper.mainAuthor);
-		const submittedById =
-			typeof paper.submittedBy === 'string' ? paper.submittedBy : String(paper.submittedBy);
-
-		// Criar notificações para quando revisor finaliza a revisão
+		// Emitir evento para quando revisor finaliza a revisao
 		try {
-			await NotificationService.createReviewSubmittedNotifications({
-				paperId: paper.id,
-				paperTitle: paper.title,
-				reviewId: reviewId,
-				reviewerId: reviewerId,
-				reviewerName: reviewerName,
-				authorId: authorId,
-				editorId: submittedById, // usando submittedBy como fallback para editor
-				reviewDecision: form.recommendation as
-					| 'accept'
-					| 'reject'
-					| 'minor_revision'
-					| 'major_revision',
-				hubId: typeof paper.hubId === 'string' ? paper.hubId : undefined
+			await emitReviewSubmittedEvent(review, paper, {
+				actorId: reviewerId,
+				metadata: {
+					endpoint: '/api/reviews',
+					reviewDecision: form.recommendation,
+					reviewRound: actualRound
+				}
 			});
-		} catch (notificationError) {
-			console.error('Error creating review notifications:', notificationError);
+		} catch (eventError) {
+			console.error('Error emitting review submitted event:', eventError);
 			// Não falhar a operação principal por causa das notificações
 		}
 

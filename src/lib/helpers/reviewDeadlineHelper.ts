@@ -1,5 +1,5 @@
 import { db } from '$lib/db/mongo';
-import { createNotification} from './notificationHelper';
+import { emitEvent } from '$lib/services/EventService';
 
 export interface ReviewDeadlineStatus {
     assignment: any;
@@ -89,50 +89,34 @@ async function sendDeadlineReminder(assignment: any, reminderType: string, daysR
     const paper = await db.collection('papers').findOne({ _id: assignment.paperId });
     if (!paper) return;
 
-    let notificationTemplate;
-    let priority: 'low' | 'medium' | 'high' | 'urgent' = 'medium';
+    const reviewerId = String(assignment.reviewerId || '');
+    if (!reviewerId) return;
+    const editorId = paper.submittedBy ? String(paper.submittedBy) : '';
+    const recipients = [
+        ...new Set([reviewerId, reminderType === 'overdue' ? editorId : ''].filter(Boolean))
+    ];
 
-    switch (reminderType) {
-        case 'overdue':
-            notificationTemplate = {
-                title: 'Review Overdue',
-                content: `Your review for "${paper.title}" is overdue. Please complete it as soon as possible.`,
-                priority: 'urgent' as const
-            };
-            priority = 'urgent';
-            break;
-        case 'urgent':
-            notificationTemplate = {
-                title: 'Review Due Soon',
-                content: `Your review for "${paper.title}" is due in ${daysRemaining} day${daysRemaining !== 1 ? 's' : ''}. Please complete it soon.`,
-                priority: 'high' as const
-            };
-            priority = 'high';
-            break;
-        case 'warning':
-            notificationTemplate = {
-                title: 'Review Deadline Approaching',
-                content: `Reminder: Your review for "${paper.title}" is due in ${daysRemaining} days.`,
-                priority: 'medium' as const
-            };
-            break;
-        default:
-            notificationTemplate = {
-                title: 'Review Reminder',
-                content: `Don't forget: Your review for "${paper.title}" is due in ${daysRemaining} days.`,
-                priority: 'medium' as const
-            };
-    }
-
-    await createNotification({
-        userId: assignment.reviewerId,
-        type: 'review_request',
-        title: notificationTemplate.title,
-        content: notificationTemplate.content,
-        relatedPaperId: assignment.paperId,
-        relatedReviewId: assignment.id,
-        priority,
-        actionUrl: `/review/inreview/${paper.id}`
+    await emitEvent({
+        type: reminderType === 'overdue' ? 'review.deadline.overdue' : 'review.deadline.reminder',
+        actorId: null,
+        recipients,
+        entityType: 'review',
+        entityId: String(assignment.id || assignment._id),
+        metadata: {
+            paperId: String(paper.id || assignment.paperId),
+            paperTitle: paper.title,
+            hubId: paper.hubId ? String(paper.hubId) : null,
+            reviewerId,
+            deadline: assignment.deadline ? new Date(assignment.deadline).toISOString() : undefined,
+            reminderType,
+            daysRemaining,
+            recipientRoles: Object.fromEntries(
+                recipients.map((recipientId) => [
+                    recipientId,
+                    recipientId === reviewerId ? 'reviewer' : 'editor'
+                ])
+            )
+        }
     });
 
     // Atualizar contador de lembretes

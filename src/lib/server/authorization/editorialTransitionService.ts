@@ -5,6 +5,7 @@ import { authorize } from './authorizationService';
 import { createEditorialAuditLog } from './audit';
 import type { PermissionKey } from './permissions';
 import { normalizeEntityId } from './roleResolver';
+import { emitPaperLifecycleTransitionEvent } from '../paperLifecycleEvents';
 
 export class EditorialTransitionError extends Error {
 	status: number;
@@ -253,7 +254,22 @@ export async function transitionPaperStatus(input: TransitionPaperStatusInput) {
 	};
 
 	if (input.session) {
-		return run(input.session);
+		const result = await run(input.session);
+		try {
+			await emitPaperLifecycleTransitionEvent(input.action, result, {
+				actorId: input.system ? null : normalizeEntityId(input.user),
+				metadata: {
+					...(input.metadata ?? {}),
+					previousStatus: input.expectedStatus,
+					newStatus: definition.to,
+					permissionKey: definition.permission,
+					system: !!input.system
+				}
+			});
+		} catch (eventError) {
+			console.error('Failed to emit paper lifecycle event:', eventError);
+		}
+		return result;
 	}
 
 	const session = await mongoose.startSession();
@@ -262,6 +278,20 @@ export async function transitionPaperStatus(input: TransitionPaperStatusInput) {
 		await session.withTransaction(async () => {
 			result = await run(session);
 		});
+		try {
+			await emitPaperLifecycleTransitionEvent(input.action, result, {
+				actorId: input.system ? null : normalizeEntityId(input.user),
+				metadata: {
+					...(input.metadata ?? {}),
+					previousStatus: input.expectedStatus,
+					newStatus: definition.to,
+					permissionKey: definition.permission,
+					system: !!input.system
+				}
+			});
+		} catch (eventError) {
+			console.error('Failed to emit paper lifecycle event:', eventError);
+		}
 		return result;
 	} finally {
 		await session.endSession();

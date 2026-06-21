@@ -3,7 +3,6 @@ import type { RequestHandler } from './$types';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import Papers from '$lib/db/models/Paper';
 import Hubs from '$lib/db/models/Hub';
-import { NotificationService } from '$lib/services/NotificationService';
 import {
     EditorialTransitionError,
     transitionPaperStatus
@@ -58,39 +57,7 @@ export const POST: RequestHandler = async ({ request, locals, params }) => {
         paper.status = updatedPaper.status;
         paper.rejectionReason = rejectionReason;
 
-        // Create notification for the paper author
-        const submitterId = typeof paper.submittedBy === 'object' 
-            ? paper.submittedBy._id || paper.submittedBy.id 
-            : paper.submittedBy;
-
-        await NotificationService.createNotification({
-            user: submitterId,
-            type: 'paper_rejected',
-            title: 'Paper Rejected',
-            content: `Your paper "${paper.title}" was rejected by ${hub.title}. Reason: ${rejectionReason}`,
-            relatedPaperId: paper.id,
-            actionUrl: `/publish/edit/${paper.id}`,
-            priority: 'high'
-        });
-
-        // Also notify main author if different from submitter
-        const mainAuthorId = typeof paper.mainAuthor === 'object'
-            ? paper.mainAuthor._id || paper.mainAuthor.id
-            : paper.mainAuthor;
-
-        if (mainAuthorId !== submitterId) {
-            await NotificationService.createNotification({
-                user: mainAuthorId,
-                type: 'paper_rejected',
-                title: 'Paper Rejected',
-                content: `The paper "${paper.title}" was rejected by ${hub.title}. Reason: ${rejectionReason}`,
-                relatedPaperId: paper.id,
-                actionUrl: `/publish/edit/${paper.id}`,
-                priority: 'high'
-            });
-        }
-
-        return json({ 
+        return json({
             success: true, 
             message: 'Paper rejected successfully',
             paper: {
