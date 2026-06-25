@@ -5,7 +5,7 @@ import Papers from '$lib/db/models/Paper';
 import Users from '$lib/db/models/User';
 import ReviewQueue from '$lib/db/models/ReviewQueue';
 import ReviewAssignment from '$lib/db/models/ReviewAssignment';
-import { NotificationService } from '$lib/services/NotificationService';
+import { emitEvent } from '$lib/services/EventService';
 import type { User } from '$lib/types/User';
 import * as crypto from 'crypto';
 import {
@@ -13,6 +13,18 @@ import {
     transitionPaperStatus
 } from '$lib/server/authorization/editorialTransitionService';
 import { getUserIdAliases } from '$lib/server/authorization/roleResolver';
+
+function normalizeId(value: any): string {
+    if (!value) return '';
+    if (typeof value === 'string' || typeof value === 'number') return String(value);
+    if (value.id) return String(value.id);
+    if (value._id) return String(value._id);
+    return String(value);
+}
+
+function displayName(user: any, fallback: string) {
+    return `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || user?.email || fallback;
+}
 
 export const POST: RequestHandler = async ({ request, locals }) => {
     await start_mongo();
@@ -51,7 +63,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
             };
         }
 
-        const response = paper.peer_review.responses.find(r => r.reviewerId === reviewerId);
+        const response = paper.peer_review.responses.find((r: any) => r.reviewerId === reviewerId);
+        const wasAlreadyAccepted = response?.status === 'accepted' || response?.status === 'completed';
 
         if (!response) {
             paper.peer_review.responses.push({
@@ -110,6 +123,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
             paperId: paperId,
             reviewerId: reviewerId
         });
+        let reviewAssignmentId = normalizeId(existingAssignment?.id) || normalizeId(existingAssignment?._id);
+        let reviewAssignmentDeadline: Date | null = existingAssignment?.deadline || null;
 
         if (!existingAssignment) {
             const deadlineDays = 15; // Default 15 dias
@@ -130,10 +145,12 @@ export const POST: RequestHandler = async ({ request, locals }) => {
                 isLinkedToHub: !!paper.hubId
             });
             await reviewAssignment.save();
+            reviewAssignmentId = assignmentId;
+            reviewAssignmentDeadline = deadline;
         }
 
         const acceptedCount = paper.peer_review.responses.filter(
-            r => r.status === 'accepted' || r.status === 'completed'
+            (r: any) => r.status === 'accepted' || r.status === 'completed'
         ).length;
 
         const shouldSendToReview = acceptedCount >= 1 && paper.status === 'reviewer assignment';
@@ -164,25 +181,42 @@ export const POST: RequestHandler = async ({ request, locals }) => {
         }
 
         // Buscar informações do revisor 
-        const reviewer = await Users.findOne({ id: reviewerId });
-        const authorId = typeof paper.mainAuthor === 'string' ? paper.mainAuthor : String(paper.mainAuthor);
-        const reviewerName = reviewer ? `${reviewer.firstName} ${reviewer.lastName}` : 'Revisor';
-        const submittedById = typeof paper.submittedBy === 'string' ? paper.submittedBy : String(paper.submittedBy);
+        const reviewer = await Users.findOne({ id: reviewerId }).lean();
+        const authorId = normalizeId(paper.mainAuthor);
+        const reviewerName = displayName(reviewer, 'Reviewer');
+        const submittedById = normalizeId(paper.submittedBy);
+        const recipients = [...new Set([reviewerId, submittedById].filter(Boolean))];
 
-        // Criar notificações para quando revisor aceita fazer a revisão
-        try {
-            await NotificationService.createReviewerAcceptedNotifications({
-                paperId: paper.id,
-                paperTitle: paper.title,
-                reviewerId: reviewerId,
-                reviewerName: reviewerName,
-                authorId: authorId,
-                editorId: submittedById, // usando submittedBy como fallback para editor
-                hubId: typeof paper.hubId === 'string' ? paper.hubId : undefined
-            });
-        } catch (notificationError) {
-            console.error('Error creating notifications:', notificationError);
-            // Não falhar a operação principal por causa das notificações
+        if (!wasAlreadyAccepted && recipients.length > 0) {
+            try {
+                await emitEvent({
+                    type: 'review.assignment.created',
+                    actorId: reviewerId,
+                    recipients,
+                    entityType: 'review',
+                    entityId: reviewAssignmentId || String(paper.id),
+                    metadata: {
+                        reviewAssignmentId,
+                        paperId: String(paper.id),
+                        paperTitle: paper.title || 'Untitled paper',
+                        hubId: typeof paper.hubId === 'string' ? paper.hubId : null,
+                        reviewerId,
+                        reviewerName,
+                        authorId,
+                        editorId: submittedById,
+                        deadline: reviewAssignmentDeadline?.toISOString(),
+                        source: 'legacy_paperspool_accept',
+                        recipientRoles: Object.fromEntries(
+                            recipients.map((recipientId) => [
+                                recipientId,
+                                recipientId === reviewerId ? 'reviewer' : 'editor'
+                            ])
+                        )
+                    }
+                });
+            } catch (eventError) {
+                console.error('Failed to emit paperspool review assignment event:', eventError);
+            }
         }
 
         return json({ success: true, paper }, { status: 200 });

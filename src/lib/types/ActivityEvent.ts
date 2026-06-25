@@ -5,6 +5,8 @@ export type ActivityEvent = {
 	targetUserId?: string | null;
 	entityType: string;
 	entityId: string;
+	idempotencyKey?: string;
+	eventKey?: string;
 	metadata: Record<string, unknown>;
 	createdAt: Date;
 };

@@ -8,12 +8,39 @@
 		groupPermissionsForDisplay
 	} from '$lib/helpers/permissionDisplay';
 
+	type RoleRemovalAssignment = {
+		assignmentId: string;
+		userId: string;
+		userName: string;
+		email: string;
+		hubName: string;
+		roleName: string;
+		roleKey: string;
+		assignedAt: string | null;
+	};
+
+	type RoleRemovalPrompt = {
+		roleId: string;
+		roleKey: string;
+		roleName: string;
+		hubId: string;
+		hubName: string;
+		assignments: RoleRemovalAssignment[];
+	};
+
 	interface Props {
 		data: PageData;
-		form?: { success?: boolean; message?: string };
+		form?: { success?: boolean; message?: string; roleRemoval?: RoleRemovalPrompt };
 	}
 
 	let { data, form }: Props = $props();
+
+	const nonRemovableRoleKeys = new Set([
+		'HubOwner',
+		'EditorChief',
+		'AssociateEditor',
+		'Reviewer'
+	]);
 
 	function normalizeValue(value: any) {
 		if (!value) return '';
@@ -73,6 +100,16 @@
 		return data.roles.filter((role: any) => role.isActive !== false && role.key !== 'ManagingEditor');
 	}
 
+	function canRemoveRole(role: any) {
+		return (
+			role.scopeType === 'hub' &&
+			role.isActive !== false &&
+			role.isProtected !== true &&
+			role.isSystem !== true &&
+			!nonRemovableRoleKeys.has(role.key)
+		);
+	}
+
 	function roleLabels() {
 		return Object.fromEntries(data.roles.map((role: any) => [role.key, role.name]));
 	}
@@ -109,6 +146,10 @@
 			}))
 			.sort((left, right) => userLabel(left.userId).localeCompare(userLabel(right.userId)));
 	}
+
+	function formatAssignedAt(value: string | null) {
+		return value ? new Date(value).toLocaleString() : '-';
+	}
 </script>
 
 <svelte:head>
@@ -126,6 +167,61 @@
 		{#if form?.message || data.statusMessage}
 			<div class="rounded border px-3 py-2 text-sm {(form?.success ?? !!data.statusMessage) ? 'border-green-200 bg-green-50 text-green-800' : 'border-red-200 bg-red-50 text-red-800'}">
 				{form?.message || data.statusMessage}
+			</div>
+		{/if}
+
+		{#if form?.roleRemoval}
+			<div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 py-6">
+				<div class="w-full max-w-5xl rounded border border-slate-200 bg-white shadow-xl">
+					<div class="border-b border-slate-200 px-5 py-4">
+						<p class="text-xs font-semibold uppercase tracking-wide text-slate-500">
+							Active assignments
+						</p>
+						<h2 class="mt-1 text-lg font-semibold text-slate-950">
+							Remove {form.roleRemoval.roleName}
+						</h2>
+						<p class="mt-1 text-sm text-slate-600">
+							{form.roleRemoval.assignments.length} assignment(s) must be revoked before this custom role can be removed.
+						</p>
+					</div>
+
+					<div class="max-h-[60vh] overflow-auto px-5 py-4">
+						<table class="min-w-full text-left text-sm">
+							<thead class="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
+								<tr>
+									<th class="px-3 py-2">User</th>
+									<th class="px-3 py-2">Email</th>
+									<th class="px-3 py-2">Hub</th>
+									<th class="px-3 py-2">Role</th>
+									<th class="px-3 py-2">Assigned date</th>
+								</tr>
+							</thead>
+							<tbody>
+								{#each form.roleRemoval.assignments as assignment}
+									<tr class="border-b border-slate-100">
+										<td class="px-3 py-2 font-medium text-slate-900">{assignment.userName}</td>
+										<td class="px-3 py-2 text-slate-600">{assignment.email || '-'}</td>
+										<td class="px-3 py-2 text-slate-600">{assignment.hubName}</td>
+										<td class="px-3 py-2 text-slate-600">{assignment.roleName}</td>
+										<td class="px-3 py-2 text-slate-600">{formatAssignedAt(assignment.assignedAt)}</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+
+					<div class="flex flex-wrap justify-end gap-2 border-t border-slate-200 px-5 py-4">
+						<a href="?" class="rounded border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700">
+							Cancel
+						</a>
+						<form method="POST" action="?/revokeAssignmentsAndDeleteRole">
+							<input type="hidden" name="roleId" value={form.roleRemoval.roleId} />
+							<button class="rounded bg-red-700 px-3 py-2 text-sm font-semibold text-white">
+								Revoke all assignments
+							</button>
+						</form>
+					</div>
+				</div>
 			</div>
 		{/if}
 
@@ -233,7 +329,7 @@
 							</button>
 						</div>
 					</form>
-					{#if !role.isProtected}
+					{#if canRemoveRole(role)}
 						<form method="POST" action="?/deleteRole" class="-mt-3">
 							<input type="hidden" name="roleId" value={role.id || role._id} />
 							<button class="rounded border border-red-200 px-3 py-2 text-sm font-semibold text-red-700">

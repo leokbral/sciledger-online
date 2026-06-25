@@ -10,13 +10,22 @@ import { authorize } from '$lib/server/authorization/authorizationService';
 import { ensureHubRoles } from '$lib/server/authorization/bootstrapRbac';
 import { DEFAULT_HUB_ROLES, PERMISSIONS } from '$lib/server/authorization/permissions';
 import { createRbacAuditLog } from '$lib/server/authorization/rbacAudit';
-import { assignHighestHubRole } from '$lib/server/authorization/roleAssignmentService';
+import {
+	assignHighestHubRole,
+	revokeHubRoleAssignments
+} from '$lib/server/authorization/roleAssignmentService';
 import { emitEvent } from '$lib/services/EventService';
 
 const HUB_CONFIGURABLE_PERMISSIONS = PERMISSIONS.filter(
 	(permission) => permission !== 'rbac.manage' && permission !== 'paper.submit'
 );
 const RESTORABLE_EDITORIAL_ROLE_KEYS = ['EditorChief', 'AssociateEditor', 'Reviewer'];
+const NON_REMOVABLE_HUB_ROLE_KEYS = new Set([
+	'HubOwner',
+	'EditorChief',
+	'AssociateEditor',
+	'Reviewer'
+]);
 
 function normalizeId(value: any): string {
 	if (!value) return '';
@@ -31,11 +40,122 @@ function serialize<T>(value: T): T {
 	return JSON.parse(JSON.stringify(value));
 }
 
+function displayName(user: any, fallback: string) {
+	return `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || user?.email || fallback;
+}
+
 function getFormPermissions(formData: FormData) {
 	return formData
 		.getAll('permissions')
 		.map((permission) => String(permission))
 		.filter((permission) => HUB_CONFIGURABLE_PERMISSIONS.includes(permission as any));
+}
+
+function isRemovableCustomHubRole(role: any) {
+	return (
+		role?.scopeType === 'hub' &&
+		role?.isActive !== false &&
+		role?.isProtected !== true &&
+		role?.isSystem !== true &&
+		!NON_REMOVABLE_HUB_ROLE_KEYS.has(String(role?.key || ''))
+	);
+}
+
+function roleRemovalNotAllowedMessage(role: any) {
+	const roleKey = String(role?.key || '');
+	if (roleKey === 'HubOwner') return 'HubOwner cannot be removed';
+	if (NON_REMOVABLE_HUB_ROLE_KEYS.has(roleKey)) {
+		return 'Default hub roles cannot be removed';
+	}
+	return 'Only custom roles can be removed';
+}
+
+async function getActiveAssignmentsForRole(roleKey: string, hubId: string) {
+	return UserRoleAssignment.find({
+		roleKey,
+		scopeType: 'hub',
+		scopeId: hubId,
+		isActive: true
+	})
+		.sort({ createdAt: 1 })
+		.lean();
+}
+
+async function buildRoleRemovalPrompt(input: {
+	role: any;
+	hub: any;
+	hubId: string;
+	assignments: any[];
+}) {
+	const userIds = [
+		...new Set(input.assignments.map((assignment) => normalizeId(assignment.userId)).filter(Boolean))
+	];
+	const users = await Users.find({ $or: [{ id: { $in: userIds } }, { _id: { $in: userIds } }] })
+		.select('id _id firstName lastName email')
+		.lean();
+	const usersById = new Map<string, any>();
+
+	for (const user of users) {
+		const userId = normalizeId(user);
+		const userObjectId = normalizeId(user._id);
+		if (userId) usersById.set(userId, user);
+		if (userObjectId) usersById.set(userObjectId, user);
+	}
+
+	return {
+		roleId: normalizeId(input.role),
+		roleKey: input.role.key,
+		roleName: input.role.name,
+		hubId: input.hubId,
+		hubName: input.hub.title || input.hub.name || 'Hub',
+		assignments: input.assignments.map((assignment) => {
+			const userId = normalizeId(assignment.userId);
+			const user = usersById.get(userId);
+			return {
+				assignmentId: normalizeId(assignment),
+				userId,
+				userName: displayName(user, userId),
+				email: user?.email || '',
+				hubName: input.hub.title || input.hub.name || 'Hub',
+				roleName: input.role.name,
+				roleKey: input.role.key,
+				assignedAt: assignment.createdAt ? new Date(assignment.createdAt).toISOString() : null
+			};
+		})
+	};
+}
+
+async function removeRoleWithAudit(input: {
+	role: any;
+	hubId: string;
+	user: any;
+	metadata?: Record<string, unknown>;
+}) {
+	input.role.isActive = false;
+	input.role.updatedAt = new Date();
+	await input.role.save();
+
+	await createRbacAuditLog({
+		user: input.user,
+		action: 'role.removed',
+		hubId: input.hubId,
+		roleKey: input.role.key,
+		roleId: normalizeId(input.role),
+		previousPermissions: input.role.permissions ?? [],
+		metadata: input.metadata
+	});
+
+	await emitRoleConfigurationEvent({
+		type: 'role.updated',
+		user: input.user,
+		hubId: input.hubId,
+		role: input.role,
+		metadata: {
+			action: 'role.removed',
+			previousPermissions: input.role.permissions ?? [],
+			...(input.metadata ?? {})
+		}
+	});
 }
 
 async function loadHub(hubId: string) {
@@ -393,46 +513,87 @@ export const actions: Actions = {
 		});
 
 		if (!role) return fail(404, { message: 'Role not found' });
-		if (role.isProtected || role.key === 'HubOwner') {
-			return fail(400, { message: 'HubOwner is protected and cannot be removed' });
+		if (!isRemovableCustomHubRole(role)) {
+			return fail(400, { message: roleRemovalNotAllowedMessage(role) });
 		}
 
-		const activeAssignments = await UserRoleAssignment.countDocuments({
-			roleKey: role.key,
-			scopeType: 'hub',
-			scopeId: hubId,
-			isActive: true
-		});
+		const activeAssignments = await getActiveAssignmentsForRole(role.key, hubId);
 
-		if (activeAssignments > 0) {
-			return fail(409, { message: 'Revoke active assignments before removing this role' });
+		if (activeAssignments.length > 0) {
+			return fail(409, {
+				message: 'Revoke active assignments before removing this role',
+				success: false,
+				roleRemoval: await buildRoleRemovalPrompt({
+					role,
+					hub,
+					hubId,
+					assignments: activeAssignments
+				})
+			});
 		}
 
-		role.isActive = false;
-		role.updatedAt = new Date();
-		await role.save();
-
-		await createRbacAuditLog({
-			user: locals.user,
-			action: 'role.removed',
-			hubId,
-			roleKey: role.key,
-			roleId: normalizeId(role),
-			previousPermissions: role.permissions ?? []
-		});
-
-		await emitRoleConfigurationEvent({
-			type: 'role.updated',
-			user: locals.user,
-			hubId,
+		await removeRoleWithAudit({
 			role,
+			hubId,
+			user: locals.user,
 			metadata: {
-				action: 'role.removed',
-				previousPermissions: role.permissions ?? []
+				removedWithActiveAssignments: false
 			}
 		});
 
-		return { success: true };
+		return { success: true, message: 'Role removed successfully' };
+	},
+
+	revokeAssignmentsAndDeleteRole: async ({ request, locals, params }) => {
+		await start_mongo();
+		if (!locals.user) return fail(401, { message: 'Unauthorized' });
+
+		const hub = await loadHub(params.id);
+		const hubId = normalizeId(hub);
+		if (!(await assertCanManageHubRoles(locals.user, hub))) {
+			return fail(403, { message: 'Insufficient permissions' });
+		}
+
+		const formData = await request.formData();
+		const roleId = String(formData.get('roleId') || '').trim();
+
+		const role: any = await Role.findOne({
+			$or: [{ _id: roleId }, { id: roleId }],
+			scopeType: 'hub',
+			scopeId: hubId
+		});
+
+		if (!role) return fail(404, { message: 'Role not found' });
+		if (!isRemovableCustomHubRole(role)) {
+			return fail(400, { message: roleRemovalNotAllowedMessage(role) });
+		}
+
+		const activeAssignments = await getActiveAssignmentsForRole(role.key, hubId);
+		const revokedBy = normalizeId(locals.user);
+		const revokedAssignments = await revokeHubRoleAssignments(
+			activeAssignments.map((assignment: any) => String(assignment.userId)),
+			hubId,
+			revokedBy,
+			{
+				auditUser: locals.user,
+				roleKeys: [role.key]
+			}
+		);
+
+		await removeRoleWithAudit({
+			role,
+			hubId,
+			user: locals.user,
+			metadata: {
+				removedWithActiveAssignments: true,
+				revokedAssignmentCount: revokedAssignments.length
+			}
+		});
+
+		return {
+			success: true,
+			message: `Role removed successfully. ${revokedAssignments.length} assignment(s) revoked.`
+		};
 	},
 
 	assignRole: async ({ request, locals, params }) => {

@@ -18,6 +18,8 @@ if (cachedNotificationModel) {
 	const isOutdatedSchema =
 		!cachedNotificationModel.schema.path('title') ||
 		!cachedNotificationModel.schema.path('actionUrl') ||
+		!cachedNotificationModel.schema.path('eventKey') ||
+		!cachedNotificationModel.schema.path('idempotencyKey') ||
 		!enumValues.includes('hub_invitation') ||
 		!enumValues.includes('review_request') ||
 		!enumValues.includes('hub_reviewer_accepted');

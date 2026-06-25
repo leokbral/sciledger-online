@@ -3,8 +3,17 @@ import { start_mongo } from '$lib/db/mongooseConnection';
 import Papers from '$lib/db/models/Paper';
 import Hubs from '$lib/db/models/Hub';
 import { authorize } from '$lib/server/authorization/authorizationService';
+import { emitEvent } from '$lib/services/EventService';
 import type { RequestHandler } from './$types';
 import * as crypto from 'crypto';
+
+function normalizeId(value: any): string {
+	if (!value) return '';
+	if (typeof value === 'string' || typeof value === 'number') return String(value);
+	if (value.id) return String(value.id);
+	if (value._id) return String(value._id);
+	return String(value);
+}
 
 export const POST: RequestHandler = async ({ params, locals }) => {
 	await start_mongo();
@@ -59,7 +68,7 @@ export const POST: RequestHandler = async ({ params, locals }) => {
 					const now = new Date();
 					const deadline = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000); // 15 dias padrão
 
-					await ReviewAssignment.create({
+					const reviewAssignment = await ReviewAssignment.create({
 						_id: assignmentId,
 						id: assignmentId,
 						paperId: paper.id,
@@ -71,6 +80,42 @@ export const POST: RequestHandler = async ({ params, locals }) => {
 						hubId: hubId,
 						isLinkedToHub: true
 					});
+
+					const actorId = normalizeId(user);
+					const normalizedReviewerId = normalizeId(reviewerId);
+					const recipients = [...new Set([normalizedReviewerId, actorId].filter(Boolean))];
+
+					if (recipients.length > 0) {
+						try {
+							await emitEvent({
+								type: 'review.assignment.created',
+								actorId,
+								recipients,
+								entityType: 'review',
+								entityId: normalizeId(reviewAssignment.id) || normalizeId(reviewAssignment._id) || assignmentId,
+								metadata: {
+									reviewAssignmentId:
+										normalizeId(reviewAssignment.id) || normalizeId(reviewAssignment._id) || assignmentId,
+									paperId: String(paper.id),
+									paperTitle: paper.title || 'Untitled paper',
+									hubId,
+									hubName: hub.title || hub.name || 'SciLedger hub',
+									reviewerId: normalizedReviewerId,
+									editorId: actorId,
+									deadline: deadline.toISOString(),
+									source: 'hub_create_review_assignments',
+									recipientRoles: Object.fromEntries(
+										recipients.map((recipientId) => [
+											recipientId,
+											recipientId === normalizedReviewerId ? 'reviewer' : 'editor'
+										])
+									)
+								}
+							});
+						} catch (eventError) {
+							console.error('Failed to emit review assignment created event:', eventError);
+						}
+					}
 
 					createdCount++;
 				}

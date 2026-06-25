@@ -66,6 +66,7 @@ function actionUrl(context: EventTemplateContext) {
 	}
 
 	if (
+		context.event.type === 'review.assignment.created' ||
 		context.event.type === 'review.assignment.deadline_updated' ||
 		context.event.type === 'review.deadline.reminder' ||
 		context.event.type === 'review.deadline.overdue' ||
@@ -386,6 +387,44 @@ registerEventEmailTemplate('review.submitted', (context) => {
 			: `${reviewerName} completed a review for "${paperTitle(context)}" and ${decision}.`;
 
 	return emailPayload(role === 'author' ? 'Review Received' : 'Review Completed', content);
+});
+
+registerEventNotificationTemplate('review.assignment.created', (context) => {
+	const role = roleFor(context);
+	const data = metadata(context);
+	const reviewerName = data.reviewerName || 'A reviewer';
+
+	if (role === 'reviewer') {
+		return notificationPayload(
+			context,
+			'New Review Assignment',
+			`You have been assigned to review "${paperTitle(context)}".`,
+			'high',
+			'review_request'
+		);
+	}
+
+	return notificationPayload(
+		context,
+		'Review Assignment Created',
+		`${reviewerName} was assigned to review "${paperTitle(context)}".`,
+		'medium',
+		'review_request'
+	);
+});
+
+registerEventEmailTemplate('review.assignment.created', (context) => {
+	const role = roleFor(context);
+	const data = metadata(context);
+	const content =
+		role === 'reviewer'
+			? `You have been assigned to review "${paperTitle(context)}".`
+			: `${data.reviewerName || 'A reviewer'} was assigned to review "${paperTitle(context)}".`;
+
+	return emailPayload(
+		role === 'reviewer' ? 'New Review Assignment' : 'Review Assignment Created',
+		content
+	);
 });
 
 function amountLabel(data: EditorialMetadata) {
