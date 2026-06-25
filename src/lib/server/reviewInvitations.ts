@@ -3,10 +3,39 @@ import Users from '$lib/db/models/User';
 import { getRoleLabel, sortRoleKeysByDisplayPriority } from '$lib/helpers/roleDisplay';
 
 export const ACTIVE_REVIEW_INVITATION_STATUSES = ['pending', 'accepted'] as const;
+export const REVIEW_INVITATION_EXPIRATION_DAYS = 7;
 
-export type ReviewInvitationStatus = 'pending' | 'accepted' | 'declined' | 'duplicate';
+export type ReviewInvitationStatus =
+	| 'pending'
+	| 'accepted'
+	| 'declined'
+	| 'expired'
+	| 'cancelled'
+	| 'duplicate';
 
 type InvitationLike = Record<string, any>;
+
+export function getReviewInvitationExpiresAt(
+	invitation: InvitationLike,
+	fallbackDate = new Date()
+) {
+	if (invitation.expiresAt) {
+		const expiresAt = new Date(invitation.expiresAt);
+		if (!Number.isNaN(expiresAt.getTime())) {
+			return expiresAt;
+		}
+	}
+
+	const rawBaseDate = invitation.createdAt || invitation.invitedAt || fallbackDate;
+	const baseDate = rawBaseDate instanceof Date ? rawBaseDate : new Date(String(rawBaseDate));
+	const safeBaseDate = Number.isNaN(baseDate.getTime()) ? fallbackDate : baseDate;
+
+	return new Date(safeBaseDate.getTime() + REVIEW_INVITATION_EXPIRATION_DAYS * 24 * 60 * 60 * 1000);
+}
+
+export function getNewReviewInvitationExpiresAt(from = new Date()) {
+	return new Date(from.getTime() + REVIEW_INVITATION_EXPIRATION_DAYS * 24 * 60 * 60 * 1000);
+}
 
 export function getIdAliases(value: unknown): string[] {
 	if (!value) return [];
@@ -81,6 +110,10 @@ export function getReviewInvitationStatusLabel(status: string | null | undefined
 			return 'Accepted';
 		case 'declined':
 			return 'Declined';
+		case 'expired':
+			return 'Expired';
+		case 'cancelled':
+			return 'Cancelled';
 		case 'duplicate':
 			return 'Duplicate';
 		default:
@@ -102,12 +135,78 @@ export function buildPaperReviewerInvitationQuery(paperIds: string[], reviewerId
 	};
 }
 
-export async function findActiveReviewInvitation(paperIds: string[], reviewerIds: string[]) {
+export function isMongoDuplicateKeyError(error: unknown) {
+	if (!error || typeof error !== 'object') return false;
+
+	const candidate = error as {
+		code?: number;
+		writeErrors?: Array<{ code?: number }>;
+	};
+
+	return (
+		candidate.code === 11000 ||
+		candidate.writeErrors?.some((writeError) => writeError.code === 11000) === true
+	);
+}
+
+export async function findPendingReviewInvitation(paperIds: string[], reviewerIds: string[]) {
 	if (paperIds.length === 0 || reviewerIds.length === 0) return null;
 
 	return PaperReviewInvitation.findOne({
-		...buildPaperReviewerInvitationQuery(paperIds, reviewerIds),
-		status: { $in: [...ACTIVE_REVIEW_INVITATION_STATUSES] }
+		$and: [buildPaperReviewerInvitationQuery(paperIds, reviewerIds), { status: 'pending' }]
+	}).sort({ createdAt: -1, invitedAt: -1 });
+}
+
+export async function savePendingReviewInvitationOrFindExisting(
+	invitation: InvitationLike,
+	paperIds: string[],
+	reviewerIds: string[]
+) {
+	try {
+		await invitation.save();
+		return { invitation, created: true };
+	} catch (error) {
+		if (!isMongoDuplicateKeyError(error)) {
+			throw error;
+		}
+
+		const existingInvitation = await findPendingReviewInvitation(paperIds, reviewerIds);
+		if (!existingInvitation) {
+			throw error;
+		}
+
+		return { invitation: existingInvitation, created: false };
+	}
+}
+
+export async function findActiveReviewInvitation(paperIds: string[], reviewerIds: string[]) {
+	if (paperIds.length === 0 || reviewerIds.length === 0) return null;
+
+	const now = new Date();
+	const legacyCutoff = new Date(
+		now.getTime() - REVIEW_INVITATION_EXPIRATION_DAYS * 24 * 60 * 60 * 1000
+	);
+
+	return PaperReviewInvitation.findOne({
+		$and: [
+			buildPaperReviewerInvitationQuery(paperIds, reviewerIds),
+			{
+				$or: [
+					{ status: 'accepted' },
+					{ status: 'pending', expiresAt: { $gt: now } },
+					{
+						status: 'pending',
+						expiresAt: { $exists: false },
+						$or: [{ createdAt: { $gt: legacyCutoff } }, { invitedAt: { $gt: legacyCutoff } }]
+					},
+					{
+						status: 'pending',
+						expiresAt: null,
+						$or: [{ createdAt: { $gt: legacyCutoff } }, { invitedAt: { $gt: legacyCutoff } }]
+					}
+				]
+			}
+		]
 	}).sort({ createdAt: 1, invitedAt: 1 });
 }
 
@@ -197,9 +296,16 @@ export async function serializeReviewInvitations(invitations: InvitationLike[]) 
 			statusLabel: getReviewInvitationStatusLabel(invitation.status),
 			duplicateOf: invitation.duplicateOf ? String(invitation.duplicateOf) : null,
 			customDeadlineDays: invitation.customDeadlineDays ?? null,
+			expiresAt: normalizeDate(getReviewInvitationExpiresAt(invitation)),
 			invitedAt: normalizeDate(invitation.invitedAt || invitation.createdAt),
 			createdAt: normalizeDate(invitation.createdAt || invitation.invitedAt),
 			respondedAt: normalizeDate(invitation.respondedAt),
+			expiredAt: normalizeDate(invitation.expiredAt),
+			cancelledAt: normalizeDate(invitation.cancelledAt),
+			resendCount: Number(invitation.resendCount || 0),
+			parentInvitationId: invitation.parentInvitationId
+				? String(invitation.parentInvitationId)
+				: null,
 			updatedAt: normalizeDate(invitation.updatedAt)
 		};
 	});

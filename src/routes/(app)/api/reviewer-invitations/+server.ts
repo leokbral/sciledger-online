@@ -4,7 +4,7 @@ import Users from '$lib/db/models/User';
 import { resolveUserIdentifiers } from '$lib/helpers/userIdentifiers';
 import { json } from '@sveltejs/kit';
 import crypto from 'crypto';
-import { NotificationService } from '$lib/services/NotificationService';
+import { emitEvent } from '$lib/services/EventService';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import { authorize } from '$lib/server/authorization/authorizationService';
 
@@ -35,7 +35,7 @@ export async function POST({ request, locals }) {
 		}
 
 		const reviewer = await Users.findOne({ $or: [{ id: reviewerId }, { _id: reviewerId }] })
-			.select('_id id')
+			.select('_id id firstName lastName email')
 			.lean();
 		if (!reviewer) {
 			return json({ error: 'Reviewer not found' }, { status: 404 });
@@ -75,13 +75,38 @@ export async function POST({ request, locals }) {
 
 		const inviterName =
 			`${inviter.firstName || ''} ${inviter.lastName || ''}`.trim() || inviter.email;
-		await NotificationService.createHubInvitationNotification({
-			userId: normalizedReviewerId,
-			hubId: String(hubId),
-			hubName: hub.title,
-			inviterName,
-			role: inviteRole === 'vice_manager' ? 'Editor-in-chief' : 'reviewer'
-		});
+		const inviteeName =
+			`${reviewer.firstName || ''} ${reviewer.lastName || ''}`.trim() ||
+			reviewer.email ||
+			'Invitee';
+		const recipients = [...new Set([normalizedReviewerId, String(inviter.id)].filter(Boolean))];
+		try {
+			await emitEvent({
+				type: 'hub.invitation.created',
+				actorId: inviter.id,
+				recipients,
+				entityType: 'hub',
+				entityId: String(hubId),
+				metadata: {
+					hubId: String(hubId),
+					hubName: hub.title,
+					invitationId: String(invitation.id || invitation._id),
+					inviteeId: normalizedReviewerId,
+					inviteeName,
+					inviterId: inviter.id,
+					inviterName,
+					role: inviteRole === 'vice_manager' ? 'Editor-in-chief' : 'reviewer',
+					recipientRoles: Object.fromEntries(
+						recipients.map((recipientId) => [
+							recipientId,
+							recipientId === normalizedReviewerId ? 'invitee' : 'inviter'
+						])
+					)
+				}
+			});
+		} catch (eventError) {
+			console.error('Failed to emit hub invitation created event:', eventError);
+		}
 
 		return json({ success: true, invitation });
 	} catch (error) {

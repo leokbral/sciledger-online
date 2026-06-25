@@ -8,13 +8,15 @@ import ReviewAssignment from '$lib/db/models/ReviewAssignment';
 import { MAX_ACTIVE_REVIEW_ASSIGNMENTS } from '$lib/constants/reviewerLimits';
 import { checkReviewerEligibility } from '$lib/helpers/reviewerEligibility';
 import { resolveUserIdentifiers } from '$lib/helpers/userIdentifiers';
-import { NotificationService } from '$lib/services/NotificationService';
 import { authorize } from '$lib/server/authorization/authorizationService';
 import { resolveEffectiveHubRoles } from '$lib/server/authorization/effectiveHubRoles';
+import { emitPaperReviewInvitationEvent } from '$lib/server/reviewInvitationLifecycle';
 import {
 	buildDuplicateInvitationDetails,
 	findActiveReviewInvitation,
 	getIdAliases,
+	getNewReviewInvitationExpiresAt,
+	savePendingReviewInvitationOrFindExisting,
 	selectInvitationRole
 } from '$lib/server/reviewInvitations';
 import type { RequestHandler } from './$types';
@@ -162,6 +164,12 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 					createdAt: new Date()
 				});
 				await duplicateInvitation.save();
+				await emitPaperReviewInvitationEvent('review.invitation.duplicate', duplicateInvitation, {
+					actorId: user.id,
+					metadata: {
+						duplicateOf: String(existingInvite.id || existingInvite._id)
+					}
+				});
 
 				const duplicateDetails = await buildDuplicateInvitationDetails(existingInvite);
 				duplicates.push(duplicateDetails);
@@ -174,6 +182,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			}
 
 			const inviteId = crypto.randomUUID();
+			const invitedAt = new Date();
 			const invitation = new PaperReviewInvitation({
 				_id: inviteId,
 				id: inviteId,
@@ -188,28 +197,65 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				hubId,
 				status: 'pending',
 				customDeadlineDays: deadlineDays,
-				invitedAt: new Date()
+				resendCount: 0,
+				invitedAt,
+				expiresAt: getNewReviewInvitationExpiresAt(invitedAt),
+				createdAt: invitedAt,
+				updatedAt: invitedAt
 			});
 
-			await invitation.save();
-			invitations.push(invitation);
-
-			await NotificationService.createNotification({
-				user: normalizedReviewerId,
-				type: 'review_request',
-				title: 'New Paper Review Request',
-				content: `You have been invited to review the paper "${paper.title}". ${availableSlotsCount} slot(s) available.`,
-				relatedPaperId: paperId,
-				relatedHubId: hubId,
-				actionUrl: `/notifications?inviteId=${inviteId}`,
-				priority: 'high',
-				metadata: {
+			const saveResult = await savePendingReviewInvitationOrFindExisting(
+				invitation,
+				paperAliases,
+				reviewerIdAliases
+			);
+			if (!saveResult.created) {
+				const existingInvite = saveResult.invitation;
+				const duplicateId = crypto.randomUUID();
+				const duplicateInvitation = new PaperReviewInvitation({
+					_id: duplicateId,
+					id: duplicateId,
 					paperId,
-					paperTitle: paper.title,
-					invitedBy: user.id,
-					invitedByName: `${user.firstName} ${user.lastName}`,
-					inviteId,
-					inviteType: 'paper_review'
+					paper: paperId,
+					reviewerId: normalizedReviewerId,
+					reviewer: normalizedReviewerId,
+					invitedBy: {
+						userId: user.id,
+						role: invitedByRole
+					},
+					hubId,
+					status: 'duplicate',
+					duplicateOf: String(existingInvite.id || existingInvite._id),
+					customDeadlineDays: deadlineDays,
+					invitedAt: new Date(),
+					createdAt: new Date()
+				});
+				await duplicateInvitation.save();
+				await emitPaperReviewInvitationEvent('review.invitation.duplicate', duplicateInvitation, {
+					actorId: user.id,
+					metadata: {
+						duplicateOf: String(existingInvite.id || existingInvite._id),
+						source: 'unique_pending_index'
+					}
+				});
+
+				const duplicateDetails = await buildDuplicateInvitationDetails(existingInvite);
+				duplicates.push(duplicateDetails);
+				skipped.push({
+					reviewerId: String(reviewerId),
+					reasons: ['Reviewer already invited for this paper'],
+					existingInvitation: duplicateDetails
+				});
+				continue;
+			}
+
+			invitations.push(saveResult.invitation);
+
+			await emitPaperReviewInvitationEvent('review.invitation.created', saveResult.invitation, {
+				actorId: user.id,
+				metadata: {
+					availableSlots: availableSlotsCount,
+					maxSlots: paper.maxReviewSlots || 3
 				}
 			});
 		}
@@ -224,10 +270,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				invitations: 0,
 				skipped,
 				duplicates,
-				message:
-					duplicateOnly
-						? 'Reviewer already invited for this paper'
-						: 'No reviewer invitations were created. Check the skipped reasons and try again.',
+				message: duplicateOnly
+					? 'Reviewer already invited for this paper'
+					: 'No reviewer invitations were created. Check the skipped reasons and try again.',
 				availableSlots: availableSlotsCount,
 				maxSlots: paper.maxReviewSlots || 3
 			});

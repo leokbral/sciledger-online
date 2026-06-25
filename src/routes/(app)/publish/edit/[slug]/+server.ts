@@ -2,12 +2,9 @@ import type { RequestHandler } from './$types';
 import { json } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import Papers from '$lib/db/models/Paper';
-import Hubs from '$lib/db/models/Hub';
 import '$lib/db/models/User';
 import type { User } from '$lib/types/User';
-import { PaperLifecycleEmailService } from '$lib/services/PaperLifecycleEmailService';
 import { authorize } from '$lib/server/authorization/authorizationService';
-import { resolveEffectiveHubRoles } from '$lib/server/authorization/effectiveHubRoles';
 import {
     EditorialTransitionError,
     transitionPaperStatus
@@ -151,56 +148,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
                     submittedFromDraft: true
                 }
             });
-        }
-
-        const nextStatus = String((paper as any).status || '');
-        if (nextStatus === 'reviewer assignment' && previousStatus !== 'reviewer assignment') {
-            const authorIds = [
-                String((paper as any).mainAuthor || ''),
-                String((paper as any).correspondingAuthor || ''),
-                String((paper as any).submittedBy || ''),
-                ...((((paper as any).coAuthors || []) as string[]).map((id) => String(id)))
-            ].filter(Boolean);
-
-            const submitterName = `${(data?.submittedBy?.firstName || '').trim()} ${(data?.submittedBy?.lastName || '').trim()}`.trim();
-
-            try {
-                await PaperLifecycleEmailService.sendSubmissionConfirmation({
-                    paperId: String((paper as any).id || data.id),
-                    paperTitle: String((paper as any).title || 'Paper sem titulo'),
-                    authorIds,
-                    submittedByName: submitterName || undefined
-                });
-            } catch (emailError) {
-                console.error('Failed to send submission confirmation email on edit:', emailError);
-            }
-
-            const hubId = String((paper as any).hubId || '');
-            if (hubId) {
-                try {
-                    const hub = await Hubs.findById(hubId).lean();
-                    const effectiveHubRoles = hub ? await resolveEffectiveHubRoles(hub) : null;
-                    const hubOwnerIds =
-                        effectiveHubRoles?.members
-                            .filter((member) => member.primaryRoleKey === 'HubOwner')
-                            .map((member) => member.userId)
-                            .filter(Boolean) ?? [];
-
-                    await Promise.all(
-                        hubOwnerIds.map((hubAdminId) =>
-                            PaperLifecycleEmailService.sendHubAdminSubmissionEmail({
-                                hubAdminId,
-                                hubName: String(hub?.title || 'Hub'),
-                                paperId: String((paper as any).id || data.id),
-                                paperTitle: String((paper as any).title || 'Untitled paper'),
-                                submittedByName: submitterName || undefined
-                            })
-                        )
-                    );
-                } catch (adminEmailError) {
-                    console.error('Failed to send hub admin submission email on edit:', adminEmailError);
-                }
-            }
         }
 
         return json({ paper }, { status: 200 });

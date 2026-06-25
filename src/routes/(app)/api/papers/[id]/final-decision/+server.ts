@@ -1,9 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import Papers from '$lib/db/models/Paper';
-import Users from '$lib/db/models/User';
 import { start_mongo } from '$lib/db/mongooseConnection';
-import { NotificationService } from '$lib/services/NotificationService';
 import {
 	EditorialTransitionError,
 	transitionPaperStatus
@@ -56,42 +54,6 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
 				rejectionReason: decision === 'reject' ? rejectionReason : undefined
 			}
 		});
-
-		const editor = await Users.findOne({ id: user.id }).lean();
-		const editorName = `${editor?.firstName || ''} ${editor?.lastName || ''}`.trim();
-		const paperTitle = paper.title;
-		const authorId = String(paper.author || paper.mainAuthor || paper.createdBy);
-		const authorName = paper.authorName || 'Autor';
-		const reviewerIds =
-			paper.peer_review?.assignedReviewers?.map((id: string | object) => String(id)) || [];
-
-		if (decision === 'accept') {
-			await NotificationService.createPaperFinalAcceptanceNotifications({
-				paperId: String(paper.id || paper._id),
-				paperTitle,
-				authorId,
-				authorName,
-				editorId: String(user.id),
-				editorName,
-				reviewerIds,
-				hubId: paper.hubId ? String(paper.hubId) : undefined,
-				hubName: paper.hubName,
-				publicationDate: finalDecisionAt
-			});
-		} else {
-			await NotificationService.createPaperFinalRejectionNotifications({
-				paperId: String(paper.id || paper._id),
-				paperTitle,
-				authorId,
-				authorName,
-				editorId: String(user.id),
-				editorName,
-				reviewerIds,
-				rejectionReason,
-				hubId: paper.hubId ? String(paper.hubId) : undefined,
-				hubName: paper.hubName
-			});
-		}
 
 		return json({
 			success: true,

@@ -8,6 +8,23 @@
 	}
 
 	type StatusFilter = 'all' | 'pending' | 'accepted' | 'declined' | 'duplicate';
+	type ReviewerInvitationRow = {
+		key: string;
+		reviewerName: string;
+		reviewerEmail: string;
+		invitations: any[];
+		matchingInvitations: any[];
+		latestInvitation: any;
+		totalCount: number;
+		matchingCount: number;
+	};
+	type PaperInvitationGroup = {
+		key: string;
+		paperId: string;
+		title: string;
+		invitations: any[];
+		reviewerRows: ReviewerInvitationRow[];
+	};
 
 	let { data }: Props = $props();
 	const { hub, invitations } = data;
@@ -15,6 +32,7 @@
 	let loadingInviteId = $state<string | null>(null);
 	let statusFilter = $state<StatusFilter>('all');
 	let searchTerm = $state('');
+	let expandedReviewerRows = $state<string[]>([]);
 
 	let pendingCount = $derived(invitations.filter((invite) => invite.status === 'pending').length);
 	let duplicateCount = $derived(
@@ -25,18 +43,10 @@
 			.length
 	);
 
-	let filteredInvitations = $derived(
-		invitations.filter((invite) => {
-			const matchesStatus = statusFilter === 'all' || invite.status === statusFilter;
-			if (!matchesStatus) return false;
-
-			const term = searchTerm.trim().toLowerCase();
-			if (!term) return true;
-
-			return getSearchText(invite).includes(term);
-		})
+	let matchingInvitationIds = $derived(
+		new Set<string>(invitations.filter(matchesInvitationFilters).map(invitationKey))
 	);
-	let paperGroups = $derived(buildPaperGroups(filteredInvitations));
+	let paperGroups = $derived(buildPaperGroups(invitations, matchingInvitationIds));
 
 	function filterButtonClass(filter: StatusFilter) {
 		return statusFilter === filter
@@ -55,6 +65,10 @@
 
 	function reviewerName(invite: any) {
 		return personName(invite?.reviewer, 'Unknown reviewer');
+	}
+
+	function reviewerEmail(invite: any) {
+		return invite?.reviewer?.email || '';
 	}
 
 	// function paperTitle(paper: any) {
@@ -143,6 +157,7 @@
 		return [
 			paperTitle(invite.paper),
 			reviewerName(invite),
+			reviewerEmail(invite),
 			editorName(invite),
 			originalEditorName(invite),
 			roleLabel(invite),
@@ -154,18 +169,117 @@
 			.toLowerCase();
 	}
 
-	function buildPaperGroups(list: any[]) {
-		const groups = new Map<string, { key: string; title: string; invitations: any[] }>();
+	function invitationKey(invite: any) {
+		return String(
+			invite?._id ||
+				invite?.id ||
+				`${invite?.paperId || ''}:${invite?.reviewerId || ''}:${
+					invite?.createdAt || invite?.invitedAt || ''
+				}`
+		);
+	}
+
+	function reviewerKey(invite: any) {
+		return String(
+			invite?.reviewerId || invite?.reviewer?._id || invite?.reviewer?.id || reviewerName(invite)
+		);
+	}
+
+	function invitationTimestamp(invite: any) {
+		const value = invite?.createdAt || invite?.invitedAt || invite?.updatedAt;
+		if (!value) return 0;
+		const date = new Date(value);
+		return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+	}
+
+	function sortInvitationsByLatest(list: any[]) {
+		return [...list].sort((left, right) => invitationTimestamp(right) - invitationTimestamp(left));
+	}
+
+	function matchesInvitationFilters(invite: any) {
+		const matchesStatus = statusFilter === 'all' || invite.status === statusFilter;
+		if (!matchesStatus) return false;
+
+		const term = searchTerm.trim().toLowerCase();
+		if (!term) return true;
+
+		return getSearchText(invite).includes(term);
+	}
+
+	function isReviewerRowExpanded(rowKey: string) {
+		return expandedReviewerRows.includes(rowKey);
+	}
+
+	function toggleReviewerRow(rowKey: string) {
+		expandedReviewerRows = isReviewerRowExpanded(rowKey)
+			? expandedReviewerRows.filter((key) => key !== rowKey)
+			: [...expandedReviewerRows, rowKey];
+	}
+
+	function buildPaperGroups(list: any[], matchingIds: Set<string>): PaperInvitationGroup[] {
+		const groups = new Map<
+			string,
+			{ key: string; paperId: string; title: string; invitations: any[] }
+		>();
 
 		for (const invite of list) {
 			const title = paperTitle(invite.paper);
 			const key = invite.paperId || title;
-			const current = groups.get(key) || { key, title, invitations: [] as any[] };
+			const current = groups.get(key) || {
+				key,
+				paperId: invite.paperId || '',
+				title,
+				invitations: [] as any[]
+			};
 			current.invitations.push(invite);
 			groups.set(key, current);
 		}
 
-		return [...groups.values()].sort((left, right) => left.title.localeCompare(right.title));
+		return [...groups.values()]
+			.map((group) => {
+				const reviewers = new Map<string, any[]>();
+
+				for (const invite of group.invitations) {
+					const key = reviewerKey(invite);
+					const current = reviewers.get(key) || [];
+					current.push(invite);
+					reviewers.set(key, current);
+				}
+
+				const reviewerRows = [...reviewers.entries()]
+					.map(([key, reviewerInvitations]) => {
+						const orderedInvitations = sortInvitationsByLatest(reviewerInvitations);
+						const matchingInvitations = orderedInvitations.filter((invite) =>
+							matchingIds.has(invitationKey(invite))
+						);
+						const latestInvitation = matchingInvitations[0] || orderedInvitations[0];
+
+						return {
+							key: `${group.key}:${key}`,
+							reviewerName: reviewerName(latestInvitation),
+							reviewerEmail: reviewerEmail(latestInvitation),
+							invitations: orderedInvitations,
+							matchingInvitations,
+							latestInvitation,
+							totalCount: orderedInvitations.length,
+							matchingCount: matchingInvitations.length
+						};
+					})
+					.filter((row) => row.matchingCount > 0)
+					.sort(
+						(left, right) =>
+							invitationTimestamp(right.latestInvitation) -
+								invitationTimestamp(left.latestInvitation) ||
+							left.reviewerName.localeCompare(right.reviewerName)
+					);
+
+				return {
+					...group,
+					reviewerRows
+				};
+			})
+			.filter((group) => group.reviewerRows.length > 0)
+			.sort((left, right) => left.title.localeCompare(right.title));
 	}
 
 	async function cancelInvitation(inviteId: string) {
@@ -286,100 +400,210 @@
 			{#each paperGroups as group}
 				<section class="overflow-hidden rounded-lg border border-surface-200 bg-white">
 					<div class="border-b border-surface-200 bg-surface-50 px-4 py-4">
-						<div class="text-xs font-semibold uppercase text-gray-500">Paper</div>
-						<h2 class="mt-1 text-lg font-semibold text-gray-950">{group.title}</h2>
+						<div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+							<div>
+								<div class="text-xs font-semibold uppercase text-gray-500">Paper</div>
+								<h2 class="mt-1 text-lg font-semibold text-gray-950">{group.title}</h2>
+								<div class="mt-2 text-xs font-medium text-gray-500">
+									{group.reviewerRows.length} reviewer rows / {group.invitations.length} total invitations
+								</div>
+							</div>
+							{#if group.paperId}
+								<a href="/publish/view/{group.paperId}" class="btn btn-sm preset-tonal">
+									<Icon icon="mdi:book-open-page-variant" class="size-4" />
+									View paper
+								</a>
+							{/if}
+						</div>
 					</div>
 
 					<div class="overflow-x-auto">
 						<table class="min-w-full divide-y divide-surface-200 text-sm">
 							<thead class="bg-white text-left text-xs font-semibold uppercase text-gray-500">
 								<tr>
-									<th class="px-4 py-3">Reviewer name</th>
-									<th class="px-4 py-3">Editor name</th>
-									<th class="px-4 py-3">Role badge</th>
-									<th class="px-4 py-3">Status badge</th>
-									<th class="px-4 py-3">Date</th>
+									<th class="px-4 py-3">Reviewer</th>
+									<th class="px-4 py-3">Latest invited by</th>
+									<th class="px-4 py-3">Role</th>
+									<th class="px-4 py-3">Latest status</th>
+									<th class="px-4 py-3">Invitations</th>
+									<th class="px-4 py-3">Latest date</th>
 									<th class="px-4 py-3 text-right">Actions</th>
 								</tr>
 							</thead>
 							<tbody class="divide-y divide-surface-100">
-								{#each group.invitations as invite (invite._id || invite.id)}
+								{#each group.reviewerRows as row (row.key)}
+									{@const latest = row.latestInvitation}
 									<tr class="align-top hover:bg-surface-50">
 										<td class="px-4 py-3">
-											<div class="font-medium text-gray-950">{reviewerName(invite)}</div>
-											{#if invite.status === 'duplicate'}
-												<div
-													class="mt-2 rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700"
-												>
-													<div class="font-semibold text-slate-900">
-														Duplicate invitation attempt
-													</div>
-													<div class="mt-1">
-														Reviewer already invited by:
-														<span class="font-medium">{originalEditorName(invite)}</span>
-													</div>
-													<div class="mt-1">
-														<span
-															class="inline-flex items-center rounded-full border px-2 py-0.5 font-semibold {roleClass(
-																originalEditorRole(invite)
-															)}"
-														>
-															{originalInvite(invite)?.invitedBy?.roleLabel ||
-																originalInvite(invite)?.invitedBy?.role ||
-																roleLabel(invite)}
-														</span>
-													</div>
-												</div>
+											<div class="font-medium text-gray-950">{row.reviewerName}</div>
+											{#if row.reviewerEmail}
+												<div class="mt-0.5 text-xs text-gray-500">{row.reviewerEmail}</div>
 											{/if}
 										</td>
-										<td class="px-4 py-3 text-gray-800">{editorName(invite)}</td>
+										<td class="px-4 py-3 text-gray-800">{editorName(latest)}</td>
 										<td class="px-4 py-3">
 											<span
 												class="inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold {roleClass(
-													rawRole(invite)
+													rawRole(latest)
 												)}"
 											>
-												{roleLabel(invite)}
+												{roleLabel(latest)}
 											</span>
 										</td>
 										<td class="px-4 py-3">
 											<span
 												class="inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold {statusClass(
-													invite.status
+													latest.status
 												)}"
 											>
-												{invite.statusLabel}
+												{latest.statusLabel || latest.status}
 											</span>
 										</td>
+										<td class="px-4 py-3">
+											<span
+												class="inline-flex min-w-9 justify-center rounded-full border border-surface-200 bg-surface-50 px-3 py-1 text-sm font-semibold text-gray-900"
+											>
+												{row.totalCount}
+											</span>
+											{#if row.matchingCount !== row.totalCount}
+												<div class="mt-1 text-xs text-gray-500">
+													{row.matchingCount} matching filter
+												</div>
+											{/if}
+										</td>
 										<td class="px-4 py-3 text-gray-600"
-											>{formatDate(invite.createdAt || invite.invitedAt)}</td
+											>{formatDate(latest.createdAt || latest.invitedAt)}</td
 										>
 										<td class="px-4 py-3">
 											<div class="flex justify-end gap-2">
-												{#if invite.paperId}
-													<a href="/publish/view/{invite.paperId}" class="btn btn-sm preset-tonal">
-														<Icon icon="mdi:book-open-page-variant" class="size-4" />
-														View
-													</a>
-												{/if}
-												{#if invite.status === 'pending'}
-													<button
-														class="btn btn-sm preset-filled-error-500"
-														disabled={loadingInviteId === (invite._id || invite.id)}
-														onclick={() => cancelInvitation(invite._id || invite.id)}
-													>
-														{#if loadingInviteId === (invite._id || invite.id)}
-															<Icon icon="eos-icons:loading" class="size-4" />
-															Cancelling
-														{:else}
-															<Icon icon="mdi:close" class="size-4" />
-															Cancel
-														{/if}
-													</button>
-												{/if}
+												<button
+													type="button"
+													class="btn btn-sm preset-tonal"
+													aria-expanded={isReviewerRowExpanded(row.key)}
+													onclick={() => toggleReviewerRow(row.key)}
+												>
+													<Icon
+														icon={isReviewerRowExpanded(row.key)
+															? 'mdi:chevron-up'
+															: 'mdi:chevron-down'}
+														class="size-4"
+													/>
+													Details
+												</button>
 											</div>
 										</td>
 									</tr>
+									{#if isReviewerRowExpanded(row.key)}
+										<tr class="bg-surface-50/70">
+											<td colspan="7" class="px-4 pb-4 pt-0">
+												<div
+													class="mt-1 overflow-hidden rounded-lg border border-surface-200 bg-white"
+												>
+													<div
+														class="flex flex-wrap items-center justify-between gap-2 border-b border-surface-200 px-4 py-3"
+													>
+														<div class="text-sm font-semibold text-gray-950">
+															Invitation history for {row.reviewerName}
+														</div>
+														<div class="text-xs font-medium text-gray-500">
+															{row.totalCount} total invitations
+														</div>
+													</div>
+													<div class="overflow-x-auto">
+														<table class="min-w-full text-sm">
+															<thead
+																class="bg-surface-50 text-left text-xs font-semibold uppercase text-gray-500"
+															>
+																<tr>
+																	<th class="px-4 py-3">Invited by</th>
+																	<th class="px-4 py-3">Role</th>
+																	<th class="px-4 py-3">Status</th>
+																	<th class="px-4 py-3">Date</th>
+																	<th class="px-4 py-3">Context</th>
+																	<th class="px-4 py-3 text-right">Action</th>
+																</tr>
+															</thead>
+															<tbody class="divide-y divide-surface-100">
+																{#each row.invitations as invite (invite._id || invite.id)}
+																	<tr>
+																		<td class="px-4 py-3 text-gray-800">{editorName(invite)}</td>
+																		<td class="px-4 py-3">
+																			<span
+																				class="inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold {roleClass(
+																					rawRole(invite)
+																				)}"
+																			>
+																				{roleLabel(invite)}
+																			</span>
+																		</td>
+																		<td class="px-4 py-3">
+																			<span
+																				class="inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold {statusClass(
+																					invite.status
+																				)}"
+																			>
+																				{invite.statusLabel || invite.status}
+																			</span>
+																		</td>
+																		<td class="px-4 py-3 text-gray-600">
+																			{formatDate(invite.createdAt || invite.invitedAt)}
+																		</td>
+																		<td class="px-4 py-3">
+																			{#if invite.status === 'duplicate'}
+																				<div class="text-xs text-slate-700">
+																					<div>
+																						Already invited by:
+																						<span class="font-medium"
+																							>{originalEditorName(invite)}</span
+																						>
+																					</div>
+																					<div class="mt-1">
+																						<span
+																							class="inline-flex items-center rounded-full border px-2 py-0.5 font-semibold {roleClass(
+																								originalEditorRole(invite)
+																							)}"
+																						>
+																							{originalInvite(invite)?.invitedBy?.roleLabel ||
+																								originalInvite(invite)?.invitedBy?.role ||
+																								roleLabel(invite)}
+																						</span>
+																					</div>
+																				</div>
+																			{:else}
+																				<span class="text-gray-400">-</span>
+																			{/if}
+																		</td>
+																		<td class="px-4 py-3">
+																			<div class="flex justify-end">
+																				{#if invite.status === 'pending'}
+																					<button
+																						class="btn btn-sm preset-filled-error-500"
+																						disabled={loadingInviteId === (invite._id || invite.id)}
+																						onclick={() =>
+																							cancelInvitation(invite._id || invite.id)}
+																					>
+																						{#if loadingInviteId === (invite._id || invite.id)}
+																							<Icon icon="eos-icons:loading" class="size-4" />
+																							Cancelling
+																						{:else}
+																							<Icon icon="mdi:close" class="size-4" />
+																							Cancel
+																						{/if}
+																					</button>
+																				{:else}
+																					<span class="text-xs text-gray-400">-</span>
+																				{/if}
+																			</div>
+																		</td>
+																	</tr>
+																{/each}
+															</tbody>
+														</table>
+													</div>
+												</div>
+											</td>
+										</tr>
+									{/if}
 								{/each}
 							</tbody>
 						</table>

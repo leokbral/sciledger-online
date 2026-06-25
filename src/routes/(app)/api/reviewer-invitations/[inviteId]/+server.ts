@@ -3,7 +3,7 @@ import Hubs from '$lib/db/models/Hub';
 import Users from '$lib/db/models/User';
 import { resolveUserIdentifiers } from '$lib/helpers/userIdentifiers';
 import { json } from '@sveltejs/kit';
-import { NotificationService } from '$lib/services/NotificationService';
+import { emitEvent } from '$lib/services/EventService';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import { assignHighestHubRole } from '$lib/server/authorization/roleAssignmentService';
 import { resolveEffectiveHubRoles } from '$lib/server/authorization/effectiveHubRoles';
@@ -74,45 +74,37 @@ export async function POST({ params, request, locals }) {
 				{ auditUser: user }
 			);
 
-			await Promise.all(
-				hubOwnerIds.map((hubOwnerId) =>
-					NotificationService.createNotification({
-						user: hubOwnerId,
-						type: 'hub_reviewer_accepted',
-						title: 'Reviewer Accepted Invitation',
-						content: `${reviewerName} accepted the invitation as ${acceptedRole === 'vice_manager' ? 'Editor-in-chief' : 'reviewer'} for "${hub.title}"`,
-						relatedHubId: String(invitation.hubId),
-						actionUrl: `/notifications`,
-						priority: 'medium',
-						metadata: {
-							reviewerName,
-							reviewerId: normalizedReviewerId,
-							hubName: hub.title,
-							role: acceptedRole
-						}
-					})
-				)
-			);
-		} else {
-			await Promise.all(
-				hubOwnerIds.map((hubOwnerId) =>
-					NotificationService.createNotification({
-						user: hubOwnerId,
-						type: 'hub_reviewer_declined',
-						title: 'Reviewer Declined Invitation',
-						content: `${reviewerName} has declined the invitation to review for "${hub.title}"`,
-						relatedHubId: String(invitation.hubId),
-						actionUrl: `/notifications`,
-						priority: 'low',
-						metadata: {
-							reviewerName,
-							reviewerId: normalizedReviewerId,
-							hubName: hub.title,
-							role: acceptedRole
-						}
-					})
-				)
-			);
+		}
+
+		const hubId = String(hub.id || hub._id || invitation.hubId);
+		const recipients = [...new Set([...hubOwnerIds, normalizedReviewerId].filter(Boolean))];
+		if (recipients.length > 0) {
+			try {
+				await emitEvent({
+					type: action === 'accept' ? 'hub.invitation.accepted' : 'hub.invitation.declined',
+					actorId: user.id,
+					recipients,
+					entityType: 'hub',
+					entityId: hubId,
+					metadata: {
+						hubId,
+						hubName: hub.title,
+						invitationId: String(invitation.id || invitation._id),
+						inviteeId: normalizedReviewerId,
+						inviteeName: reviewerName,
+						reviewerId: normalizedReviewerId,
+						role: acceptedRole === 'vice_manager' ? 'Editor-in-chief' : 'reviewer',
+						recipientRoles: Object.fromEntries(
+							recipients.map((recipientId) => [
+								recipientId,
+								recipientId === normalizedReviewerId ? 'invitee' : 'manager'
+							])
+						)
+					}
+				});
+			} catch (eventError) {
+				console.error(`Failed to emit hub invitation ${action} event:`, eventError);
+			}
 		}
 
 		await Invitation.findByIdAndDelete(inviteId);

@@ -5,6 +5,7 @@ import { start_mongo } from '$lib/db/mongooseConnection';
 import Hubs from '$lib/db/models/Hub';
 import Users from '$lib/db/models/User';
 import { ensureHubOwnerAssignment, ensureHubRoles } from '$lib/server/authorization/bootstrapRbac';
+import { emitEvent } from '$lib/services/EventService';
 
 export const POST: RequestHandler = async ({ request }) => {
     await start_mongo();
@@ -127,6 +128,26 @@ export const POST: RequestHandler = async ({ request }) => {
         user.hubs = user.hubs || [];
         user.hubs.push(newHub.id);
         await user.save();
+
+        try {
+            await emitEvent({
+                type: 'hub.created',
+                actorId: createdBy.id,
+                recipients: [createdBy.id],
+                entityType: 'hub',
+                entityId: newHub.id,
+                metadata: {
+                    hubId: newHub.id,
+                    hubName: newHub.title,
+                    status: newHub.status,
+                    recipientRoles: {
+                        [createdBy.id]: 'owner'
+                    }
+                }
+            });
+        } catch (eventError) {
+            console.error('Failed to emit hub created event:', eventError);
+        }
 
         return json({ hub: { id: newHub.id } }, { status: 201 });
     } catch (error) {

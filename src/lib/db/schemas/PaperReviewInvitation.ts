@@ -13,7 +13,7 @@ export const PaperReviewInvitationSchema: Schema = new Schema(
 		hubId: { type: String, ref: 'Hub', default: null },
 		status: {
 			type: String,
-			enum: ['pending', 'accepted', 'declined', 'duplicate'],
+			enum: ['pending', 'accepted', 'declined', 'expired', 'cancelled', 'duplicate'],
 			default: 'pending',
 			required: true
 		},
@@ -21,7 +21,15 @@ export const PaperReviewInvitationSchema: Schema = new Schema(
 		customDeadlineDays: { type: Number, default: 15 },
 		reviewAssignmentId: { type: String, ref: 'ReviewAssignment' },
 		invitedAt: { type: Date, default: Date.now, required: true },
+		expiresAt: {
+			type: Date,
+			default: () => new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+		},
 		respondedAt: { type: Date },
+		expiredAt: { type: Date },
+		cancelledAt: { type: Date },
+		resendCount: { type: Number, default: 0 },
+		parentInvitationId: { type: String, ref: 'PaperReviewInvitation', default: null },
 		createdAt: { type: Date, default: Date.now },
 		updatedAt: { type: Date, default: Date.now }
 	},
@@ -33,3 +41,13 @@ PaperReviewInvitationSchema.index({ paperId: 1, reviewerId: 1, status: 1 });
 PaperReviewInvitationSchema.index({ reviewer: 1, status: 1 });
 PaperReviewInvitationSchema.index({ reviewerId: 1, status: 1 });
 PaperReviewInvitationSchema.index({ hubId: 1 });
+PaperReviewInvitationSchema.index({ status: 1, expiresAt: 1 });
+PaperReviewInvitationSchema.index({ parentInvitationId: 1 });
+PaperReviewInvitationSchema.index(
+	{ paperId: 1, reviewerId: 1 },
+	{
+		unique: true,
+		partialFilterExpression: { status: 'pending' },
+		name: 'unique_pending_paper_review_invitation'
+	}
+);

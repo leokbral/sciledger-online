@@ -3,6 +3,7 @@ import { json } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import Papers from '$lib/db/models/Paper';
 import { authorize } from '$lib/server/authorization/authorizationService';
+import { emitPaperLifecycleEvent } from '$lib/server/paperLifecycleEvents';
 
 export const PATCH: RequestHandler = async ({ request, params, locals }) => {
     await start_mongo();
@@ -72,6 +73,23 @@ export const PATCH: RequestHandler = async ({ request, params, locals }) => {
 
         if (!updatedPaper) {
             return json({ error: 'Paper not found.' }, { status: 404 });
+        }
+
+        try {
+            await emitPaperLifecycleEvent('paper.correction_deadline.updated', updatedPaper, {
+                actorId: user.id,
+                editorIds: [user.id],
+                metadata: {
+                    endpoint: '/api/papers/[id]/correction-deadline',
+                    deadline: updateData.correctionDeadline?.toISOString(),
+                    previousDeadline: currentPaper.correctionDeadline
+                        ? new Date(currentPaper.correctionDeadline).toISOString()
+                        : null,
+                    correctionAcceptedAt: updateData.correctionAcceptedAt?.toISOString()
+                }
+            });
+        } catch (eventError) {
+            console.error('Failed to emit correction deadline event:', eventError);
         }
 
         return json({ success: true, paper: updatedPaper }, { status: 200 });

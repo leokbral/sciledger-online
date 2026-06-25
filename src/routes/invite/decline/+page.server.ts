@@ -3,11 +3,8 @@ import type { Actions, PageServerLoad } from './$types';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import mongoose from 'mongoose';
 import { EmailReviewerInvitationSchema } from '$lib/db/schemas/EmailReviewerInvitation.js';
-import { NotificationService } from '$lib/services/NotificationService';
+import { emitEvent } from '$lib/services/EventService';
 import Hubs from '$lib/db/models/Hub';
-import Users from '$lib/db/models/User';
-import nodemailer from 'nodemailer';
-import { env } from '$env/dynamic/private';
 import { resolveEffectiveHubRoles } from '$lib/server/authorization/effectiveHubRoles';
 
 if (mongoose.models.EmailReviewerInvitation) {
@@ -18,8 +15,6 @@ const EmailReviewerInvitation = mongoose.model(
 	'EmailReviewerInvitation',
 	EmailReviewerInvitationSchema
 );
-
-let transporter: nodemailer.Transporter | null = null;
 
 const DECLINE_CATEGORIES = [
 	'lack_of_time',
@@ -38,33 +33,6 @@ const DECLINE_LABELS: Record<DeclineCategory, string> = {
 	already_overloaded: 'Already overloaded',
 	other: 'Other'
 };
-
-function getTransporter(): nodemailer.Transporter | null {
-	if (transporter) return transporter;
-
-	if (!env.SMTP_USER || !env.SMTP_PASS) {
-		return null;
-	}
-
-	const smtpPort = Number(env.SMTP_PORT || 587);
-	transporter = nodemailer.createTransport({
-		host: env.SMTP_HOST || 'smtp.gmail.com',
-		port: smtpPort,
-		secure: env.SMTP_SECURE === 'true' || smtpPort === 465,
-		auth: {
-			user: env.SMTP_USER,
-			pass: env.SMTP_PASS
-		}
-	});
-
-	return transporter;
-}
-
-async function findUserByAnyId(userId: string | null | undefined) {
-	if (!userId) return null;
-	const id = String(userId);
-	return Users.findOne({ $or: [{ _id: id }, { id }] }).lean();
-}
 
 export const load: PageServerLoad = async ({ url }) => {
 	const token = url.searchParams.get('token');
@@ -172,53 +140,33 @@ export const actions: Actions = {
 				effectiveHubRoles.members.find((member) => member.primaryRoleKey === 'HubOwner')?.userId ||
 				'';
 		}
-		const manager = await findUserByAnyId(managerId);
-
 		if (managerId) {
 			const declineLabel = DECLINE_LABELS[category] || category;
-			const detailsSuffix = reason ? ` Reason details: ${reason}` : '';
 
 			try {
-				await NotificationService.createNotification({
-					user: managerId,
-					type: 'hub_reviewer_declined',
-					title: 'Reviewer Declined Email Invitation',
-					content: `${invitation.email} declined the reviewer invitation for "${hub?.title || 'your hub'}". Reason: ${declineLabel}.${detailsSuffix}`,
-					relatedHubId: String(invitation.hubId),
-					actionUrl: '/notifications',
-					priority: 'medium',
+				await emitEvent({
+					type: 'hub.invitation.declined',
+					actorId: null,
+					recipients: [managerId],
+					entityType: 'hub',
+					entityId: String(invitation.hubId),
 					metadata: {
-						inviteeEmail: invitation.email,
+						hubId: String(invitation.hubId),
 						hubName: hub?.title || null,
+						inviteeEmail: invitation.email,
+						inviteeName: invitation.email,
 						declineCategory: category,
+						declineLabel,
 						declineReason: reason || null,
 						paperId: invitation.paperId || null,
-						source: 'email_reviewer_invitation'
+						source: 'email_reviewer_invitation',
+						recipientRoles: {
+							[managerId]: 'manager'
+						}
 					}
 				});
-			} catch (notifyError) {
-				console.error('Failed to create decline notification for manager:', notifyError);
-			}
-
-			try {
-				const smtpTransporter = getTransporter();
-				if (smtpTransporter && manager?.email) {
-					await smtpTransporter.sendMail({
-						from: `"SciLedger Team" <${env.SMTP_USER}>`,
-						to: manager.email,
-						subject: `Reviewer declined invitation - ${hub?.title || 'Hub'}`,
-						html: `
-							<p>Hello ${(manager.firstName || '').trim() || 'Hub Manager'},</p>
-							<p>The invited reviewer <strong>${invitation.email}</strong> declined your invitation for the hub <strong>${hub?.title || 'your hub'}</strong>.</p>
-							<p><strong>Reason:</strong> ${declineLabel}</p>
-							${reason ? `<p><strong>Additional details:</strong> ${reason}</p>` : ''}
-							${invitation.paperId ? `<p><strong>Paper reference:</strong> ${String(invitation.paperId)}</p>` : ''}
-							<p>You can view this update in your SciLedger notifications.</p>
-						`
-					});
-				}
-			} catch (emailError) {
-				console.error('Failed to send decline email copy to manager:', emailError);
+			} catch (eventError) {
+				console.error('Failed to emit hub invitation declined event:', eventError);
 			}
 		}
 

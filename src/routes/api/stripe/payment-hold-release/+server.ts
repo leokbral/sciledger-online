@@ -4,11 +4,34 @@ import type { RequestHandler } from './$types';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import Papers from '$lib/db/models/Paper';
 import { env } from '$env/dynamic/private';
+import { emitEvent } from '$lib/services/EventService';
 
 function getStripe() {
   const stripeSecretKey = env.STRIPE_SECRET_KEY;
   if (!stripeSecretKey) return null;
   return new Stripe(stripeSecretKey);
+}
+
+function normalizeUserId(value: any): string {
+  if (!value) return '';
+  if (typeof value === 'string') return value;
+  if (value.id) return String(value.id);
+  if (value._id) return String(value._id);
+  return String(value);
+}
+
+function getPaperRecipients(paper: any) {
+  return [
+    ...new Set(
+      [
+        normalizeUserId(paper.mainAuthor),
+        normalizeUserId(paper.correspondingAuthor),
+        normalizeUserId(paper.submittedBy),
+        ...(paper.coAuthors || []).map(normalizeUserId),
+        ...(paper.authors || []).map(normalizeUserId)
+      ].filter(Boolean)
+    )
+  ];
 }
 
 export const POST: RequestHandler = async ({ request }) => {
@@ -67,6 +90,31 @@ export const POST: RequestHandler = async ({ request }) => {
     paper.paymentHold.releasedAt = new Date();
     paper.paymentHold.failureReason = reason || 'Paper rejected or cancelled';
     await paper.save();
+
+    const recipients = getPaperRecipients(paper);
+    if (recipients.length > 0) {
+      try {
+        await emitEvent({
+          type: 'payment.hold.released',
+          actorId: null,
+          recipients,
+          entityType: 'paper',
+          entityId: String(paper.id || paper._id),
+          metadata: {
+            paperId: String(paper.id || paper._id),
+            paperTitle: paper.title,
+            amount: paper.paymentHold.amount,
+            currency: paper.paymentHold.currency || 'brl',
+            paymentStatus: paper.paymentHold.status,
+            stripePaymentIntentId: paper.paymentHold.stripePaymentIntentId,
+            reason: paper.paymentHold.failureReason,
+            recipientRoles: Object.fromEntries(recipients.map((recipientId) => [recipientId, 'author']))
+          }
+        });
+      } catch (eventError) {
+        console.error('Failed to emit payment hold released event:', eventError);
+      }
+    }
 
     return json({
       success: true,

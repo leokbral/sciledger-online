@@ -4,12 +4,14 @@ import { start_mongo } from '$lib/db/mongooseConnection';
 import Papers from '$lib/db/models/Paper';
 import PaperReviewInvitation from '$lib/db/models/PaperReviewInvitation';
 import Users from '$lib/db/models/User';
-import { NotificationService } from '$lib/services/NotificationService';
 import { authorize } from '$lib/server/authorization/authorizationService';
+import { emitPaperReviewInvitationEvent } from '$lib/server/reviewInvitationLifecycle';
 import {
 	buildDuplicateInvitationDetails,
 	findActiveReviewInvitation,
 	getIdAliases,
+	getNewReviewInvitationExpiresAt,
+	savePendingReviewInvitationOrFindExisting,
 	selectInvitationRole
 } from '$lib/server/reviewInvitations';
 import type { RequestHandler } from './$types';
@@ -46,7 +48,10 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 		if (isStandalonePaper && !hasAuthorizedPaymentHold) {
 			return json(
-				{ error: 'Payment authorization is required before inviting reviewers for standalone papers.' },
+				{
+					error:
+						'Payment authorization is required before inviting reviewers for standalone papers.'
+				},
 				{ status: 403 }
 			);
 		}
@@ -84,7 +89,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		const duplicates = [];
 
 		for (const rawReviewerId of normalizedReviewerIds) {
-			const reviewer = await Users.findOne({ $or: [{ id: rawReviewerId }, { _id: rawReviewerId }] });
+			const reviewer = await Users.findOne({
+				$or: [{ id: rawReviewerId }, { _id: rawReviewerId }]
+			});
 			if (!reviewer) {
 				console.warn(`Reviewer ${rawReviewerId} not found`);
 				skipped.push({ reviewerId: rawReviewerId, reasons: ['Reviewer not found'] });
@@ -117,6 +124,12 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 					hubId: paper.hubId || null
 				});
 				await duplicateInvitation.save();
+				await emitPaperReviewInvitationEvent('review.invitation.duplicate', duplicateInvitation, {
+					actorId: user.id,
+					metadata: {
+						duplicateOf: String(existingInvite.id || existingInvite._id)
+					}
+				});
 
 				const duplicateDetails = await buildDuplicateInvitationDetails(existingInvite);
 				duplicates.push(duplicateDetails);
@@ -129,6 +142,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			}
 
 			const invitationId = randomUUID();
+			const invitedAt = new Date();
 			const invitation = new PaperReviewInvitation({
 				_id: invitationId,
 				id: invitationId,
@@ -141,23 +155,66 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 					role: invitedByRole
 				},
 				status: 'pending',
-				invitedAt: new Date(),
+				resendCount: 0,
+				invitedAt,
+				expiresAt: getNewReviewInvitationExpiresAt(invitedAt),
+				createdAt: invitedAt,
+				updatedAt: invitedAt,
 				hubId: paper.hubId || null
 			});
 
-			await invitation.save();
-			invitations.push(invitation);
-
-			try {
-				await NotificationService.createPaperReviewRequest({
-					reviewerId: normalizedReviewerId,
+			const saveResult = await savePendingReviewInvitationOrFindExisting(
+				invitation,
+				paperAliases,
+				reviewerAliases
+			);
+			if (!saveResult.created) {
+				const existingInvite = saveResult.invitation;
+				const duplicateId = randomUUID();
+				const duplicateInvitation = new PaperReviewInvitation({
+					_id: duplicateId,
+					id: duplicateId,
 					paperId: normalizedPaperId,
-					paperTitle: paper.title,
-					authorName: `${user.firstName} ${user.lastName}`
+					paper: normalizedPaperId,
+					reviewerId: normalizedReviewerId,
+					reviewer: normalizedReviewerId,
+					invitedBy: {
+						userId: user.id,
+						role: invitedByRole
+					},
+					status: 'duplicate',
+					duplicateOf: String(existingInvite.id || existingInvite._id),
+					invitedAt: new Date(),
+					createdAt: new Date(),
+					hubId: paper.hubId || null
 				});
-			} catch (notifyError) {
-				console.error('Failed to create notification:', notifyError);
+				await duplicateInvitation.save();
+				await emitPaperReviewInvitationEvent('review.invitation.duplicate', duplicateInvitation, {
+					actorId: user.id,
+					metadata: {
+						duplicateOf: String(existingInvite.id || existingInvite._id),
+						source: 'unique_pending_index'
+					}
+				});
+
+				const duplicateDetails = await buildDuplicateInvitationDetails(existingInvite);
+				duplicates.push(duplicateDetails);
+				skipped.push({
+					reviewerId: rawReviewerId,
+					reasons: ['Reviewer already invited for this paper'],
+					existingInvitation: duplicateDetails
+				});
+				continue;
 			}
+
+			invitations.push(saveResult.invitation);
+
+			await emitPaperReviewInvitationEvent('review.invitation.created', saveResult.invitation, {
+				actorId: user.id,
+				metadata: {
+					source: 'api.review.assign'
+				}
+			});
 		}
 
 		paper.updatedAt = new Date();

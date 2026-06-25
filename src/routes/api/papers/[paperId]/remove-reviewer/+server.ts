@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import Papers from '$lib/db/models/Paper';
 import { authorize } from '$lib/server/authorization/authorizationService';
+import { emitEvent } from '$lib/services/EventService';
 
 export async function POST({ params, request, locals }) {
     try {
@@ -34,12 +35,41 @@ export async function POST({ params, request, locals }) {
         }
 
         // Remover o revisor do array
-        if (paper.reviewers && paper.reviewers.includes(reviewerId)) {
-            paper.reviewers = paper.reviewers.filter(r => r !== reviewerId);
+        if (paper.reviewers && paper.reviewers.some((reviewer: unknown) => String(reviewer) === String(reviewerId))) {
+            paper.reviewers = paper.reviewers.filter((reviewer: unknown) => String(reviewer) !== String(reviewerId));
             await paper.save();
 
-            return json({ 
-                success: true, 
+            const actorId = String(locals.user.id || locals.user._id || '');
+            const recipients = [...new Set([String(reviewerId), actorId].filter(Boolean))];
+            const hubId = paper.hubId ? String(paper.hubId) : null;
+
+            try {
+                await emitEvent({
+                    type: 'review.assignment.removed',
+                    actorId,
+                    recipients,
+                    entityType: 'review',
+                    entityId: String(paper.id || paper._id || paperId),
+                    metadata: {
+                        paperId: String(paper.id || paper._id || paperId),
+                        paperTitle: paper.title,
+                        hubId,
+                        reviewerId: String(reviewerId),
+                        removedBy: actorId,
+                        recipientRoles: Object.fromEntries(
+                            recipients.map((recipientId) => [
+                                recipientId,
+                                recipientId === String(reviewerId) ? 'reviewer' : 'editor'
+                            ])
+                        )
+                    }
+                });
+            } catch (eventError) {
+                console.error('Failed to emit review assignment removed event:', eventError);
+            }
+
+            return json({
+                success: true,
                 message: 'Reviewer removed successfully',
                 reviewers: paper.reviewers
             });

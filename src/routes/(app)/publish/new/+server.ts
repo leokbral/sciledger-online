@@ -5,16 +5,14 @@ import * as crypto from 'crypto';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import Papers from '$lib/db/models/Paper';
 import Users from '$lib/db/models/User';
-import Hubs from '$lib/db/models/Hub';
 import type { User } from '$lib/types/User';
 import Stripe from 'stripe';
-import { PaperLifecycleEmailService } from '$lib/services/PaperLifecycleEmailService';
 import { can } from '$lib/server/authorization/authorizationService';
 import { getUserIdAliases } from '$lib/server/authorization/roleResolver';
-import { resolveEffectiveHubRoles } from '$lib/server/authorization/effectiveHubRoles';
+import { emitPaperLifecycleEvent } from '$lib/server/paperLifecycleEvents';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
-  apiVersion: '2026-02-25.preview'
+  apiVersion: '2026-02-25.preview' as Stripe.LatestApiVersion
 });
 
 function normalizeAuthorAffiliations(input: unknown) {
@@ -83,11 +81,15 @@ export const POST: RequestHandler = async ({ request, locals }) => {
             const paymentIntent = await stripe.paymentIntents.retrieve(paymentAuthorizationCode);
             
             if (paymentIntent.status !== 'succeeded' && paymentIntent.status !== 'requires_capture') {
-                return json({ 
+                return json({
                     error: `Invalid payment authorization status: ${paymentIntent.status}. Please complete the payment hold.`,
                     currentStatus: paymentIntent.status
                 }, { status: 403 });
             }
+
+            const paymentIntentWithCharges = paymentIntent as Stripe.PaymentIntent & {
+                charges?: { data?: Array<{ receipt_url?: string | null }> };
+            };
 
             paymentIntentData = {
                 stripePaymentIntentId: paymentIntent.id,
@@ -95,7 +97,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
                 amount: paymentIntent.amount,
                 currency: paymentIntent.currency,
                 authorizedAt: new Date(paymentIntent.created * 1000),
-                receiptUrl: paymentIntent.charges.data[0]?.receipt_url || null
+                receiptUrl: paymentIntentWithCharges.charges?.data?.[0]?.receipt_url || null
             };
         } catch (stripeError) {
             if (requiresPaymentAuthorization) {
@@ -152,52 +154,33 @@ export const POST: RequestHandler = async ({ request, locals }) => {
             }
         }
 
-        // Email de comprovante apenas para submissao (nao para rascunho)
-        if (newPaper.status && newPaper.status !== 'draft') {
-            const authorIds = [
-                String(newPaper.mainAuthor || ''),
-                String(newPaper.correspondingAuthor || ''),
-                String(newPaper.submittedBy || ''),
-                ...((newPaper.coAuthors || []).map((id: string) => String(id)))
-            ].filter(Boolean);
+        if (!newPaper.status || newPaper.status === 'draft') {
+            try {
+                await emitPaperLifecycleEvent('paper.created', newPaper, {
+                    actorId: user.id,
+                    metadata: {
+                        endpoint: '/publish/new'
+                    }
+                });
+            } catch (eventError) {
+                console.error('Failed to emit paper created event:', eventError);
+            }
+        }
 
+        // Evento de submissao apenas para submissao (nao para rascunho)
+        if (newPaper.status && newPaper.status !== 'draft') {
             const submitterName = `${(submittedBy?.firstName || '').trim()} ${(submittedBy?.lastName || '').trim()}`.trim();
 
             try {
-                await PaperLifecycleEmailService.sendSubmissionConfirmation({
-                    paperId: String(newPaper.id),
-                    paperTitle: String(newPaper.title || 'Paper sem titulo'),
-                    authorIds,
-                    submittedByName: submitterName || undefined
+                await emitPaperLifecycleEvent('paper.submitted', newPaper, {
+                    actorId: user.id,
+                    metadata: {
+                        endpoint: '/publish/new',
+                        submittedByName: submitterName || undefined
+                    }
                 });
-            } catch (emailError) {
-                console.error('Failed to send paper submission email:', emailError);
-            }
-
-            if (newPaper.hubId) {
-                try {
-                    const hub = await Hubs.findById(String(newPaper.hubId)).lean();
-                    const effectiveHubRoles = hub ? await resolveEffectiveHubRoles(hub) : null;
-                    const hubOwnerIds =
-                        effectiveHubRoles?.members
-                            .filter((member) => member.primaryRoleKey === 'HubOwner')
-                            .map((member) => member.userId)
-                            .filter(Boolean) ?? [];
-
-                    await Promise.all(
-                        hubOwnerIds.map((hubAdminId) =>
-                            PaperLifecycleEmailService.sendHubAdminSubmissionEmail({
-                                hubAdminId,
-                                hubName: String(hub?.title || 'Hub'),
-                                paperId: String(newPaper.id),
-                                paperTitle: String(newPaper.title || 'Untitled paper'),
-                                submittedByName: submitterName || undefined
-                            })
-                        )
-                    );
-                } catch (adminEmailError) {
-                    console.error('Failed to send hub admin submission email:', adminEmailError);
-                }
+            } catch (eventError) {
+                console.error('Failed to emit paper submission event:', eventError);
             }
         }
 

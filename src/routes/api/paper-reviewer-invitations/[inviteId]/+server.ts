@@ -9,14 +9,15 @@ import ReviewAssignment from '$lib/db/models/ReviewAssignment';
 import { MAX_ACTIVE_REVIEW_ASSIGNMENTS } from '$lib/constants/reviewerLimits';
 import { checkReviewerEligibility } from '$lib/helpers/reviewerEligibility';
 import { resolveUserIdentifiers } from '$lib/helpers/userIdentifiers';
-import { NotificationService } from '$lib/services/NotificationService';
+import { emitEvent } from '$lib/services/EventService';
 import { authorize } from '$lib/server/authorization/authorizationService';
 import { resolveEffectiveHubRoles } from '$lib/server/authorization/effectiveHubRoles';
+import { emitPaperReviewInvitationEvent } from '$lib/server/reviewInvitationLifecycle';
 import {
 	getInvitationInviterId,
 	getInvitationInviterRole,
 	getInvitationPaperId,
-	getInvitationReviewerId
+	getReviewInvitationExpiresAt
 } from '$lib/server/reviewInvitations';
 import {
 	EditorialTransitionError,
@@ -66,6 +67,11 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 			return json({ error: 'Invitation already processed' }, { status: 400 });
 		}
 
+		const now = new Date();
+		if (getReviewInvitationExpiresAt(invitation, now) <= now) {
+			return json({ error: 'Invitation expired' }, { status: 400 });
+		}
+
 		const { canonicalId: canonicalReviewerId, aliases: invitationReviewerAliases } =
 			await resolveUserIdentifiers(invitation.reviewer as any);
 		const currentUserAliases = [String(user.id), String(user._id || '')].filter(Boolean);
@@ -95,6 +101,8 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 		if (action === 'accept') {
 			let paymentCaptured = false;
 			let capturedPaymentIntentId: string | null = null;
+			let capturedPaymentAmount: number | null = null;
+			let capturedPaymentCurrency: string | null = null;
 
 			let effectiveReviewerIds: string[] = [];
 			const isHubPaper = !!invitation.hubId && !!paper.hubId;
@@ -104,7 +112,10 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 					const effectiveRoles = await resolveEffectiveHubRoles(String(invitation.hubId));
 					effectiveReviewerIds = effectiveRoles.reviewerIds;
 				} catch (e) {
-					console.error('Failed to resolve effective hub reviewers during invitation acceptance:', e);
+					console.error(
+						'Failed to resolve effective hub reviewers during invitation acceptance:',
+						e
+					);
 				}
 			}
 
@@ -142,10 +153,6 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 				);
 			}
 
-			invitation.status = 'accepted';
-			invitation.respondedAt = new Date();
-			await invitation.save();
-
 			if (!paper.reviewSlots || paper.reviewSlots.length === 0) {
 				paper.reviewSlots = [
 					{ slotNumber: 1, reviewerId: null, status: 'available' },
@@ -170,6 +177,10 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 					{ status: 400 }
 				);
 			}
+
+			invitation.status = 'accepted';
+			invitation.respondedAt = new Date();
+			await invitation.save();
 
 			availableSlot.reviewerId = actingReviewerId;
 			availableSlot.status = 'occupied';
@@ -215,6 +226,12 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 
 			invitation.reviewAssignmentId = assignmentId;
 			await invitation.save();
+			await emitPaperReviewInvitationEvent('review.invitation.accepted', invitation, {
+				actorId: actingReviewerId,
+				metadata: {
+					reviewAssignmentId: assignmentId
+				}
+			});
 
 			const paperDoc = await Papers.findOne({ id: typeof paper === 'object' ? paper.id : paper });
 			if (paperDoc) {
@@ -283,6 +300,8 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 							paperDoc.paymentHold.receiptUrl = null;
 							paymentCaptured = true;
 							capturedPaymentIntentId = paymentIntent.id;
+							capturedPaymentAmount = paymentIntent.amount;
+							capturedPaymentCurrency = paymentIntent.currency;
 						} catch (captureError) {
 							console.error('Failed to capture payment after 3 acceptances:', captureError);
 						}
@@ -308,7 +327,10 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 						});
 					} catch (transitionError) {
 						if (transitionError instanceof EditorialTransitionError) {
-							console.warn('Reviewer invitation status transition skipped:', transitionError.message);
+							console.warn(
+								'Reviewer invitation status transition skipped:',
+								transitionError.message
+							);
 						} else {
 							throw transitionError;
 						}
@@ -318,35 +340,9 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 				console.error('Paper not found for ID:', typeof paper === 'object' ? paper.id : paper);
 			}
 
-			if (invitedBy) {
-				const notificationData: any = {
-					user: String(invitedBy._id || invitedBy.id),
-					type: 'reviewer_accepted_review',
-					title: 'Reviewer Accepted Paper Review',
-					content: `${user.firstName} ${user.lastName} accepted the invitation to review "${paper?.title}"`,
-					relatedPaperId: typeof paper === 'object' ? paper.id : paper,
-					actionUrl: `/notifications`,
-					priority: 'medium',
-					metadata: {
-						reviewerName: `${user.firstName} ${user.lastName}`,
-						reviewerId: actingReviewerId,
-						paperTitle: paper?.title
-					}
-				};
-
-				if (invitation.hubId && paper.hubId) {
-					notificationData.relatedHubId = String(invitation.hubId);
-				}
-
-				await NotificationService.createNotification(notificationData);
-			}
-
 			if (paymentCaptured) {
 				const paperId = typeof paper === 'object' ? paper.id : String(paper);
 				const paperTitle = paper?.title || 'your paper';
-				const amountInBrl = paper?.paymentHold?.amount
-					? `R$${(Number(paper.paymentHold.amount) / 100).toFixed(2)} BRL`
-					: 'the authorized amount';
 				const authorId =
 					typeof paper?.submittedBy === 'object'
 						? String((paper.submittedBy as any)?._id || (paper.submittedBy as any)?.id)
@@ -354,47 +350,45 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 							? String(paper.submittedBy)
 							: null;
 				const editorId = invitedBy ? String(invitedBy._id || invitedBy.id) : null;
+				const recipients = [...new Set([authorId, editorId].filter(Boolean).map(String))];
 
-				if (authorId) {
-					await NotificationService.createNotification({
-						user: authorId,
-						type: 'system',
-						title: 'Payment Captured',
-						content: `Payment for "${paperTitle}" was captured after ${REQUIRED_REVIEWERS} reviewers accepted. Amount: ${amountInBrl}.`,
-						relatedPaperId: paperId,
-						actionUrl: `/notifications`,
-						priority: 'high',
-						metadata: {
-							paymentIntentId: capturedPaymentIntentId,
-							reviewersAccepted: REQUIRED_REVIEWERS,
-							amount: paper?.paymentHold?.amount,
-							currency: paper?.paymentHold?.currency
-						}
-					});
-				}
-
-				if (editorId && editorId !== authorId) {
-					await NotificationService.createNotification({
-						user: editorId,
-						type: 'system',
-						title: 'Payment Captured After 3 Acceptances',
-						content: `Payment for "${paperTitle}" has been captured after all ${REQUIRED_REVIEWERS} reviewers accepted. Amount: ${amountInBrl}.`,
-						relatedPaperId: paperId,
-						actionUrl: `/notifications`,
-						priority: 'high',
-						metadata: {
-							paymentIntentId: capturedPaymentIntentId,
-							reviewersAccepted: REQUIRED_REVIEWERS,
-							amount: paper?.paymentHold?.amount,
-							currency: paper?.paymentHold?.currency
-						}
-					});
+				if (recipients.length > 0) {
+					try {
+						await emitEvent({
+							type: 'payment.hold.captured',
+							actorId: null,
+							recipients,
+							entityType: 'paper',
+							entityId: paperId,
+							metadata: {
+								paperId,
+								paperTitle,
+								amount: capturedPaymentAmount ?? paper?.paymentHold?.amount,
+								currency: capturedPaymentCurrency ?? paper?.paymentHold?.currency ?? 'brl',
+								paymentStatus: 'captured',
+								stripePaymentIntentId: capturedPaymentIntentId,
+								reviewersAccepted: REQUIRED_REVIEWERS,
+								trigger: 'required_reviewers_accepted',
+								recipientRoles: Object.fromEntries(
+									recipients.map((recipientId) => [
+										recipientId,
+										recipientId === authorId ? 'author' : 'editor'
+									])
+								)
+							}
+						});
+					} catch (eventError) {
+						console.error('Failed to emit payment hold captured event:', eventError);
+					}
 				}
 			}
 		} else {
 			invitation.status = 'declined';
 			invitation.respondedAt = new Date();
 			await invitation.save();
+			await emitPaperReviewInvitationEvent('review.invitation.declined', invitation, {
+				actorId: actingReviewerId
+			});
 
 			const reviewerSlot = paper.reviewSlots?.find(
 				(slot: any) => slot.reviewerId?.toString() === actingReviewerId && slot.status === 'pending'
@@ -410,24 +404,6 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 				).length;
 
 				await paper.save();
-			}
-
-			if (invitedBy) {
-				await NotificationService.createNotification({
-					user: String(invitedBy._id || invitedBy.id),
-					type: 'reviewer_declined_review',
-					title: 'Reviewer Declined Paper Review',
-					content: `${user.firstName} ${user.lastName} declined the invitation to review "${paper?.title}"`,
-					relatedPaperId: typeof paper === 'object' ? paper.id : paper,
-					relatedHubId: String(invitation.hubId),
-					actionUrl: `/paper/${typeof paper === 'object' ? paper.id : paper}`,
-					priority: 'low',
-					metadata: {
-						reviewerName: `${user.firstName} ${user.lastName}`,
-						reviewerId: actingReviewerId,
-						paperTitle: paper?.title
-					}
-				});
 			}
 		}
 
@@ -478,25 +454,18 @@ export const DELETE: RequestHandler = async ({ params, locals }) => {
 			);
 		}
 
-		await PaperReviewInvitation.deleteOne({ $or: [{ _id: inviteId }, { id: inviteId }] });
-
-		const reviewerId = getInvitationReviewerId(invitation);
-		if (reviewerId) {
-			await NotificationService.createNotification({
-				user: reviewerId,
-				type: 'invitation_cancelled',
-				title: 'Review Invitation Cancelled',
-				content: `Your invitation to review "${paper?.title || 'a paper'}" has been cancelled.`,
-				relatedPaperId: paper?.id,
-				relatedHubId: String(invitation.hubId),
-				actionUrl: `/notifications`,
-				priority: 'low',
-				metadata: {
-					paperTitle: paper?.title,
-					paperId: paper?.id
-				}
-			});
+		if (invitation.status !== 'pending') {
+			return json({ error: 'Only pending invitations can be cancelled' }, { status: 400 });
 		}
+
+		invitation.status = 'cancelled';
+		invitation.cancelledAt = new Date();
+		invitation.updatedAt = new Date();
+		await invitation.save();
+
+		await emitPaperReviewInvitationEvent('review.invitation.cancelled', invitation, {
+			actorId: user.id
+		});
 
 		return json({
 			success: true,

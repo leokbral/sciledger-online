@@ -2,6 +2,7 @@ import type { RequestHandler } from './$types';
 import { json } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import Hubs from '$lib/db/models/Hub';
+import { emitEvent } from '$lib/services/EventService';
 
 export const PUT: RequestHandler = async ({ request, params }) => {
     await start_mongo();
@@ -82,6 +83,36 @@ export const PUT: RequestHandler = async ({ request, params }) => {
         hub.updatedAt = new Date();
 
         await hub.save();
+
+        const ownerId = hub.createdBy ? String(hub.createdBy) : '';
+        const assistantManagerIds = Array.isArray(hub.assistantManagers)
+            ? hub.assistantManagers.map((managerId: any) => String(managerId || '')).filter(Boolean)
+            : [];
+        const recipients = [...new Set([ownerId, ...assistantManagerIds].filter(Boolean))];
+
+        if (recipients.length > 0) {
+            try {
+                await emitEvent({
+                    type: 'hub.updated',
+                    actorId: ownerId || null,
+                    recipients,
+                    entityType: 'hub',
+                    entityId: String(hub.id || hub._id),
+                    metadata: {
+                        hubId: String(hub.id || hub._id),
+                        hubName: hub.title,
+                        recipientRoles: Object.fromEntries(
+                            recipients.map((recipientId) => [
+                                recipientId,
+                                recipientId === ownerId ? 'owner' : 'manager'
+                            ])
+                        )
+                    }
+                });
+            } catch (eventError) {
+                console.error('Failed to emit hub updated event:', eventError);
+            }
+        }
 
         return json({ hub: { id: hub.id } }, { status: 200 });
     } catch (error) {

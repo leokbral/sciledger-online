@@ -5,6 +5,7 @@ import { start_mongo } from '$lib/db/mongooseConnection';
 import { ensureHubRoles } from './bootstrapRbac';
 import { roleInheritsRole } from './roleInheritance';
 import { createRbacAuditLog } from './rbacAudit';
+import { emitEvent } from '$lib/services/EventService';
 
 type AssignHighestHubRoleOptions = {
 	auditUser?: any;
@@ -253,6 +254,33 @@ export async function assignHighestHubRole(
 		}
 	}
 
+	if (!existingAssignment?.isActive) {
+		try {
+			await emitEvent({
+				type: 'role.assigned',
+				actorId: grantedBy,
+				recipients: [normalizedUserId],
+				entityType: 'role',
+				entityId: String(assignment._id || assignment.id || normalizedRoleKey),
+				metadata: {
+					hubId: normalizedHubId,
+					roleKey: normalizedRoleKey,
+					roleName: role.name,
+					targetUserId: normalizedUserId,
+					grantedBy,
+					supersededRoleKeys: inheritedAssignments.map((assignmentRow: any) =>
+						String(assignmentRow.roleKey)
+					),
+					recipientRoles: {
+						[normalizedUserId]: 'target'
+					}
+				}
+			});
+		} catch (eventError) {
+			console.error('Failed to emit role assigned event:', eventError);
+		}
+	}
+
 	return {
 		assignment,
 		roleKey: normalizedRoleKey,
@@ -401,6 +429,34 @@ export async function revokeHubRoleAssignments(
 			});
 		}
 	}
+
+	await Promise.all(
+		(activeAssignments as any[]).map(async (assignment) => {
+			const targetUserId = String(assignment.userId || '');
+			if (!targetUserId) return;
+
+			try {
+				await emitEvent({
+					type: 'role.revoked',
+					actorId: revokedBy,
+					recipients: [targetUserId],
+					entityType: 'role',
+					entityId: String(assignment._id || assignment.id || assignment.roleKey),
+					metadata: {
+						hubId: normalizedHubId,
+						roleKey: assignment.roleKey,
+						targetUserId,
+						revokedBy,
+						recipientRoles: {
+							[targetUserId]: 'target'
+						}
+					}
+				});
+			} catch (eventError) {
+				console.error('Failed to emit role revoked event:', eventError);
+			}
+		})
+	);
 
 	return activeAssignments;
 }

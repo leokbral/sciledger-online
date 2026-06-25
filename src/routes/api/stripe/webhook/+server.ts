@@ -4,6 +4,7 @@ import type { RequestHandler } from './$types';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import Papers from '$lib/db/models/Paper';
 import { env } from '$env/dynamic/private';
+import { emitEvent } from '$lib/services/EventService';
 
 function getStripe() {
   const stripeSecretKey = env.STRIPE_SECRET_KEY;
@@ -11,6 +12,62 @@ function getStripe() {
     return null;
   }
   return new Stripe(stripeSecretKey);
+}
+
+function normalizeUserId(value: any): string {
+  if (!value) return '';
+  if (typeof value === 'string') return value;
+  if (value.id) return String(value.id);
+  if (value._id) return String(value._id);
+  return String(value);
+}
+
+function getPaperRecipients(paper: any) {
+  return [
+    ...new Set(
+      [
+        normalizeUserId(paper.mainAuthor),
+        normalizeUserId(paper.correspondingAuthor),
+        normalizeUserId(paper.submittedBy),
+        ...(paper.coAuthors || []).map(normalizeUserId),
+        ...(paper.authors || []).map(normalizeUserId)
+      ].filter(Boolean)
+    )
+  ];
+}
+
+async function emitPaymentEvent(
+  type:
+    | 'payment.hold.authorized'
+    | 'payment.hold.failed'
+    | 'payment.hold.released'
+    | 'payment.refunded',
+  paper: any,
+  metadata: Record<string, unknown>
+) {
+  const recipients = getPaperRecipients(paper);
+  if (recipients.length === 0) return;
+
+  try {
+    await emitEvent({
+      type,
+      actorId: null,
+      recipients,
+      entityType: 'paper',
+      entityId: String(paper.id || paper._id),
+      metadata: {
+        paperId: String(paper.id || paper._id),
+        paperTitle: paper.title,
+        amount: paper.paymentHold?.amount,
+        currency: paper.paymentHold?.currency || 'brl',
+        paymentStatus: paper.paymentHold?.status,
+        recipientRoles: Object.fromEntries(recipients.map((recipientId) => [recipientId, 'author'])),
+        ...metadata
+      }
+    });
+  } catch (eventError) {
+    console.error(`Failed to emit ${type} event:`, eventError);
+  }
 }
 
 export const POST: RequestHandler = async ({ request }) => {
@@ -89,6 +146,9 @@ async function handlePaymentIntentSucceeded(paymentIntent: any) {
     paper.paymentHold.status = 'authorized';
     paper.paymentHold.authorizedAt = new Date(paymentIntent.created * 1000);
     await paper.save();
+    await emitPaymentEvent('payment.hold.authorized', paper, {
+      stripePaymentIntentId: paymentIntent.id
+    });
   }
 
   return json({ received: true });
@@ -106,10 +166,18 @@ async function handlePaymentIntentFailed(paymentIntent: any) {
     return json({ received: true });
   }
 
+  const previousStatus = paper.paymentHold.status;
+
   // Marcar como falho
   paper.paymentHold.status = 'failed';
   paper.paymentHold.failureReason = paymentIntent.last_payment_error?.message || 'Payment failed';
   await paper.save();
+  if (previousStatus !== 'failed') {
+    await emitPaymentEvent('payment.hold.failed', paper, {
+      stripePaymentIntentId: paymentIntent.id,
+      failureReason: paper.paymentHold.failureReason
+    });
+  }
   return json({ received: true });
 }
 
@@ -127,10 +195,17 @@ async function handlePaymentIntentCanceled(paymentIntent: any) {
 
   // Marcar como liberado se não foi capturado
   if (paper.paymentHold.status !== 'captured') {
+    const previousStatus = paper.paymentHold.status;
     paper.paymentHold.status = 'released';
     paper.paymentHold.releasedAt = new Date();
     paper.paymentHold.failureReason = 'Payment intent canceled';
     await paper.save();
+    if (previousStatus !== 'released') {
+      await emitPaymentEvent('payment.hold.released', paper, {
+        stripePaymentIntentId: paymentIntent.id,
+        reason: paper.paymentHold.failureReason
+      });
+    }
   }
 
   return json({ received: true });
@@ -154,6 +229,12 @@ async function handleChargeRefunded(charge: any) {
     paper.paymentHold.releasedAt = new Date();
     paper.paymentHold.failureReason = `Refunded: ${charge.amount / 100} ${charge.currency.toUpperCase()}`;
     await paper.save();
+    await emitPaymentEvent('payment.refunded', paper, {
+      stripePaymentIntentId: String(paymentIntentId || ''),
+      amount: charge.amount,
+      currency: charge.currency,
+      reason: paper.paymentHold.failureReason
+    });
   }
 
   return json({ received: true });
