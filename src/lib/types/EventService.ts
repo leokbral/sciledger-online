@@ -20,6 +20,7 @@ export const platformEventTypes = [
 	'review.invitation.cancelled',
 	'review.invitation.duplicate',
 	'review.submitted',
+	'review.assignment.created',
 	'review.assignment.deadline_updated',
 	'review.deadline.reminder',
 	'review.deadline.overdue',
@@ -68,6 +69,7 @@ export type EmitEventInput = {
 	recipients: EventRecipient[];
 	entityType: EventEntityType;
 	entityId: string;
+	idempotencyKey?: string;
 	metadata?: Record<string, unknown>;
 	channels?: EventChannel[];
 };
@@ -75,6 +77,8 @@ export type EmitEventInput = {
 export type NormalizedEventRecipient = {
 	userId: string;
 	channels: EventChannel[];
+	idempotencyKey: string;
+	eventKey: string;
 };
 
 export type NormalizedEvent = {
@@ -83,6 +87,7 @@ export type NormalizedEvent = {
 	recipients: NormalizedEventRecipient[];
 	entityType: EventEntityType;
 	entityId: string;
+	idempotencyKey: string;
 	metadata: Record<string, unknown>;
 	channels: EventChannel[];
 };

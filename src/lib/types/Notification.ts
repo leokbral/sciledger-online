@@ -44,6 +44,8 @@ export type Notification = {
 	relatedHubId?: string;
 	relatedReviewId?: string;
 	actionUrl?: string;
+	idempotencyKey?: string;
+	eventKey?: string;
 	metadata?: Record<string, unknown>;
 	isRead: boolean;
 	priority: NotificationPriority;

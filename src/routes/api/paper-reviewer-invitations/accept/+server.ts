@@ -5,10 +5,63 @@ import Invitations from '$lib/db/models/Invitation';
 import type { RequestHandler } from './$types';
 import type { User } from '$lib/types/User';
 import * as crypto from 'crypto';
+import { emitEvent } from '$lib/services/EventService';
 import {
 	EditorialTransitionError,
 	transitionPaperStatus
 } from '$lib/server/authorization/editorialTransitionService';
+
+function normalizeId(value: any): string {
+	if (!value) return '';
+	if (typeof value === 'string' || typeof value === 'number') return String(value);
+	if (value.id) return String(value.id);
+	if (value._id) return String(value._id);
+	return String(value);
+}
+
+function displayName(user: any, fallback: string) {
+	return `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || user?.email || fallback;
+}
+
+async function emitLegacyReviewInvitationEvent(
+	type: 'review.invitation.accepted' | 'review.invitation.declined',
+	input: { invitation: any; paper: any; user: any }
+) {
+	const { invitation, paper, user } = input;
+	const reviewerId = normalizeId(invitation.reviewer) || normalizeId(user);
+	const editorId = normalizeId(paper?.submittedBy);
+	const paperId = normalizeId(paper?.id) || normalizeId(paper?._id) || normalizeId(invitation.paper);
+	const recipients = [...new Set([reviewerId, editorId].filter(Boolean))];
+
+	if (recipients.length === 0) {
+		return;
+	}
+
+	await emitEvent({
+		type,
+		actorId: normalizeId(user) || reviewerId || null,
+		recipients,
+		entityType: 'reviewInvitation',
+		entityId: normalizeId(invitation.id) || normalizeId(invitation._id) || paperId,
+		metadata: {
+			inviteId: normalizeId(invitation.id) || normalizeId(invitation._id),
+			paperId,
+			paperTitle: paper?.title || 'Untitled paper',
+			hubId: normalizeId(invitation.hubId) || normalizeId(paper?.hubId) || null,
+			reviewerId,
+			reviewerName: displayName(user, 'Reviewer'),
+			editorId,
+			status: invitation.status,
+			source: 'legacy_paper_reviewer_invitations_accept',
+			recipientRoles: Object.fromEntries(
+				recipients.map((recipientId) => [
+					recipientId,
+					recipientId === reviewerId ? 'reviewer' : 'editor'
+				])
+			)
+		}
+	});
+}
 
 export const POST: RequestHandler = async ({ request, locals }) => {
 	await start_mongo();
@@ -121,7 +174,16 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		}
 
 		// TODO: Criar notificações
-		// await NotificationService.createReviewerAcceptedNotifications({...});
+
+		try {
+			await emitLegacyReviewInvitationEvent('review.invitation.accepted', {
+				invitation,
+				paper,
+				user
+			});
+		} catch (eventError) {
+			console.error('Failed to emit legacy review invitation accepted event:', eventError);
+		}
 
 		return json({
 			success: true,
@@ -172,6 +234,16 @@ export const DELETE: RequestHandler = async ({ request, locals }) => {
 		invitation.status = 'declined';
 		invitation.respondedAt = new Date();
 		await invitation.save();
+		const paper = invitation.paper ? await Papers.findOne({ id: invitation.paper }).lean() : null;
+		try {
+			await emitLegacyReviewInvitationEvent('review.invitation.declined', {
+				invitation,
+				paper,
+				user
+			});
+		} catch (eventError) {
+			console.error('Failed to emit legacy review invitation declined event:', eventError);
+		}
 
 		return json({
 			success: true,

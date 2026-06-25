@@ -47,6 +47,8 @@ export const NotificationSchema: Schema = new Schema(
 		relatedHubId: { type: String },
 		relatedReviewId: { type: String },
 		actionUrl: { type: String }, // URL to redirect the user to
+		idempotencyKey: { type: String },
+		eventKey: { type: String },
 		metadata: { type: Schema.Types.Mixed }, // Additional type-specific data
 		isRead: {
 			type: Boolean,
@@ -71,3 +73,8 @@ export const NotificationSchema: Schema = new Schema(
 NotificationSchema.index({ user: 1, createdAt: -1 });
 NotificationSchema.index({ user: 1, isRead: 1 });
 NotificationSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+NotificationSchema.index(
+	{ eventKey: 1 },
+	{ unique: true, sparse: true, name: 'unique_notification_event_key' }
+);
+NotificationSchema.index({ idempotencyKey: 1, createdAt: -1 });

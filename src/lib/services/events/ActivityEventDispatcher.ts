@@ -5,6 +5,15 @@ import type {
 	EventDispatchResult
 } from '$lib/types/EventService';
 
+function isDuplicateKeyError(error: unknown) {
+	return (
+		typeof error === 'object' &&
+		error !== null &&
+		'code' in error &&
+		Number((error as { code?: number }).code) === 11000
+	);
+}
+
 export class ActivityEventDispatcher implements EventDispatcher {
 	readonly channel = 'activity' as const;
 
@@ -21,7 +30,13 @@ export class ActivityEventDispatcher implements EventDispatcher {
 			targetUserId: recipient.userId,
 			entityType: event.entityType,
 			entityId: event.entityId,
-			metadata: event.metadata,
+			idempotencyKey: recipient.idempotencyKey,
+			eventKey: recipient.eventKey,
+			metadata: {
+				...event.metadata,
+				eventKey: recipient.eventKey,
+				idempotencyKey: recipient.idempotencyKey
+			},
 			createdAt: new Date()
 		}));
 
@@ -42,15 +57,40 @@ export class ActivityEventDispatcher implements EventDispatcher {
 					];
 		}
 
-		const createdEvents = await ActivityEvent.insertMany(docs, { ordered: false });
+		const results: EventDispatchResult[] = [];
+
+		for (let index = 0; index < docs.length; index += 1) {
+			const recipient = activeRecipients[index];
+			try {
+				const createdEvent = await ActivityEvent.create(docs[index]);
+				results.push({
+					channel: this.channel,
+					status: 'sent',
+					recipientId: recipient.userId,
+					record: createdEvent
+				});
+			} catch (error) {
+				if (isDuplicateKeyError(error)) {
+					results.push({
+						channel: this.channel,
+						status: 'skipped',
+						recipientId: recipient.userId,
+						reason: 'duplicate_event_key'
+					});
+					continue;
+				}
+
+				results.push({
+					channel: this.channel,
+					status: 'failed',
+					recipientId: recipient.userId,
+					error: error instanceof Error ? error.message : String(error)
+				});
+			}
+		}
 
 		return [
-			...activeRecipients.map((recipient, index) => ({
-				channel: this.channel,
-				status: 'sent' as const,
-				recipientId: recipient.userId,
-				record: createdEvents[index]
-			})),
+			...results,
 			...skippedRecipients.map((recipient) => ({
 				channel: this.channel,
 				status: 'skipped' as const,

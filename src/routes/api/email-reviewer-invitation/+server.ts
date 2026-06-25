@@ -11,6 +11,8 @@ import * as crypto from 'crypto';
 import type { RequestHandler } from './$types';
 import nodemailer from 'nodemailer';
 import { authorize } from '$lib/server/authorization/authorizationService';
+import { emitEvent } from '$lib/services/EventService';
+import type { EventRecipient } from '$lib/types/EventService';
 import { emitPaperReviewInvitationEvent } from '$lib/server/reviewInvitationLifecycle';
 import {
 	buildDuplicateInvitationDetails,
@@ -83,6 +85,10 @@ function getEmailSendErrorMessage(error: unknown): string {
 function getUserId(user: any): string | null {
 	const id = user?.id || user?._id;
 	return id ? String(id) : null;
+}
+
+function getUserDisplayName(user: any, fallback: string) {
+	return `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || user?.email || fallback;
 }
 
 function normalizeEmail(value: unknown): string | null {
@@ -410,6 +416,56 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
 				console.error('Failed to clean up unsent email invitation:', cleanupError);
 			});
 			throw error;
+		}
+
+		try {
+			const inviteeUser = await Users.findOne({ email: normalizedEmail })
+				.select('id _id firstName lastName email')
+				.lean();
+			const inviteeUserId = getUserId(inviteeUser);
+			const eventRecipients: EventRecipient[] = [inviterId];
+			const recipientRoles: Record<string, string> = {
+				[inviterId]: paperIdValue ? 'editor' : 'inviter'
+			};
+
+			if (inviteeUserId && inviteeUserId !== inviterId) {
+				eventRecipients.push({
+					userId: inviteeUserId,
+					channels: ['activity', 'notification']
+				});
+				recipientRoles[inviteeUserId] = paperIdValue ? 'reviewer' : 'invitee';
+			}
+
+			await emitEvent({
+				type: paperIdValue ? 'review.invitation.created' : 'hub.invitation.created',
+				actorId: inviterId,
+				recipients: eventRecipients,
+				entityType: paperIdValue ? 'reviewInvitation' : 'hub',
+				entityId: paperIdValue ? String(invitation.id || invitation._id) : hubIdValue,
+				metadata: {
+					inviteId: String(invitation.id || invitation._id),
+					emailInvitationId: String(invitation.id || invitation._id),
+					paperId: paperIdValue,
+					paperTitle: paper?.title || undefined,
+					hubId: hubIdValue,
+					hubName: hub.title || hub.name || 'SciLedger hub',
+					reviewerId: inviteeUserId || undefined,
+					reviewerName: getUserDisplayName(inviteeUser, normalizedEmail),
+					reviewerEmail: normalizedEmail,
+					inviteeId: inviteeUserId || undefined,
+					inviteeName: getUserDisplayName(inviteeUser, normalizedEmail),
+					inviteeEmail: normalizedEmail,
+					inviterId,
+					invitationUrl,
+					declineUrl,
+					expiresAt: expiresAt.toISOString(),
+					source: 'email_reviewer_invitation',
+					delivery: 'smtp',
+					recipientRoles
+				}
+			});
+		} catch (eventError) {
+			console.error('Failed to emit email reviewer invitation event:', eventError);
 		}
 
 		return json({

@@ -6,6 +6,15 @@ import type {
 } from '$lib/types/EventService';
 import { getEventNotificationTemplate } from './templates';
 
+function isDuplicateKeyError(error: unknown) {
+	return (
+		typeof error === 'object' &&
+		error !== null &&
+		'code' in error &&
+		Number((error as { code?: number }).code) === 11000
+	);
+}
+
 export class NotificationEventDispatcher implements EventDispatcher {
 	readonly channel = 'notification' as const;
 
@@ -45,23 +54,46 @@ export class NotificationEventDispatcher implements EventDispatcher {
 				continue;
 			}
 
-			await NotificationService.createNotification({
-				...payload,
-				user: recipient.userId,
-				relatedUser: payload.relatedUser ?? event.actorId ?? undefined,
-				metadata: {
-					...(payload.metadata ?? {}),
-					eventType: event.type,
-					entityType: event.entityType,
-					entityId: event.entityId
-				}
-			});
+			try {
+				await NotificationService.createNotification({
+					...payload,
+					user: recipient.userId,
+					relatedUser: payload.relatedUser ?? event.actorId ?? undefined,
+					idempotencyKey: recipient.idempotencyKey,
+					eventKey: recipient.eventKey,
+					metadata: {
+						...(payload.metadata ?? {}),
+						eventType: event.type,
+						entityType: event.entityType,
+						entityId: event.entityId,
+						eventKey: recipient.eventKey,
+						idempotencyKey: recipient.idempotencyKey
+					}
+				});
 
-			results.push({
-				channel: this.channel,
-				status: 'sent',
-				recipientId: recipient.userId
-			});
+				results.push({
+					channel: this.channel,
+					status: 'sent',
+					recipientId: recipient.userId
+				});
+			} catch (error) {
+				if (isDuplicateKeyError(error)) {
+					results.push({
+						channel: this.channel,
+						status: 'skipped',
+						recipientId: recipient.userId,
+						reason: 'duplicate_event_key'
+					});
+					continue;
+				}
+
+				results.push({
+					channel: this.channel,
+					status: 'failed',
+					recipientId: recipient.userId,
+					error: error instanceof Error ? error.message : String(error)
+				});
+			}
 		}
 
 		return results;
