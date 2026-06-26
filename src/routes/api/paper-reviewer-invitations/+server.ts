@@ -19,6 +19,10 @@ import {
 	savePendingReviewInvitationOrFindExisting,
 	selectInvitationRole
 } from '$lib/server/reviewInvitations';
+import {
+	REVIEW_CONFLICT_OF_INTEREST_MESSAGE,
+	validateReviewerCanReviewPaper
+} from '$lib/server/reviewConflictOfInterest';
 import type { RequestHandler } from './$types';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
@@ -119,6 +123,15 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			});
 			const normalizedReviewerId = canonicalId || String(reviewerId);
 			const reviewerIdAliases = aliases.length > 0 ? aliases : [normalizedReviewerId];
+			const conflictValidation = validateReviewerCanReviewPaper(paper as any, reviewer as any);
+
+			if (!conflictValidation.allowed) {
+				skipped.push({
+					reviewerId: String(reviewerId),
+					reasons: [REVIEW_CONFLICT_OF_INTEREST_MESSAGE]
+				});
+				continue;
+			}
 
 			const activeAssignmentsCount =
 				typeof MAX_ACTIVE_REVIEW_ASSIGNMENTS === 'number'
@@ -262,20 +275,30 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 		if (invitations.length === 0) {
 			const duplicateOnly = duplicates.length > 0 && skipped.length === duplicates.length;
-			return json({
-				success: false,
-				error: duplicateOnly
-					? 'Reviewer already invited for this paper'
-					: 'No reviewer invitations were created',
-				invitations: 0,
-				skipped,
-				duplicates,
-				message: duplicateOnly
-					? 'Reviewer already invited for this paper'
-					: 'No reviewer invitations were created. Check the skipped reasons and try again.',
-				availableSlots: availableSlotsCount,
-				maxSlots: paper.maxReviewSlots || 3
-			});
+			const conflictOnly =
+				skipped.length > 0 &&
+				skipped.every((item) => item.reasons.includes(REVIEW_CONFLICT_OF_INTEREST_MESSAGE));
+			return json(
+				{
+					success: false,
+					error: conflictOnly
+						? REVIEW_CONFLICT_OF_INTEREST_MESSAGE
+						: duplicateOnly
+							? 'Reviewer already invited for this paper'
+							: 'No reviewer invitations were created',
+					invitations: 0,
+					skipped,
+					duplicates,
+					message: conflictOnly
+						? REVIEW_CONFLICT_OF_INTEREST_MESSAGE
+						: duplicateOnly
+							? 'Reviewer already invited for this paper'
+							: 'No reviewer invitations were created. Check the skipped reasons and try again.',
+					availableSlots: availableSlotsCount,
+					maxSlots: paper.maxReviewSlots || 3
+				},
+				conflictOnly ? { status: 403 } : undefined
+			);
 		}
 
 		return json({

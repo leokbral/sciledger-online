@@ -26,6 +26,10 @@ import {
 	selectInvitationRole
 } from '$lib/server/reviewInvitations';
 import {
+	REVIEW_CONFLICT_OF_INTEREST_MESSAGE,
+	validateReviewerCanReviewPaper
+} from '$lib/server/reviewConflictOfInterest';
+import {
 	EditorialTransitionError,
 	transitionPaperStatus
 } from '$lib/server/authorization/editorialTransitionService';
@@ -128,6 +132,11 @@ async function acceptPaperReviewInvite(options: {
 	const user = await Users.findOne({ $or: [{ id: userId }, { _id: userId }] }).lean();
 	if (!user) {
 		return { ok: false, status: 404, error: 'Reviewer not found' };
+	}
+
+	const conflictValidation = validateReviewerCanReviewPaper(paper as any, user);
+	if (!conflictValidation.allowed) {
+		return { ok: false, status: 403, error: REVIEW_CONFLICT_OF_INTEREST_MESSAGE };
 	}
 
 	const hubDoc = await Hubs.findById(hubId).lean();
@@ -493,6 +502,14 @@ export async function POST({ request }) {
 			: normalizedUserId;
 		const managerId = String(emailInvitation.invitedBy || '');
 		const managerUser = await findUserByAnyId(managerId);
+
+		if (emailInvitation.paperId && reviewerUser) {
+			const paper = await Papers.findOne({ id: String(emailInvitation.paperId) }).lean();
+			const conflictValidation = validateReviewerCanReviewPaper(paper as any, reviewerUser);
+			if (!conflictValidation.allowed) {
+				return json({ error: REVIEW_CONFLICT_OF_INTEREST_MESSAGE }, { status: 403 });
+			}
+		}
 
 		const hubDoc = await Hubs.findById(emailInvitation.hubId);
 		if (!hubDoc) {

@@ -5,7 +5,9 @@ import mongoose from 'mongoose';
 import { EmailReviewerInvitationSchema } from '$lib/db/schemas/EmailReviewerInvitation.js';
 import { emitEvent } from '$lib/services/EventService';
 import Hubs from '$lib/db/models/Hub';
+import Papers from '$lib/db/models/Paper';
 import { resolveEffectiveHubRoles } from '$lib/server/authorization/effectiveHubRoles';
+import { getPaperAuthorAliases } from '$lib/server/reviewConflictOfInterest';
 
 if (mongoose.models.EmailReviewerInvitation) {
 	delete mongoose.models.EmailReviewerInvitation;
@@ -132,7 +134,15 @@ export const actions: Actions = {
 		invitation.updatedAt = new Date();
 		await invitation.save();
 
-		const hub = await Hubs.findById(String(invitation.hubId)).lean();
+		const isPaperReviewInvitation = Boolean(invitation.paperId);
+		const [hub, paper] = await Promise.all([
+			Hubs.findById(String(invitation.hubId)).lean(),
+			isPaperReviewInvitation
+				? Papers.findOne({
+						$or: [{ id: String(invitation.paperId) }, { _id: String(invitation.paperId) }]
+					}).lean()
+				: Promise.resolve(null)
+		]);
 		let managerId = String(invitation.invitedBy || '');
 		if (!managerId && hub) {
 			const effectiveHubRoles = await resolveEffectiveHubRoles(hub);
@@ -140,19 +150,32 @@ export const actions: Actions = {
 				effectiveHubRoles.members.find((member) => member.primaryRoleKey === 'HubOwner')?.userId ||
 				'';
 		}
-		if (managerId) {
+		const authorIds = isPaperReviewInvitation
+			? getPaperAuthorAliases(paper).filter((authorId) => authorId !== managerId)
+			: [];
+		const recipients = [...new Set([managerId, ...authorIds].filter(Boolean).map(String))];
+
+		if (recipients.length > 0) {
 			const declineLabel = DECLINE_LABELS[category] || category;
 
 			try {
 				await emitEvent({
-					type: 'hub.invitation.declined',
+					type: isPaperReviewInvitation ? 'review.invitation.declined' : 'hub.invitation.declined',
 					actorId: null,
-					recipients: [managerId],
-					entityType: 'hub',
-					entityId: String(invitation.hubId),
+					recipients,
+					entityType: isPaperReviewInvitation ? 'reviewInvitation' : 'hub',
+					entityId: isPaperReviewInvitation
+						? String(invitation.id || invitation._id)
+						: String(invitation.hubId),
 					metadata: {
+						inviteId: String(invitation.id || invitation._id),
+						emailInvitationId: String(invitation.id || invitation._id),
 						hubId: String(invitation.hubId),
 						hubName: hub?.title || null,
+						reviewerName: invitation.email,
+						reviewerEmail: invitation.email,
+						editorId: managerId,
+						paperTitle: paper?.title || undefined,
 						inviteeEmail: invitation.email,
 						inviteeName: invitation.email,
 						declineCategory: category,
@@ -160,9 +183,16 @@ export const actions: Actions = {
 						declineReason: reason || null,
 						paperId: invitation.paperId || null,
 						source: 'email_reviewer_invitation',
-						recipientRoles: {
-							[managerId]: 'manager'
-						}
+						recipientRoles: Object.fromEntries(
+							recipients.map((recipientId) => [
+								recipientId,
+								authorIds.includes(recipientId)
+									? 'author'
+									: isPaperReviewInvitation
+										? 'editor'
+										: 'manager'
+							])
+						)
 					}
 				});
 			} catch (eventError) {

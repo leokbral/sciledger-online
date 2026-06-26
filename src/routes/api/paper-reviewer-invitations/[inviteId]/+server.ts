@@ -20,6 +20,10 @@ import {
 	getReviewInvitationExpiresAt
 } from '$lib/server/reviewInvitations';
 import {
+	REVIEW_CONFLICT_OF_INTEREST_MESSAGE,
+	validateReviewerCanReviewPaper
+} from '$lib/server/reviewConflictOfInterest';
+import {
 	EditorialTransitionError,
 	transitionPaperStatus
 } from '$lib/server/authorization/editorialTransitionService';
@@ -99,6 +103,11 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 		};
 
 		if (action === 'accept') {
+			const conflictValidation = validateReviewerCanReviewPaper(paper as any, user);
+			if (!conflictValidation.allowed) {
+				return json({ error: REVIEW_CONFLICT_OF_INTEREST_MESSAGE }, { status: 403 });
+			}
+
 			let paymentCaptured = false;
 			let capturedPaymentIntentId: string | null = null;
 			let capturedPaymentAmount: number | null = null;

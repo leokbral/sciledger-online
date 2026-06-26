@@ -2,8 +2,13 @@ import { json } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import PaperReviewInvitation from '$lib/db/models/PaperReviewInvitation';
 import Papers from '$lib/db/models/Paper';
+import Users from '$lib/db/models/User';
 import { emitEvent } from '$lib/services/EventService';
 import { authorize } from '$lib/server/authorization/authorizationService';
+import {
+	REVIEW_CONFLICT_OF_INTEREST_MESSAGE,
+	validateReviewerCanReviewPaper
+} from '$lib/server/reviewConflictOfInterest';
 import type { RequestHandler } from './$types';
 import * as crypto from 'crypto';
 
@@ -105,6 +110,17 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				reviewAssignment = updated || reviewAssignment;
 			} else {
 				// Criar novo ReviewAssignment (caso ainda não exista)
+				const reviewer = await Users.findOne({
+					$or: [{ id: String(reviewerId) }, { _id: String(reviewerId) }]
+				}).lean();
+				const conflictValidation = validateReviewerCanReviewPaper(
+					paper as any,
+					reviewer || reviewerId
+				);
+				if (!conflictValidation.allowed) {
+					return json({ error: REVIEW_CONFLICT_OF_INTEREST_MESSAGE }, { status: 403 });
+				}
+
 				const assignmentId = crypto.randomUUID();
 				reviewAssignment = new ReviewAssignment({
 					_id: assignmentId,
