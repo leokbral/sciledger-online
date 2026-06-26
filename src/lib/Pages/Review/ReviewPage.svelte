@@ -1,6 +1,5 @@
 <script lang="ts">
 	import ReviewDashboard from '$lib/ReviewDashboard.svelte';
-	import PaperReviewInvitations from '$lib/components/PaperReviewInvitations/PaperReviewInvitations.svelte';
 	import MyPapers from '$lib/MyPapers.svelte';
 	import { Tabs } from '@skeletonlabs/skeleton-svelte';
 	import Icon from '@iconify/svelte';
@@ -19,7 +18,6 @@
 	let papers = data.papersData;
 	let reviews = data.reviews; // Recebendo as revisões
 	let user = data.user;
-	let reviewerInvitations = data.reviewerInvitations;
 	let reviewAssignments = data.reviewAssignments;
 
 </script>
@@ -27,8 +25,6 @@
 <div class="container page p-4 m-auto">
 	<div>
 		<ReviewDashboard {reviews} {user}></ReviewDashboard>
-		<PaperReviewInvitations {reviewerInvitations} />
-		<!--TEM QUE PASSAR OS DADOS DO REVISOR AQUI-->
 	</div>
 	<div class="text-xl font-bold mb-6">Your Activities</div>
 
