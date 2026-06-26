@@ -31,12 +31,13 @@
 	let showSubmitModal = $state(false);
 	let confirmInformationAccurate = $state(false);
 	let confirmPoliciesAgreed = $state(false);
+	let isSavingPaper = $state(false);
 
 	interface Props {
 		authorsOptions: any;
 		author: User;
 		inicialValue?: PaperPublishStoreData;
-		savePaper: (paper: PaperPublishStoreData) => void;
+		savePaper: (paper: PaperPublishStoreData) => void | Promise<void>;
 	}
 
 	interface AuthorAffiliationForm {
@@ -1123,53 +1124,64 @@
 	}
 
 	async function hdlSaveDraft(
-		event: MouseEvent & { currentTarget: EventTarget & HTMLButtonElement }
+		event?: MouseEvent & { currentTarget: EventTarget & HTMLButtonElement }
 	) {
-		$store.authors = inputAuthorList.map(
-			(i) => authorsOptions.filter((a: User) => a.username === i)[0]
-		);
-		$store.mainAuthor = $store.authors[0];
-		$store.coAuthors = $store.authors.slice(1, $store.authors.length);
-		$store.authorAffiliations = serializeAuthorAffiliations();
-		//const uploadResult = await uploadFile();
-		// if (
-		// 	!$store.pdfUrl ||
-		// 	(uploadResult.result !== $store.pdfUrl && uploadResult.result !== 'no_file')
-		// ) {
-		// 	$store.pdfUrl = uploadResult.result;
-		// }
-		$store.pdfUrl = 'nope';
-		const newImageIds = await Promise.all(
-			imageItems
-				.filter((item) => item.file)
-				.map(async (item) => {
-					const formData = new FormData();
-					formData.append('image', item.file!);
-					const response = await fetch('/api/images/upload', {
-						method: 'POST',
-						body: formData
-					});
-					const data = await response.json();
-					return data.id;
-				})
-		);
+		if (isSavingPaper) return;
 
-		const existingImageIds = imageItems.filter((item) => item.id).map((item) => item.id!);
-		const allImageIds = [...existingImageIds, ...newImageIds];
+		isSavingPaper = true;
+		try {
+			$store.authors = inputAuthorList.map(
+				(i) => authorsOptions.filter((a: User) => a.username === i)[0]
+			);
+			$store.mainAuthor = $store.authors[0];
+			$store.coAuthors = $store.authors.slice(1, $store.authors.length);
+			$store.authorAffiliations = serializeAuthorAffiliations();
+			//const uploadResult = await uploadFile();
+			// if (
+			// 	!$store.pdfUrl ||
+			// 	(uploadResult.result !== $store.pdfUrl && uploadResult.result !== 'no_file')
+			// ) {
+			// 	$store.pdfUrl = uploadResult.result;
+			// }
+			$store.pdfUrl = 'nope';
+			const newImageIds = await Promise.all(
+				imageItems
+					.filter((item) => item.file)
+					.map(async (item) => {
+						const formData = new FormData();
+						formData.append('image', item.file!);
+						const response = await fetch('/api/images/upload', {
+							method: 'POST',
+							body: formData
+						});
+						const data = await response.json();
+						return data.id;
+					})
+			);
 
-		$store.paperPictures = allImageIds;
-		$store.content = content;
-		savePaper($store);
+			const existingImageIds = imageItems.filter((item) => item.id).map((item) => item.id!);
+			const allImageIds = [...existingImageIds, ...newImageIds];
 
-		return $store;
+			$store.paperPictures = allImageIds;
+			$store.content = content;
+			await savePaper($store);
+
+			return $store;
+		} finally {
+			isSavingPaper = false;
+		}
 	}
 
 	function hdlSubmit(event: MouseEvent & { currentTarget: EventTarget & HTMLButtonElement }) {
+		if (isSavingPaper) return;
+
 		// Show confirmation modal instead of directly submitting
 		showSubmitModal = true;
 	}
 
-	function confirmSubmit() {
+	async function confirmSubmit() {
+		if (isSavingPaper) return;
+
 		if (!confirmInformationAccurate) {
 			alert('Please confirm that the information submitted is accurate.');
 			return;
@@ -1185,7 +1197,7 @@
 		showSubmitModal = false;
 		confirmInformationAccurate = false;
 		confirmPoliciesAgreed = false;
-		hdlSaveDraft(event as any);
+		await hdlSaveDraft();
 	}
 
 	function cancelSubmit() {
@@ -2242,11 +2254,19 @@
 	</fieldset>
 	
 	<div class="flex justify-end gap-3 mt-6 pr-5">
-		<button class="bg-primary-500 text-white rounded-lg px-4 py-2" onclick={hdlSaveDraft}>
-			Save Draft
+		<button
+			class="bg-primary-500 text-white rounded-lg px-4 py-2 disabled:cursor-not-allowed disabled:opacity-60"
+			onclick={hdlSaveDraft}
+			disabled={isSavingPaper}
+		>
+			{isSavingPaper ? 'Saving...' : 'Save Draft'}
 		</button>
 		{#if page.url.pathname.includes('edit')}
-			<button class="bg-primary-500 text-white rounded-lg px-4 py-2" onclick={hdlSubmit}>
+			<button
+				class="bg-primary-500 text-white rounded-lg px-4 py-2 disabled:cursor-not-allowed disabled:opacity-60"
+				onclick={hdlSubmit}
+				disabled={isSavingPaper}
+			>
 				Submit Article
 			</button>
 		{/if}
@@ -2315,11 +2335,11 @@
 						Cancel
 					</button>
 					<button 
-						class="px-4 py-2 text-white rounded-lg {(confirmInformationAccurate && confirmPoliciesAgreed) ? 'bg-primary-500 hover:bg-primary-600' : 'bg-gray-400 cursor-not-allowed'}"
+						class="px-4 py-2 text-white rounded-lg {(confirmInformationAccurate && confirmPoliciesAgreed && !isSavingPaper) ? 'bg-primary-500 hover:bg-primary-600' : 'bg-gray-400 cursor-not-allowed'}"
 						onclick={confirmSubmit}
-						disabled={!confirmInformationAccurate || !confirmPoliciesAgreed}
+						disabled={!confirmInformationAccurate || !confirmPoliciesAgreed || isSavingPaper}
 					>
-						Confirm & Submit
+						{isSavingPaper ? 'Submitting...' : 'Confirm & Submit'}
 					</button>
 				</div>
 				</div>
