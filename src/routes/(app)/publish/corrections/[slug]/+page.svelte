@@ -74,7 +74,7 @@
 			accept_without_changes: 'Accept without changes',
 			accept_with_minor_revisions: 'Accept with minor revisions',
 			major_revision: 'Major revision required',
-			reject: 'Reject'
+			reject: 'Decline'
 		};
 		return recommendations[recommendation] || recommendation;
 	}

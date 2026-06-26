@@ -604,23 +604,32 @@ registerEventEmailTemplate('review.deadline.overdue', (context) => {
 
 registerEventNotificationTemplate('review.assignment.removed', (context) => {
 	const role = roleFor(context);
+	const data = metadata(context);
 	return notificationPayload(
 		context,
 		'Reviewer Removed',
 		role === 'reviewer'
 			? `You were removed from reviewing "${paperTitle(context)}".`
+			: role === 'author'
+				? `${data.reviewerName || 'A reviewer'} was removed from reviewing "${paperTitle(context)}".`
 			: `A reviewer was removed from "${paperTitle(context)}".`,
 		'medium',
 		'system'
 	);
 });
 
-registerEventEmailTemplate('review.assignment.removed', (context) =>
-	emailPayload(
-		'Reviewer Removed',
-		`A reviewer assignment for "${paperTitle(context)}" was removed.`
-	)
-);
+registerEventEmailTemplate('review.assignment.removed', (context) => {
+	const role = roleFor(context);
+	const data = metadata(context);
+	const content =
+		role === 'reviewer'
+			? `You were removed from reviewing "${paperTitle(context)}".`
+			: role === 'author'
+				? `${data.reviewerName || 'A reviewer'} was removed from reviewing "${paperTitle(context)}".`
+				: `A reviewer assignment for "${paperTitle(context)}" was removed.`;
+
+	return emailPayload('Reviewer Removed', content);
+});
 
 registerEventNotificationTemplate('role.assigned', (context) => {
 	const role = roleFor(context);

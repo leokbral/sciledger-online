@@ -7,6 +7,11 @@ import type { User } from '$lib/types/User';
 import * as crypto from 'crypto';
 import { emitEvent } from '$lib/services/EventService';
 import {
+	getPaperAuthorAliases,
+	REVIEW_CONFLICT_OF_INTEREST_MESSAGE,
+	validateReviewerCanReviewPaper
+} from '$lib/server/reviewConflictOfInterest';
+import {
 	EditorialTransitionError,
 	transitionPaperStatus
 } from '$lib/server/authorization/editorialTransitionService';
@@ -31,7 +36,10 @@ async function emitLegacyReviewInvitationEvent(
 	const reviewerId = normalizeId(invitation.reviewer) || normalizeId(user);
 	const editorId = normalizeId(paper?.submittedBy);
 	const paperId = normalizeId(paper?.id) || normalizeId(paper?._id) || normalizeId(invitation.paper);
-	const recipients = [...new Set([reviewerId, editorId].filter(Boolean))];
+	const authorIds = getPaperAuthorAliases(paper).filter(
+		(authorId) => authorId !== reviewerId && authorId !== editorId
+	);
+	const recipients = [...new Set([reviewerId, editorId, ...authorIds].filter(Boolean))];
 
 	if (recipients.length === 0) {
 		return;
@@ -56,7 +64,11 @@ async function emitLegacyReviewInvitationEvent(
 			recipientRoles: Object.fromEntries(
 				recipients.map((recipientId) => [
 					recipientId,
-					recipientId === reviewerId ? 'reviewer' : 'editor'
+					recipientId === reviewerId
+						? 'reviewer'
+						: authorIds.includes(recipientId)
+							? 'author'
+							: 'editor'
 				])
 			)
 		}
@@ -98,6 +110,11 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		const paper = await Papers.findOne({ id: invitation.paper });
 		if (!paper) {
 			return json({ error: 'Paper not found' }, { status: 404 });
+		}
+
+		const conflictValidation = validateReviewerCanReviewPaper(paper as any, user);
+		if (!conflictValidation.allowed) {
+			return json({ error: REVIEW_CONFLICT_OF_INTEREST_MESSAGE }, { status: 403 });
 		}
 
 		// Atualizar status do convite

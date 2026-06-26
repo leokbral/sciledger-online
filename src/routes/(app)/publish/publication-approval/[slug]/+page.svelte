@@ -47,7 +47,7 @@
 			accept_without_changes: 'Accept (no changes)',
 			accept_with_minor_revisions: 'Accept (minor revisions)',
 			major_revision: 'Major revision',
-			reject: 'Reject'
+			reject: 'Decline'
 		};
 		return map[rec] || rec || '-';
 	}
@@ -111,7 +111,7 @@
 	}
 
 	async function reject() {
-		const ok = confirm('Reject publication and send the paper back to author corrections?');
+		const ok = confirm('Decline publication and send the paper back to author corrections?');
 		if (!ok) return;
 		isRejecting = true;
 		actionError = '';
@@ -217,7 +217,7 @@
 					disabled={isApproving || isRejecting}
 					onclick={reject}
 				>
-					{isRejecting ? 'Rejecting...' : 'Reject'}
+					{isRejecting ? 'Declining...' : 'Decline'}
 				</button>
 			{/if}
 		</div>

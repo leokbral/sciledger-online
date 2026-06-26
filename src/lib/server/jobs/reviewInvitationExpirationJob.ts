@@ -1,8 +1,11 @@
 import crypto from 'crypto';
 import { env } from '$env/dynamic/private';
 import PaperReviewInvitation from '$lib/db/models/PaperReviewInvitation';
+import Papers from '$lib/db/models/Paper';
+import Users from '$lib/db/models/User';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import { emitPaperReviewInvitationEvent } from '$lib/server/reviewInvitationLifecycle';
+import { validateReviewerCanReviewPaper } from '$lib/server/reviewConflictOfInterest';
 import {
 	buildPaperReviewerInvitationQuery,
 	getInvitationPaperId,
@@ -87,6 +90,19 @@ async function createResentInvitation(expiredInvitation: any, now: Date) {
 		};
 	}
 
+	const [paper, reviewer] = await Promise.all([
+		Papers.findOne({ $or: [{ id: paperId }, { _id: paperId }] }).lean(),
+		Users.findOne({ $or: [{ id: reviewerId }, { _id: reviewerId }] }).lean()
+	]);
+	const conflictValidation = validateReviewerCanReviewPaper(paper as any, reviewer || reviewerId);
+	if (!conflictValidation.allowed) {
+		return {
+			invitation: null,
+			created: false,
+			reason: 'conflict_of_interest'
+		};
+	}
+
 	const inviteId = crypto.randomUUID();
 	const resentInvitation = new PaperReviewInvitation({
 		_id: inviteId,
@@ -156,7 +172,7 @@ async function processExpiredInvitation(invitation: any, now: Date) {
 	}
 
 	const resendResult = await createResentInvitation(expiredInvitation, now);
-	if (!resendResult.created) {
+	if (!resendResult.created || !resendResult.invitation) {
 		return { expired: true, resent: false };
 	}
 

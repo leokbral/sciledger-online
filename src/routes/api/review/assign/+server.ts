@@ -14,6 +14,10 @@ import {
 	savePendingReviewInvitationOrFindExisting,
 	selectInvitationRole
 } from '$lib/server/reviewInvitations';
+import {
+	REVIEW_CONFLICT_OF_INTEREST_MESSAGE,
+	validateReviewerCanReviewPaper
+} from '$lib/server/reviewConflictOfInterest';
 import type { RequestHandler } from './$types';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
@@ -102,6 +106,16 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			const reviewerAliases = [
 				...new Set([rawReviewerId, normalizedReviewerId, ...getIdAliases(reviewer)].filter(Boolean))
 			];
+			const conflictValidation = validateReviewerCanReviewPaper(paper as any, reviewer as any);
+
+			if (!conflictValidation.allowed) {
+				skipped.push({
+					reviewerId: rawReviewerId,
+					reasons: [REVIEW_CONFLICT_OF_INTEREST_MESSAGE]
+				});
+				continue;
+			}
+
 			const existingInvite = await findActiveReviewInvitation(paperAliases, reviewerAliases);
 
 			if (existingInvite) {
@@ -220,16 +234,29 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		paper.updatedAt = new Date();
 		await paper.save();
 
-		return json({
-			success: invitations.length > 0,
-			message:
-				invitations.length > 0
-					? `Successfully sent ${invitations.length} invitation(s)`
-					: 'Reviewer already invited for this paper',
-			invitations: invitations.length,
-			skipped,
-			duplicates
-		});
+		const conflictOnly =
+			invitations.length === 0 &&
+			skipped.length > 0 &&
+			skipped.every((item: any) =>
+				(item.reasons || []).includes(REVIEW_CONFLICT_OF_INTEREST_MESSAGE)
+			);
+
+		return json(
+			{
+				success: invitations.length > 0,
+				message:
+					invitations.length > 0
+						? `Successfully sent ${invitations.length} invitation(s)`
+						: conflictOnly
+							? REVIEW_CONFLICT_OF_INTEREST_MESSAGE
+							: 'Reviewer already invited for this paper',
+				error: conflictOnly ? REVIEW_CONFLICT_OF_INTEREST_MESSAGE : undefined,
+				invitations: invitations.length,
+				skipped,
+				duplicates
+			},
+			conflictOnly ? { status: 403 } : undefined
+		);
 	} catch (error) {
 		console.error('Error assigning reviewers:', error);
 		return json(

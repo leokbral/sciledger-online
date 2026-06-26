@@ -63,7 +63,7 @@
 			accept_without_changes: 'Accept without changes',
 			accept_with_minor_revisions: 'Accept with minor revisions',
 			major_revision: 'Major revision',
-			reject: 'Reject'
+			reject: 'Decline'
 		};
 
 		return labels[value] || value || 'Not selected';
@@ -108,7 +108,7 @@
 							<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
 								<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
 							</svg>
-							Paper Rejected
+							Paper Declined
 						</span>
 					{:else if paper.status === 'reviewer assignment'}
 						<span class="inline-flex items-center gap-2 px-3 py-1.5 bg-yellow-100 text-yellow-800 text-sm font-medium rounded-lg">
@@ -125,14 +125,14 @@
 				</div>
 			{/if}
 
-			<!-- Rejection Reason -->
+			<!-- Decline Reason -->
 			{#if (paper.rejectedByHub || paper.status === 'rejected') && paper.rejectionReason}
 				<div class="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-					<p class="text-sm font-semibold text-red-900 mb-1">Rejection Reason:</p>
+					<p class="text-sm font-semibold text-red-900 mb-1">Decline Reason:</p>
 					<p class="text-sm text-red-800">{paper.rejectionReason}</p>
 					{#if paper.rejectedAt}
 						<p class="text-xs text-red-600 mt-2">
-							Rejected on {new Date(paper.rejectedAt).toLocaleDateString()}
+							Declined on {new Date(paper.rejectedAt).toLocaleDateString()}
 						</p>
 					{/if}
 				</div>

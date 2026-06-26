@@ -96,7 +96,7 @@
 		accept_without_changes: 'Accept without changes',
 		accept_with_minor_revisions: 'Accept with minor revisions',
 		major_revision: 'Major revision',
-		reject: 'Reject'
+		reject: 'Decline'
 	};
 
 	const ethicsHumanResearchLabel: Record<string, string> = {

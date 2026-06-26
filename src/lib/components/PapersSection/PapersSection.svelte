@@ -555,7 +555,7 @@
                                     {/if}
                                     {#if paper.rejectedAt}
                                         <span class="text-xs block mt-1 opacity-75">
-                                            Rejected on {new Date(paper.rejectedAt).toLocaleDateString()}
+                                            Declined on {new Date(paper.rejectedAt).toLocaleDateString()}
                                         </span>
                                     {/if}
                                 </div>
@@ -653,13 +653,13 @@
                                             onclick={() => openRejectDialog(paper)}
                                         >
                                             <Icon icon="mdi:close-circle" width="20" height="20" />
-                                            Reject Paper
+                                            Decline Decision
                                         </button>
                                     {/if}
                                     {#if paper.rejectedByHub}
                                         <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-100 text-red-800 text-sm font-medium rounded-lg">
                                             <Icon icon="mdi:close-circle" width="18" height="18" />
-                                            Rejected
+                                            Declined
                                         </span>
                                     {/if}
                                     {#if getAvailableReviewers(paper).length > 0 && !paper.rejectedByHub}
@@ -1189,7 +1189,7 @@
             <div class="space-y-4">
                 <div class="flex justify-between items-center">
                     <h3 class="text-xl font-bold text-error-600 dark:text-error-400">
-                        Reject Paper
+                        Decline Decision
                     </h3>
                     <button
                         class="btn-icon btn-icon-sm"
@@ -1202,7 +1202,7 @@
                 <div class="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg">
                     <p class="text-sm text-yellow-800 dark:text-yellow-200">
                         <Icon icon="mdi:alert" class="inline mr-1" width="20" height="20" />
-                        <strong>Warning:</strong> Rejecting this paper will notify the author and they will no longer be able to submit it to this hub. This action cannot be undone.
+                        <strong>Warning:</strong> Declining this paper will notify the author and they will no longer be able to submit it to this hub. This action cannot be undone.
                     </p>
                 </div>
                 
@@ -1214,7 +1214,7 @@
                 
                 <div class="space-y-2">
                     <label for="rejection-reason" class="block font-medium text-gray-900 dark:text-white">
-                        Reason for Rejection <span class="text-error-600">*</span>
+                        Reason for Decline <span class="text-error-600">*</span>
                     </label>
                     <textarea
                         id="rejection-reason"
@@ -1244,10 +1244,10 @@
                     >
                         {#if loading}
                             <Icon icon="mdi:loading" class="animate-spin mr-2" width="20" height="20" />
-                            Rejecting...
+                            Declining...
                         {:else}
                             <Icon icon="mdi:close-circle" class="mr-2" width="20" height="20" />
-                            Reject Paper
+                            Decline Decision
                         {/if}
                     </button>
                 </div>

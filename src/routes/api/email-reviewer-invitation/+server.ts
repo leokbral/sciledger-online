@@ -20,6 +20,10 @@ import {
 	getIdAliases,
 	selectInvitationRole
 } from '$lib/server/reviewInvitations';
+import {
+	REVIEW_CONFLICT_OF_INTEREST_MESSAGE,
+	validateReviewerCanReviewPaper
+} from '$lib/server/reviewConflictOfInterest';
 
 // Clear the model cache to ensure we use the updated schema
 if (mongoose.models.EmailReviewerInvitation) {
@@ -286,6 +290,25 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
 
 			const existingReviewer = await Users.findOne({ email: normalizedEmail }).lean();
 			if (existingReviewer) {
+				const conflictValidation = validateReviewerCanReviewPaper(paper, existingReviewer);
+				if (!conflictValidation.allowed) {
+					const normalizedReviewerId = String(existingReviewer.id || existingReviewer._id);
+					return json(
+						{
+							success: false,
+							error: REVIEW_CONFLICT_OF_INTEREST_MESSAGE,
+							message: REVIEW_CONFLICT_OF_INTEREST_MESSAGE,
+							skipped: [
+								{
+									reviewerId: normalizedReviewerId,
+									reasons: [REVIEW_CONFLICT_OF_INTEREST_MESSAGE]
+								}
+							]
+						},
+						{ status: 403 }
+					);
+				}
+
 				const reviewerAliases = getIdAliases(existingReviewer);
 				const normalizedPaperId = String(paperIdValue);
 				const existingInvite = await findActiveReviewInvitation(

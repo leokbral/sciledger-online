@@ -127,7 +127,7 @@
 							onclick={() => handleInvitation(invite._id, 'reject')}
 						>
 							<Icon icon="mdi:close" class="mr-2" />
-							Reject
+							Decline
 						</button>
 					</div>
 				</div>

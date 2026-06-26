@@ -2,8 +2,13 @@ import { json } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import Papers from '$lib/db/models/Paper';
 import Hubs from '$lib/db/models/Hub';
+import Users from '$lib/db/models/User';
 import { authorize } from '$lib/server/authorization/authorizationService';
 import { emitEvent } from '$lib/services/EventService';
+import {
+	REVIEW_CONFLICT_OF_INTEREST_MESSAGE,
+	validateReviewerCanReviewPaper
+} from '$lib/server/reviewConflictOfInterest';
 import type { RequestHandler } from './$types';
 import * as crypto from 'crypto';
 
@@ -50,12 +55,26 @@ export const POST: RequestHandler = async ({ params, locals }) => {
 		}).lean();
 
 		let createdCount = 0;
+		const skipped: Array<{ paperId: string; reviewerId: string; reasons: string[] }> = [];
 
 		// Para cada paper, verificar revisores e criar ReviewAssignments se não existirem
 		for (const paper of papers) {
 			if (!paper.reviewers || paper.reviewers.length === 0) continue;
 
 			for (const reviewerId of paper.reviewers) {
+				const reviewer = await Users.findOne({
+					$or: [{ id: String(reviewerId) }, { _id: String(reviewerId) }]
+				}).lean();
+				const conflictValidation = validateReviewerCanReviewPaper(paper, reviewer || reviewerId);
+				if (!conflictValidation.allowed) {
+					skipped.push({
+						paperId: String(paper.id || paper._id),
+						reviewerId: String(reviewerId),
+						reasons: [REVIEW_CONFLICT_OF_INTEREST_MESSAGE]
+					});
+					continue;
+				}
+
 				// Verificar se já existe ReviewAssignment
 				const existing = await ReviewAssignment.findOne({
 					paperId: paper.id,
@@ -125,6 +144,7 @@ export const POST: RequestHandler = async ({ params, locals }) => {
 		return json({
 			success: true,
 			created: createdCount,
+			skipped,
 			message: `Successfully created ${createdCount} review assignment(s)`
 		});
 	} catch (error) {

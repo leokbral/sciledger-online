@@ -9,6 +9,7 @@ import {
 	getInvitationReviewerId,
 	getReviewInvitationExpiresAt
 } from './reviewInvitations';
+import { getPaperAuthorAliases } from './reviewConflictOfInterest';
 
 type InvitationLike = Record<string, any>;
 
@@ -47,7 +48,9 @@ async function findUser(userId: string) {
 async function findPaper(paperId: string) {
 	if (!paperId) return null;
 	return Papers.findOne({ $or: [{ id: paperId }, { _id: paperId }] })
-		.select('_id id title hubId')
+		.select(
+			'_id id title hubId mainAuthor correspondingAuthor submittedBy coAuthors authors authorAffiliations'
+		)
 		.lean();
 }
 
@@ -55,15 +58,24 @@ function defaultRecipientsForEvent(
 	type: PlatformEventType,
 	reviewerId: string,
 	editorId: string,
-	actorId: string | null
+	actorId: string | null,
+	authorIds: string[] = []
 ) {
+	const baseRecipients = [reviewerId, editorId];
+
 	switch (type) {
+		case 'review.invitation.accepted':
+		case 'review.invitation.declined':
 		case 'review.invitation.expired':
-			return [editorId || reviewerId];
+		case 'review.invitation.cancelled':
+			return [...baseRecipients, ...authorIds];
+		case 'review.invitation.resent':
+		case 'review.invitation.created':
+			return baseRecipients;
 		case 'review.invitation.duplicate':
-			return [actorId || editorId || reviewerId];
+			return [reviewerId, actorId || editorId];
 		default:
-			return [reviewerId, editorId];
+			return baseRecipients;
 	}
 }
 
@@ -95,6 +107,9 @@ export async function emitPaperReviewInvitationEvent(
 	const normalizedReviewerId = reviewer?.id ? String(reviewer.id) : reviewerId;
 	const normalizedEditorId = editor?.id ? String(editor.id) : editorId;
 	const normalizedActorId = actor?.id ? String(actor.id) : actorId;
+	const normalizedAuthorIds = getPaperAuthorAliases(paper).filter(
+		(authorId) => authorId !== normalizedReviewerId && authorId !== normalizedEditorId
+	);
 
 	const recipients = [
 		...new Set(
@@ -104,7 +119,8 @@ export async function emitPaperReviewInvitationEvent(
 						type,
 						normalizedReviewerId,
 						normalizedEditorId,
-						normalizedActorId
+						normalizedActorId,
+						normalizedAuthorIds
 					)
 			)
 				.filter(Boolean)
@@ -119,6 +135,9 @@ export async function emitPaperReviewInvitationEvent(
 	const recipientRoles: Record<string, string> = {};
 	if (normalizedReviewerId) recipientRoles[normalizedReviewerId] = 'reviewer';
 	if (normalizedEditorId) recipientRoles[normalizedEditorId] = 'editor';
+	for (const authorId of normalizedAuthorIds) {
+		recipientRoles[authorId] = 'author';
+	}
 	if (normalizedActorId && !recipientRoles[normalizedActorId])
 		recipientRoles[normalizedActorId] = 'actor';
 

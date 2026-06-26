@@ -3,6 +3,7 @@ import { start_mongo } from '$lib/db/mongooseConnection';
 import Papers from '$lib/db/models/Paper';
 import { authorize } from '$lib/server/authorization/authorizationService';
 import { emitEvent } from '$lib/services/EventService';
+import { getPaperAuthorAliases } from '$lib/server/reviewConflictOfInterest';
 
 export async function POST({ params, request, locals }) {
     try {
@@ -40,7 +41,10 @@ export async function POST({ params, request, locals }) {
             await paper.save();
 
             const actorId = String(locals.user.id || locals.user._id || '');
-            const recipients = [...new Set([String(reviewerId), actorId].filter(Boolean))];
+            const authorIds = getPaperAuthorAliases(paper).filter(
+                (authorId) => authorId !== String(reviewerId) && authorId !== actorId
+            );
+            const recipients = [...new Set([String(reviewerId), actorId, ...authorIds].filter(Boolean))];
             const hubId = paper.hubId ? String(paper.hubId) : null;
 
             try {
@@ -55,11 +59,16 @@ export async function POST({ params, request, locals }) {
                         paperTitle: paper.title,
                         hubId,
                         reviewerId: String(reviewerId),
+                        reviewerName: String(reviewerId),
                         removedBy: actorId,
                         recipientRoles: Object.fromEntries(
                             recipients.map((recipientId) => [
                                 recipientId,
-                                recipientId === String(reviewerId) ? 'reviewer' : 'editor'
+                                recipientId === String(reviewerId)
+                                    ? 'reviewer'
+                                    : authorIds.includes(recipientId)
+                                        ? 'author'
+                                        : 'editor'
                             ])
                         )
                     }

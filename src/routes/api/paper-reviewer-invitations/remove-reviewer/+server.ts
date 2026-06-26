@@ -4,6 +4,7 @@ import Papers from '$lib/db/models/Paper';
 import ReviewQueue from '$lib/db/models/ReviewQueue';
 import { emitEvent } from '$lib/services/EventService';
 import { authorize } from '$lib/server/authorization/authorizationService';
+import { getPaperAuthorAliases } from '$lib/server/reviewConflictOfInterest';
 import type { RequestHandler } from './$types';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
@@ -97,7 +98,12 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			}
 		);
 
-		const recipients = [...new Set([String(reviewerId), String(user.id)].filter(Boolean))];
+		const authorIds = getPaperAuthorAliases(paper).filter(
+			(authorId) => authorId !== String(reviewerId) && authorId !== String(user.id)
+		);
+		const recipients = [
+			...new Set([String(reviewerId), String(user.id), ...authorIds].filter(Boolean))
+		];
 		const hubId =
 			typeof paper.hubId === 'object' && paper.hubId
 				? String(paper.hubId._id || paper.hubId.id)
@@ -117,12 +123,17 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 					paperTitle: paper.title,
 					hubId,
 					reviewerId: String(reviewerId),
+					reviewerName: String(reviewerId),
 					removedBy: user.id,
 					removedByName: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email,
 					recipientRoles: Object.fromEntries(
 						recipients.map((recipientId) => [
 							recipientId,
-							recipientId === String(reviewerId) ? 'reviewer' : 'editor'
+							recipientId === String(reviewerId)
+								? 'reviewer'
+								: authorIds.includes(recipientId)
+									? 'author'
+									: 'editor'
 						])
 					)
 				}

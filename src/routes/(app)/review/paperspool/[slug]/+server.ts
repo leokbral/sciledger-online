@@ -13,6 +13,10 @@ import {
     transitionPaperStatus
 } from '$lib/server/authorization/editorialTransitionService';
 import { getUserIdAliases } from '$lib/server/authorization/roleResolver';
+import {
+    REVIEW_CONFLICT_OF_INTEREST_MESSAGE,
+    validateReviewerCanReviewPaper
+} from '$lib/server/reviewConflictOfInterest';
 
 function normalizeId(value: any): string {
     if (!value) return '';
@@ -49,6 +53,11 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
         if (!paper) {
             return json({ error: 'Paper not found.' }, { status: 404 });
+        }
+
+        const conflictValidation = validateReviewerCanReviewPaper(paper as any, user);
+        if (!conflictValidation.allowed) {
+            return json({ error: REVIEW_CONFLICT_OF_INTEREST_MESSAGE }, { status: 403 });
         }
 
         if (!paper.peer_review) {
