@@ -14,6 +14,7 @@
 	import ReviewerModal from '$lib/components/ReviewerModal/ReviewerModal.svelte';
 	import PaperReviewerInvite from '$lib/components/PaperReviewerInvite/PaperReviewerInvite.svelte';
 	import ManageReviewerDeadline from '$lib/components/ReviewerManagement/ManageReviewerDeadline.svelte';
+	import { hasHubPublication } from '$lib/helpers/paperPublicationModel';
 
 	interface Props {
 		data: any;
@@ -27,13 +28,14 @@
 	let canManageHub: boolean = $state(!!(data as any).canManageHub);
 	let isApprovingPublication = $state(false);
 	let approvePublicationError = $state('');
-	let isStandalonePaper = $derived(!!paper && !paper.hubId);
+	let isHubPublication = $derived(!!paper && hasHubPublication(paper));
+	let isStandalonePaper = $derived(!!paper && !isHubPublication);
 	let hasStandalonePaymentAuthorization = $derived(
 		!!paper?.paymentHold?.stripePaymentIntentId &&
 		(paper?.paymentHold?.status === 'authorized' || paper?.paymentHold?.status === 'captured')
 	);
 	let requiresPaymentBeforeInviting = $derived(isStandalonePaper && !hasStandalonePaymentAuthorization);
-	let canEditReviewerAssignments = $derived(!paper?.hubId || canManageHub);
+	let canEditReviewerAssignments = $derived(isStandalonePaper);
 
 	interface ImageItem {
 		id?: string;
@@ -673,19 +675,19 @@
 		</div> -->
 
 		{#if canEditReviewerAssignments}
-		<!-- Peer Review Options -->
-		<label for="peer_review" class="block mb-1">Peer Review Options</label>
-		<select
-			id="peer_review"
-			name="peer_review"
-			class="w-full p-2 border border-surface-300 rounded-lg"
-			bind:value={peer_review}
-			disabled={requiresPaymentBeforeInviting}
-		>
-			<option value="" disabled selected>Select peer review option</option>
-			<option value="open">Open</option>
-			<option value="selected">Selected</option>
-		</select>
+			<!-- Peer Review Options -->
+			<label for="peer_review" class="block mb-1">Peer Review Options</label>
+			<select
+				id="peer_review"
+				name="peer_review"
+				class="w-full p-2 border border-surface-300 rounded-lg"
+				bind:value={peer_review}
+				disabled={requiresPaymentBeforeInviting}
+			>
+				<option value="" disabled selected>Select peer review option</option>
+				<option value="open">Open</option>
+				<option value="selected">Selected</option>
+			</select>
 
 		{#if peer_review === 'selected'}
 			{#if requiresPaymentBeforeInviting}
