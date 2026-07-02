@@ -26,6 +26,14 @@ export function getEventEmailTemplate(type: PlatformEventType) {
 	return emailTemplates.get(type);
 }
 
+export function getAllEventNotificationTemplates() {
+	return Array.from(notificationTemplates.entries()).map(([type, template]) => ({ type, template }));
+}
+
+export function getAllEventEmailTemplates() {
+	return Array.from(emailTemplates.entries()).map(([type, template]) => ({ type, template }));
+}
+
 export function clearEventTemplates() {
 	notificationTemplates.clear();
 	emailTemplates.clear();

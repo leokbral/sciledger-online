@@ -1,8 +1,5 @@
-import type {
-	EventEmailPayload,
-	EventNotificationPayload,
-	EventTemplateContext
-} from '$lib/types/EventService';
+import type { EventNotificationPayload, EventTemplateContext } from '$lib/types/EventService';
+import { buildInstitutionalEventEmail } from './institutionalEmailTemplate';
 import { registerEventEmailTemplate, registerEventNotificationTemplate } from './templates';
 
 type InvitationMetadata = {
@@ -37,15 +34,6 @@ function paperUrl(context: EventTemplateContext) {
 	return data.paperId ? `/publish/view/${data.paperId}` : '/notifications';
 }
 
-function escapeHtml(value: string) {
-	return value
-		.replace(/&/g, '&amp;')
-		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;')
-		.replace(/"/g, '&quot;')
-		.replace(/'/g, '&#039;');
-}
-
 function notificationPayload(
 	context: EventTemplateContext,
 	title: string,
@@ -69,12 +57,13 @@ function notificationPayload(
 	};
 }
 
-function emailPayload(title: string, content: string): EventEmailPayload {
-	return {
-		subject: title,
-		text: `${content}\n\nOpen SciLedger to view the latest details.`,
-		html: `<p>${escapeHtml(content)}</p><p>Open SciLedger to view the latest details.</p>`
-	};
+function emailPayload(context: EventTemplateContext, title: string, content: string) {
+	return buildInstitutionalEventEmail({
+		context,
+		title,
+		message: content,
+		ctaUrl: paperUrl(context)
+	});
 }
 
 registerEventNotificationTemplate('review.invitation.created', (context) => {
@@ -107,6 +96,7 @@ registerEventEmailTemplate('review.invitation.created', (context) => {
 			? `You have been invited to review "${paperTitle(context)}".`
 			: `Invitation sent to ${data.reviewerName || 'the reviewer'} for "${paperTitle(context)}".`;
 	return emailPayload(
+		context,
 		role === 'reviewer' ? 'New Paper Review Request' : 'Review Invitation Sent',
 		content
 	);
@@ -153,8 +143,8 @@ registerEventEmailTemplate('review.invitation.accepted', (context) => {
 			? `You accepted the invitation to review "${paperTitle(context)}".`
 			: role === 'author'
 				? `${data.reviewerName || 'A reviewer'} accepted the invitation to review "${paperTitle(context)}".`
-			: `${data.reviewerName || 'A reviewer'} accepted the invitation to review "${paperTitle(context)}".`;
-	return emailPayload('Review Invitation Accepted', content);
+				: `${data.reviewerName || 'A reviewer'} accepted the invitation to review "${paperTitle(context)}".`;
+	return emailPayload(context, 'Review Invitation Accepted', content);
 });
 
 registerEventNotificationTemplate('review.invitation.declined', (context) => {
@@ -198,8 +188,8 @@ registerEventEmailTemplate('review.invitation.declined', (context) => {
 			? `You declined the invitation to review "${paperTitle(context)}".`
 			: role === 'author'
 				? `${data.reviewerName || 'A reviewer'} declined the invitation to review "${paperTitle(context)}".`
-			: `${data.reviewerName || 'A reviewer'} declined the invitation to review "${paperTitle(context)}".`;
-	return emailPayload('Review Invitation Declined', content);
+				: `${data.reviewerName || 'A reviewer'} declined the invitation to review "${paperTitle(context)}".`;
+	return emailPayload(context, 'Review Invitation Declined', content);
 });
 
 registerEventNotificationTemplate('review.invitation.expired', (context) => {
@@ -221,7 +211,7 @@ registerEventEmailTemplate('review.invitation.expired', (context) => {
 			? `Your invitation to review "${paperTitle(context)}" expired.`
 			: `${data.reviewerName || 'The reviewer'} did not respond to the invitation for "${paperTitle(context)}" before it expired.`;
 
-	return emailPayload('Review Invitation Expired', content);
+	return emailPayload(context, 'Review Invitation Expired', content);
 });
 
 registerEventNotificationTemplate('review.invitation.resent', (context) => {
@@ -254,7 +244,7 @@ registerEventEmailTemplate('review.invitation.resent', (context) => {
 		role === 'reviewer'
 			? `You have been invited again to review "${paperTitle(context)}".`
 			: `The invitation for "${paperTitle(context)}" was resent to ${data.reviewerName || 'the reviewer'}.`;
-	return emailPayload('Review Invitation Resent', content);
+	return emailPayload(context, 'Review Invitation Resent', content);
 });
 
 registerEventNotificationTemplate('review.invitation.cancelled', (context) => {
@@ -265,7 +255,7 @@ registerEventNotificationTemplate('review.invitation.cancelled', (context) => {
 			? `Your invitation to review "${paperTitle(context)}" has been cancelled.`
 			: role === 'author'
 				? `A review invitation for "${paperTitle(context)}" has been cancelled.`
-			: `The review invitation for "${paperTitle(context)}" has been cancelled.`;
+				: `The review invitation for "${paperTitle(context)}" has been cancelled.`;
 
 	return notificationPayload(context, title, content, 'low', 'invitation_cancelled');
 });
@@ -277,8 +267,8 @@ registerEventEmailTemplate('review.invitation.cancelled', (context) => {
 			? `Your invitation to review "${paperTitle(context)}" has been cancelled.`
 			: role === 'author'
 				? `A review invitation for "${paperTitle(context)}" has been cancelled.`
-			: `The review invitation for "${paperTitle(context)}" has been cancelled.`;
-	return emailPayload('Review Invitation Cancelled', content);
+				: `The review invitation for "${paperTitle(context)}" has been cancelled.`;
+	return emailPayload(context, 'Review Invitation Cancelled', content);
 });
 
 registerEventNotificationTemplate('review.invitation.duplicate', (context) => {
@@ -298,5 +288,5 @@ registerEventEmailTemplate('review.invitation.duplicate', (context) => {
 			? `A duplicate review invitation attempt was recorded for "${paperTitle(context)}". Your original invitation remains the active one.`
 			: `${metadata(context).reviewerName || 'This reviewer'} already has an active invitation for "${paperTitle(context)}".`;
 
-	return emailPayload('Duplicate Review Invitation', content);
+	return emailPayload(context, 'Duplicate Review Invitation', content);
 });

@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
 import Users from '$lib/db/models/User';
 import { env } from '$env/dynamic/private';
+import { createEmailLayout, type EmailDetail } from '$lib/services/emailDesignSystem';
 
 type UserRecipient = {
 	id: string;
@@ -40,57 +41,23 @@ function renderNotificationTemplate(data: {
 	title: string;
 	greeting: string;
 	intro: string;
-	detailsHtml?: string;
+	details?: EmailDetail[];
 	actionLabel: string;
 	actionUrl: string;
 	note?: string;
 }): string {
-	return `
-		<!DOCTYPE html>
-		<html lang="en">
-		<head>
-			<meta charset="utf-8">
-			<meta name="viewport" content="width=device-width, initial-scale=1">
-			<title>${data.title} - SciLedger</title>
-		</head>
-		<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 20px; background-color: #f8f9fa;">
-			<div style="max-width: 600px; margin: 0 auto; background-color: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); overflow: hidden;">
-				<div style="background-color: #0170f3; color: white; padding: 30px 20px; text-align: center;">
-					<h1 style="margin: 0; font-size: 32px; font-weight: bold;">SciLedger</h1>
-					<p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;">Scientific Platform</p>
-				</div>
-
-				<div style="padding: 40px 30px;">
-					<h2 style="color: #333; margin-bottom: 20px; font-size: 24px;">${data.title}</h2>
-					<p style="font-size: 16px; margin-bottom: 20px;">${data.greeting}</p>
-					<p style="font-size: 16px; margin-bottom: 25px;">${data.intro}</p>
-
-					${data.detailsHtml || ''}
-
-					<div style="text-align: center; margin: 40px 0;">
-						<a href="${data.actionUrl}" style="display: inline-block; background-color: #0170f3; color: white; padding: 14px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; box-shadow: 0 2px 4px rgba(1, 112, 243, 0.3);">
-							${data.actionLabel}
-						</a>
-					</div>
-
-					<p style="font-size: 14px; color: #666; margin-bottom: 10px;">If the button does not work, copy and paste this link into your browser:</p>
-					<div style="word-break: break-all; background-color: #f8f4ff; padding: 15px; border-radius: 4px; font-family: monospace; font-size: 12px; border: 1px solid #e0e0e0;">
-						${data.actionUrl}
-					</div>
-
-					${data.note ? `<div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 25px 0; border-radius: 4px;"><p style="color: #856404; margin: 0; font-weight: bold;">Note</p><p style="color: #856404; margin: 5px 0 0 0;">${data.note}</p></div>` : ''}
-				</div>
-
-				<div style="background-color: #f8f9fa; padding: 25px 30px; text-align: center; border-top: 1px solid #e0e0e0;">
-					<p style="font-size: 12px; color: #666; margin: 0 0 5px 0;">© ${new Date().getFullYear()} SciLedger. All rights reserved.</p>
-					<p style="font-size: 12px; color: #666; margin: 0;">This is an automated message. Please do not reply.</p>
-				</div>
-			</div>
-		</body>
-		</html>
-	`;
+	return createEmailLayout({
+		title: data.title,
+		subtitle: 'Paper workflow update',
+		greeting: data.greeting,
+		message: data.intro,
+		details: data.details,
+		actionLabel: data.actionLabel,
+		actionUrl: data.actionUrl,
+		fallbackUrl: data.actionUrl,
+		warning: data.note ? { title: 'Note', message: data.note } : undefined
+	});
 }
-
 export class PaperLifecycleEmailService {
 	private static transporter: nodemailer.Transporter | null = null;
 
@@ -148,12 +115,10 @@ export class PaperLifecycleEmailService {
 	}): EmailPayload {
 		const paperUrl = buildPaperUrl(data.paperId);
 		const submittedByLine = data.submittedByName ? ` by ${data.submittedByName}` : '';
-		const detailsHtml = `
-			<div style="background-color: #f8f9fa; border-left: 4px solid #0170f3; padding: 20px; margin: 25px 0; border-radius: 4px;">
-				<p style="margin: 0 0 8px 0;"><strong>Paper title:</strong> ${data.paperTitle}</p>
-				<p style="margin: 0;"><strong>Status:</strong> Submitted</p>
-			</div>
-		`;
+		const details: EmailDetail[] = [
+			{ label: 'Paper title', value: data.paperTitle },
+			{ label: 'Status', value: 'Submitted' }
+		];
 
 		return {
 			subject: `Submission Confirmation: ${data.paperTitle}`,
@@ -162,7 +127,7 @@ export class PaperLifecycleEmailService {
 				title: 'Submission Confirmation',
 				greeting: `Dear ${data.recipientName},`,
 				intro: `This is to confirm that the paper <strong>${data.paperTitle}</strong> has been successfully submitted${submittedByLine}.`,
-				detailsHtml,
+				details,
 				actionLabel: 'View Submission',
 				actionUrl: paperUrl,
 				note: 'You will continue to receive status updates as the submission progresses.'
@@ -179,13 +144,12 @@ export class PaperLifecycleEmailService {
 	}): EmailPayload {
 		const paperUrl = buildPaperUrl(data.paperId);
 		const acceptedByLine = data.acceptedByName ? ` by ${data.acceptedByName}` : '';
-		const acceptedLabel = data.acceptanceType === 'publication' ? 'approved for publication' : 'accepted for review';
-		const detailsHtml = `
-			<div style="background-color: #f8f9fa; border-left: 4px solid #0170f3; padding: 20px; margin: 25px 0; border-radius: 4px;">
-				<p style="margin: 0 0 8px 0;"><strong>Paper title:</strong> ${data.paperTitle}</p>
-				<p style="margin: 0;"><strong>New status:</strong> ${acceptedLabel}</p>
-			</div>
-		`;
+		const acceptedLabel =
+			data.acceptanceType === 'publication' ? 'approved for publication' : 'accepted for review';
+		const details: EmailDetail[] = [
+			{ label: 'Paper title', value: data.paperTitle },
+			{ label: 'New status', value: acceptedLabel }
+		];
 
 		return {
 			subject: `Paper Status Update: ${data.paperTitle}`,
@@ -194,7 +158,7 @@ export class PaperLifecycleEmailService {
 				title: 'Paper Status Update',
 				greeting: `Dear ${data.recipientName},`,
 				intro: `Your paper <strong>${data.paperTitle}</strong> has been <strong>${acceptedLabel}</strong>${acceptedByLine}.`,
-				detailsHtml,
+				details,
 				actionLabel: 'View Paper Details',
 				actionUrl: paperUrl,
 				note: 'Please review the updated status and next actions in your dashboard.'
@@ -211,13 +175,11 @@ export class PaperLifecycleEmailService {
 	}): EmailPayload {
 		const paperUrl = buildPaperUrl(data.paperId);
 		const submittedByLabel = data.submittedByName || 'an author';
-		const detailsHtml = `
-			<div style="background-color: #f8f9fa; border-left: 4px solid #0170f3; padding: 20px; margin: 25px 0; border-radius: 4px;">
-				<p style="margin: 0 0 8px 0;"><strong>Hub:</strong> ${data.hubName}</p>
-				<p style="margin: 0 0 8px 0;"><strong>Paper title:</strong> ${data.paperTitle}</p>
-				<p style="margin: 0;"><strong>Submitted by:</strong> ${submittedByLabel}</p>
-			</div>
-		`;
+		const details: EmailDetail[] = [
+			{ label: 'Hub', value: data.hubName },
+			{ label: 'Paper title', value: data.paperTitle },
+			{ label: 'Submitted by', value: submittedByLabel }
+		];
 
 		return {
 			subject: `New Hub Submission: ${data.paperTitle}`,
@@ -226,7 +188,7 @@ export class PaperLifecycleEmailService {
 				title: 'New Hub Submission',
 				greeting: `Dear ${data.recipientName},`,
 				intro: `A new paper has been submitted to your hub <strong>${data.hubName}</strong>.`,
-				detailsHtml,
+				details,
 				actionLabel: 'Review Submission',
 				actionUrl: paperUrl,
 				note: 'Please review the submission details and proceed with the appropriate editorial decision.'
@@ -242,7 +204,9 @@ export class PaperLifecycleEmailService {
 	}) {
 		const transporter = this.getTransporter();
 		if (!transporter) {
-			console.warn('PaperLifecycleEmailService: SMTP is not configured. Skipping submission email.');
+			console.warn(
+				'PaperLifecycleEmailService: SMTP is not configured. Skipping submission email.'
+			);
 			return;
 		}
 
@@ -281,7 +245,9 @@ export class PaperLifecycleEmailService {
 	}) {
 		const transporter = this.getTransporter();
 		if (!transporter) {
-			console.warn('PaperLifecycleEmailService: SMTP is not configured. Skipping acceptance email.');
+			console.warn(
+				'PaperLifecycleEmailService: SMTP is not configured. Skipping acceptance email.'
+			);
 			return;
 		}
 
@@ -321,7 +287,9 @@ export class PaperLifecycleEmailService {
 	}) {
 		const transporter = this.getTransporter();
 		if (!transporter) {
-			console.warn('PaperLifecycleEmailService: SMTP is not configured. Skipping hub admin submission email.');
+			console.warn(
+				'PaperLifecycleEmailService: SMTP is not configured. Skipping hub admin submission email.'
+			);
 			return;
 		}
 

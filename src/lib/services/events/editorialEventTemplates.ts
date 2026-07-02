@@ -1,8 +1,5 @@
-import type {
-	EventEmailPayload,
-	EventNotificationPayload,
-	EventTemplateContext
-} from '$lib/types/EventService';
+import type { EventNotificationPayload, EventTemplateContext } from '$lib/types/EventService';
+import { buildInstitutionalEventEmail } from './institutionalEmailTemplate';
 import { registerEventEmailTemplate, registerEventNotificationTemplate } from './templates';
 
 type EditorialMetadata = {
@@ -112,15 +109,6 @@ function actionUrl(context: EventTemplateContext) {
 	return `/publish/view/${paperId}`;
 }
 
-function escapeHtml(value: string) {
-	return value
-		.replace(/&/g, '&amp;')
-		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;')
-		.replace(/"/g, '&quot;')
-		.replace(/'/g, '&#039;');
-}
-
 function notificationPayload(
 	context: EventTemplateContext,
 	title: string,
@@ -142,12 +130,13 @@ function notificationPayload(
 	};
 }
 
-function emailPayload(title: string, content: string): EventEmailPayload {
-	return {
-		subject: title,
-		text: `${content}\n\nOpen SciLedger to view the latest details.`,
-		html: `<p>${escapeHtml(content)}</p><p>Open SciLedger to view the latest details.</p>`
-	};
+function emailPayload(context: EventTemplateContext, title: string, content: string) {
+	return buildInstitutionalEventEmail({
+		context,
+		title,
+		message: content,
+		ctaUrl: actionUrl(context)
+	});
 }
 
 function reviewDecisionLabel(value?: string) {
@@ -174,7 +163,7 @@ registerEventNotificationTemplate('paper.created', (context) =>
 );
 
 registerEventEmailTemplate('paper.created', (context) =>
-	emailPayload('Paper Draft Created', `Your draft "${paperTitle(context)}" was created.`)
+	emailPayload(context, 'Paper Draft Created', `Your draft "${paperTitle(context)}" was created.`)
 );
 
 registerEventNotificationTemplate('paper.submitted', (context) => {
@@ -207,7 +196,11 @@ registerEventEmailTemplate('paper.submitted', (context) => {
 			? `New paper "${paperTitle(context)}" was submitted for review.`
 			: `Your paper "${paperTitle(context)}" was submitted successfully.`;
 
-	return emailPayload(role === 'editor' ? 'New Paper Submitted' : 'Paper Submitted', content);
+	return emailPayload(
+		context,
+		role === 'editor' ? 'New Paper Submitted' : 'Paper Submitted',
+		content
+	);
 });
 
 registerEventNotificationTemplate('paper.accepted', (context) => {
@@ -267,6 +260,7 @@ registerEventEmailTemplate('paper.accepted', (context) => {
 				: `Your paper "${paperTitle(context)}" was accepted.`;
 
 	return emailPayload(
+		context,
 		data.acceptanceType === 'review' ? 'Paper Accepted for Review' : 'Paper Accepted',
 		content
 	);
@@ -302,6 +296,7 @@ registerEventEmailTemplate('paper.rejected', (context) => {
 	const data = metadata(context);
 	const reason = data.rejectionReason ? ` Reason: ${data.rejectionReason}` : '';
 	return emailPayload(
+		context,
 		data.finalDecision === 'reject' || data.decision === 'reject'
 			? 'Final Decision on Paper'
 			: 'Paper Rejected',
@@ -330,6 +325,7 @@ registerEventEmailTemplate('paper.correction_requested', (context) => {
 	const data = metadata(context);
 	const publicationRejected = data.correctionReason === 'publication_rejected';
 	return emailPayload(
+		context,
 		publicationRejected ? 'Publication Corrections Requested' : 'Corrections Requested',
 		publicationRejected
 			? `Publication for "${paperTitle(context)}" was not approved. Further corrections are requested.`
@@ -348,7 +344,11 @@ registerEventNotificationTemplate('paper.published', (context) =>
 );
 
 registerEventEmailTemplate('paper.published', (context) =>
-	emailPayload('Paper Published', `Your paper "${paperTitle(context)}" has been published.`)
+	emailPayload(
+		context,
+		'Paper Published',
+		`Your paper "${paperTitle(context)}" has been published.`
+	)
 );
 
 registerEventNotificationTemplate('review.submitted', (context) => {
@@ -386,7 +386,7 @@ registerEventEmailTemplate('review.submitted', (context) => {
 			? `Your paper "${paperTitle(context)}" has been reviewed. The reviewer ${decision}.`
 			: `${reviewerName} completed a review for "${paperTitle(context)}" and ${decision}.`;
 
-	return emailPayload(role === 'author' ? 'Review Received' : 'Review Completed', content);
+	return emailPayload(context, role === 'author' ? 'Review Received' : 'Review Completed', content);
 });
 
 registerEventNotificationTemplate('review.assignment.created', (context) => {
@@ -422,6 +422,7 @@ registerEventEmailTemplate('review.assignment.created', (context) => {
 			: `${data.reviewerName || 'A reviewer'} was assigned to review "${paperTitle(context)}".`;
 
 	return emailPayload(
+		context,
 		role === 'reviewer' ? 'New Review Assignment' : 'Review Assignment Created',
 		content
 	);
@@ -466,7 +467,7 @@ registerEventEmailTemplate('paper.corrections_submitted', (context) => {
 		role === 'author'
 			? `Your corrections for "${paperTitle(context)}" were submitted successfully.`
 			: `${data.actorName || 'The author'} submitted corrections for "${paperTitle(context)}".`;
-	return emailPayload('Corrections Submitted', content);
+	return emailPayload(context, 'Corrections Submitted', content);
 });
 
 registerEventNotificationTemplate('paper.final_review_submitted', (context) =>
@@ -481,6 +482,7 @@ registerEventNotificationTemplate('paper.final_review_submitted', (context) =>
 
 registerEventEmailTemplate('paper.final_review_submitted', (context) =>
 	emailPayload(
+		context,
 		'Final Review Version Submitted',
 		`A corrected final review version of "${paperTitle(context)}" was submitted.`
 	)
@@ -498,6 +500,7 @@ registerEventNotificationTemplate('paper.publication_requested', (context) =>
 
 registerEventEmailTemplate('paper.publication_requested', (context) =>
 	emailPayload(
+		context,
 		'Publication Approval Requested',
 		`Publication approval was requested for "${paperTitle(context)}".`
 	)
@@ -517,7 +520,7 @@ registerEventNotificationTemplate('paper.withdrawn', (context) => {
 });
 
 registerEventEmailTemplate('paper.withdrawn', (context) =>
-	emailPayload('Paper Withdrawn', `"${paperTitle(context)}" was withdrawn.`)
+	emailPayload(context, 'Paper Withdrawn', `"${paperTitle(context)}" was withdrawn.`)
 );
 
 registerEventNotificationTemplate('paper.correction_deadline.updated', (context) => {
@@ -534,6 +537,7 @@ registerEventNotificationTemplate('paper.correction_deadline.updated', (context)
 registerEventEmailTemplate('paper.correction_deadline.updated', (context) => {
 	const data = metadata(context);
 	return emailPayload(
+		context,
 		'Correction Deadline Updated',
 		`The correction deadline for "${paperTitle(context)}" was updated${data.deadline ? ` to ${data.deadline}` : ''}.`
 	);
@@ -553,6 +557,7 @@ registerEventNotificationTemplate('review.assignment.deadline_updated', (context
 registerEventEmailTemplate('review.assignment.deadline_updated', (context) => {
 	const data = metadata(context);
 	return emailPayload(
+		context,
 		'Review Deadline Updated',
 		`The review deadline for "${paperTitle(context)}" was updated${data.deadline ? ` to ${data.deadline}` : ''}.`
 	);
@@ -574,6 +579,7 @@ registerEventEmailTemplate('review.deadline.reminder', (context) => {
 	const data = metadata(context);
 	const days = Number(data.daysRemaining || 0);
 	return emailPayload(
+		context,
 		days <= 1 ? 'Review Due Soon' : 'Review Deadline Reminder',
 		`Your review for "${paperTitle(context)}" is due ${days > 0 ? `in ${days} day${days === 1 ? '' : 's'}` : 'soon'}.`
 	);
@@ -595,6 +601,7 @@ registerEventNotificationTemplate('review.deadline.overdue', (context) => {
 registerEventEmailTemplate('review.deadline.overdue', (context) => {
 	const role = roleFor(context);
 	return emailPayload(
+		context,
 		'Review Overdue',
 		role === 'editor'
 			? `A review for "${paperTitle(context)}" is overdue.`
@@ -612,7 +619,7 @@ registerEventNotificationTemplate('review.assignment.removed', (context) => {
 			? `You were removed from reviewing "${paperTitle(context)}".`
 			: role === 'author'
 				? `${data.reviewerName || 'A reviewer'} was removed from reviewing "${paperTitle(context)}".`
-			: `A reviewer was removed from "${paperTitle(context)}".`,
+				: `A reviewer was removed from "${paperTitle(context)}".`,
 		'medium',
 		'system'
 	);
@@ -628,7 +635,7 @@ registerEventEmailTemplate('review.assignment.removed', (context) => {
 				? `${data.reviewerName || 'A reviewer'} was removed from reviewing "${paperTitle(context)}".`
 				: `A reviewer assignment for "${paperTitle(context)}" was removed.`;
 
-	return emailPayload('Reviewer Removed', content);
+	return emailPayload(context, 'Reviewer Removed', content);
 });
 
 registerEventNotificationTemplate('role.assigned', (context) => {
@@ -648,7 +655,11 @@ registerEventNotificationTemplate('role.assigned', (context) => {
 
 registerEventEmailTemplate('role.assigned', (context) => {
 	const data = metadata(context);
-	return emailPayload('Role Assigned', `You were assigned ${data.roleName || data.roleKey || 'a role'}.`);
+	return emailPayload(
+		context,
+		'Role Assigned',
+		`You were assigned ${data.roleName || data.roleKey || 'a role'}.`
+	);
 });
 
 registerEventNotificationTemplate('role.revoked', (context) => {
@@ -669,6 +680,7 @@ registerEventNotificationTemplate('role.revoked', (context) => {
 registerEventEmailTemplate('role.revoked', (context) => {
 	const data = metadata(context);
 	return emailPayload(
+		context,
 		'Role Revoked',
 		`${data.roleName || data.roleKey || 'A role'} was revoked from your account.`
 	);
@@ -686,6 +698,7 @@ registerEventNotificationTemplate('role.created', (context) =>
 
 registerEventEmailTemplate('role.created', (context) =>
 	emailPayload(
+		context,
 		'Role Created',
 		`Role "${metadata(context).roleName || metadata(context).roleKey || 'Untitled role'}" was created.`
 	)
@@ -703,6 +716,7 @@ registerEventNotificationTemplate('role.updated', (context) =>
 
 registerEventEmailTemplate('role.updated', (context) =>
 	emailPayload(
+		context,
 		'Role Updated',
 		`Role "${metadata(context).roleName || metadata(context).roleKey || 'Untitled role'}" was updated.`
 	)
@@ -719,7 +733,11 @@ registerEventNotificationTemplate('hub.created', (context) =>
 );
 
 registerEventEmailTemplate('hub.created', (context) =>
-	emailPayload('Hub Created', `Hub "${metadata(context).hubName || 'Untitled hub'}" was created.`)
+	emailPayload(
+		context,
+		'Hub Created',
+		`Hub "${metadata(context).hubName || 'Untitled hub'}" was created.`
+	)
 );
 
 registerEventNotificationTemplate('hub.updated', (context) =>
@@ -733,7 +751,11 @@ registerEventNotificationTemplate('hub.updated', (context) =>
 );
 
 registerEventEmailTemplate('hub.updated', (context) =>
-	emailPayload('Hub Updated', `Hub "${metadata(context).hubName || 'Untitled hub'}" was updated.`)
+	emailPayload(
+		context,
+		'Hub Updated',
+		`Hub "${metadata(context).hubName || 'Untitled hub'}" was updated.`
+	)
 );
 
 registerEventNotificationTemplate('hub.invitation.created', (context) => {
@@ -754,6 +776,7 @@ registerEventEmailTemplate('hub.invitation.created', (context) => {
 	const role = roleFor(context);
 	const data = metadata(context);
 	return emailPayload(
+		context,
 		role === 'invitee' ? 'Hub Invitation' : 'Hub Invitation Sent',
 		role === 'invitee'
 			? `You were invited to join "${data.hubName || 'a hub'}".`
@@ -779,6 +802,7 @@ registerEventEmailTemplate('hub.invitation.accepted', (context) => {
 	const role = roleFor(context);
 	const data = metadata(context);
 	return emailPayload(
+		context,
 		'Hub Invitation Accepted',
 		role === 'invitee'
 			? `You accepted the invitation to "${data.hubName || 'the hub'}".`
@@ -804,6 +828,7 @@ registerEventEmailTemplate('hub.invitation.declined', (context) => {
 	const role = roleFor(context);
 	const data = metadata(context);
 	return emailPayload(
+		context,
 		'Hub Invitation Declined',
 		role === 'invitee'
 			? `You declined the invitation to "${data.hubName || 'the hub'}".`
@@ -822,7 +847,11 @@ registerEventNotificationTemplate('payment.hold.authorized', (context) =>
 );
 
 registerEventEmailTemplate('payment.hold.authorized', (context) =>
-	emailPayload('Payment Hold Authorized', `Payment hold for "${paperTitle(context)}" was authorized.`)
+	emailPayload(
+		context,
+		'Payment Hold Authorized',
+		`Payment hold for "${paperTitle(context)}" was authorized.`
+	)
 );
 
 registerEventNotificationTemplate('payment.hold.captured', (context) => {
@@ -839,6 +868,7 @@ registerEventNotificationTemplate('payment.hold.captured', (context) => {
 registerEventEmailTemplate('payment.hold.captured', (context) => {
 	const data = metadata(context);
 	return emailPayload(
+		context,
 		'Payment Hold Captured',
 		`Payment hold for "${paperTitle(context)}" was captured (${amountLabel(data)}).`
 	);
@@ -858,6 +888,7 @@ registerEventNotificationTemplate('payment.hold.failed', (context) => {
 registerEventEmailTemplate('payment.hold.failed', (context) => {
 	const data = metadata(context);
 	return emailPayload(
+		context,
 		'Payment Hold Failed',
 		`Payment hold for "${paperTitle(context)}" failed${data.failureReason ? `: ${data.failureReason}` : ''}.`
 	);
@@ -877,6 +908,7 @@ registerEventNotificationTemplate('payment.hold.released', (context) => {
 registerEventEmailTemplate('payment.hold.released', (context) => {
 	const data = metadata(context);
 	return emailPayload(
+		context,
 		'Payment Hold Released',
 		`Payment hold for "${paperTitle(context)}" was released${data.reason ? `: ${data.reason}` : ''}.`
 	);
@@ -896,6 +928,7 @@ registerEventNotificationTemplate('payment.refunded', (context) => {
 registerEventEmailTemplate('payment.refunded', (context) => {
 	const data = metadata(context);
 	return emailPayload(
+		context,
 		'Payment Refunded',
 		`Payment for "${paperTitle(context)}" was refunded${data.reason ? `: ${data.reason}` : ''}.`
 	);
@@ -915,6 +948,7 @@ registerEventNotificationTemplate('reviewer.payout.paid', (context) => {
 registerEventEmailTemplate('reviewer.payout.paid', (context) => {
 	const data = metadata(context);
 	return emailPayload(
+		context,
 		'Reviewer Payout Paid',
 		`Your reviewer payout for "${paperTitle(context)}" was paid (${amountLabel(data)}).`
 	);
