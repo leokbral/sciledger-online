@@ -4,11 +4,12 @@ import { respond } from '../_respond';
 import { AUTH_CONFIG_SECRET } from '$env/static/private';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import Users from '$lib/db/models/User';
+import { respondWithSession } from '$lib/server/auth/authResponse';
 
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, url }) => {
 	try {
 		await start_mongo(); // Não necessário mais
-		const { login, password } = await request.json();
+		const { login, password, rememberMe } = await request.json();
 
 		// Verifica se os dados foram enviados
 		if (!login || !password) {
@@ -36,9 +37,7 @@ export const POST: RequestHandler = async ({ request }) => {
 		}
 
 		// Usuário autenticado com sucesso
-		return respond({
-			user
-		});
+		return respondWithSession({ user }, { request, url, rememberMe: Boolean(rememberMe) });
 	} catch (err) {
 		console.error('Login error:', err);
 		return respond({ errors: 'Internal server error.', status: 500 });
