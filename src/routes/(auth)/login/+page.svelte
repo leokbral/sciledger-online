@@ -9,6 +9,7 @@
 
 	let login = $state('');
 	let password = $state('');
+	let rememberMe = $state(false);
 	let formWarning = $state('');
 	let processing = false;
 	let notInView: boolean = $state(true);
@@ -19,7 +20,7 @@
 
 	async function submit(event: unknown) {
 		hideSplash();
-		const response = await post(`/login`, { login, password });
+		const response = await post(`/login`, { login, password, rememberMe });
 
 		if (response.user) {
 			goto('/');
@@ -67,6 +68,14 @@
 						class="bg-transparent rounded-xl border-b border-surface-500 text-black font-medium text-lg p-2 w-full focus:outline-hidden focus:border-primary-500 placeholder-gray-500"
 					/>
 				</fieldset>
+				<label class="flex items-center gap-2 text-sm font-medium text-surface-700">
+					<input
+						type="checkbox"
+						bind:checked={rememberMe}
+						class="h-4 w-4 rounded border-surface-400 text-primary-600 focus:ring-primary-500"
+					/>
+					Remember me
+				</label>
 				{#if formWarning}
 					<span transition:fade={{ duration: 500 }} class="text-red-500 font-bold"
 						>{formWarning}</span

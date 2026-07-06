@@ -4,7 +4,7 @@ import { ORCID_CLIENT_ID, ORCID_CLIENT_SECRET, ORCID_REDIRECT_URI } from '$env/s
 import { env } from '$env/dynamic/private';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import Users from '$lib/db/models/User';
-import { respond } from '../../(auth)/_respond';
+import { respondWithSession } from '$lib/server/auth/authResponse';
 import * as crypto from 'crypto';
 
 /**
@@ -25,8 +25,8 @@ function isProfileComplete(user: any): boolean {
 /**
  * Faz login e redireciona para a página correta
  */
-function loginAndRedirect(user: any): Response {
-	const response = respond({ user });
+async function loginAndRedirect(user: any, request: Request, url: URL): Promise<Response> {
+	const response = await respondWithSession({ user }, { request, url });
 	const redirectPath = isProfileComplete(user) ? '/' : '/complete-profile';
 	response.headers.set('Location', redirectPath);
 
@@ -48,7 +48,7 @@ function loginAndRedirect(user: any): Response {
  * 4. Cria novo usuário ou atualiza existente
  * 5. Faz login usando o sistema atual
  */
-export const GET: RequestHandler = async ({ url }) => {
+export const GET: RequestHandler = async ({ url, request }) => {
 	try {
 		await start_mongo();
 
@@ -181,7 +181,7 @@ export const GET: RequestHandler = async ({ url }) => {
 			await user.save();
 
 			// Faz login e redireciona para home ou complete-profile
-			return loginAndRedirect(user);
+			return loginAndRedirect(user, request, url);
 		}
 
 		// 3.2: Se tem email, buscar por email
@@ -200,7 +200,7 @@ export const GET: RequestHandler = async ({ url }) => {
 				await user.save();
 
 				// Faz login e redireciona para home ou complete-profile
-				return loginAndRedirect(user);
+				return loginAndRedirect(user, request, url);
 			}
 		}
 
@@ -239,7 +239,7 @@ export const GET: RequestHandler = async ({ url }) => {
 			existingPlaceholderUser.orcidTokenExpiry = new Date(Date.now() + expires_in * 1000);
 			await existingPlaceholderUser.save();
 
-			return loginAndRedirect(existingPlaceholderUser);
+			return loginAndRedirect(existingPlaceholderUser, request, url);
 		}
 
 		// Cria novo usuário
@@ -265,7 +265,7 @@ export const GET: RequestHandler = async ({ url }) => {
 		await newUser.save();
 
 		// Faz login e redireciona para complete-profile (já que dados podem estar incompletos)
-		return loginAndRedirect(newUser);
+		return loginAndRedirect(newUser, request, url);
 
 	} catch (error) {
 		console.error('❌ ORCID callback error:', error);
