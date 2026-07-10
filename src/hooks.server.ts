@@ -99,19 +99,6 @@ async function authenticateWithSession(sessionToken: string, event: Parameters<H
 	};
 }
 
-function authenticateWithLegacyJwt(
-	jwtCookie: string | undefined,
-	event: Parameters<Handle>[0]['event']
-) {
-	if (!jwtCookie) return;
-
-	const jwt = Buffer.from(jwtCookie, 'base64').toString('utf-8');
-	const _jwt = JSON.parse(jwt);
-	event.locals.user = _jwt.user;
-	event.locals.token = _jwt.token;
-	event.locals.refreshToken = _jwt.refreshToken;
-}
-
 export const handle: Handle = async ({ event, resolve }) => {
 	// Initialize MongoDB on first request
 	if (!mongoInitPromise) {
@@ -129,17 +116,10 @@ export const handle: Handle = async ({ event, resolve }) => {
 			const sessionAuth = await authenticateWithSession(sessionToken, event);
 			clearSessionCookie = sessionAuth.clearSessionCookie;
 			renewedSessionExpiresAt = sessionAuth.renewedExpiresAt ?? null;
-
-			if (!sessionAuth.authenticated) {
-				authenticateWithLegacyJwt(cookies.jwt, event);
-			}
 		} catch (error) {
 			console.error('Failed to authenticate with persistent session:', error);
 			clearSessionCookie = true;
-			authenticateWithLegacyJwt(cookies.jwt, event);
 		}
-	} else {
-		authenticateWithLegacyJwt(cookies.jwt, event);
 	}
 
 	const response = await resolve(event);

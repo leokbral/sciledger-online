@@ -1,4 +1,4 @@
-import { respond } from '../../../routes/(auth)/_respond';
+import { error, json } from '@sveltejs/kit';
 import { createSession } from './SessionService';
 import { isSecureRequest, serializeSessionCookie } from './sessionCookie';
 
@@ -33,7 +33,11 @@ export async function respondWithSession(
 	options: AuthResponseOptions,
 	createSessionForAuth: CreateSessionForAuth = createSession
 ) {
-	const response = respond(body);
+	if (body?.errors) {
+		error(body.status || 500, body);
+	}
+
+	const response = json(body);
 
 	if (!body?.user) {
 		return response;

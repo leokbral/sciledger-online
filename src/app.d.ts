@@ -4,8 +4,6 @@
 declare namespace App {
 	interface Locals {
 		user: /* {name: string} */ import('$lib/types').User;
-		token: import('$lib/types').Token;
-		refreshToken: import('$lib/types').RefreshToken;
 	}
 	// interface PageData {}
 	// interface Error {}
