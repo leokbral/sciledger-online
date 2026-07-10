@@ -49,6 +49,7 @@ describe('authenticated response session cookie', () => {
 			})
 		);
 		expect(getSessionCookie(response)).toContain('session=normal-session-token');
+		expect(getSessionCookie(response)).not.toContain('jwt=');
 		expect(getSessionCookie(response)).toContain(
 			`Expires=${new Date(now.getTime() + SESSION_DURATION).toUTCString()}`
 		);
@@ -87,6 +88,7 @@ describe('authenticated response session cookie', () => {
 			})
 		);
 		expect(getSessionCookie(response)).toContain('session=remember-session-token');
+		expect(getSessionCookie(response)).not.toContain('jwt=');
 		expect(getSessionCookie(response)).toContain(
 			`Expires=${new Date(now.getTime() + REMEMBER_ME_DURATION).toUTCString()}`
 		);

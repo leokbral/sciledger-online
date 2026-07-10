@@ -3,18 +3,6 @@ import { json } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import Users from '$lib/db/models/User';
 
-function getUserIdFromAuth(localsUser: any, jwtCookie?: string): string | null {
-	if (localsUser?.id) return String(localsUser.id);
-
-	if (!jwtCookie) return null;
-
-	try {
-		const decoded = JSON.parse(Buffer.from(jwtCookie, 'base64').toString());
-		return decoded?.user?.id || decoded?.user?._id || decoded?.id || decoded?.sub || null;
-	} catch {
-		return null;
-	}
-}
 interface CompleteProfileRequest {
 	firstName: string;
 	lastName: string;
@@ -23,7 +11,7 @@ interface CompleteProfileRequest {
 	dob?: string;
 }
 
-export const POST: RequestHandler = async ({ request, cookies, locals }) => {
+export const POST: RequestHandler = async ({ request, locals }) => {
 	try {
 		await start_mongo();
 
@@ -40,8 +28,7 @@ export const POST: RequestHandler = async ({ request, cookies, locals }) => {
 			);
 		}
 
-		const jwtCookie = cookies.get('jwt');
-		const userId = getUserIdFromAuth(locals.user, jwtCookie);
+		const userId = locals.user?.id ? String(locals.user.id) : null;
 
 		if (!userId) {
 			return json(
@@ -54,7 +41,7 @@ export const POST: RequestHandler = async ({ request, cookies, locals }) => {
 		}
 
 		// Verifica se o novo email já existe (se for diferente do atual)
-		const user = await Users.findById(userId);
+		const user = await Users.findOne({ $or: [{ id: userId }, { _id: userId }] });
 
 		if (!user) {
 			return json(

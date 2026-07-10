@@ -4,6 +4,7 @@ import mongoose from 'mongoose';
 import { UserSchema } from '$lib/db/schemas/UserSchema.js';
 import * as crypto from 'crypto';
 import { AUTH_CONFIG_SECRET } from '$env/static/private';
+import { revokeAllUserSessions } from '$lib/server/auth/SessionService';
 import type { RequestHandler } from './$types';
 
 const User = mongoose.models.User || mongoose.model('User', UserSchema);
@@ -68,6 +69,7 @@ export const POST: RequestHandler = async ({ request }) => {
         user.updatedAt = new Date().toISOString();
         
         await user.save();
+        await revokeAllUserSessions(String(user.id || user._id), 'password_reset');
 
         return json({ 
             message: 'Password updated successfully',

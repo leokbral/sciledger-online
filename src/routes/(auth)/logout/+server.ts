@@ -5,7 +5,6 @@ import { revokeSession } from '$lib/server/auth/SessionService';
 import {
 	SESSION_COOKIE_NAME,
 	isSecureRequest,
-	serializeExpiredLegacyJwtCookie,
 	serializeExpiredSessionCookie
 } from '$lib/server/auth/sessionCookie';
 
@@ -22,7 +21,6 @@ export const POST: RequestHandler = async ({ request, url }) => {
 	}
 
 	const headers = new Headers();
-	headers.append('set-cookie', serializeExpiredLegacyJwtCookie());
 	headers.append(
 		'set-cookie',
 		serializeExpiredSessionCookie({
