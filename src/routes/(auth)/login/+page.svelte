@@ -24,6 +24,8 @@
 
 		if (response.user) {
 			goto('/');
+		} else if (response.emailVerificationRequired && response.redirectTo) {
+			goto(response.redirectTo);
 		} else {
 			hideSplash();
 			formWarning = 'Credentials not found!';

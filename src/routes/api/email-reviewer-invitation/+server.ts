@@ -25,6 +25,7 @@ import {
 	validateReviewerCanReviewPaper
 } from '$lib/server/reviewConflictOfInterest';
 import { buildReviewerInvitationEmailHtml } from '$lib/services/platformEmailTemplates';
+import { normalizeAndValidateEmail } from '$lib/server/auth/normalizeEmail';
 
 // Clear the model cache to ensure we use the updated schema
 if (mongoose.models.EmailReviewerInvitation) {
@@ -96,19 +97,6 @@ function getUserDisplayName(user: any, fallback: string) {
 	return `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || user?.email || fallback;
 }
 
-function normalizeEmail(value: unknown): string | null {
-	if (typeof value !== 'string') return null;
-
-	const email = value.trim().toLowerCase();
-	const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-	if (email.length > 254 || !emailRegex.test(email)) {
-		return null;
-	}
-
-	return email;
-}
-
 export const POST: RequestHandler = async ({ request, locals, url }) => {
 	try {
 		await start_mongo();
@@ -126,7 +114,7 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
 		}
 
 		const hubIdValue = String(hubId);
-		const normalizedEmail = normalizeEmail(email);
+		const normalizedEmail = normalizeAndValidateEmail(email);
 		if (!normalizedEmail) {
 			return json({ error: 'Invalid email format' }, { status: 400 });
 		}

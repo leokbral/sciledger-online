@@ -100,7 +100,9 @@ export const PUT: RequestHandler = async ({ request, locals, params }) => {
 			{ $set: updates },
 			{ new: true } // Return the updated document
 		)
-			.select('-password -refreshToken -resetPasswordToken -resetPasswordExpiry -orcidAccessToken -orcidRefreshToken')
+			.select(
+				'-password -refreshToken -resetPasswordTokenHash -resetPasswordExpiresAt -pendingEmailTokenHash -pendingEmailExpiresAt -orcidAccessToken -orcidRefreshToken'
+			)
 			.lean();
 
 		if (!updatedUser) {

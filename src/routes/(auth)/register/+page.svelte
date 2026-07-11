@@ -91,7 +91,8 @@
 				email,
 				password,
 				confirmPassword,
-				isAdmin
+				isAdmin,
+				inviteToken: inviteToken || undefined
 			});
 
 			if (response.user) {

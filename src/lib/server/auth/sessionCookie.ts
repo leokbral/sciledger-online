@@ -28,11 +28,3 @@ export function serializeExpiredSessionCookie(options: Pick<SessionCookieOptions
 		expires: new Date(0)
 	});
 }
-
-export function serializeExpiredLegacyJwtCookie() {
-	return cookie.serialize('jwt', 'deleted', {
-		path: '/',
-		httpOnly: true,
-		expires: new Date(0)
-	});
-}

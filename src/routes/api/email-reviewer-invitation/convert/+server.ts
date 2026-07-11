@@ -1,8 +1,12 @@
 import { json } from '@sveltejs/kit';
 import mongoose from 'mongoose';
 import crypto from 'crypto';
-import { EmailReviewerInvitationSchema } from '$lib/db/schemas/EmailReviewerInvitation.js';
 import { start_mongo } from '$lib/db/mongooseConnection';
+import {
+	findEmailReviewerInvitationByToken,
+	isEmailReviewerInvitationActive
+} from '$lib/server/auth/emailReviewerInvitation';
+import { normalizeEmail } from '$lib/server/auth/normalizeEmail';
 import PaperReviewInvitation from '$lib/db/models/PaperReviewInvitation';
 import Papers from '$lib/db/models/Paper';
 import ReviewQueue from '$lib/db/models/ReviewQueue';
@@ -33,14 +37,6 @@ import {
 	EditorialTransitionError,
 	transitionPaperStatus
 } from '$lib/server/authorization/editorialTransitionService';
-
-// Clear cache to ensure we get the updated schema
-delete mongoose.models.EmailReviewerInvitation;
-
-const EmailReviewerInvitation = mongoose.model(
-	'EmailReviewerInvitation',
-	EmailReviewerInvitationSchema
-);
 
 // Import models
 let Invitation: any;
@@ -475,15 +471,32 @@ export async function POST({ request }) {
 			return json({ error: 'Missing required fields' }, { status: 400 });
 		}
 
-		// Find the email invitation
-		const emailInvitation = await EmailReviewerInvitation.findOne({
-			token,
-			status: 'pending',
-			expiresAt: { $gt: new Date() }
-		});
+		// Find the email invitation. Validity (pending + unexpired) is decided by
+		// the same shared predicate used by /register and /invite/register so
+		// the three consumers of these tokens can never diverge.
+		const emailInvitation = await findEmailReviewerInvitationByToken(token);
 
-		if (!emailInvitation) {
+		if (!emailInvitation || !isEmailReviewerInvitationActive(emailInvitation)) {
 			return json({ error: 'Invalid or expired invitation' }, { status: 404 });
+		}
+
+		const normalizedUserId = String(userId);
+		const reviewerUser = await findUserByAnyId(normalizedUserId);
+
+		if (!reviewerUser) {
+			return json({ error: 'Reviewer account not found' }, { status: 404 });
+		}
+
+		// The invitation belongs to the (token, email) pair, not the token alone:
+		// only the account that actually owns the invited email may convert it.
+		if (
+			normalizeEmail(String(reviewerUser.email || '')) !==
+			normalizeEmail(String(emailInvitation.email || ''))
+		) {
+			return json(
+				{ error: 'This invitation is not valid for the authenticated account' },
+				{ status: 403 }
+			);
 		}
 
 		// Get hub information
@@ -493,8 +506,6 @@ export async function POST({ request }) {
 			return json({ error: 'Hub not found' }, { status: 404 });
 		}
 
-		const normalizedUserId = String(userId);
-		const reviewerUser = await findUserByAnyId(normalizedUserId);
 		const reviewerName = reviewerUser
 			? `${reviewerUser.firstName || ''} ${reviewerUser.lastName || ''}`.trim() ||
 				reviewerUser.email ||

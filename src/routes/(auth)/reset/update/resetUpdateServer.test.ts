@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { hashPasswordResetToken } from '$lib/server/auth/passwordReset';
 
 const mocks = vi.hoisted(() => ({
 	startMongo: vi.fn(),
@@ -79,5 +80,63 @@ describe('password reset session revocation', () => {
 		expect(response.status).toBe(200);
 		expect(mocks.save).toHaveBeenCalled();
 		expect(mocks.revokeAllUserSessions).toHaveBeenCalledWith('user-1', 'password_reset');
+	});
+
+	it('looks up the user by the hashed token, never the raw token', async () => {
+		const rawToken = 'a'.repeat(64);
+		const { POST } = await import('./+server');
+
+		await POST({
+			request: createResetRequest()
+		} as Parameters<typeof POST>[0]);
+
+		expect(mocks.findOne).toHaveBeenCalledWith(
+			expect.objectContaining({
+				resetPasswordTokenHash: hashPasswordResetToken(rawToken)
+			})
+		);
+		const query = mocks.findOne.mock.calls[0][0];
+		expect(query.resetPasswordTokenHash).not.toBe(rawToken);
+		expect(query).not.toHaveProperty('resetPasswordToken');
+	});
+
+	it('rejects tokens from before the hashing migration -- a document with no resetPasswordTokenHash can never match', async () => {
+		// Simulates the real-world consequence of the migration: a
+		// pre-migration document never had resetPasswordTokenHash set, and
+		// the query only ever filters on that field, so it can never match
+		// regardless of what raw token the old email link still points to.
+		mocks.findOne.mockResolvedValue(null);
+		const { POST } = await import('./+server');
+
+		const response = await POST({
+			request: createResetRequest()
+		} as Parameters<typeof POST>[0]);
+		const body = await response.json();
+
+		expect(response.status).toBe(400);
+		expect(body.error).toMatch(/invalid or expired/i);
+		expect(mocks.revokeAllUserSessions).not.toHaveBeenCalled();
+	});
+
+	it('clears the stored token hash after a successful reset', async () => {
+		const user = {
+			id: 'user-1',
+			_id: 'user-1',
+			email: 'user@example.com',
+			firstName: 'Ada',
+			password: hashPassword('old-password1'),
+			resetPasswordTokenHash: hashPasswordResetToken('a'.repeat(64)),
+			resetPasswordExpiresAt: new Date(Date.now() + 60 * 60 * 1000),
+			save: mocks.save
+		};
+		mocks.findOne.mockResolvedValue(user);
+		const { POST } = await import('./+server');
+
+		await POST({
+			request: createResetRequest()
+		} as Parameters<typeof POST>[0]);
+
+		expect(user.resetPasswordTokenHash).toBeUndefined();
+		expect(user.resetPasswordExpiresAt).toBeUndefined();
 	});
 });

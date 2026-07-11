@@ -1,14 +1,16 @@
-import { json } from '@sveltejs/kit';
-import mongoose from 'mongoose';
-import { UserSchema } from '$lib/db/schemas/UserSchema.js';
+import { json, type RequestHandler } from '@sveltejs/kit';
 import * as crypto from 'crypto';
-import bcrypt from 'bcryptjs';
 import { start_mongo } from '$lib/db/mongooseConnection';
+import { AUTH_CONFIG_SECRET } from '$env/static/private';
+import User from '$lib/db/models/User';
+import { normalizeAndValidateEmail } from '$lib/server/auth/normalizeEmail';
 
-const User = mongoose.models.User || mongoose.model('User', UserSchema);
-
-export async function POST({ request }) {
+export const POST: RequestHandler = async ({ request, locals }) => {
     try {
+        if (!locals.user) {
+            return json({ error: 'Authentication required' }, { status: 401 });
+        }
+
         await start_mongo();
         
         const { orcidProfile, email } = await request.json();
@@ -32,9 +34,11 @@ export async function POST({ request }) {
         })?.email || emails[0]?.email;
         const mainAffiliation = affiliations?.[0]?.['summaries']?.[0]?.['employment-summary'];
 
-        // Use provided email or primary email from ORCID
-        const userEmail = email || primaryEmail;
-        
+        const hasPublicOrcidEmail = Boolean(primaryEmail);
+        // Public ORCID email proves ownership through ORCID. A manually supplied co-author
+        // email is stored for contact, but remains unverified until a dedicated flow exists.
+        const userEmail = normalizeAndValidateEmail(primaryEmail || email);
+
         if (!userEmail) {
             return json({ error: 'Email is required for user creation' }, { status: 400 });
         }
@@ -64,7 +68,7 @@ export async function POST({ request }) {
         
         // Generate a temporary password (user will need to reset it)
         const tempPassword = crypto.randomBytes(12).toString('hex');
-        const hashedPassword = await bcrypt.hash(tempPassword, 12);
+        const hashedPassword = crypto.pbkdf2Sync(tempPassword, AUTH_CONFIG_SECRET, 1000, 64, 'sha512').toString('hex');
 
         const userData = {
             _id: userId,
@@ -76,7 +80,13 @@ export async function POST({ request }) {
             username,
             email: userEmail,
             password: hashedPassword,
-            refreshToken: null,
+            emailVerified: hasPublicOrcidEmail,
+            ...(hasPublicOrcidEmail
+                ? {
+                    emailVerifiedAt: new Date(),
+                    verificationSource: 'orcid'
+                }
+                : {}),
             darkMode: false,
             roles: {
                 author: true,
@@ -121,7 +131,7 @@ export async function POST({ request }) {
             },
             hasEmail: !!primaryEmail,
             isPreRegistration: !primaryEmail,
-            tempPassword: !primaryEmail ? null : tempPassword // Only return temp password if email exists
+            tempPassword: hasPublicOrcidEmail ? tempPassword : null // Only return temp password if ORCID exposes email
         });
 
     } catch (error) {
@@ -131,4 +141,4 @@ export async function POST({ request }) {
             details: error instanceof Error ? error.message : 'Unknown error'
         }, { status: 500 });
     }
-}
+};
