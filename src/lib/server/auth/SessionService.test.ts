@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
+	MAX_ACTIVE_SESSIONS,
 	REMEMBER_ME_DURATION,
 	SESSION_DURATION,
 	SESSION_RENEW_THRESHOLD,
@@ -12,6 +13,7 @@ import {
 } from './SessionService';
 
 type MockSession = {
+	_id: string;
 	id: string;
 	userId: string;
 	sessionTokenHash: string;
@@ -32,8 +34,10 @@ function createMockSessionModel() {
 	let sequence = 0;
 
 	function createDocument(data: Record<string, unknown>) {
+		sequence += 1;
 		const session: MockSession = {
-			id: String(data.id || `session-${++sequence}`),
+			_id: String(data._id || `doc-${sequence}`),
+			id: String(data.id || `session-${sequence}`),
 			userId: String(data.userId),
 			sessionTokenHash: String(data.sessionTokenHash),
 			createdAt: new Date(data.createdAt as Date),
@@ -64,13 +68,24 @@ function createMockSessionModel() {
 					return sessions.find((session) => session.sessionTokenHash === query.sessionTokenHash) ?? null;
 				}
 
+				if (typeof query._id === 'string') {
+					return (
+						sessions.find(
+							(session) =>
+								session._id === query._id && (!query.userId || session.userId === query.userId)
+						) ?? null
+					);
+				}
+
 				return null;
 			},
 			async updateMany(query: Record<string, unknown>, update: Record<string, unknown>) {
 				const set = (update.$set || {}) as Partial<MockSession>;
+				const excludeId = (query._id as { $ne?: unknown } | undefined)?.$ne;
 				const matchingSessions = sessions.filter((session) => {
 					if (query.userId && session.userId !== query.userId) return false;
 					if ('revokedAt' in query && session.revokedAt !== query.revokedAt) return false;
+					if (excludeId !== undefined && session._id === String(excludeId)) return false;
 					return true;
 				});
 
@@ -82,6 +97,41 @@ function createMockSessionModel() {
 					matchedCount: matchingSessions.length,
 					modifiedCount: matchingSessions.length
 				};
+			},
+			find(query: Record<string, unknown>) {
+				const matches = sessions.filter((session) => {
+					if (query.userId && session.userId !== query.userId) return false;
+					if ('revokedAt' in query && session.revokedAt !== query.revokedAt) return false;
+					const expiresAtQuery = query.expiresAt as { $gt?: Date } | undefined;
+					if (expiresAtQuery?.$gt && !(session.expiresAt.getTime() > expiresAtQuery.$gt.getTime())) {
+						return false;
+					}
+					return true;
+				});
+
+				return {
+					async sort(sortSpec: Record<string, 1 | -1>) {
+						const [[field, direction]] = Object.entries(sortSpec);
+						return [...matches].sort((a, b) => {
+							const aTime = (a[field as keyof MockSession] as Date).getTime();
+							const bTime = (b[field as keyof MockSession] as Date).getTime();
+							return direction === 1 ? aTime - bTime : bTime - aTime;
+						});
+					}
+				};
+			},
+			async deleteMany(query: Record<string, unknown>) {
+				const idQuery = query._id as { $in?: unknown[] } | undefined;
+				const idsToDelete = new Set((idQuery?.$in ?? []).map(String));
+				const before = sessions.length;
+
+				for (let index = sessions.length - 1; index >= 0; index -= 1) {
+					if (idsToDelete.has(String(sessions[index]._id))) {
+						sessions.splice(index, 1);
+					}
+				}
+
+				return { deletedCount: before - sessions.length };
 			}
 		}
 	};
@@ -187,6 +237,171 @@ describe('SessionService', () => {
 		expect(result.modifiedCount).toBe(1);
 		expect(await service.validateSession(second.sessionToken, { now })).toBeNull();
 		expect(await service.validateSession(third.sessionToken, { now })).not.toBeNull();
+	});
+
+	it('keeps every session when a user is at or under MAX_ACTIVE_SESSIONS', async () => {
+		const now = new Date('2026-07-03T12:00:00.000Z');
+
+		for (let i = 0; i < MAX_ACTIVE_SESSIONS; i += 1) {
+			await service.createSession(
+				{ userId: 'user-1' },
+				{ now: new Date(now.getTime() + i * 1000) }
+			);
+		}
+
+		const remaining = sessionModel.sessions.filter((session) => session.userId === 'user-1');
+		expect(remaining).toHaveLength(MAX_ACTIVE_SESSIONS);
+	});
+
+	it('deletes the oldest active sessions once a user exceeds MAX_ACTIVE_SESSIONS', async () => {
+		const now = new Date('2026-07-03T12:00:00.000Z');
+		const created: Awaited<ReturnType<typeof service.createSession>>[] = [];
+
+		for (let i = 0; i < MAX_ACTIVE_SESSIONS + 3; i += 1) {
+			created.push(
+				await service.createSession(
+					{ userId: 'user-1' },
+					{ now: new Date(now.getTime() + i * 1000) }
+				)
+			);
+		}
+
+		const remaining = sessionModel.sessions.filter((session) => session.userId === 'user-1');
+		expect(remaining).toHaveLength(MAX_ACTIVE_SESSIONS);
+
+		// The 3 oldest sessions (created first) must have been deleted.
+		for (let i = 0; i < 3; i += 1) {
+			const oldestSessionId = created[i].session._id;
+			expect(remaining.some((session) => session._id === oldestSessionId)).toBe(false);
+			expect(await service.validateSession(created[i].sessionToken, { now })).toBeNull();
+		}
+
+		// The remaining (newest) sessions must still be present and valid.
+		for (let i = 3; i < created.length; i += 1) {
+			const survivingSessionId = created[i].session._id;
+			expect(remaining.some((session) => session._id === survivingSessionId)).toBe(true);
+		}
+	});
+
+	it('never deletes the session that was just created, even far past the limit', async () => {
+		const now = new Date('2026-07-03T12:00:00.000Z');
+
+		for (let i = 0; i < MAX_ACTIVE_SESSIONS + 10; i += 1) {
+			const { sessionToken, session } = await service.createSession(
+				{ userId: 'user-1' },
+				{ now: new Date(now.getTime() + i * 1000) }
+			);
+
+			// Immediately after creation, the just-created session must always
+			// still validate -- it can never be among the ones trimmed away.
+			const validated = await service.validateSession(sessionToken, {
+				now: new Date(now.getTime() + i * 1000)
+			});
+			expect(validated?._id).toBe(session._id);
+		}
+
+		expect(
+			sessionModel.sessions.filter((session) => session.userId === 'user-1')
+		).toHaveLength(MAX_ACTIVE_SESSIONS);
+	});
+
+	it('still revokes all sessions for a user after the active-session limit has trimmed old ones', async () => {
+		const now = new Date('2026-07-03T12:00:00.000Z');
+
+		for (let i = 0; i < MAX_ACTIVE_SESSIONS + 4; i += 1) {
+			await service.createSession(
+				{ userId: 'user-1' },
+				{ now: new Date(now.getTime() + i * 1000) }
+			);
+		}
+		const otherUserSession = await service.createSession({ userId: 'user-2' }, { now });
+
+		const result = await service.revokeAllUserSessions('user-1', 'security', {
+			now: new Date(now.getTime() + 100000)
+		});
+
+		expect(result.matchedCount).toBe(MAX_ACTIVE_SESSIONS);
+		expect(
+			sessionModel.sessions
+				.filter((session) => session.userId === 'user-1')
+				.every((session) => session.revokedAt !== null)
+		).toBe(true);
+		expect(await service.validateSession(otherUserSession.sessionToken, { now })).not.toBeNull();
+	});
+
+	it('lists only active sessions for a user, newest activity first', async () => {
+		const now = new Date('2026-07-03T12:00:00.000Z');
+		const first = await service.createSession({ userId: 'user-1' }, { now });
+		const second = await service.createSession(
+			{ userId: 'user-1' },
+			{ now: new Date(now.getTime() + 1000) }
+		);
+		await service.createSession({ userId: 'user-2' }, { now });
+		const expiredSoon = await service.createSession(
+			{ userId: 'user-1', expiresAt: new Date(now.getTime() + 500) },
+			{ now }
+		);
+
+		// Bump second's activity so it should sort before first.
+		await service.touchSession(second.sessionToken, { now: new Date(now.getTime() + 5000) });
+
+		const active = await service.listActiveSessions('user-1', { now: new Date(now.getTime() + 2000) });
+
+		expect(active.map((session) => session._id)).toEqual([second.session._id, first.session._id]);
+		expect(active.some((session) => session._id === expiredSoon.session._id)).toBe(false);
+	});
+
+	it('excludes revoked sessions from listActiveSessions', async () => {
+		const now = new Date('2026-07-03T12:00:00.000Z');
+		const { session, sessionToken } = await service.createSession({ userId: 'user-1' }, { now });
+		await service.revokeSession(sessionToken, 'user_revoked', { now });
+
+		const active = await service.listActiveSessions('user-1', { now });
+
+		expect(active.some((s) => s._id === session._id)).toBe(false);
+	});
+
+	it('revokes a session by id only when it belongs to the requesting user', async () => {
+		const now = new Date('2026-07-03T12:00:00.000Z');
+		const { session } = await service.createSession({ userId: 'user-1' }, { now });
+
+		const wrongUserAttempt = await service.revokeSessionById(String(session._id), 'user-2', 'user_revoked', {
+			now
+		});
+		expect(wrongUserAttempt).toBeNull();
+
+		const revoked = await service.revokeSessionById(String(session._id), 'user-1', 'user_revoked', { now });
+		expect(revoked?.revokedAt).toEqual(now);
+		expect(revoked?.revokedReason).toBe('user_revoked');
+
+		const stillActive = await service.listActiveSessions('user-1', { now });
+		expect(stillActive.some((s) => s._id === session._id)).toBe(false);
+	});
+
+	it('returns null from revokeSessionById for an unknown session id', async () => {
+		const result = await service.revokeSessionById('does-not-exist', 'user-1');
+		expect(result).toBeNull();
+	});
+
+	it('revokes every active session for a user except the one given by id', async () => {
+		const now = new Date('2026-07-03T12:00:00.000Z');
+		const kept = await service.createSession({ userId: 'user-1' }, { now });
+		const revokedFirst = await service.createSession({ userId: 'user-1' }, { now });
+		const revokedSecond = await service.createSession({ userId: 'user-1' }, { now });
+		const otherUser = await service.createSession({ userId: 'user-2' }, { now });
+
+		const result = await service.revokeAllUserSessionsExcept(
+			'user-1',
+			String(kept.session._id),
+			'user_revoked_all_except_current',
+			{ now: new Date(now.getTime() + 1000) }
+		);
+
+		expect(result.modifiedCount).toBe(2);
+		expect(await service.validateSession(kept.sessionToken, { now })).not.toBeNull();
+		expect(await service.validateSession(revokedFirst.sessionToken, { now })).toBeNull();
+		expect(await service.validateSession(revokedSecond.sessionToken, { now })).toBeNull();
+		expect(await service.validateSession(otherUser.sessionToken, { now })).not.toBeNull();
 	});
 
 	it('renews and touches an active session', async () => {

@@ -1,5 +1,6 @@
 import type { Handle } from '@sveltejs/kit';
 import * as cookie from 'cookie';
+import { env } from '$env/dynamic/private';
 import Users from '$lib/db/models/User';
 import {
 	renewIfNecessary,
@@ -34,6 +35,20 @@ const initMongo = async () => {
 
 // Start MongoDB when first request comes in
 let mongoInitPromise: Promise<void> | null = null;
+
+// The app is single-origin; the wildcard this used to be here can never be
+// combined with Allow-Credentials in real browsers anyway. Reuse the same
+// configured-site-origin convention already used everywhere else in this
+// codebase (email links, Stripe redirect URLs) rather than inventing a new
+// multi-origin allowlist mechanism.
+function getAllowedOrigin(requestUrl: URL): string {
+	const configuredOrigin = env.SITE_URL || env.PUBLIC_SITE_URL;
+	if (configuredOrigin) {
+		return configuredOrigin.replace(/\/+$/, '');
+	}
+
+	return requestUrl.origin;
+}
 
 function getSessionUser(user: any) {
 	return {
@@ -71,7 +86,7 @@ async function authenticateWithSession(sessionToken: string, event: Parameters<H
 
 	const user = await Users.findOne({ $or: [{ id: activeSession.userId }, { _id: activeSession.userId }] })
 		.select(
-			'-password -refreshToken -resetPasswordToken -resetPasswordExpiry -orcidAccessToken -orcidRefreshToken'
+			'-password -refreshToken -resetPasswordTokenHash -resetPasswordExpiresAt -pendingEmailTokenHash -pendingEmailExpiresAt -orcidAccessToken -orcidRefreshToken'
 		)
 		.lean();
 
@@ -124,7 +139,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	const response = await resolve(event);
 
-	response.headers.set('Access-Control-Allow-Origin', '*'); // Allows all origins, you can restrict to a specific domain
+	response.headers.set('Access-Control-Allow-Origin', getAllowedOrigin(event.url));
 	response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
 	response.headers.set(
 		'Access-Control-Allow-Headers',

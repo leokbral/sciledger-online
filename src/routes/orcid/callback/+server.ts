@@ -5,6 +5,7 @@ import { env } from '$env/dynamic/private';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import Users from '$lib/db/models/User';
 import { respondWithSession } from '$lib/server/auth/authResponse';
+import { normalizeEmail } from '$lib/server/auth/normalizeEmail';
 import * as crypto from 'crypto';
 
 /**
@@ -20,6 +21,21 @@ function isProfileComplete(user: any): boolean {
 		user.email &&
 		!user.email.includes('@orcid.placeholder')
 	);
+}
+
+function getOrcidVerificationFields(hasPublicEmail: boolean) {
+	if (!hasPublicEmail) {
+		return {
+			emailVerified: false,
+			verificationSource: 'orcid_placeholder'
+		};
+	}
+
+	return {
+		emailVerified: true,
+		emailVerifiedAt: new Date(),
+		verificationSource: 'orcid'
+	};
 }
 
 /**
@@ -149,9 +165,13 @@ export const GET: RequestHandler = async ({ url, request }) => {
 				// Busca o email primário ou o primeiro disponível
 				const primaryEmail = personData.emails.email.find((e: any) => e.primary === true);
 				email = primaryEmail?.email || personData.emails.email[0]?.email || '';
-			} else {
 			}
 		}
+
+		// Normaliza (trim + lowercase) antes de qualquer busca/gravação -- sem
+		// isso, um email vindo do ORCID com capitalização diferente da já
+		// armazenada nunca daria match e criaria uma conta duplicada.
+		email = normalizeEmail(email);
 
 		// Fallback: se não conseguiu extrair nome da API, usa o 'name' do token
 		if (!firstName && !lastName && name) {
@@ -196,7 +216,9 @@ export const GET: RequestHandler = async ({ url, request }) => {
 				user.orcidAccessToken = access_token;
 				user.orcidRefreshToken = refresh_token;
 				user.orcidTokenExpiry = new Date(Date.now() + expires_in * 1000);
-				user.emailVerified = true; // ORCID já verificou o email
+				user.emailVerified = true; // Public ORCID email is treated as verified by ORCID.
+				user.emailVerifiedAt = user.emailVerifiedAt || new Date();
+				user.verificationSource = 'orcid';
 				await user.save();
 
 				// Faz login e redireciona para home ou complete-profile
@@ -208,8 +230,10 @@ export const GET: RequestHandler = async ({ url, request }) => {
 		// ETAPA 4: Criar novo usuário
 		// ====================================================================
 
-		// Se não tem email do ORCID, usa email placeholder determinístico
+		// Se não tem email público no ORCID, usa email placeholder determinístico.
+		// Placeholders não comprovam posse de e-mail real e permanecem não verificados.
 		const userEmail = email || `${orcid}@orcid.placeholder`;
+		const orcidVerificationFields = getOrcidVerificationFields(Boolean(email));
 
 		// Gera username único baseado no ORCID
 		const baseUsername = `@${firstName.toLowerCase()}_${orcid.split('-').pop()}`;
@@ -237,6 +261,14 @@ export const GET: RequestHandler = async ({ url, request }) => {
 			existingPlaceholderUser.orcidAccessToken = access_token;
 			existingPlaceholderUser.orcidRefreshToken = refresh_token;
 			existingPlaceholderUser.orcidTokenExpiry = new Date(Date.now() + expires_in * 1000);
+			if (email) {
+				existingPlaceholderUser.emailVerified = true;
+				existingPlaceholderUser.emailVerifiedAt = existingPlaceholderUser.emailVerifiedAt || new Date();
+				existingPlaceholderUser.verificationSource = 'orcid';
+			} else if (existingPlaceholderUser.emailVerified !== true) {
+				existingPlaceholderUser.emailVerified = false;
+				existingPlaceholderUser.verificationSource = 'orcid_placeholder';
+			}
 			await existingPlaceholderUser.save();
 
 			return loginAndRedirect(existingPlaceholderUser, request, url);
@@ -253,7 +285,7 @@ export const GET: RequestHandler = async ({ url, request }) => {
 			country: '', // Usuário pode preencher depois
 			dob: '', // Usuário pode preencher depois
 			password: randomPassword, // Senha temporária aleatória
-			emailVerified: email ? true : false, // Se tem email do ORCID, considera verificado
+			...orcidVerificationFields,
 			orcid: orcid,
 			orcidAccessToken: access_token,
 			orcidRefreshToken: refresh_token,

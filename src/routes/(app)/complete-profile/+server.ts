@@ -6,7 +6,7 @@ import Users from '$lib/db/models/User';
 interface CompleteProfileRequest {
 	firstName: string;
 	lastName: string;
-	email: string;
+	email?: unknown;
 	country?: string;
 	dob?: string;
 }
@@ -18,11 +18,27 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		const data: CompleteProfileRequest = await request.json();
 
 		// Valida dados obrigatórios
-		if (!data.firstName || !data.lastName || !data.email) {
+		if (!data.firstName || !data.lastName) {
 			return json(
 				{
 					success: false,
-					message: 'Primeiro nome, sobrenome e email são obrigatórios'
+					message: 'Primeiro nome e sobrenome são obrigatórios'
+				},
+				{ status: 400 }
+			);
+		}
+
+		// complete-profile only ever manages profile fields (name, country,
+		// birthday, ...). Email changes require proof of ownership and must go
+		// through POST /api/account/email-change instead -- reject the field
+		// here rather than silently accepting or ignoring it, so a caller still
+		// sending it gets a clear signal to switch endpoints.
+		if (typeof data.email === 'string' && data.email.trim()) {
+			return json(
+				{
+					success: false,
+					message:
+						'Email changes are not supported here. Use POST /api/account/email-change instead.'
 				},
 				{ status: 400 }
 			);
@@ -40,7 +56,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			);
 		}
 
-		// Verifica se o novo email já existe (se for diferente do atual)
 		const user = await Users.findOne({ $or: [{ id: userId }, { _id: userId }] });
 
 		if (!user) {
@@ -53,24 +68,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			);
 		}
 
-		// Se email foi mudado, verifica se já não existe
-		if (data.email !== user.email) {
-			const existingUser = await Users.findOne({ email: data.email });
-			if (existingUser) {
-				return json(
-					{
-						success: false,
-						message: 'Este email já está registrado'
-					},
-					{ status: 400 }
-				);
-			}
-		}
-
 		// Atualiza os dados
 		user.firstName = data.firstName;
 		user.lastName = data.lastName;
-		user.email = data.email;
 		user.country = data.country || '';
 		user.dob = data.dob || '';
 		user.profileCompletedAt = new Date(); // Flag para rastrear quando completou

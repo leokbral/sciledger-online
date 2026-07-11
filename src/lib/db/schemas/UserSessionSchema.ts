@@ -10,7 +10,7 @@ export const UserSessionSchema: Schema = new Schema(
 		createdAt: { type: Date, default: () => new Date() },
 		updatedAt: { type: Date, default: () => new Date() },
 		lastActivityAt: { type: Date, default: () => new Date(), index: true },
-		expiresAt: { type: Date, required: true, index: true },
+		expiresAt: { type: Date, required: true },
 		rememberMe: { type: Boolean, default: false },
 		ip: { type: String, default: '' },
 		userAgent: { type: String, default: '' },
@@ -22,5 +22,9 @@ export const UserSessionSchema: Schema = new Schema(
 
 UserSessionSchema.index({ userId: 1 });
 UserSessionSchema.index({ sessionTokenHash: 1 }, { unique: true });
-UserSessionSchema.index({ expiresAt: 1 });
 UserSessionSchema.index({ userId: 1, revokedAt: 1, expiresAt: 1 });
+
+// TTL index: MongoDB automatically deletes a session document once its
+// expiresAt timestamp is in the past. No cron job or background worker is
+// involved -- expireAfterSeconds: 0 means "expire exactly at expiresAt".
+UserSessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });

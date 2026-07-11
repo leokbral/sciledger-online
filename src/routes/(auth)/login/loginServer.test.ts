@@ -50,6 +50,7 @@ describe('login route persistent sessions', () => {
 		mocks.findOne.mockResolvedValue({
 			id: 'user-1',
 			email: 'user@example.com',
+			emailVerified: true,
 			password: hashPassword('correct-password')
 		});
 		mocks.respondWithSession.mockResolvedValue(new Response(JSON.stringify({ user: { id: 'user-1' } })));
@@ -95,5 +96,65 @@ describe('login route persistent sessions', () => {
 				rememberMe: true
 			})
 		);
+	});
+
+	it('blocks unverified traditional users without creating a session', async () => {
+		mocks.findOne.mockResolvedValue({
+			id: 'user-1',
+			email: 'user@example.com',
+			emailVerified: false,
+			verificationSource: 'register',
+			password: hashPassword('correct-password')
+		});
+		const { POST } = await import('./+server');
+		const request = createLoginRequest(false);
+		const url = new URL(request.url);
+
+		const response = await POST({ request, url } as Parameters<typeof POST>[0]);
+		const body = await response.json();
+
+		expect(response.status).toBe(403);
+		expect(body).toEqual({
+			emailVerificationRequired: true,
+			email: 'user@example.com',
+			redirectTo: '/verify-email/pending?email=user%40example.com'
+		});
+		expect(mocks.respondWithSession).not.toHaveBeenCalled();
+	});
+
+	it('normalizes the email login field (trim + lowercase) before querying', async () => {
+		const { POST } = await import('./+server');
+		const request = new Request('https://sciledger.online/login', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({
+				login: '  User@Example.COM  ',
+				password: 'correct-password',
+				rememberMe: false
+			})
+		});
+		const url = new URL(request.url);
+
+		await POST({ request, url } as Parameters<typeof POST>[0]);
+
+		expect(mocks.findOne).toHaveBeenCalledWith({
+			$or: [{ email: 'user@example.com' }, { username: 'User@Example.COM' }]
+		});
+	});
+
+	it('does not block non-register users with legacy unverified state', async () => {
+		mocks.findOne.mockResolvedValue({
+			id: 'user-1',
+			email: 'user@example.com',
+			emailVerified: false,
+			password: hashPassword('correct-password')
+		});
+		const { POST } = await import('./+server');
+		const request = createLoginRequest(false);
+		const url = new URL(request.url);
+
+		await POST({ request, url } as Parameters<typeof POST>[0]);
+
+		expect(mocks.respondWithSession).toHaveBeenCalled();
 	});
 });

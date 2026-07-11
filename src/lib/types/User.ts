@@ -13,9 +13,14 @@ export type User = {
     email: string; // User email
     password: string; // User password
     refreshToken?: string; // Token for managing login sessions
-    resetPasswordToken: string;
-    resetPasswordExpiry: string; // Password reset token expiry
+    resetPasswordTokenHash: string;
+    resetPasswordExpiresAt: Date; // Password reset token expiry
     emailVerified: boolean; // Email verification
+    emailVerifiedAt?: Date;
+    pendingEmail?: string; // New email awaiting confirmation
+    pendingEmailTokenHash?: string;
+    pendingEmailExpiresAt?: Date;
+    pendingEmailLastSentAt?: Date;
     darkMode: boolean; // Dark mode
     roles: {
         author: boolean; // Whether the user is an author

@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import mongoose from 'mongoose';
 import { UserSchema } from '$lib/db/schemas/UserSchema.js';
+import { hashPasswordResetToken } from '$lib/server/auth/passwordReset';
 import type { RequestHandler } from './$types';
 
 const User = mongoose.models.User || mongoose.model('User', UserSchema);
@@ -23,8 +24,8 @@ export const POST: RequestHandler = async ({ request }) => {
         }
 
         const user = await User.findOne({
-            resetPasswordToken: token,
-            resetPasswordExpiry: { $gt: new Date().toISOString() }
+            resetPasswordTokenHash: hashPasswordResetToken(token),
+            resetPasswordExpiresAt: { $gt: new Date() }
         });
 
         if (!user) {
@@ -32,7 +33,7 @@ export const POST: RequestHandler = async ({ request }) => {
         }
 
         // Verificar se o token não está muito próximo da expiração (menos de 5 minutos)
-        const expiryTime = new Date(user.resetPasswordExpiry).getTime();
+        const expiryTime = new Date(user.resetPasswordExpiresAt).getTime();
         const currentTime = new Date().getTime();
         const timeUntilExpiry = expiryTime - currentTime;
         

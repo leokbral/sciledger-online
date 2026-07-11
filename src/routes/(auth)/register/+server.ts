@@ -4,14 +4,33 @@ import * as crypto from 'crypto';
 import Users from '$lib/db/models/User';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import { AUTH_CONFIG_SECRET } from '$env/static/private';
+import { normalizeEmail } from '$lib/server/auth/normalizeEmail';
+import { findValidEmailReviewerInvitation } from '$lib/server/auth/emailReviewerInvitation';
+import {
+	generateEmailVerificationToken,
+	getEmailVerificationExpiresAt,
+	getEmailVerificationUrl,
+	hashEmailVerificationToken,
+	sendEmailVerification
+} from '$lib/server/auth/emailVerification';
 
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, url }) => {
 
 	await start_mongo(); // Não necessário mais
 
 	try {
-		const { firstName, lastName, username, country, state, dob, email, password, confirmPassword } =
-			await request.json();
+		const {
+			firstName,
+			lastName,
+			username,
+			country,
+			state,
+			dob,
+			email,
+			password,
+			confirmPassword,
+			inviteToken
+		} = await request.json();
 
 		// Verifica se todas as informações necessárias foram enviadas
 		if (!firstName || !lastName || !username || !country || !dob || !email || !password || !confirmPassword) {
@@ -23,8 +42,10 @@ export const POST: RequestHandler = async ({ request }) => {
 			return json({ error: 'As senhas não coincidem.' }, { status: 400 });
 		}
 
+		const normalizedEmail = normalizeEmail(email);
+
 		// Verifica se o usuário já existe
-		const existingUser = await Users.findOne({ email });
+		const existingUser = await Users.findOne({ email: normalizedEmail });
 		if (existingUser) {
 			return json({ error: 'Usuário já cadastrado.' }, { status: 409 });
 		}
@@ -48,6 +69,20 @@ export const POST: RequestHandler = async ({ request }) => {
 		const hashedPassword = crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
 
 		const id = crypto.randomUUID()
+
+		// A invitation only counts when it is validated server-side against the
+		// database (pending, unexpired, and issued for this exact email). The
+		// Referer header is attacker-controlled and must never drive this decision.
+		const invitation = await findValidEmailReviewerInvitation(inviteToken, normalizedEmail);
+		const shouldSendEmailVerification = !invitation;
+		const emailVerificationToken = shouldSendEmailVerification ? generateEmailVerificationToken() : '';
+		const emailVerificationTokenHash = shouldSendEmailVerification
+			? hashEmailVerificationToken(emailVerificationToken)
+			: undefined;
+		const emailVerificationExpiresAt = shouldSendEmailVerification
+			? getEmailVerificationExpiresAt()
+			: undefined;
+		const emailVerificationLastSentAt = shouldSendEmailVerification ? new Date() : undefined;
 		// Cria um novo usuário
 		const newUser = new Users({
 			_id: id,
@@ -58,9 +93,18 @@ export const POST: RequestHandler = async ({ request }) => {
 			country,
 			state,
 			dob,
-			email,
-			handle: email,
+			email: normalizedEmail,
+			handle: normalizedEmail,
 			password: hashedPassword,
+			emailVerified: false,
+			...(shouldSendEmailVerification
+				? {
+						emailVerificationTokenHash,
+						emailVerificationExpiresAt,
+						emailVerificationLastSentAt,
+						verificationSource: 'register'
+					}
+				: {}),
 			isAdmin: false,
 			createdAt: new Date(),
 			updatedAt: new Date()
@@ -68,6 +112,13 @@ export const POST: RequestHandler = async ({ request }) => {
 
 		// Salva o usuário no banco de dados
 		await newUser.save();
+		if (shouldSendEmailVerification) {
+			await sendEmailVerification({
+				to: newUser.email,
+				firstName: newUser.firstName,
+				verificationUrl: getEmailVerificationUrl(url.origin, emailVerificationToken)
+			});
+		}
 
 		// Resposta de sucesso
 		return json({ user: { id: newUser.id, email: newUser.email } }, { status: 201 });

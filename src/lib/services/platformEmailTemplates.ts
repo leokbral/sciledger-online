@@ -55,6 +55,61 @@ export function buildPasswordResetEmailHtml(firstName: string, resetUrl: string)
 	});
 }
 
+export function buildEmailVerificationEmailHtml(firstName: string, verificationUrl: string) {
+	return createEmailLayout({
+		title: 'Verify Your Email',
+		subtitle: 'Account verification',
+		greeting: `Hello ${firstName},`,
+		message:
+			'Please confirm your email address to finish setting up your SciLedger account.',
+		ctaIntro: 'Click the button below to verify your email address:',
+		actionLabel: 'Verify Email',
+		actionUrl: verificationUrl,
+		fallbackUrl: verificationUrl,
+		warning: {
+			title: 'Important',
+			message: 'This verification link will expire in 24 hours.'
+		},
+		closing: 'Thank you for joining SciLedger.'
+	});
+}
+
+export function buildEmailChangeConfirmationEmailHtml(firstName: string, confirmationUrl: string) {
+	return createEmailLayout({
+		title: 'Confirm Your New Email',
+		subtitle: 'Account security',
+		greeting: `Hello ${firstName},`,
+		message:
+			'We received a request to change the email address on your SciLedger account to this address. Confirming will make this your new sign-in email.',
+		ctaIntro: 'Click the button below to confirm your new email address:',
+		actionLabel: 'Confirm New Email',
+		actionUrl: confirmationUrl,
+		fallbackUrl: confirmationUrl,
+		warning: {
+			title: 'Important',
+			message: 'This link will expire in 24 hours. If you did not request this change, you can safely ignore this email.'
+		},
+		closing: 'If you continue having problems, please contact our support team.'
+	});
+}
+
+export function buildEmailChangedNotificationEmailHtml(firstName: string, newEmail: string) {
+	return createEmailLayout({
+		title: 'Your Account Email Has Changed',
+		subtitle: 'Account security',
+		greeting: `Hello ${firstName},`,
+		message: 'Your SciLedger account email has been changed.',
+		information: {
+			fields: [{ label: 'New email', value: newEmail }]
+		},
+		warning: {
+			title: 'Was this not you?',
+			message: 'If this was not you, contact support immediately.'
+		},
+		closing: 'This message was sent to your previous email address for your security.'
+	});
+}
+
 export function buildCoAuthorWelcomeEmailHtml(data: {
 	coAuthorName: string;
 	inviterName: string;

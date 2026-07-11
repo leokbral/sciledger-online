@@ -2,12 +2,17 @@ import { json } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import mongoose from 'mongoose';
 import { UserSchema } from '$lib/db/schemas/UserSchema.js';
-import * as crypto from 'crypto';
 import type { RequestHandler } from './$types';
 import nodemailer from 'nodemailer';
 import { SITE_URL } from '$env/static/private';
 import { env } from '$env/dynamic/private';
 import { buildPasswordResetEmailHtml } from '$lib/services/platformEmailTemplates';
+import { normalizeAndValidateEmail } from '$lib/server/auth/normalizeEmail';
+import {
+	generatePasswordResetToken,
+	getPasswordResetExpiresAt,
+	hashPasswordResetToken
+} from '$lib/server/auth/passwordReset';
 
 const User = mongoose.models.User || mongoose.model('User', UserSchema);
 
@@ -39,19 +44,6 @@ function getTransporter(): nodemailer.Transporter | null {
 	return transporter;
 }
 
-function normalizeEmail(value: unknown): string | null {
-	if (typeof value !== 'string') return null;
-
-	const email = value.trim().toLowerCase();
-	const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-	if (email.length > 254 || !emailRegex.test(email)) {
-		return null;
-	}
-
-	return email;
-}
-
 export const POST: RequestHandler = async ({ request }) => {
 	try {
 		await start_mongo();
@@ -62,7 +54,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			return json({ error: 'Email is required' }, { status: 400 });
 		}
 
-		const normalizedEmail = normalizeEmail(email);
+		const normalizedEmail = normalizeAndValidateEmail(email);
 		if (!normalizedEmail) {
 			return json({ error: 'Invalid email format' }, { status: 400 });
 		}
@@ -76,22 +68,22 @@ export const POST: RequestHandler = async ({ request }) => {
 		}
 
 		// Check if there's already a valid token (not expired)
-		if (user.resetPasswordToken && user.resetPasswordExpiry) {
+		if (user.resetPasswordTokenHash && user.resetPasswordExpiresAt) {
 			const now = new Date();
-			const expiry = new Date(user.resetPasswordExpiry);
+			const expiry = new Date(user.resetPasswordExpiresAt);
 
 			if (expiry > now) {
 				return json({ message: 'success' });
 			}
 		}
 
-		// Generate new recovery token
-		const resetToken = crypto.randomBytes(32).toString('hex');
-		const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour
+		// Generate new recovery token; only the hash is persisted
+		const resetToken = generatePasswordResetToken();
+		const resetTokenExpiry = getPasswordResetExpiresAt();
 
-		// Save token to user
-		user.resetPasswordToken = resetToken;
-		user.resetPasswordExpiry = resetTokenExpiry.toISOString();
+		// Save token hash to user
+		user.resetPasswordTokenHash = hashPasswordResetToken(resetToken);
+		user.resetPasswordExpiresAt = resetTokenExpiry;
 		user.updatedAt = new Date().toISOString();
 		await user.save();
 

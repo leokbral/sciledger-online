@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import UserSession, { type IUserSession } from '$lib/db/models/UserSession';
 import {
+	MAX_ACTIVE_SESSIONS,
 	REMEMBER_ME_DURATION,
 	SESSION_DURATION,
 	SESSION_RENEW_THRESHOLD,
@@ -8,6 +9,7 @@ import {
 } from './sessionConstants';
 
 export {
+	MAX_ACTIVE_SESSIONS,
 	REMEMBER_ME_DURATION,
 	SESSION_DURATION,
 	SESSION_RENEW_THRESHOLD,
@@ -37,6 +39,7 @@ export type RevokeAllUserSessionsResult = {
 };
 
 export type SessionDocumentLike = {
+	_id?: unknown;
 	userId: string;
 	sessionTokenHash: string;
 	createdAt: Date;
@@ -51,13 +54,19 @@ export type SessionDocumentLike = {
 	save(): Promise<unknown>;
 };
 
+type SessionQueryLike<TSession> = {
+	sort(sortSpec: Record<string, 1 | -1>): PromiseLike<TSession[]>;
+};
+
 type SessionModelLike<TSession extends SessionDocumentLike = IUserSession> = {
 	create(data: Record<string, unknown>): Promise<TSession>;
 	findOne(query: Record<string, unknown>): PromiseLike<TSession | null>;
+	find(query: Record<string, unknown>): SessionQueryLike<TSession>;
 	updateMany(
 		query: Record<string, unknown>,
 		update: Record<string, unknown>
 	): PromiseLike<{ matchedCount?: number; modifiedCount?: number; nModified?: number }>;
+	deleteMany(query: Record<string, unknown>): PromiseLike<{ deletedCount?: number }>;
 };
 
 function resolveNow(options?: SessionServiceOptions) {
@@ -115,6 +124,33 @@ export function hashSessionToken(sessionToken: string) {
 export function createSessionService<TSession extends SessionDocumentLike = IUserSession>(
 	model: SessionModelLike<TSession> = UserSession as SessionModelLike<TSession>
 ) {
+	async function enforceMaxActiveSessions(
+		userId: string,
+		currentSessionId: unknown,
+		options?: SessionServiceOptions
+	) {
+		const now = resolveNow(options);
+		const activeSessions = await model
+			.find({
+				userId,
+				revokedAt: null,
+				expiresAt: { $gt: now }
+			})
+			.sort({ createdAt: 1 }); // oldest first
+
+		const excessCount = activeSessions.length - MAX_ACTIVE_SESSIONS;
+		if (excessCount <= 0) return;
+
+		const deletableIds = activeSessions
+			.filter((activeSession) => String(activeSession._id) !== String(currentSessionId))
+			.slice(0, excessCount)
+			.map((activeSession) => activeSession._id);
+
+		if (deletableIds.length === 0) return;
+
+		await model.deleteMany({ _id: { $in: deletableIds } });
+	}
+
 	async function createSession(input: SessionInput, options?: SessionServiceOptions) {
 		const now = resolveNow(options);
 		const sessionToken = generateSessionToken();
@@ -132,6 +168,13 @@ export function createSessionService<TSession extends SessionDocumentLike = IUse
 			ip: input.ip || '',
 			userAgent: input.userAgent || ''
 		});
+
+		try {
+			await enforceMaxActiveSessions(input.userId, session._id, options);
+		} catch (error) {
+			// Trimming old sessions must never block a legitimate login.
+			console.error('Failed to enforce MAX_ACTIVE_SESSIONS:', error);
+		}
 
 		return { session, sessionToken };
 	}
@@ -245,6 +288,69 @@ export function createSessionService<TSession extends SessionDocumentLike = IUse
 		};
 	}
 
+	/** All active (non-revoked, non-expired) sessions for a user, newest activity first. */
+	async function listActiveSessions(userId: string, options?: SessionServiceOptions) {
+		const now = resolveNow(options);
+		return model
+			.find({
+				userId,
+				revokedAt: null,
+				expiresAt: { $gt: now }
+			})
+			.sort({ lastActivityAt: -1 });
+	}
+
+	/**
+	 * Revokes a single session by its id, scoped to the owning user so one
+	 * account can never revoke another account's session by guessing an id.
+	 */
+	async function revokeSessionById(
+		sessionId: string,
+		userId: string,
+		revokedReason = 'revoked',
+		options?: SessionServiceOptions
+	) {
+		const session = await model.findOne({ _id: sessionId, userId });
+		if (!session) return null;
+
+		const now = resolveNow(options);
+		session.revokedAt = session.revokedAt || now;
+		session.revokedReason = revokedReason;
+		session.updatedAt = now;
+		await session.save();
+
+		return session;
+	}
+
+	/** Revokes every active session for a user except the one given by id. */
+	async function revokeAllUserSessionsExcept(
+		userId: string,
+		exceptSessionId: string,
+		revokedReason = 'revoked_all_except_current',
+		options?: SessionServiceOptions
+	): Promise<RevokeAllUserSessionsResult> {
+		const now = resolveNow(options);
+		const result = await model.updateMany(
+			{
+				userId,
+				revokedAt: null,
+				_id: { $ne: exceptSessionId }
+			},
+			{
+				$set: {
+					revokedAt: now,
+					revokedReason,
+					updatedAt: now
+				}
+			}
+		);
+
+		return {
+			matchedCount: result.matchedCount ?? result.modifiedCount ?? result.nModified ?? 0,
+			modifiedCount: result.modifiedCount ?? result.nModified ?? 0
+		};
+	}
+
 	return {
 		createSession,
 		findSession,
@@ -255,7 +361,10 @@ export function createSessionService<TSession extends SessionDocumentLike = IUse
 		renewSession,
 		renewIfNecessary,
 		revokeSession,
-		revokeAllUserSessions
+		revokeAllUserSessions,
+		listActiveSessions,
+		revokeSessionById,
+		revokeAllUserSessionsExcept
 	};
 }
 
@@ -269,3 +378,6 @@ export const renewSession = SessionService.renewSession;
 export const renewIfNecessary = SessionService.renewIfNecessary;
 export const revokeSession = SessionService.revokeSession;
 export const revokeAllUserSessions = SessionService.revokeAllUserSessions;
+export const listActiveSessions = SessionService.listActiveSessions;
+export const revokeSessionById = SessionService.revokeSessionById;
+export const revokeAllUserSessionsExcept = SessionService.revokeAllUserSessionsExcept;

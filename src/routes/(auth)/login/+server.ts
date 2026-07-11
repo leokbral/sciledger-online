@@ -5,6 +5,7 @@ import { AUTH_CONFIG_SECRET } from '$env/static/private';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import Users from '$lib/db/models/User';
 import { respondWithSession } from '$lib/server/auth/authResponse';
+import { normalizeEmail } from '$lib/server/auth/normalizeEmail';
 
 export const POST: RequestHandler = async ({ request, url }) => {
 	try {
@@ -17,13 +18,14 @@ export const POST: RequestHandler = async ({ request, url }) => {
 		}
 
 		// Adiciona o '@' se não estiver presente no login (no caso de ser um username)
-		let queryLogin = login;
-		if (!login.includes('@')) {
-		  queryLogin = `@${login}`; // Adiciona o '@' para procurar o username corretamente
-		}
+		const trimmedLogin = String(login).trim();
+		const usernameCandidate = trimmedLogin.includes('@') ? trimmedLogin : `@${trimmedLogin}`;
+		const emailCandidate = normalizeEmail(trimmedLogin);
 
 		// Encontra o usuário no banco de dados
-		const user = await Users.findOne({ $or: [{ email: queryLogin }, { username: queryLogin }] });
+		const user = await Users.findOne({
+			$or: [{ email: emailCandidate }, { username: usernameCandidate }]
+		});
 		
 		if (!user) {
 			return json({ errors: 'Invalid credentials.', status: 401 }, { status: 401 });
@@ -37,6 +39,17 @@ export const POST: RequestHandler = async ({ request, url }) => {
 		}
 
 		// Usuário autenticado com sucesso
+		if (user.emailVerified === false && user.verificationSource === 'register') {
+			return json(
+				{
+					emailVerificationRequired: true,
+					email: user.email,
+					redirectTo: `/verify-email/pending?email=${encodeURIComponent(user.email)}`
+				},
+				{ status: 403 }
+			);
+		}
+
 		return respondWithSession({ user }, { request, url, rememberMe: Boolean(rememberMe) });
 	} catch (err) {
 		console.error('Login error:', err);
