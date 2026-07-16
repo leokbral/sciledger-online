@@ -4,6 +4,8 @@ import mongoose from 'mongoose';
 import { UserSchema } from '$lib/db/schemas/UserSchema.js';
 import * as crypto from 'crypto';
 import { AUTH_CONFIG_SECRET } from '$env/static/private';
+import { revokeAllUserSessions } from '$lib/server/auth/SessionService';
+import { hashPasswordResetToken } from '$lib/server/auth/passwordReset';
 import type { RequestHandler } from './$types';
 
 const User = mongoose.models.User || mongoose.model('User', UserSchema);
@@ -42,8 +44,8 @@ export const POST: RequestHandler = async ({ request }) => {
         }
 
         const user = await User.findOne({
-            resetPasswordToken: token,
-            resetPasswordExpiry: { $gt: new Date().toISOString() }
+            resetPasswordTokenHash: hashPasswordResetToken(token),
+            resetPasswordExpiresAt: { $gt: new Date() }
         });
 
         if (!user) {
@@ -62,12 +64,12 @@ export const POST: RequestHandler = async ({ request }) => {
 
         // Atualizar senha e limpar tokens de reset
         user.password = newHashedPassword;
-        user.resetPasswordToken = undefined;
-        user.resetPasswordExpiry = undefined;
-        user.refreshToken = undefined; // Invalidar sessões existentes
+        user.resetPasswordTokenHash = undefined;
+        user.resetPasswordExpiresAt = undefined;
         user.updatedAt = new Date().toISOString();
         
         await user.save();
+        await revokeAllUserSessions(String(user.id || user._id), 'password_reset');
 
         return json({ 
             message: 'Password updated successfully',

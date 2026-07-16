@@ -24,7 +24,7 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 	try {
 		const freshUser = await Users.findOne({ id: sessionUser.id })
 			.select(
-				'-password -refreshToken -resetPasswordToken -resetPasswordExpiry -orcidAccessToken -orcidRefreshToken'
+				'-password -refreshToken -resetPasswordTokenHash -resetPasswordExpiresAt -pendingEmailTokenHash -pendingEmailExpiresAt -orcidAccessToken -orcidRefreshToken'
 			)
 			.lean();
 

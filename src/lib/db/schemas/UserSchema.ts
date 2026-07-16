@@ -13,9 +13,19 @@ export const UserSchema: Schema = new Schema({
     email: { type: String, required: true, unique: true }, // User email
     password: { type: String, required: false }, // User password (optional for ORCID login)
     refreshToken: { type: String }, // Token for managing login sessions
-    resetPasswordToken: { type: String },
-    resetPasswordExpiry: { type: String }, // Password reset token expiry
+    resetPasswordTokenHash: { type: String, index: true },
+    resetPasswordExpiresAt: { type: Date }, // Password reset token expiry
     emailVerified: { type: Boolean, default: false }, // Email verification
+    emailVerifiedAt: { type: Date },
+    emailVerificationTokenHash: { type: String, index: true },
+    emailVerificationExpiresAt: { type: Date },
+    emailVerificationLastSentAt: { type: Date },
+    verificationSource: { type: String },
+    // Secure email change fields
+    pendingEmail: { type: String },
+    pendingEmailTokenHash: { type: String, index: true },
+    pendingEmailExpiresAt: { type: Date },
+    pendingEmailLastSentAt: { type: Date },
     // ORCID OAuth fields
     orcid: { type: String, unique: true, sparse: true }, // User's ORCID iD
     orcidAccessToken: { type: String }, // ORCID access token

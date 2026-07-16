@@ -100,7 +100,9 @@ export const PUT: RequestHandler = async ({ request, locals, params }) => {
 			{ $set: updates },
 			{ new: true } // Return the updated document
 		)
-			.select('-password -refreshToken -resetPasswordToken -resetPasswordExpiry -orcidAccessToken -orcidRefreshToken')
+			.select(
+				'-password -refreshToken -resetPasswordTokenHash -resetPasswordExpiresAt -pendingEmailTokenHash -pendingEmailExpiresAt -orcidAccessToken -orcidRefreshToken'
+			)
 			.lean();
 
 		if (!updatedUser) {
@@ -111,35 +113,8 @@ export const PUT: RequestHandler = async ({ request, locals, params }) => {
 			await deleteImageIfUnused(previousProfilePictureUrl, existingUser.id);
 		}
 
-		const cookiePayload = {
-			user: {
-				...locals.user,
-				email: updatedUser.email,
-				username: updatedUser.username,
-				firstName: updatedUser.firstName,
-				lastName: updatedUser.lastName,
-				roles: updatedUser.roles,
-				profilePictureUrl: updatedUser.profilePictureUrl,
-				bio: updatedUser.bio,
-				position: updatedUser.position,
-				institution: updatedUser.institution
-			},
-			token: locals.token,
-			refreshToken: locals.refreshToken
-		};
-
-		const cookieValue = Buffer.from(JSON.stringify(cookiePayload)).toString('base64');
-
 		// Success response
-		return json(
-			{ user: updatedUser },
-			{
-				status: 200,
-				headers: {
-					'set-cookie': `jwt=${cookieValue}; Path=/; HttpOnly`
-				}
-			}
-		);
+		return json({ user: updatedUser }, { status: 200 });
 	} catch (error) {
 		console.error('Error updating user:', error);
 		return json({ error: 'Internal server error.' }, { status: 500 });

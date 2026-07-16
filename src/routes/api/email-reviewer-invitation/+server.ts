@@ -24,6 +24,8 @@ import {
 	REVIEW_CONFLICT_OF_INTEREST_MESSAGE,
 	validateReviewerCanReviewPaper
 } from '$lib/server/reviewConflictOfInterest';
+import { buildReviewerInvitationEmailHtml } from '$lib/services/platformEmailTemplates';
+import { normalizeAndValidateEmail } from '$lib/server/auth/normalizeEmail';
 
 // Clear the model cache to ensure we use the updated schema
 if (mongoose.models.EmailReviewerInvitation) {
@@ -95,129 +97,6 @@ function getUserDisplayName(user: any, fallback: string) {
 	return `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || user?.email || fallback;
 }
 
-function normalizeEmail(value: unknown): string | null {
-	if (typeof value !== 'string') return null;
-
-	const email = value.trim().toLowerCase();
-	const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-	if (email.length > 254 || !emailRegex.test(email)) {
-		return null;
-	}
-
-	return email;
-}
-
-function generateInvitationEmailTemplate(
-	email: string,
-	hubName: string,
-	invitationUrl: string,
-	declineUrl: string,
-	options?: {
-		paperTitle?: string | null;
-		paperAbstract?: string | null;
-	}
-): string {
-	const paperTitle = options?.paperTitle?.trim() || '';
-	const paperAbstract = options?.paperAbstract?.trim() || '';
-	// Normalize and remove HTML tags, but preserve line breaks from common tags
-	const stripHtml = (s: string) =>
-		String(s || '')
-			.replace(/<\s*(br|\/p|p)[^>]*>/gi, '\n')
-			.replace(/<[^>]+>/g, '')
-			.replace(/\r\n|\r/g, '\n')
-			.replace(/\n\s+/g, '\n')
-			.trim();
-
-	const cleanPaperTitle = stripHtml(paperTitle);
-	const cleanPaperAbstract = stripHtml(paperAbstract);
-	const hasPaperContext = Boolean(cleanPaperTitle || cleanPaperAbstract);
-
-	const safeText = (value: string) =>
-		value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
-	// Use full abstract in email, render line breaks using CSS `white-space: pre-wrap`
-	const paperSection = hasPaperContext
-		? `
-					<div style="background-color: #ffffff; border: 1px solid #e6eefc; padding: 22px; margin: 22px 0; border-radius: 8px;">
-						<h3 style="margin: 0 0 10px 0; font-size: 18px; color: #0b3d91;">📄 ${safeText(cleanPaperTitle || 'Untitled')}</h3>
-						${cleanPaperAbstract ? `<div style="margin-top:8px; color: #374151; font-size: 14px; line-height:1.5; white-space: pre-wrap;">${safeText(cleanPaperAbstract)}</div>` : ''}
-					</div>
-				`
-		: '';
-
-	return `
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1">
-            <title>Reviewer Invitation - SciLedger</title>
-        </head>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 20px; background-color: #f8f9fa;">
-            <div style="max-width: 600px; margin: 0 auto; background-color: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); overflow: hidden;">
-				<!-- Header -->
-				<div style="background-color: #07326a; color: #ffffff; padding: 28px 20px; text-align: center;">
-					<h1 style="margin: 0; font-size: 28px; font-weight: 700; color: #ffffff; letter-spacing: -0.2px;">SciLedger</h1>
-					<p style="margin: 8px 0 0 0; font-size: 13px; color: rgba(255,255,255,0.95); opacity: 0.95;">Scientific Platform</p>
-				</div>
-
-                <!-- Content -->
-                <div style="padding: 40px 30px;">
-				<h2 style="color: #0f1724; margin-bottom: 14px; font-size: 20px; font-weight: 600;">You've Been Invited to Join as a Reviewer</h2>
-
-				<p style="font-size: 15px; margin-bottom: 14px; color: #334155;">Hello,</p>
-
-				<p style="font-size: 15px; margin-bottom: 20px; color: #334155;">You have been invited to join <strong>SciLedger</strong> as a reviewer for the following hub:</p>
-
-                    <!-- Hub Info Box -->
-					<div style="background-color: #f4f8ff; border-left: 4px solid #0b63d6; padding: 16px; margin: 20px 0; border-radius: 6px;">
-						<p style="margin: 0; color: #0b3d91; font-weight: 600; font-size: 15px;"><strong>Hub:</strong> ${hubName}</p>
-					</div>
-
-					${paperSection}
-
-					<p style="font-size: 16px; margin-bottom: 25px;">To accept this invitation and create your reviewer account, please click the button below:</p>
-
-                    <!-- Button -->
-					<div style="text-align: center; margin: 36px 0;">
-						<a href="${invitationUrl}" style="display: inline-block; background-color: #0066cc; color: #ffffff; padding: 14px 36px; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 15px;">
-							Accept Invitation & Register
-						</a>
-					</div>
-
-					<p style="font-size: 14px; color: #666; margin-bottom: 12px;">If you are unable to review, you can decline and inform the hub manager:</p>
-					<div style="text-align: center; margin: 0 0 30px 0;">
-						<a href="${declineUrl}" style="display: inline-block; background-color: #f3f4f6; color: #111827; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; border: 1px solid #d1d5db;">
-							Decline Invitation
-						</a>
-					</div>
-
-                    <p style="font-size: 14px; color: #666; margin-bottom: 10px;">Or copy and paste this link into your browser:</p>
-                    <div style="word-break: break-all; background-color: #f8f4ff; padding: 15px; border-radius: 4px; font-family: monospace; font-size: 12px; border: 1px solid #e0e0e0;">
-                        ${invitationUrl}
-                    </div>
-
-                    <!-- Warning Box -->
-                    <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 25px 0; border-radius: 4px;">
-                        <p style="color: #856404; margin: 0; font-weight: bold;">⚠️ Important</p>
-                        <p style="color: #856404; margin: 5px 0 0 0;">This invitation link will expire in <strong>7 days</strong>.</p>
-                    </div>
-
-                    <p style="font-size: 16px; margin-top: 30px;">We look forward to having you as part of our reviewer community!</p>
-                </div>
-
-                <!-- Footer -->
-                <div style="background-color: #f8f9fa; padding: 25px 30px; text-align: center; border-top: 1px solid #e0e0e0;">
-                    <p style="font-size: 12px; color: #666; margin: 0 0 5px 0;">© ${new Date().getFullYear()} SciLedger. All rights reserved.</p>
-                    <p style="font-size: 12px; color: #666; margin: 0;">This is an automated message, please do not reply.</p>
-                </div>
-            </div>
-        </body>
-        </html>
-    `;
-}
-
 export const POST: RequestHandler = async ({ request, locals, url }) => {
 	try {
 		await start_mongo();
@@ -235,7 +114,7 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
 		}
 
 		const hubIdValue = String(hubId);
-		const normalizedEmail = normalizeEmail(email);
+		const normalizedEmail = normalizeAndValidateEmail(email);
 		if (!normalizedEmail) {
 			return json({ error: 'Invalid email format' }, { status: 400 });
 		}
@@ -423,16 +302,13 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
 				from: `"SciLedger Team" <${process.env.SMTP_USER}>`,
 				to: normalizedEmail,
 				subject: '📝 Invitation to Join as Reviewer - SciLedger',
-				html: generateInvitationEmailTemplate(
-					normalizedEmail,
-					hub.title || hub.name || 'SciLedger hub',
+				html: buildReviewerInvitationEmailHtml({
+					hubName: hub.title || hub.name || 'SciLedger hub',
 					invitationUrl,
 					declineUrl,
-					{
-						paperTitle: paper?.title || null,
-						paperAbstract: paper?.abstract || paper?.summary || null
-					}
-				)
+					paperTitle: paper?.title || null,
+					paperAbstract: paper?.abstract || paper?.summary || null
+				})
 			});
 		} catch (error) {
 			await EmailReviewerInvitation.deleteOne({ _id: invitation._id }).catch((cleanupError) => {

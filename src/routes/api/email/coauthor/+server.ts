@@ -1,20 +1,8 @@
 // arquivo: src/routes/api/email/coauthor/+server.ts
 import { json } from '@sveltejs/kit';
 import { emailService } from '$lib/utils/CoAuthorEmailService';
+import { normalizeAndValidateEmail } from '$lib/server/auth/normalizeEmail';
 import type { RequestHandler } from './$types';
-
-function normalizeEmail(value: unknown): string | null {
-	if (typeof value !== 'string') return null;
-
-	const email = value.trim().toLowerCase();
-	const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-	if (email.length > 254 || !emailRegex.test(email)) {
-		return null;
-	}
-
-	return email;
-}
 
 export const POST: RequestHandler = async ({ request, locals }) => {
 	try {
@@ -25,7 +13,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		const body = await request.json();
 
 		const { coAuthorName, coAuthorEmail, inviterName, projectTitle, loginUrl } = body;
-		const normalizedEmail = normalizeEmail(coAuthorEmail);
+		const normalizedEmail = normalizeAndValidateEmail(coAuthorEmail);
 
 		if (!coAuthorName || !normalizedEmail) {
 			return json({ error: 'Valid co-author name and email are required' }, { status: 400 });
