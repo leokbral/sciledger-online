@@ -1,4 +1,7 @@
 <script lang="ts">
+	import SettingsCard from '$lib/components/Settings/SettingsCard.svelte';
+	import SettingsField from '$lib/components/Settings/SettingsField.svelte';
+	import StatusBadge from '$lib/components/Settings/StatusBadge.svelte';
 	import type { PageData } from './$types';
 
 	interface Props {
@@ -8,13 +11,20 @@
 	let { data }: Props = $props();
 </script>
 
-<div class="card border rounded-lg p-5 space-y-2">
-	<h2 class="text-lg font-semibold">Perfil de Revisor</h2>
+<SettingsCard title="Reviewer Profile">
+	<SettingsField label="Status">
+		<StatusBadge
+			label={data.isReviewer ? 'Reviewer Enabled' : 'Reviewer Not Enabled'}
+			tone={data.isReviewer ? 'success' : 'neutral'}
+			variant={data.isReviewer ? 'filled' : 'outlined'}
+		/>
+	</SettingsField>
+
 	<p class="text-sm text-surface-600-400">
 		{#if data.isReviewer}
-			Revisor habilitado
+			Your account is enabled as a reviewer.
 		{:else}
-			Seu usuario ainda nao esta habilitado como revisor
+			Your account is not yet enabled as a reviewer.
 		{/if}
 	</p>
-</div>
+</SettingsCard>

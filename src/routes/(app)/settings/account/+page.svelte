@@ -1,5 +1,8 @@
 <script lang="ts">
 	import { Modal } from '@skeletonlabs/skeleton-svelte';
+	import SettingsCard from '$lib/components/Settings/SettingsCard.svelte';
+	import SettingsField from '$lib/components/Settings/SettingsField.svelte';
+	import StatusBadge from '$lib/components/Settings/StatusBadge.svelte';
 	import { toaster } from '$lib/toaster-svelte';
 	import type { PageData } from './$types';
 
@@ -65,7 +68,8 @@
 		} catch (error: unknown) {
 			toaster.error({
 				title: 'Could not change email',
-				description: error instanceof Error ? error.message : 'Something went wrong. Please try again.'
+				description:
+					error instanceof Error ? error.message : 'Something went wrong. Please try again.'
 			});
 		} finally {
 			isSubmitting = false;
@@ -87,7 +91,8 @@
 		} catch (error: unknown) {
 			toaster.error({
 				title: 'Could not resend email',
-				description: error instanceof Error ? error.message : 'Something went wrong. Please try again.'
+				description:
+					error instanceof Error ? error.message : 'Something went wrong. Please try again.'
 			});
 		} finally {
 			isResending = false;
@@ -95,40 +100,35 @@
 	}
 </script>
 
-<div class="card border rounded-lg p-5 space-y-2">
-	<h2 class="text-lg font-semibold">Conta</h2>
+<SettingsCard title="Account">
 	<p class="text-sm text-surface-600-400">{data.user.firstName} {data.user.lastName}</p>
 	<p class="text-sm text-surface-600-400">@{data.user.username}</p>
-</div>
+</SettingsCard>
 
-<div class="card border rounded-lg p-5 space-y-4">
-	<h2 class="text-lg font-semibold">Email</h2>
-
-	<div class="space-y-1">
-		<p class="text-xs uppercase tracking-wide opacity-70">Current Email</p>
+<SettingsCard title="Email">
+	<SettingsField label="Current Email">
 		<div class="flex items-center gap-2">
 			<p class="text-sm font-medium">{data.user.email}</p>
 			{#if emailVerified}
-				<span class="badge preset-filled-success-500 text-xs">Verified</span>
+				<StatusBadge label="Verified" tone="success" />
 			{:else}
-				<span class="badge preset-filled-warning-500 text-xs">Not verified</span>
+				<StatusBadge label="Not verified" tone="warning" />
 			{/if}
 		</div>
-	</div>
+	</SettingsField>
 
 	{#if pendingEmail}
-		<div class="rounded-md border p-3 space-y-2">
-			<p class="text-xs uppercase tracking-wide opacity-70">Pending Email</p>
+		<SettingsField label="Pending Email" boxed class="space-y-2">
 			<p class="text-sm font-medium">{pendingEmail}</p>
 			<p class="text-sm text-surface-600-400">Waiting for confirmation</p>
 			<button class="btn preset-tonal" onclick={resendConfirmation} disabled={isResending}>
 				{isResending ? 'Resending...' : 'Resend Email'}
 			</button>
-		</div>
+		</SettingsField>
 	{:else}
 		<button class="btn preset-filled" onclick={openChangeEmailModal}>Change Email</button>
 	{/if}
-</div>
+</SettingsCard>
 
 <Modal open={openModal} onOpenChange={(e) => (openModal = e.open)}>
 	{#snippet trigger()}
@@ -136,9 +136,7 @@
 	{/snippet}
 
 	{#snippet content()}
-		<div class="card border rounded-lg p-6 space-y-4 max-w-md w-full mx-auto shadow-2xl">
-			<h3 class="text-lg font-semibold">Change Email</h3>
-
+		<SettingsCard title="Change Email" class="max-w-md w-full mx-auto shadow-2xl">
 			<label class="block space-y-1">
 				<span class="text-sm font-medium">New Email</span>
 				<input
@@ -158,6 +156,6 @@
 					{isSubmitting ? 'Sending...' : 'Send Confirmation'}
 				</button>
 			</div>
-		</div>
+		</SettingsCard>
 	{/snippet}
 </Modal>
