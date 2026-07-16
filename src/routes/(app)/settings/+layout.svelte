@@ -24,6 +24,6 @@
 	</div>
 
 	<div>
-		<button class="btn preset-tonal" onclick={() => goto('/review')}>Voltar para Review</button>
+		<button class="btn preset-tonal" onclick={() => goto('/review')}>Back to Review</button>
 	</div>
 </section>

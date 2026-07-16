@@ -1,6 +1,9 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { Modal } from '@skeletonlabs/skeleton-svelte';
+	import SettingsCard from '$lib/components/Settings/SettingsCard.svelte';
+	import SettingsField from '$lib/components/Settings/SettingsField.svelte';
+	import StatusBadge from '$lib/components/Settings/StatusBadge.svelte';
 	import { toaster } from '$lib/toaster-svelte';
 	import { parseUserAgent, formatDateTime } from './sessionFormat';
 	import type { PageData } from './$types';
@@ -52,7 +55,8 @@
 		} catch (error: unknown) {
 			toaster.error({
 				title: 'Could not terminate session',
-				description: error instanceof Error ? error.message : 'Something went wrong. Please try again.'
+				description:
+					error instanceof Error ? error.message : 'Something went wrong. Please try again.'
 			});
 		} finally {
 			revokingSessionId = null;
@@ -82,7 +86,8 @@
 		} catch (error: unknown) {
 			toaster.error({
 				title: 'Could not terminate other sessions',
-				description: error instanceof Error ? error.message : 'Something went wrong. Please try again.'
+				description:
+					error instanceof Error ? error.message : 'Something went wrong. Please try again.'
 			});
 		} finally {
 			isRevokingAll = false;
@@ -90,36 +95,25 @@
 	}
 </script>
 
-<div class="card border rounded-lg p-5 space-y-2">
-	<h2 class="text-lg font-semibold">Security</h2>
-	<p class="text-sm text-surface-600-400">Manage the devices currently signed in to your account.</p>
-</div>
+<SettingsCard
+	title="Security"
+	description="Manage the devices currently signed in to your account."
+/>
 
 {#if currentSession}
 	{@const ua = parseUserAgent(currentSession.userAgent)}
-	<div class="card border rounded-lg p-5 space-y-3">
-		<h3 class="text-base font-semibold">Current Session</h3>
-
+	<SettingsCard title="Current Session">
 		<div class="flex flex-wrap items-center gap-2">
-			<span class="badge preset-filled-primary-500 text-xs">Current</span>
+			<StatusBadge label="Current" tone="primary" />
 			{#if currentSession.rememberMe}
-				<span class="badge preset-outlined-primary-500 text-xs">Remember Me</span>
+				<StatusBadge label="Remember Me" tone="primary" variant="outlined" />
 			{/if}
 		</div>
 
 		<div class="grid gap-3 sm:grid-cols-2">
-			<div>
-				<p class="text-xs uppercase tracking-wide opacity-70">Browser</p>
-				<p class="text-sm font-medium">{ua.browser}</p>
-			</div>
-			<div>
-				<p class="text-xs uppercase tracking-wide opacity-70">OS</p>
-				<p class="text-sm font-medium">{ua.os}</p>
-			</div>
-			<div>
-				<p class="text-xs uppercase tracking-wide opacity-70">Last Activity</p>
-				<p class="text-sm font-medium">{formatDateTime(currentSession.lastActivityAt)}</p>
-			</div>
+			<SettingsField label="Browser" value={ua.browser} />
+			<SettingsField label="OS" value={ua.os} />
+			<SettingsField label="Last Activity" value={formatDateTime(currentSession.lastActivityAt)} />
 		</div>
 
 		<div>
@@ -131,12 +125,10 @@
 				Revoke
 			</button>
 		</div>
-	</div>
+	</SettingsCard>
 {/if}
 
-<div class="card border rounded-lg p-5 space-y-4">
-	<h3 class="text-base font-semibold">Other Active Sessions</h3>
-
+<SettingsCard title="Other Active Sessions">
 	{#if otherSessions.length === 0}
 		<p class="text-sm text-surface-600-400">No other active sessions.</p>
 	{:else}
@@ -145,30 +137,12 @@
 				{@const ua = parseUserAgent(session.userAgent)}
 				<div class="rounded-md border p-4 space-y-3">
 					<div class="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
-						<div>
-							<p class="text-xs uppercase tracking-wide opacity-70">Browser</p>
-							<p class="text-sm font-medium">{ua.browser}</p>
-						</div>
-						<div>
-							<p class="text-xs uppercase tracking-wide opacity-70">OS</p>
-							<p class="text-sm font-medium">{ua.os}</p>
-						</div>
-						<div>
-							<p class="text-xs uppercase tracking-wide opacity-70">Created</p>
-							<p class="text-sm font-medium">{formatDateTime(session.createdAt)}</p>
-						</div>
-						<div>
-							<p class="text-xs uppercase tracking-wide opacity-70">Last Activity</p>
-							<p class="text-sm font-medium">{formatDateTime(session.lastActivityAt)}</p>
-						</div>
-						<div>
-							<p class="text-xs uppercase tracking-wide opacity-70">Expires</p>
-							<p class="text-sm font-medium">{formatDateTime(session.expiresAt)}</p>
-						</div>
-						<div>
-							<p class="text-xs uppercase tracking-wide opacity-70">Remember Me</p>
-							<p class="text-sm font-medium">{session.rememberMe ? 'Yes' : 'No'}</p>
-						</div>
+						<SettingsField label="Browser" value={ua.browser} />
+						<SettingsField label="OS" value={ua.os} />
+						<SettingsField label="Created" value={formatDateTime(session.createdAt)} />
+						<SettingsField label="Last Activity" value={formatDateTime(session.lastActivityAt)} />
+						<SettingsField label="Expires" value={formatDateTime(session.expiresAt)} />
+						<SettingsField label="Remember Me" value={session.rememberMe ? 'Yes' : 'No'} />
 					</div>
 
 					<button
@@ -182,13 +156,12 @@
 			{/each}
 		</div>
 	{/if}
-</div>
+</SettingsCard>
 
-<div class="card border-2 border-red-300 dark:border-red-900 rounded-lg p-5 space-y-3">
-	<h3 class="text-base font-semibold text-red-700 dark:text-red-400">Danger Zone</h3>
+<SettingsCard title="Danger Zone" danger>
 	<p class="text-sm text-surface-600-400">
-		Immediately sign out every other device currently signed in to your account. This session
-		stays active.
+		Immediately sign out every other device currently signed in to your account. This session stays
+		active.
 	</p>
 	<button
 		class="btn preset-filled-error-500"
@@ -197,7 +170,7 @@
 	>
 		Terminate Other Sessions
 	</button>
-</div>
+</SettingsCard>
 
 <Modal open={confirmRevokeAllOpen} onOpenChange={(e) => (confirmRevokeAllOpen = e.open)}>
 	{#snippet trigger()}
@@ -205,8 +178,7 @@
 	{/snippet}
 
 	{#snippet content()}
-		<div class="card border rounded-lg p-6 space-y-4 max-w-md w-full mx-auto shadow-2xl">
-			<h3 class="text-lg font-semibold">Terminate Other Sessions?</h3>
+		<SettingsCard title="Terminate Other Sessions?" class="max-w-md w-full mx-auto shadow-2xl">
 			<p class="text-sm text-surface-600-400">
 				This will sign out every other device currently signed in to your account. This cannot be
 				undone, and those devices will need to sign in again.
@@ -228,6 +200,6 @@
 					{isRevokingAll ? 'Terminating...' : 'Terminate Other Sessions'}
 				</button>
 			</div>
-		</div>
+		</SettingsCard>
 	{/snippet}
 </Modal>

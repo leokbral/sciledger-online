@@ -1,4 +1,7 @@
 <script lang="ts">
+	import SettingsCard from '$lib/components/Settings/SettingsCard.svelte';
+	import SettingsField from '$lib/components/Settings/SettingsField.svelte';
+	import StatusBadge from '$lib/components/Settings/StatusBadge.svelte';
 	import type { PageData } from './$types';
 
 	interface Props {
@@ -20,7 +23,9 @@
 		lastPayoutAt: string | Date | null;
 	};
 
-	function normalizePayments(input: Partial<ReviewerPaymentsView> | null | undefined): ReviewerPaymentsView {
+	function normalizePayments(
+		input: Partial<ReviewerPaymentsView> | null | undefined
+	): ReviewerPaymentsView {
 		return {
 			stripeConnectAccountId: input?.stripeConnectAccountId ?? '',
 			onboardingComplete: !!input?.onboardingComplete,
@@ -63,17 +68,17 @@
 			const payload = await response.json();
 
 			if (!response.ok) {
-				throw new Error(payload?.error || 'Falha ao carregar status da conta Stripe');
+				throw new Error(payload?.error || 'Failed to load Stripe account status.');
 			}
 
 			reviewerPayments = payload.reviewerPayments
 				? normalizePayments(payload.reviewerPayments as Partial<ReviewerPaymentsView>)
 				: reviewerPayments;
 			feedbackType = 'success';
-			feedback = 'Status Stripe atualizado com sucesso.';
+			feedback = 'Stripe status updated successfully.';
 		} catch (error: unknown) {
 			feedbackType = 'error';
-			feedback = error instanceof Error ? error.message : 'Erro ao atualizar status Stripe';
+			feedback = error instanceof Error ? error.message : 'Failed to update Stripe status.';
 		} finally {
 			isLoading = false;
 		}
@@ -88,25 +93,26 @@
 			const payload = await response.json();
 
 			if (!response.ok) {
-				throw new Error(payload?.error || 'Falha ao gerar onboarding do Stripe Connect');
+				throw new Error(payload?.error || 'Failed to create Stripe Connect onboarding link.');
 			}
 
 			reviewerPayments = payload.accountStatus
 				? {
-					...normalizePayments(reviewerPayments || undefined),
-					stripeConnectAccountId: payload.accountId,
-					onboardingComplete: payload.accountStatus.onboardingComplete,
-					detailsSubmitted: payload.accountStatus.detailsSubmitted,
-					chargesEnabled: payload.accountStatus.chargesEnabled,
-					payoutsEnabled: payload.accountStatus.payoutsEnabled,
-					defaultCurrency: payload.accountStatus.defaultCurrency
-				}
+						...normalizePayments(reviewerPayments || undefined),
+						stripeConnectAccountId: payload.accountId,
+						onboardingComplete: payload.accountStatus.onboardingComplete,
+						detailsSubmitted: payload.accountStatus.detailsSubmitted,
+						chargesEnabled: payload.accountStatus.chargesEnabled,
+						payoutsEnabled: payload.accountStatus.payoutsEnabled,
+						defaultCurrency: payload.accountStatus.defaultCurrency
+					}
 				: reviewerPayments;
 
 			window.location.href = payload.onboardingUrl;
 		} catch (error: unknown) {
 			feedbackType = 'error';
-			feedback = error instanceof Error ? error.message : 'Erro ao iniciar onboarding Stripe Connect';
+			feedback =
+				error instanceof Error ? error.message : 'Failed to start Stripe Connect onboarding.';
 			isLoading = false;
 		}
 	}
@@ -120,13 +126,13 @@
 			const payload = await response.json();
 
 			if (!response.ok) {
-				throw new Error(payload?.error || 'Falha ao abrir dashboard Stripe');
+				throw new Error(payload?.error || 'Failed to open Stripe dashboard.');
 			}
 
 			window.location.href = payload.dashboardUrl;
 		} catch (error: unknown) {
 			feedbackType = 'error';
-			feedback = error instanceof Error ? error.message : 'Erro ao abrir dashboard Stripe';
+			feedback = error instanceof Error ? error.message : 'Failed to open Stripe dashboard.';
 			isLoading = false;
 		}
 	}
@@ -147,72 +153,80 @@
 {/if}
 
 {#if isReviewer}
-	<div class="card border rounded-lg p-5 space-y-4">
-		<div class="flex flex-col gap-1">
-			<h2 class="text-xl font-semibold">Stripe Connect</h2>
-			<p class="text-sm text-surface-600-400">
-				Conecte sua conta para receber pagamentos automaticamente apos a revisao final.
-			</p>
-		</div>
-
+	<SettingsCard
+		title="Stripe Connect"
+		description="Connect your account to receive payments automatically after the final review is submitted."
+	>
 		<div class="grid gap-3 md:grid-cols-2">
-			<div class="rounded-md border p-3">
-				<p class="text-xs uppercase tracking-wide opacity-70">Conta conectada</p>
-				<p class="font-semibold">
+			<SettingsField label="Connected Account" boxed>
+				<p class="text-sm font-medium break-all">
 					{reviewerPayments?.stripeConnectAccountId
 						? reviewerPayments.stripeConnectAccountId
-						: 'Nao conectada'}
+						: 'Not connected'}
 				</p>
-			</div>
-			<div class="rounded-md border p-3">
-				<p class="text-xs uppercase tracking-wide opacity-70">Onboarding</p>
-				<p class="font-semibold">
-					{reviewerPayments?.onboardingComplete ? 'Completo' : 'Pendente'}
-				</p>
-			</div>
-			<div class="rounded-md border p-3">
-				<p class="text-xs uppercase tracking-wide opacity-70">Charges habilitados</p>
-				<p class="font-semibold">{reviewerPayments?.chargesEnabled ? 'Sim' : 'Nao'}</p>
-			</div>
-			<div class="rounded-md border p-3">
-				<p class="text-xs uppercase tracking-wide opacity-70">Payouts habilitados</p>
-				<p class="font-semibold">{reviewerPayments?.payoutsEnabled ? 'Sim' : 'Nao'}</p>
-			</div>
+			</SettingsField>
+
+			<SettingsField label="Onboarding" boxed>
+				<StatusBadge
+					label={reviewerPayments?.onboardingComplete ? 'Complete' : 'Pending'}
+					tone={reviewerPayments?.onboardingComplete ? 'success' : 'warning'}
+					variant={reviewerPayments?.onboardingComplete ? 'filled' : 'outlined'}
+				/>
+			</SettingsField>
+
+			<SettingsField label="Charges Enabled" boxed>
+				<StatusBadge
+					label={reviewerPayments?.chargesEnabled ? 'Yes' : 'No'}
+					tone={reviewerPayments?.chargesEnabled ? 'success' : 'warning'}
+					variant={reviewerPayments?.chargesEnabled ? 'filled' : 'outlined'}
+				/>
+			</SettingsField>
+
+			<SettingsField label="Payouts Enabled" boxed>
+				<StatusBadge
+					label={reviewerPayments?.payoutsEnabled ? 'Yes' : 'No'}
+					tone={reviewerPayments?.payoutsEnabled ? 'success' : 'warning'}
+					variant={reviewerPayments?.payoutsEnabled ? 'filled' : 'outlined'}
+				/>
+			</SettingsField>
 		</div>
 
 		<div class="grid gap-3 md:grid-cols-3">
-			<div class="rounded-md border p-3">
-				<p class="text-xs uppercase tracking-wide opacity-70">Total recebido</p>
-				<p class="font-semibold">{currencyFromCents(reviewerPayments?.totalPaidOutCents || 0)}</p>
-			</div>
-			<div class="rounded-md border p-3">
-				<p class="text-xs uppercase tracking-wide opacity-70">Total ganho</p>
-				<p class="font-semibold">{currencyFromCents(reviewerPayments?.totalEarnedCents || 0)}</p>
-			</div>
-			<div class="rounded-md border p-3">
-				<p class="text-xs uppercase tracking-wide opacity-70">Pendente</p>
-				<p class="font-semibold">{currencyFromCents(reviewerPayments?.pendingPayoutCents || 0)}</p>
-			</div>
+			<SettingsField
+				label="Total Paid Out"
+				value={currencyFromCents(reviewerPayments?.totalPaidOutCents || 0)}
+				boxed
+			/>
+			<SettingsField
+				label="Total Earned"
+				value={currencyFromCents(reviewerPayments?.totalEarnedCents || 0)}
+				boxed
+			/>
+			<SettingsField
+				label="Pending"
+				value={currencyFromCents(reviewerPayments?.pendingPayoutCents || 0)}
+				boxed
+			/>
 		</div>
 
 		<div class="flex flex-wrap gap-3">
 			<button class="btn preset-filled" onclick={startOnboarding} disabled={isLoading}>
-				{reviewerPayments?.stripeConnectAccountId ? 'Atualizar onboarding Stripe' : 'Conectar Stripe'}
+				{reviewerPayments?.stripeConnectAccountId ? 'Update Stripe Onboarding' : 'Connect Stripe'}
 			</button>
 			<button class="btn preset-tonal" onclick={refreshStatus} disabled={isLoading}>
-				Atualizar status
+				Refresh Status
 			</button>
 			<button
 				class="btn preset-tonal"
 				onclick={openDashboard}
 				disabled={isLoading || !reviewerPayments?.stripeConnectAccountId}
 			>
-				Abrir dashboard Stripe
+				Open Stripe Dashboard
 			</button>
 		</div>
 
 		<p class="text-xs text-surface-500-400">
-			Pagamentos pendentes sao processados automaticamente apos o envio da revisao final.
+			Pending payments are processed automatically after the final review is submitted.
 		</p>
-	</div>
+	</SettingsCard>
 {/if}
