@@ -439,9 +439,9 @@
 								<a
 									href={`https://twitter.com/${hub.socialMedia.twitter}`}
 									target="_blank"
-									class="text-surface-500 hover:text-blue-600"
+									class="text-surface-500 hover:text-black"
 								>
-									<Icon icon="mdi:twitter" class="size-5" />
+									<Icon icon="ri:twitter-x-fill" class="size-5" />
 								</a>
 							{/if}
 							{#if hub.socialMedia.facebook}
