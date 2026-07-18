@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { Modal } from '@skeletonlabs/skeleton-svelte';
+	import { toaster } from '$lib/toaster-svelte';
 	import SettingsCard from '$lib/components/Settings/SettingsCard.svelte';
 	import SettingsField from '$lib/components/Settings/SettingsField.svelte';
 	import StatusBadge from '$lib/components/Settings/StatusBadge.svelte';
-	import { toaster } from '$lib/toaster-svelte';
 	import type { PageData } from './$types';
 
 	interface Props {
@@ -68,8 +68,7 @@
 		} catch (error: unknown) {
 			toaster.error({
 				title: 'Could not change email',
-				description:
-					error instanceof Error ? error.message : 'Something went wrong. Please try again.'
+				description: error instanceof Error ? error.message : 'Something went wrong. Please try again.'
 			});
 		} finally {
 			isSubmitting = false;
@@ -91,8 +90,7 @@
 		} catch (error: unknown) {
 			toaster.error({
 				title: 'Could not resend email',
-				description:
-					error instanceof Error ? error.message : 'Something went wrong. Please try again.'
+				description: error instanceof Error ? error.message : 'Something went wrong. Please try again.'
 			});
 		} finally {
 			isResending = false;
@@ -101,8 +99,10 @@
 </script>
 
 <SettingsCard title="Account">
-	<p class="text-sm text-surface-600-400">{data.user.firstName} {data.user.lastName}</p>
-	<p class="text-sm text-surface-600-400">@{data.user.username}</p>
+	<div class="space-y-1">
+		<p class="text-sm text-surface-600-400">{data.user.firstName} {data.user.lastName}</p>
+		<p class="text-sm text-surface-600-400">@{data.user.username}</p>
+	</div>
 </SettingsCard>
 
 <SettingsCard title="Email">
@@ -118,13 +118,13 @@
 	</SettingsField>
 
 	{#if pendingEmail}
-		<SettingsField label="Pending Email" boxed class="space-y-2">
-			<p class="text-sm font-medium">{pendingEmail}</p>
+		<div class="space-y-2 rounded-md border p-3">
+			<SettingsField label="Pending Email" value={pendingEmail} />
 			<p class="text-sm text-surface-600-400">Waiting for confirmation</p>
 			<button class="btn preset-tonal" onclick={resendConfirmation} disabled={isResending}>
 				{isResending ? 'Resending...' : 'Resend Email'}
 			</button>
-		</SettingsField>
+		</div>
 	{:else}
 		<button class="btn preset-filled" onclick={openChangeEmailModal}>Change Email</button>
 	{/if}
@@ -136,7 +136,9 @@
 	{/snippet}
 
 	{#snippet content()}
-		<SettingsCard title="Change Email" class="max-w-md w-full mx-auto shadow-2xl">
+		<div class="card mx-auto w-full max-w-md space-y-4 rounded-lg border p-6 shadow-2xl">
+			<h3 class="text-lg font-semibold">Change Email</h3>
+
 			<label class="block space-y-1">
 				<span class="text-sm font-medium">New Email</span>
 				<input
@@ -156,6 +158,6 @@
 					{isSubmitting ? 'Sending...' : 'Send Confirmation'}
 				</button>
 			</div>
-		</SettingsCard>
+		</div>
 	{/snippet}
 </Modal>

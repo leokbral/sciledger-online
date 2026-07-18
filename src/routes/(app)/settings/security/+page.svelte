@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { Modal } from '@skeletonlabs/skeleton-svelte';
+	import { toaster } from '$lib/toaster-svelte';
 	import SettingsCard from '$lib/components/Settings/SettingsCard.svelte';
 	import SettingsField from '$lib/components/Settings/SettingsField.svelte';
 	import StatusBadge from '$lib/components/Settings/StatusBadge.svelte';
-	import { toaster } from '$lib/toaster-svelte';
 	import { parseUserAgent, formatDateTime } from './sessionFormat';
 	import type { PageData } from './$types';
 
@@ -55,8 +55,7 @@
 		} catch (error: unknown) {
 			toaster.error({
 				title: 'Could not terminate session',
-				description:
-					error instanceof Error ? error.message : 'Something went wrong. Please try again.'
+				description: error instanceof Error ? error.message : 'Something went wrong. Please try again.'
 			});
 		} finally {
 			revokingSessionId = null;
@@ -86,8 +85,7 @@
 		} catch (error: unknown) {
 			toaster.error({
 				title: 'Could not terminate other sessions',
-				description:
-					error instanceof Error ? error.message : 'Something went wrong. Please try again.'
+				description: error instanceof Error ? error.message : 'Something went wrong. Please try again.'
 			});
 		} finally {
 			isRevokingAll = false;
@@ -135,7 +133,7 @@
 		<div class="space-y-3">
 			{#each otherSessions as session (session.sessionId)}
 				{@const ua = parseUserAgent(session.userAgent)}
-				<div class="rounded-md border p-4 space-y-3">
+				<div class="space-y-3 rounded-md border p-4">
 					<div class="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
 						<SettingsField label="Browser" value={ua.browser} />
 						<SettingsField label="OS" value={ua.os} />
@@ -158,18 +156,33 @@
 	{/if}
 </SettingsCard>
 
-<SettingsCard title="Danger Zone" danger>
+<SettingsCard>
+	<div class="flex items-center gap-2">
+		<h2 class="text-lg font-semibold">Change Password</h2>
+		<StatusBadge label="Coming Soon" tone="neutral" />
+	</div>
 	<p class="text-sm text-surface-600-400">
-		Immediately sign out every other device currently signed in to your account. This session stays
-		active.
+		Password changes will be available here soon.
 	</p>
-	<button
-		class="btn preset-filled-error-500"
-		onclick={() => (confirmRevokeAllOpen = true)}
-		disabled={otherSessions.length === 0}
-	>
-		Terminate Other Sessions
-	</button>
+	<div>
+		<button class="btn preset-tonal" disabled>Change Password</button>
+	</div>
+</SettingsCard>
+
+<SettingsCard
+	danger
+	title="Danger Zone"
+	description="Immediately sign out every other device currently signed in to your account. This session stays active."
+>
+	<div>
+		<button
+			class="btn preset-filled-error-500"
+			onclick={() => (confirmRevokeAllOpen = true)}
+			disabled={otherSessions.length === 0}
+		>
+			Terminate Other Sessions
+		</button>
+	</div>
 </SettingsCard>
 
 <Modal open={confirmRevokeAllOpen} onOpenChange={(e) => (confirmRevokeAllOpen = e.open)}>
@@ -178,7 +191,8 @@
 	{/snippet}
 
 	{#snippet content()}
-		<SettingsCard title="Terminate Other Sessions?" class="max-w-md w-full mx-auto shadow-2xl">
+		<div class="card mx-auto w-full max-w-md space-y-4 rounded-lg border p-6 shadow-2xl">
+			<h3 class="text-lg font-semibold">Terminate Other Sessions?</h3>
 			<p class="text-sm text-surface-600-400">
 				This will sign out every other device currently signed in to your account. This cannot be
 				undone, and those devices will need to sign in again.
@@ -200,6 +214,6 @@
 					{isRevokingAll ? 'Terminating...' : 'Terminate Other Sessions'}
 				</button>
 			</div>
-		</SettingsCard>
+		</div>
 	{/snippet}
 </Modal>

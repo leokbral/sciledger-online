@@ -469,7 +469,7 @@
 						<!-- Twitter -->
 						<div class="relative">
 							<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-								<Icon icon="mdi:twitter" class="text-gray-500" width="20" />
+								<Icon icon="ri:twitter-x-fill" class="text-gray-500" width="20" />
 							</div>
 							<input
 								bind:value={form.socialMedia.twitter}

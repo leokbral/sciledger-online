@@ -1,6 +1,6 @@
-import type { HubMetrics, HubSummary } from './hubTypes';
+import type { HubMetrics, HubSummary, HubWorkspacePaper, HubWorkspaceReview } from './hubTypes';
 
-export function countPapersByStatus(papers: Record<string, any>[], statuses: string[]) {
+export function countPapersByStatus(papers: HubWorkspacePaper[], statuses: string[]) {
 	const normalizedStatuses = new Set(statuses.map((status) => status.toLowerCase()));
 
 	return papers.filter((paper) => normalizedStatuses.has(String(paper?.status ?? '').toLowerCase()))
@@ -20,12 +20,15 @@ const STATUS = {
 
 export function getHubMetrics(
 	hubs: HubSummary[],
-	papers: Record<string, any>[],
-	reviews: Record<string, any>[]
+	papers: HubWorkspacePaper[],
+	reviews: HubWorkspaceReview[]
 ): HubMetrics {
 	const total = papers.length;
 	const drafts = countPapersByStatus(papers, STATUS.draft);
-	const underReview = countPapersByStatus(papers, [...STATUS.reviewerAssignment, ...STATUS.inReview]);
+	const underReview = countPapersByStatus(papers, [
+		...STATUS.reviewerAssignment,
+		...STATUS.inReview
+	]);
 	const corrections = countPapersByStatus(papers, STATUS.corrections);
 	const accepted = countPapersByStatus(papers, STATUS.accepted);
 	const published = countPapersByStatus(papers, STATUS.published);

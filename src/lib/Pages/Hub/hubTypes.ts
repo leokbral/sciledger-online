@@ -20,8 +20,23 @@ export type HubSummary = {
 	viewerRole?: HubRoleContext;
 	currentUserHubMember?: HubRoleContext;
 	createdAt?: string;
-	[key: string]: any;
+	[key: string]: unknown;
 };
+
+export type HubWorkspacePaper = Record<string, unknown> & {
+	mainAuthor?: unknown;
+	correspondingAuthor?: unknown;
+	submittedBy?: unknown;
+	coAuthors?: unknown[] | null;
+	reviewers?: unknown[] | null;
+	isAcceptedForReview?: unknown;
+	peer_review?: {
+		assignedReviewers?: unknown[] | null;
+		responses?: unknown[] | null;
+	} | null;
+};
+
+export type HubWorkspaceReview = Record<string, unknown>;
 
 export type HubMetrics = {
 	hubs: number;
@@ -79,8 +94,8 @@ export type HubWorkspaceProps = {
 	hub?: HubSummary | null;
 	hubRoleLabel?: string;
 	hubs: HubSummary[];
-	papers: Record<string, any>[];
-	reviews: Record<string, any>[];
+	papers: HubWorkspacePaper[];
+	reviews: HubWorkspaceReview[];
 	metrics: HubMetrics;
 	loading: boolean;
 	error: string | null;
@@ -91,8 +106,26 @@ export type HubWorkspaceProps = {
 	stats?: HubStats;
 };
 
+export type HubWorkspacePersonaKey =
+	| 'HubOwner'
+	| 'EditorChief'
+	| 'AssociateEditor'
+	| 'Reviewer'
+	| 'Author'
+	| 'Reader';
+
+export type HubWorkspacePersona = {
+	key: HubWorkspacePersonaKey;
+	label: string;
+	role: DashboardRole;
+	roleKey: string | null;
+	priority: number;
+};
+
 export type HubWorkspaceResolution = {
 	role: DashboardRole;
 	label: string;
 	roleKey: string | null;
+	personaKey: HubWorkspacePersonaKey;
+	availablePersonas: HubWorkspacePersona[];
 };
