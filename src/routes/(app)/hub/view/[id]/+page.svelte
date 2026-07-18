@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { fade, fly } from 'svelte/transition';
 	import { Modal } from '@skeletonlabs/skeleton-svelte';
 	import Icon from '@iconify/svelte';
@@ -175,6 +176,10 @@
 		membersDrawerOpen = true;
 	}
 
+	function handleMembersRequested() {
+		openMembersDrawer();
+	}
+
 	function closeMembersDrawer() {
 		membersDrawerOpen = false;
 	}
@@ -184,6 +189,14 @@
 			closeMembersDrawer();
 		}
 	}
+
+	onMount(() => {
+		window.addEventListener('hub-members-requested', handleMembersRequested);
+
+		return () => {
+			window.removeEventListener('hub-members-requested', handleMembersRequested);
+		};
+	});
 
 	const filteredPapers = data.papers?.filter((paper: any) => {
 		if (paper.status === 'published') return true;
@@ -241,7 +254,14 @@
 	const hasAcknowledgement = !!(
 		hub.acknowledgement && hub.acknowledgement.replace(/<[^>]*>/g, '').trim()
 	);
-	const hubCoverImage = hub.bannerUrl || hub.cardUrl || '';
+	const hubCoverImages = [hub.bannerUrl, hub.cardUrl].filter(Boolean);
+	let hubCoverImageIndex = $state(0);
+	let hubCoverImage = $derived(hubCoverImages[hubCoverImageIndex] || '');
+
+	function handleHubCoverError() {
+		hubCoverImageIndex += 1;
+	}
+
 	const identityStats: { label: string; value: number }[] = [
 		{ label: 'Manuscripts', value: hubStats.manuscripts },
 		{ label: 'Published', value: hubStats.published },
@@ -251,7 +271,7 @@
 	];
 </script>
 
-<svelte:window on:hub-members-requested={openMembersDrawer} on:keydown={handleDrawerKeydown} />
+<svelte:window onkeydown={handleDrawerKeydown} />
 
 {#snippet hubIdentityHeader()}
 	<section class="rounded-xl border border-surface-200 bg-white shadow-sm">
@@ -261,6 +281,7 @@
 					src={hubImageUrl(hubCoverImage)}
 					alt={`${hub.title ?? 'Hub'} cover`}
 					class="h-full w-full object-cover"
+					onerror={handleHubCoverError}
 				/>
 			{:else}
 				<div
