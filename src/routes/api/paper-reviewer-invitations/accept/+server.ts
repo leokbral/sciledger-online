@@ -35,7 +35,8 @@ async function emitLegacyReviewInvitationEvent(
 	const { invitation, paper, user } = input;
 	const reviewerId = normalizeId(invitation.reviewer) || normalizeId(user);
 	const editorId = normalizeId(paper?.submittedBy);
-	const paperId = normalizeId(paper?.id) || normalizeId(paper?._id) || normalizeId(invitation.paper);
+	const paperId =
+		normalizeId(paper?.id) || normalizeId(paper?._id) || normalizeId(invitation.paper);
 	const authorIds = getPaperAuthorAliases(paper).filter(
 		(authorId) => authorId !== reviewerId && authorId !== editorId
 	);
@@ -140,10 +141,15 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			paper.peer_review.assignedReviewers.push(user.id as any);
 		}
 
+		if (!paper.reviewers) {
+			paper.reviewers = [];
+		}
+		if (!paper.reviewers.some((reviewer: User | string) => String(reviewer) === user.id)) {
+			paper.reviewers.push(user.id);
+		}
+
 		// Adicionar resposta de aceitação
-		const existingResponse = paper.peer_review.responses.find(
-			(r: any) => r.reviewerId === user.id
-		);
+		const existingResponse = paper.peer_review.responses.find((r: any) => r.reviewerId === user.id);
 
 		if (!existingResponse) {
 			paper.peer_review.responses.push({
@@ -209,10 +215,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		});
 	} catch (error) {
 		console.error('Error accepting paper review invitation:', error);
-		return json(
-			{ error: 'Failed to accept invitation' },
-			{ status: 500 }
-		);
+		return json({ error: 'Failed to accept invitation' }, { status: 500 });
 	}
 };
 
@@ -268,9 +271,6 @@ export const DELETE: RequestHandler = async ({ request, locals }) => {
 		});
 	} catch (error) {
 		console.error('Error declining paper review invitation:', error);
-		return json(
-			{ error: 'Failed to decline invitation' },
-			{ status: 500 }
-		);
+		return json({ error: 'Failed to decline invitation' }, { status: 500 });
 	}
 };

@@ -33,9 +33,7 @@ function getIdAliases(value: unknown): string[] {
 		toString?: () => string;
 	};
 
-	const aliases = [candidate.id, candidate._id]
-		.filter(Boolean)
-		.map((alias) => String(alias));
+	const aliases = [candidate.id, candidate._id].filter(Boolean).map((alias) => String(alias));
 
 	const stringified = candidate.toString?.();
 	if (stringified && stringified !== '[object Object]') {
@@ -55,8 +53,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 	await start_mongo();
 
 	const fetchHub = async () => {
-		const hub = await Hubs.findById(params.id)
-			.lean();
+		const hub = await Hubs.findById(params.id).lean();
 
 		if (!hub) {
 			throw error(404, 'Hub not found');
@@ -75,7 +72,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 
 		if (canViewAllHubPapers) {
 			// Usuários com permissão editorial efetiva no hub veem todos os papers exceto drafts.
-			paperQuery = { 
+			paperQuery = {
 				hubId: params.id,
 				status: { $ne: 'draft' }
 			};
@@ -85,9 +82,9 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 				hubId: params.id,
 				$or: [
 					{ status: 'published' },
-					{ 
-						reviewers: { $in: [locals.user.id] }, 
-						status: { $ne: 'draft' } 
+					{
+						reviewers: { $in: [locals.user.id] },
+						status: { $ne: 'draft' }
 					}, // Papers onde é revisor (não draft)
 					{
 						status: { $ne: 'published' },
@@ -102,41 +99,106 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 			};
 		}
 
-
 		const papersRaw = await Papers.find(paperQuery)
-			.populate("mainAuthor")
-			.populate("coAuthors")
-			.populate("submittedBy")
-			.populate("reviewers")
+			.populate('mainAuthor')
+			.populate('coAuthors')
+			.populate('submittedBy')
+			.populate('reviewers')
 			.lean()
 			.exec();
 
 		// Normalizar peer_review para evitar erro de serialização
-		const papers = papersRaw.map(paper => {
+		const reviewerLookupIds = [
+			...new Set(
+				papersRaw
+					.flatMap((paper) => [
+						...(paper.reviewers ?? []),
+						...(paper.peer_review?.assignedReviewers ?? []),
+						...(paper.peer_review?.responses ?? []).map(
+							(response: { reviewerId?: unknown }) => response?.reviewerId
+						),
+						...(paper.reviewSlots ?? []).map((slot: { reviewerId?: unknown }) => slot?.reviewerId)
+					])
+					.flatMap(getIdAliases)
+			)
+		];
+		const reviewerUsers =
+			reviewerLookupIds.length > 0
+				? await Users.find({
+						$or: [{ _id: { $in: reviewerLookupIds } }, { id: { $in: reviewerLookupIds } }]
+					})
+						.select('id _id firstName lastName username email profilePictureUrl profilePicture')
+						.lean()
+						.exec()
+				: [];
+		const reviewerUsersByAlias = new Map<string, unknown>();
+		for (const reviewerUser of reviewerUsers) {
+			for (const alias of getIdAliases(reviewerUser)) {
+				reviewerUsersByAlias.set(alias, reviewerUser);
+			}
+		}
+
+		const resolveReviewerRef = (value: unknown) => {
+			return (
+				getIdAliases(value)
+					.map((alias) => reviewerUsersByAlias.get(alias))
+					.find(Boolean) ?? value
+			);
+		};
+
+		const buildPaperReviewers = (paper: {
+			reviewers?: unknown[];
+			peer_review?: {
+				assignedReviewers?: unknown[];
+				responses?: Array<{ reviewerId?: unknown; status?: unknown }>;
+			};
+			reviewSlots?: Array<{ reviewerId?: unknown; status?: unknown }>;
+		}) => {
+			const reviewers: unknown[] = [];
+			const seenAliases = new Set<string>();
+			const addReviewer = (value: unknown) => {
+				const aliases = getIdAliases(value);
+				if (aliases.length === 0 || aliases.some((alias) => seenAliases.has(alias))) return;
+				aliases.forEach((alias) => seenAliases.add(alias));
+				reviewers.push(resolveReviewerRef(value));
+			};
+
+			(paper.reviewers ?? []).forEach(addReviewer);
+			(paper.peer_review?.assignedReviewers ?? []).forEach(addReviewer);
+			(paper.peer_review?.responses ?? [])
+				.filter((response) => ['accepted', 'completed'].includes(String(response?.status)))
+				.forEach((response) => addReviewer(response?.reviewerId));
+			(paper.reviewSlots ?? [])
+				.filter((slot) => slot?.status === 'occupied')
+				.forEach((slot) => addReviewer(slot?.reviewerId));
+
+			return reviewers;
+		};
+
+		const papers = papersRaw.map((paper) => {
 			const peer_review = paper.peer_review
 				? {
-					reviewType: paper.peer_review.reviewType,
-					assignedReviewers: paper.peer_review.assignedReviewers ?? [],
-					responses: paper.peer_review.responses ?? [],
-					reviews: paper.peer_review.reviews ?? [],
-					averageScore: paper.peer_review.averageScore ?? 0,
-					reviewCount: paper.peer_review.reviewCount ?? 0,
-					reviewStatus: paper.peer_review.reviewStatus ?? 'not_started'
-				}
+						reviewType: paper.peer_review.reviewType,
+						assignedReviewers: paper.peer_review.assignedReviewers ?? [],
+						responses: paper.peer_review.responses ?? [],
+						reviews: paper.peer_review.reviews ?? [],
+						averageScore: paper.peer_review.averageScore ?? 0,
+						reviewCount: paper.peer_review.reviewCount ?? 0,
+						reviewStatus: paper.peer_review.reviewStatus ?? 'not_started'
+					}
 				: {
-					reviewType: "open",
-					assignedReviewers: [],
-					responses: [],
-					reviews: [],
-					averageScore: 0,
-					reviewCount: 0,
-					reviewStatus: "not_started"
-				};
+						reviewType: 'open',
+						assignedReviewers: [],
+						responses: [],
+						reviews: [],
+						averageScore: 0,
+						reviewCount: 0,
+						reviewStatus: 'not_started'
+					};
 
 			// Marcar se o usuário é revisor deste paper (está no campo reviewers)
 			// reviewers pode conter objetos populados ou strings
-			const reviewerIds =
-				paper.reviewers?.flatMap((reviewer: any) => getIdAliases(reviewer)) || [];
+			const reviewerIds = paper.reviewers?.flatMap((reviewer: any) => getIdAliases(reviewer)) || [];
 			const isAcceptedForReview =
 				reviewerIds.includes(locals.user.id) ||
 				(paper.peer_review?.responses ?? []).some((response: any) => {
@@ -145,10 +207,10 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 						(response?.status === 'accepted' || response?.status === 'completed')
 					);
 				});
-			
 
 			return {
 				...paper,
+				reviewers: buildPaperReviewers(paper),
 				peer_review,
 				isAcceptedForReview
 			};
@@ -188,33 +250,33 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		})
 			.select('key name priority')
 			.lean();
-		
-		
+
 		// Buscar ReviewAssignments para este hub (apenas para manager do hub)
 		const isCreator = currentUserHubMember?.primaryRoleKey === 'HubOwner';
 		const isViceManager = currentUserHubMember?.primaryRoleKey === 'EditorChief';
 		const isHubManager = canManageEditorialFlow;
 		let reviewAssignments: any[] = [];
 		let pendingPaperInvitations: Array<{ paperId: string; reviewerId: string }> = [];
-		
-		
+
 		if (isHubManager) {
 			const ReviewAssignment = (await import('$lib/db/models/ReviewAssignment')).default;
-			const assignmentsRaw = await ReviewAssignment.find({ 
+			const assignmentsRaw = await ReviewAssignment.find({
 				hubId: params.id,
 				status: { $in: ['accepted', 'pending'] }
 			})
 				.populate('reviewerId')
 				.lean()
 				.exec();
-			
-			
+
 			// Converter para formato serializável (evitar objetos populados)
 			reviewAssignments = assignmentsRaw.map((ra: any) => ({
 				_id: ra._id,
 				id: ra.id,
 				paperId: ra.paperId,
-				reviewerId: typeof ra.reviewerId === 'object' ? (ra.reviewerId?._id || ra.reviewerId?.id) : ra.reviewerId,
+				reviewerId:
+					typeof ra.reviewerId === 'object'
+						? ra.reviewerId?._id || ra.reviewerId?.id
+						: ra.reviewerId,
 				status: ra.status,
 				deadline: ra.deadline,
 				hubId: ra.hubId,
@@ -222,7 +284,6 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 				acceptedAt: ra.acceptedAt,
 				updatedAt: ra.updatedAt
 			}));
-			
 
 			const pendingInvitesRaw = await PaperReviewInvitation.find({
 				hubId: params.id,
@@ -243,20 +304,19 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		// Buscar convites pendentes para o usuário neste hub
 		let hubInvitations = [];
 		let paperReviewInvitations = [];
-		
-		
+
 		// Hub invitations
-		const hubInvitesRaw = await Invitation.find({ 
-			reviewer: locals.user.id, 
+		const hubInvitesRaw = await Invitation.find({
+			reviewer: locals.user.id,
 			hubId: params.id,
-			status: 'pending' 
+			status: 'pending'
 		})
-		.populate({
-			path: 'hubId',
-			select: 'title type description logoUrl'
-		})
-		.lean();
-		
+			.populate({
+				path: 'hubId',
+				select: 'title type description logoUrl'
+			})
+			.lean();
+
 		hubInvitations = hubInvitesRaw.map((inv: any) => ({
 			_id: String(inv._id),
 			hubId: typeof inv.hubId === 'object' ? inv.hubId : null,
@@ -264,28 +324,26 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 			status: inv.status,
 			createdAt: inv.createdAt
 		}));
-		
-		
+
 		// Paper review invitations for papers in this hub
 		const userAliases = getIdAliases(locals.user);
-		const paperReviewInvitesRaw = await PaperReviewInvitation.find({ 
-			$or: [
-				{ reviewerId: { $in: userAliases } },
-				{ reviewer: { $in: userAliases } }
-			],
+		const paperReviewInvitesRaw = await PaperReviewInvitation.find({
+			$or: [{ reviewerId: { $in: userAliases } }, { reviewer: { $in: userAliases } }],
 			hubId: params.id,
 			status: 'pending'
 		})
-		.populate({
-			path: 'paper',
-			select: 'title hubId'
-		})
-		.lean();
-		
-		const serializedPaperReviewInvites = await serializeReviewInvitations(paperReviewInvitesRaw as any[]);
+			.populate({
+				path: 'paper',
+				select: 'title hubId'
+			})
+			.lean();
+
+		const serializedPaperReviewInvites = await serializeReviewInvitations(
+			paperReviewInvitesRaw as any[]
+		);
 		paperReviewInvitations = serializedPaperReviewInvites
-			.filter(inv => inv.paper) // Filter out invites for deleted papers
-			.map(inv => ({
+			.filter((inv) => inv.paper) // Filter out invites for deleted papers
+			.map((inv) => ({
 				_id: String(inv._id),
 				paperId: typeof inv.paper === 'object' ? inv.paper : null,
 				invitedBy: inv.invitedBy.user,
@@ -293,7 +351,6 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 				status: inv.status,
 				createdAt: inv.createdAt
 			}));
-		
 
 		return {
 			hub: hubData,
@@ -330,4 +387,4 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		console.error('Error loading data:', e);
 		throw error(500, 'Error loading page data');
 	}
-}
+};

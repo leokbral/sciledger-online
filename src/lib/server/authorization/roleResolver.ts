@@ -2,7 +2,11 @@ import type mongoose from 'mongoose';
 import Hubs from '$lib/db/models/Hub';
 import Papers from '$lib/db/models/Paper';
 import UserRoleAssignment, { type RoleScopeType } from '$lib/db/models/UserRoleAssignment';
-import { ensureDefaultRoles, ensureHubRoles } from './bootstrapRbac';
+import {
+	ensureDefaultRoles,
+	ensureHubLegacyRoleAssignments,
+	ensureHubRoles
+} from './bootstrapRbac';
 
 export type AuthorizationResource = {
 	paperId?: string;
@@ -116,6 +120,9 @@ export async function resolveRoleAssignments(
 	await ensureDefaultRoles();
 	if (context.hubId) {
 		await ensureHubRoles(context.hubId);
+		if (context.hub) {
+			await ensureHubLegacyRoleAssignments(context.hub);
+		}
 	}
 
 	const aliases = getUserIdAliases(user);
