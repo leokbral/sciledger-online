@@ -4,7 +4,7 @@ import Role from '$lib/db/models/Role';
 import Users from '$lib/db/models/User';
 import UserRoleAssignment from '$lib/db/models/UserRoleAssignment';
 import { start_mongo } from '$lib/db/mongooseConnection';
-import { ensureHubRoles } from './bootstrapRbac';
+import { ensureHubLegacyRoleAssignments, ensureHubRoles } from './bootstrapRbac';
 import {
 	getInheritedRoleKeys,
 	getRoleDefinitionScopeKey,
@@ -146,7 +146,9 @@ export async function resolveEffectiveHubRoles(
 	const hub = await loadHub(hubOrId, session);
 	const hubId = normalizeEntityId(hub) ?? normalizeEntityId(hubOrId) ?? String(hubOrId || '');
 	const hubAliases = [
-		...new Set([...getIdAliases(hub), normalizeEntityId(hubOrId), hubId].filter(Boolean).map(String))
+		...new Set(
+			[...getIdAliases(hub), normalizeEntityId(hubOrId), hubId].filter(Boolean).map(String)
+		)
 	];
 
 	if (!hub || !hubId) {
@@ -161,6 +163,7 @@ export async function resolveEffectiveHubRoles(
 	}
 
 	await Promise.all(hubAliases.map((alias) => ensureHubRoles(alias)));
+	await ensureHubLegacyRoleAssignments(hub);
 
 	const [hubRoles, assignments] = await Promise.all([
 		Role.find({ scopeType: 'hub', scopeId: { $in: hubAliases }, isActive: true })
@@ -289,10 +292,7 @@ export async function resolveEffectiveHubRoles(
 	};
 }
 
-export async function resolveEffectiveReviewersForHub(
-	hubOrId: any,
-	options: ResolveOptions = {}
-) {
+export async function resolveEffectiveReviewersForHub(hubOrId: any, options: ResolveOptions = {}) {
 	const result = await resolveEffectiveHubRoles(hubOrId, options);
 	return result.reviewers;
 }
