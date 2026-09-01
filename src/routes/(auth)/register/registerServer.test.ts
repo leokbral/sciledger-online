@@ -68,6 +68,8 @@ function createRequest(overrides: Record<string, unknown> = {}, referer?: string
 			email: 'ada@example.com',
 			password: 'strong-password',
 			confirmPassword: 'strong-password',
+			termsAccepted: true,
+			privacyAccepted: true,
 			...overrides
 		})
 	});
@@ -101,6 +103,10 @@ describe('traditional registration email verification', () => {
 		expect(user.emailVerificationExpiresAt).toEqual(new Date('2026-07-11T12:00:00.000Z'));
 		expect(user.emailVerificationLastSentAt).toBeInstanceOf(Date);
 		expect(user.verificationSource).toBe('register');
+		expect(user.termsVersion).toBe('terms-v1');
+		expect(user.termsAcceptedAt).toBeInstanceOf(Date);
+		expect(user.privacyVersion).toBe('privacy-v1');
+		expect(user.privacyAcceptedAt).toBeInstanceOf(Date);
 		expect(user.save).toHaveBeenCalled();
 		expect(mocks.sendEmailVerification).toHaveBeenCalledWith({
 			to: 'ada@example.com',
@@ -186,5 +192,20 @@ describe('traditional registration email verification', () => {
 		expect(user.email).toBe('ada@example.com');
 		expect(user.handle).toBe('ada@example.com');
 		expect(mocks.findValidEmailReviewerInvitation).toHaveBeenCalledWith(undefined, 'ada@example.com');
+	});
+
+	it('requires Terms and Privacy Policy acceptance', async () => {
+		const { POST } = await import('./+server');
+
+		const response = await POST({
+			request: createRequest({ termsAccepted: false, privacyAccepted: true }),
+			url: new URL('https://sciledger.online/register')
+		} as any);
+		const body = await response.json();
+
+		expect(response.status).toBe(400);
+		expect(body.error).toContain('Terms and Privacy Policy acceptance is required');
+		expect(mocks.instances.length).toBe(0);
+		expect(mocks.sendEmailVerification).not.toHaveBeenCalled();
 	});
 });

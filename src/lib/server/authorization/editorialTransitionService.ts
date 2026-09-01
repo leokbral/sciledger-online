@@ -6,6 +6,11 @@ import { createEditorialAuditLog } from './audit';
 import type { PermissionKey } from './permissions';
 import { normalizeEntityId } from './roleResolver';
 import { emitPaperLifecycleTransitionEvent } from '../paperLifecycleEvents';
+import { getPaperPaymentGate } from '../payments/paperPaymentService';
+import {
+	UserBillingStatusError,
+	assertUserCanSubmitPapers
+} from '../payments/userBillingStatusService';
 
 export class EditorialTransitionError extends Error {
 	status: number;
@@ -118,6 +123,13 @@ export const EDITORIAL_TRANSITIONS: Record<string, TransitionDefinition> = {
 	}
 };
 
+const PAPER_PAYMENT_GATED_ACTIONS = new Set([
+	'paper.submit',
+	'paper.sendToReview',
+	'paper.publish',
+	'paper.publishStandalone'
+]);
+
 type TransitionPaperStatusInput = {
 	user?: any;
 	paperId: string;
@@ -204,6 +216,31 @@ export async function transitionPaperStatus(input: TransitionPaperStatusInput) {
 			}
 
 			roleKeys = authorization.roleKeys;
+		}
+
+		if (!input.system && input.action === 'paper.submit') {
+			try {
+				assertUserCanSubmitPapers(input.user);
+			} catch (error) {
+				if (error instanceof UserBillingStatusError) {
+					throw new EditorialTransitionError(error.message, error.status, error.code);
+				}
+				throw error;
+			}
+		}
+
+		if (PAPER_PAYMENT_GATED_ACTIONS.has(input.action)) {
+			const paymentGate = await getPaperPaymentGate(paperBefore, {
+				session,
+				action: input.action
+			});
+			if (!paymentGate.allowed) {
+				throw new EditorialTransitionError(
+					'Payment captured is required before this paper can move forward.',
+					402,
+					'payment_required'
+				);
+			}
 		}
 
 		const updatedPaper = await Papers.findOneAndUpdate(

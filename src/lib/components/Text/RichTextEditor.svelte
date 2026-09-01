@@ -141,6 +141,8 @@
 					'a',
 					'br',
 					'u',
+					'sup',
+					'sub',
 					'span'
 				],
 				allowedAttributes: {

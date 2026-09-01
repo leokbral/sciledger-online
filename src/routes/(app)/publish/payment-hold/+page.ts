@@ -1,10 +1,15 @@
 import type { PageLoad } from './$types';
 
 export const load: PageLoad = async ({ data }) => {
+	const serverData = data as any;
 	return {
-		...data,
-		user: data.user,
-		stripePublicKey: data.stripePublicKey,
-		error: data.error
+		...serverData,
+		user: serverData.user,
+		stripePublicKey: serverData.stripePublicKey,
+		error: serverData.error,
+		amountCents: serverData.amountCents,
+		currency: serverData.currency,
+		paymentState: serverData.paymentState,
+		paymentPolicyAccepted: serverData.paymentPolicyAccepted
 	};
 };

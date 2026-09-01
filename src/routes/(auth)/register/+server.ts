@@ -14,6 +14,9 @@ import {
 	sendEmailVerification
 } from '$lib/server/auth/emailVerification';
 
+const TERMS_VERSION = 'terms-v1';
+const PRIVACY_VERSION = 'privacy-v1';
+
 export const POST: RequestHandler = async ({ request, url }) => {
 
 	await start_mongo(); // Não necessário mais
@@ -29,12 +32,21 @@ export const POST: RequestHandler = async ({ request, url }) => {
 			email,
 			password,
 			confirmPassword,
+			termsAccepted,
+			privacyAccepted,
 			inviteToken
 		} = await request.json();
 
 		// Verifica se todas as informações necessárias foram enviadas
 		if (!firstName || !lastName || !username || !country || !dob || !email || !password || !confirmPassword) {
 			return json({ error: 'Todos os campos são obrigatórios.' }, { status: 400 });
+		}
+
+		if (termsAccepted !== true || privacyAccepted !== true) {
+			return json(
+				{ error: 'Terms and Privacy Policy acceptance is required.' },
+				{ status: 400 }
+			);
 		}
 
 		// Verifica se as senhas coincidem
@@ -105,6 +117,10 @@ export const POST: RequestHandler = async ({ request, url }) => {
 						verificationSource: 'register'
 					}
 				: {}),
+			termsVersion: TERMS_VERSION,
+			termsAcceptedAt: new Date(),
+			privacyVersion: PRIVACY_VERSION,
+			privacyAcceptedAt: new Date(),
 			isAdmin: false,
 			createdAt: new Date(),
 			updatedAt: new Date()

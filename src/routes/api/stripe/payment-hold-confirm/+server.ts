@@ -1,63 +1,45 @@
-import Stripe from 'stripe';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { env } from '$env/dynamic/private';
+import { confirmPaperPayment } from '$lib/server/payments/paperPaymentService';
+import { paymentErrorResponse } from '$lib/server/payments/paymentHttp';
 
-function getStripe() {
-  const stripeSecretKey = env.STRIPE_SECRET_KEY;
-  if (!stripeSecretKey) {
-    return null;
-  }
-  return new Stripe(stripeSecretKey);
-}
+export const POST: RequestHandler = async ({ request, locals }) => {
+	try {
+		const user = locals.user;
+		if (!user) {
+			return json({ error: 'User not authenticated', code: 'unauthenticated' }, { status: 401 });
+		}
 
-export const POST: RequestHandler = async ({ request }) => {
-  try {
-    const stripe = getStripe();
-    if (!stripe) {
-      return json({
-        error: 'Stripe is not configured on the server'
-      }, { status: 500 });
-    }
+		const body = await request.json().catch(() => ({}));
+		const paperId = body?.paperId ? String(body.paperId) : '';
+		const paymentIntentId = body?.paymentIntentId ? String(body.paymentIntentId) : undefined;
+		const paymentMethodId = body?.paymentMethodId ? String(body.paymentMethodId) : undefined;
 
-    const body = await request.json();
-    const paymentIntentId = body?.paymentIntentId as string | undefined;
+		if (!paperId) {
+			return json({ error: 'paperId is required', code: 'paper_id_required' }, { status: 400 });
+		}
 
-    if (!paymentIntentId) {
-      return json({
-        error: 'Must provide `paymentIntentId`'
-      }, { status: 400 });
-    }
+		const result = await confirmPaperPayment({
+			paperId,
+			user,
+			paymentIntentId,
+			paymentMethodId
+		});
 
-    // Confirmar o payment intent para autorizar o bloqueio
-    const paymentIntent = await stripe.paymentIntents.confirm(paymentIntentId, {
-      payment_method: body?.paymentMethodId as string | undefined
-    });
-
-    // Verificar se a verificação foi bem-sucedida
-    if (paymentIntent.status === 'succeeded' || paymentIntent.status === 'requires_capture') {
-      return json({
-        success: true,
-        paymentIntentId: paymentIntent.id,
-        status: paymentIntent.status,
-        amount: paymentIntent.amount,
-        currency: paymentIntent.currency,
-        message: paymentIntent.status === 'requires_capture' 
-          ? 'Funds authorized successfully. Will be captured on publication.'
-          : 'Payment successful'
-      });
-    } else {
-      return json({
-        success: false,
-        error: `Payment intent status: ${paymentIntent.status}`,
-        paymentIntentId: paymentIntent.id
-      }, { status: 400 });
-    }
-  } catch (error) {
-    console.error('Stripe error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return json({
-      error: `Failed to confirm payment hold: ${errorMessage}`
-    }, { status: 500 });
-  }
+		return json({
+			success: result.paymentState === 'captured',
+			paperId,
+			paymentIntentId: result.paymentIntent.id,
+			status: result.paymentIntent.status,
+			paymentState: result.paymentState,
+			amount: result.paymentIntent.amount,
+			amountCents: result.paymentIntent.amount,
+			currency: result.paymentIntent.currency,
+			policy: result.policy,
+			purpose: result.purpose,
+			receiptUrl: result.attempt.receiptUrl
+		});
+	} catch (error) {
+		return paymentErrorResponse(error, 'Failed to confirm paper payment');
+	}
 };

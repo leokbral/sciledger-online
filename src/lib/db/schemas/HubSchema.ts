@@ -24,6 +24,21 @@ export const HubSchema: Schema = new Schema({
 	authorInvite: { type: String, enum: ['Yes', 'No'], default: 'Yes' },
 	identityVisibility: { type: String, enum: ['Everyone', 'Reviewers Only', 'Hidden'], default: 'Everyone' },
 	reviewVisibility: { type: String, enum: ['Everyone', 'Authors Only', 'Hidden'], default: 'Everyone' },
+	billing: {
+		paperPaymentPolicy: {
+			type: String,
+			enum: ['submission', 'review', 'publication'],
+			default: 'publication'
+		},
+		policyVersion: { type: String, default: 'hub-billing-v1' },
+		updatedAt: { type: Date }
+	},
+	publicationPolicy: {
+		text: { type: String, default: '' },
+		version: { type: String, default: 'hub-publication-v1' },
+		updatedAt: { type: Date },
+		updatedBy: { type: String, ref: 'User' }
+	},
 
 	socialMedia: {
 		twitter: { type: String },

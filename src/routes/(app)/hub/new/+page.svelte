@@ -32,6 +32,13 @@
 		authorInvite: '',
 		identityVisibility: '',
 		reviewVisibility: '',
+		billing: {
+			paperPaymentPolicy: 'publication'
+		},
+		publicationPolicy: {
+			text: '',
+			version: 'hub-publication-v1'
+		},
 		tracks: '',
 		calendar: '',
 		showCalendar: false,
@@ -554,6 +561,19 @@
 			<option>Authors Only</option>
 			<option>Hidden</option>
 		</select>
+		Paper payment policy
+		<select bind:value={form.billing.paperPaymentPolicy} class="w-full p-2 border rounded">
+			<option value="submission">Submission</option>
+			<option value="review">Review</option>
+			<option value="publication">Publication</option>
+		</select>
+		Publication policy
+		<textarea
+			bind:value={form.publicationPolicy.text}
+			class="w-full p-2 border rounded"
+			rows="4"
+			placeholder="Publication rules for this Hub"
+		></textarea>
 	</div>
 
 	<Accordion {value} onValueChange={(e) => (value = e.value)} collapsible>

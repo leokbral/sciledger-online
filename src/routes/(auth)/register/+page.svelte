@@ -14,11 +14,13 @@
 	let username = $state('');
 	let country = $state('');
 	let countryIso = $state('');
-	let state = $state('');
+	let regionState = $state('');
 	let dob = $state('');
 	let email = $state('');
 	let password = $state('');
 	let confirmPassword = $state('');
+	let termsAccepted = $state(false);
+	let privacyAccepted = $state(false);
 	let processing = $state(false);
 	let isAdmin = false;
 	let formWarning = $state('');
@@ -43,7 +45,7 @@
 				.sort((a, b) => a.name.localeCompare(b.name));
 		} else {
 			country = '';
-			state = '';
+			regionState = '';
 			states = [];
 		}
 	});
@@ -76,6 +78,11 @@
 			processing = false;
 			return;
 		}
+		if (!termsAccepted || !privacyAccepted) {
+			formWarning = 'You must accept the Terms and Privacy Policy to continue.';
+			processing = false;
+			return;
+		}
 
 		try {
 			// Adiciona '@' ao username apenas no envio dos dados
@@ -86,11 +93,13 @@
 				lastName,
 				username: formattedUsername,
 				country,
-				state,
+				state: regionState,
 				dob,
 				email,
 				password,
 				confirmPassword,
+				termsAccepted,
+				privacyAccepted,
 				isAdmin,
 				inviteToken: inviteToken || undefined
 			});
@@ -220,7 +229,7 @@
 					>
 					<select
 						id="state"
-						bind:value={state}
+						bind:value={regionState}
 						disabled={!states.length}
 						class="w-full p-2 border border-surface-500 rounded-md text-surface-900 disabled:bg-surface-100 disabled:cursor-not-allowed"
 					>
@@ -283,6 +292,17 @@
 						class="w-full p-2 border border-surface-500 rounded-md text-surface-900"
 					/>
 				</fieldset>
+
+				<div class="space-y-3 rounded-md border border-surface-200 bg-surface-50 p-3">
+					<label class="flex gap-3 text-sm text-surface-700">
+						<input type="checkbox" bind:checked={termsAccepted} class="mt-1 h-4 w-4" />
+						<span>I accept the SciLedger Terms of Service.</span>
+					</label>
+					<label class="flex gap-3 text-sm text-surface-700">
+						<input type="checkbox" bind:checked={privacyAccepted} class="mt-1 h-4 w-4" />
+						<span>I accept the SciLedger Privacy Policy.</span>
+					</label>
+				</div>
 			</div>
 
 			{#if formWarning}

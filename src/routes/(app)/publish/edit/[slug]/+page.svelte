@@ -92,6 +92,14 @@
 		try {
 			// const response = await post(`/publish/edit/${updatedPaper.id}`, updatedPaper);
 			const response = await post(`/publish/edit/${store.id}`, store);
+			if (response?.code === 'payment_required') {
+				goto(`/publish/payment-hold?paperId=${encodeURIComponent(store.id)}`);
+				return;
+			}
+			if (response?.code === 'supplementary_total_limit_exceeded') {
+				alert(response.error || 'Os arquivos suplementares excedem o limite total de 20 MB.');
+				return;
+			}
 			if (response.paper) {
 				const isSubmitted = store?.status === 'reviewer assignment';
 				goto(`/publish/${isSubmitted ? '?submitted=1' : ''}`);

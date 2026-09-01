@@ -1,194 +1,241 @@
 import type { RequestHandler } from './$types';
 import { json } from '@sveltejs/kit';
 import * as crypto from 'crypto';
-//import Users from '$lib/db/models/User';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import Papers from '$lib/db/models/Paper';
+import Hubs from '$lib/db/models/Hub';
 import Users from '$lib/db/models/User';
 import type { User } from '$lib/types/User';
-import Stripe from 'stripe';
 import { can } from '$lib/server/authorization/authorizationService';
 import { getUserIdAliases } from '$lib/server/authorization/roleResolver';
 import { emitPaperLifecycleEvent } from '$lib/server/paperLifecycleEvents';
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
-  apiVersion: '2026-02-25.preview' as Stripe.LatestApiVersion
-});
+import {
+	UserBillingStatusError,
+	assertUserCanSubmitPapers
+} from '$lib/server/payments/userBillingStatusService';
+import {
+	normalizePaperCoverIds,
+	validateSupplementaryFilesTotal
+} from '$lib/utils/paperFileValidation';
 
 function normalizeAuthorAffiliations(input: unknown) {
-    if (!Array.isArray(input)) return [];
+	if (!Array.isArray(input)) return [];
 
-    return input
-        .map((item) => {
-            const affiliation = item as Record<string, unknown>;
-            const name = String(affiliation.name ?? '').trim();
-            if (!name) return null;
+	return input
+		.map((item) => {
+			const affiliation = item as Record<string, unknown>;
+			const name = String(affiliation.name ?? '').trim();
+			if (!name) return null;
 
-            return {
-                userId: affiliation.userId ? String(affiliation.userId) : undefined,
-                username: affiliation.username ? String(affiliation.username) : undefined,
-                name,
-                department: String(affiliation.department ?? '').trim(),
-                affiliation: String(affiliation.affiliation ?? '').trim()
-            };
-        })
-        .filter(Boolean);
+			return {
+				userId: affiliation.userId ? String(affiliation.userId) : undefined,
+				username: affiliation.username ? String(affiliation.username) : undefined,
+				name,
+				department: String(affiliation.department ?? '').trim(),
+				affiliation: String(affiliation.affiliation ?? '').trim()
+			};
+		})
+		.filter(Boolean);
+}
+
+function normalizeUserId(input: any): string {
+	if (!input) return '';
+	if (typeof input === 'string') return input;
+	if (input.id) return String(input.id);
+	if (input._id) return String(input._id);
+	return String(input);
+}
+
+async function getHubPaperPaymentPolicy(hubId: string | undefined) {
+	if (!hubId) return null;
+	const hub = await Hubs.findOne({ $or: [{ id: hubId }, { _id: hubId }] }).lean();
+	const policy = String((hub as any)?.billing?.paperPaymentPolicy ?? 'publication');
+	return policy === 'submission' || policy === 'review' || policy === 'publication'
+		? policy
+		: 'publication';
 }
 
 export const POST: RequestHandler = async ({ request, locals }) => {
+	await start_mongo();
 
-    await start_mongo(); // Não necessário mais
+	try {
+		const user = locals.user;
+		if (!user) {
+			return json({ error: 'User not authenticated' }, { status: 401 });
+		}
 
-    try {
-        const user = locals.user;
-        if (!user) {
-            return json({ error: 'User not authenticated' }, { status: 401 });
-        }
+		const {
+			paperPictures,
+			content,
+			mainAuthor,
+			correspondingAuthor,
+			title,
+			abstract,
+			keywords,
+			pdfUrl,
+			submittedBy,
+			price,
+			coAuthors = [],
+			status,
+			authors,
+			authorAffiliations,
+			hubId,
+			isLinkedToHub,
+			scopusArea,
+			scopusSubArea,
+			scopusClassifications,
+			supplementaryMaterials,
+			supplementaryFiles
+		} = await request.json();
 
-        const { paperPictures, content, mainAuthor, correspondingAuthor, title, abstract, keywords, pdfUrl, submittedBy, price, coAuthors, status, authors, authorAffiliations, hubId, isLinkedToHub, scopusArea, scopusSubArea, scopusClassifications, supplementaryMaterials, supplementaryFiles, paymentAuthorizationCode } =
-            await request.json();
-        
-        // Verifica se todas as informações necessárias foram enviadas
-        if (!mainAuthor || !correspondingAuthor || !title || !abstract || !keywords || !pdfUrl || !submittedBy) {
-            return json({ error: `Todos os campos são obrigatórios. ${mainAuthor}, ${correspondingAuthor}, ${title}, ${abstract}, ${keywords}, ${pdfUrl}, ${submittedBy}` }, { status: 400 });
-        }
+		if (!mainAuthor || !correspondingAuthor || !title || !abstract || !keywords || !pdfUrl || !submittedBy) {
+			return json(
+				{
+					error: `Todos os campos sao obrigatorios. ${mainAuthor}, ${correspondingAuthor}, ${title}, ${abstract}, ${keywords}, ${pdfUrl}, ${submittedBy}`
+				},
+				{ status: 400 }
+			);
+		}
 
-        if (!getUserIdAliases(user).includes(String(submittedBy.id || submittedBy._id || submittedBy))) {
-            return json({ error: 'submittedBy must match the authenticated user' }, { status: 403 });
-        }
+		const submittedById = normalizeUserId(submittedBy);
+		if (!getUserIdAliases(user).includes(submittedById)) {
+			return json({ error: 'submittedBy must match the authenticated user' }, { status: 403 });
+		}
 
-        const canSubmit = await can(user, 'paper.submit');
-        if (!canSubmit) {
-            return json({ error: 'Insufficient permissions' }, { status: 403 });
-        }
+		const canSubmit = await can(user, 'paper.submit');
+		if (!canSubmit) {
+			return json({ error: 'Insufficient permissions' }, { status: 403 });
+		}
 
-        const isStandaloneSubmission = !hubId && !isLinkedToHub;
-        const currentStatus = status || 'draft';
-        const requiresPaymentAuthorization = isStandaloneSubmission && currentStatus !== 'draft';
+		const currentStatus = status || 'draft';
+		const isStandaloneSubmission = !hubId && !isLinkedToHub;
+		if (isStandaloneSubmission && currentStatus !== 'draft') {
+			return json(
+				{
+					error: 'Standalone papers must be saved as a draft before payment and submission.',
+					code: 'payment_required'
+				},
+				{ status: 402 }
+			);
+		}
+		if (currentStatus !== 'draft') {
+			try {
+				assertUserCanSubmitPapers(user);
+			} catch (error) {
+				if (error instanceof UserBillingStatusError) {
+					return json(
+						{ error: error.message, code: error.code, billingStatus: error.billingStatus },
+						{ status: error.status }
+					);
+				}
+				throw error;
+			}
+		}
+		const hubPaymentPolicy = await getHubPaperPaymentPolicy(hubId ? String(hubId) : undefined);
+		if (hubPaymentPolicy === 'submission' && currentStatus !== 'draft') {
+			return json(
+				{
+					error: 'This Hub requires payment before submission. Save the paper as a draft first.',
+					code: 'payment_required',
+					paymentPolicy: hubPaymentPolicy
+				},
+				{ status: 402 }
+			);
+		}
 
-        // Para paper avulso, o bloqueio de pagamento é obrigatório
-        if (requiresPaymentAuthorization && !paymentAuthorizationCode) {
-            return json({ error: 'Payment authorization required. Please complete the payment hold step.' }, { status: 403 });
-        }
+		const normalizedCoAuthors = coAuthors.map((author: User) => normalizeUserId(author)).filter(Boolean);
+		const normalizedAuthors = authors?.map((author: User) => normalizeUserId(author)).filter(Boolean) || [];
+		const normalizedAuthorAffiliations = normalizeAuthorAffiliations(authorAffiliations);
+		const supplementaryValidation = validateSupplementaryFilesTotal(supplementaryFiles || []);
+		if (!supplementaryValidation.ok) {
+			return json(
+				{
+					error: supplementaryValidation.message,
+					code: 'supplementary_total_limit_exceeded',
+					maxTotalSize: supplementaryValidation.maxBytes,
+					currentTotalSize: supplementaryValidation.totalSize
+				},
+				{ status: 413 }
+			);
+		}
+		const id = crypto.randomUUID();
 
-        // Verificar o status da autorização no Stripe
-        let paymentIntentData = null;
-        try {
-            if (!paymentAuthorizationCode) {
-                throw new Error('No payment authorization code provided');
-            }
+		const newPaper = new Papers({
+			_id: id,
+			id,
+			mainAuthor: normalizeUserId(mainAuthor),
+			correspondingAuthor: normalizeUserId(correspondingAuthor),
+			coAuthors: normalizedCoAuthors,
+			authorAffiliations: normalizedAuthorAffiliations,
+			authors: normalizedAuthors,
+			status: currentStatus,
+			content,
+			paperPictures: normalizePaperCoverIds(paperPictures),
+			title,
+			abstract,
+			keywords,
+			pdfUrl,
+			submittedBy: submittedById,
+			price,
+			...(hubId && { hubId, isLinkedToHub: true }),
+			...(scopusArea && { scopusArea }),
+			...(scopusSubArea && { scopusSubArea }),
+			...(scopusClassifications?.length > 0 && { scopusClassifications }),
+			...(supplementaryMaterials?.length > 0 && { supplementaryMaterials }),
+			...(supplementaryFiles?.length > 0 && { supplementaryFiles }),
+			createdAt: new Date(),
+			updatedAt: new Date()
+		});
 
-            const paymentIntent = await stripe.paymentIntents.retrieve(paymentAuthorizationCode);
-            
-            if (paymentIntent.status !== 'succeeded' && paymentIntent.status !== 'requires_capture') {
-                return json({
-                    error: `Invalid payment authorization status: ${paymentIntent.status}. Please complete the payment hold.`,
-                    currentStatus: paymentIntent.status
-                }, { status: 403 });
-            }
+		await newPaper.save();
 
-            const paymentIntentWithCharges = paymentIntent as Stripe.PaymentIntent & {
-                charges?: { data?: Array<{ receipt_url?: string | null }> };
-            };
+		const mainAuthorUser = await Users.findById(normalizeUserId(mainAuthor));
+		if (!mainAuthorUser) {
+			return json({ error: 'Autor principal nao encontrado.' }, { status: 404 });
+		}
+		mainAuthorUser.papers.push(newPaper.id);
+		await mainAuthorUser.save();
 
-            paymentIntentData = {
-                stripePaymentIntentId: paymentIntent.id,
-                status: paymentIntent.status === 'requires_capture' ? 'authorized' : 'authorized',
-                amount: paymentIntent.amount,
-                currency: paymentIntent.currency,
-                authorizedAt: new Date(paymentIntent.created * 1000),
-                receiptUrl: paymentIntentWithCharges.charges?.data?.[0]?.receipt_url || null
-            };
-        } catch (stripeError) {
-            if (requiresPaymentAuthorization) {
-                console.error('Stripe verification error:', stripeError);
-                return json({ error: 'Failed to verify payment authorization' }, { status: 400 });
-            }
-        }
+		for (const coAuthorId of normalizedCoAuthors) {
+			const coAuthor = await Users.findById(coAuthorId);
+			if (coAuthor) {
+				coAuthor.papers.push(newPaper.id);
+				await coAuthor.save();
+			}
+		}
 
-        const _coAuthors = coAuthors.map((a: User) => a.id)
-        const _authors = authors?.map((a: User) => a.id) || [];
-        const normalizedAuthorAffiliations = normalizeAuthorAffiliations(authorAffiliations);
-        const id = crypto.randomUUID()
-        // Cria um novo paper
-        const newPaper = new Papers({
-            _id: id,
-            id: id,
-            mainAuthor: mainAuthor.id,
-           
-            correspondingAuthor: correspondingAuthor.id,
-            coAuthors: _coAuthors,
-            authorAffiliations: normalizedAuthorAffiliations,
-            authors: _authors,
-            status,
-            content,
-            paperPictures, title, abstract, keywords, pdfUrl, submittedBy: submittedBy.id, price,
-            ...(hubId && { hubId, isLinkedToHub: true }),
-            ...(scopusArea && { scopusArea }),
-            ...(scopusSubArea && { scopusSubArea }),
-            ...(scopusClassifications && scopusClassifications.length > 0 && { scopusClassifications }),
-            ...(supplementaryMaterials && supplementaryMaterials.length > 0 && { supplementaryMaterials }),
-                        ...(supplementaryFiles && supplementaryFiles.length > 0 && { supplementaryFiles }),
-            // Adicionar dados de pagamento
-            ...(paymentIntentData && { paymentHold: paymentIntentData }),
-            createdAt: new Date(),
-            updatedAt: new Date()
-        });
-        // Salva o usuário no banco de dados
-        await newPaper.save();
+		if (!newPaper.status || newPaper.status === 'draft') {
+			try {
+				await emitPaperLifecycleEvent('paper.created', newPaper, {
+					actorId: user.id,
+					metadata: {
+						endpoint: '/publish/new'
+					}
+				});
+			} catch (eventError) {
+				console.error('Failed to emit paper created event:', eventError);
+			}
+		}
 
-        // Buscar e atualizar o autor principal
-        const mainAuthorUser = await Users.findById(mainAuthor.id);
-        if (!mainAuthorUser) {
-            return json({ error: 'Autor principal não encontrado.' }, { status: 404 });
-        }
-        mainAuthorUser.papers.push(newPaper.id);
-        await mainAuthorUser.save();
+		if (newPaper.status && newPaper.status !== 'draft') {
+			const submitterName = `${(submittedBy?.firstName || '').trim()} ${(submittedBy?.lastName || '').trim()}`.trim();
 
-        // Buscar e atualizar os coautores
-        for (const coAuthorId of _coAuthors) {
-            const coAuthor = await Users.findById(coAuthorId);
-            if (coAuthor) {
-                coAuthor.papers.push(newPaper.id);  // Adiciona o artigo ao coautor
-                await coAuthor.save();  // Salva as alterações do coautor
-            }
-        }
+			try {
+				await emitPaperLifecycleEvent('paper.submitted', newPaper, {
+					actorId: user.id,
+					metadata: {
+						endpoint: '/publish/new',
+						submittedByName: submitterName || undefined
+					}
+				});
+			} catch (eventError) {
+				console.error('Failed to emit paper submission event:', eventError);
+			}
+		}
 
-        if (!newPaper.status || newPaper.status === 'draft') {
-            try {
-                await emitPaperLifecycleEvent('paper.created', newPaper, {
-                    actorId: user.id,
-                    metadata: {
-                        endpoint: '/publish/new'
-                    }
-                });
-            } catch (eventError) {
-                console.error('Failed to emit paper created event:', eventError);
-            }
-        }
-
-        // Evento de submissao apenas para submissao (nao para rascunho)
-        if (newPaper.status && newPaper.status !== 'draft') {
-            const submitterName = `${(submittedBy?.firstName || '').trim()} ${(submittedBy?.lastName || '').trim()}`.trim();
-
-            try {
-                await emitPaperLifecycleEvent('paper.submitted', newPaper, {
-                    actorId: user.id,
-                    metadata: {
-                        endpoint: '/publish/new',
-                        submittedByName: submitterName || undefined
-                    }
-                });
-            } catch (eventError) {
-                console.error('Failed to emit paper submission event:', eventError);
-            }
-        }
-
-        // Resposta de sucesso
-        return json({ paper: { id: newPaper.id } }, { status: 201 });
-    } catch (error) {
-        console.error('Erro ao registrar usuário:', error);
-        return json({ error: 'Erro interno do servidor.' }, { status: 500 });
-    }
+		return json({ paper: { id: newPaper.id } }, { status: 201 });
+	} catch (error) {
+		console.error('Erro ao registrar paper:', error);
+		return json({ error: 'Erro interno do servidor.' }, { status: 500 });
+	}
 };
-

@@ -15,6 +15,28 @@ export type Paper = {
         department?: string;
         affiliation?: string;
     }>;
+    creditAuthorStatements?: Array<{
+        userId?: string;
+        authorName?: string;
+        roles?: Array<
+            | 'Conceptualization'
+            | 'Data curation'
+            | 'Formal analysis'
+            | 'Funding acquisition'
+            | 'Investigation'
+            | 'Methodology'
+            | 'Project administration'
+            | 'Resources'
+            | 'Software'
+            | 'Supervision'
+            | 'Validation'
+            | 'Visualization'
+            | 'Writing - original draft'
+            | 'Writing - review and editing'
+        >;
+        statement?: string;
+        updatedAt?: Date;
+    }>;
     reviewers: Array<User | string>; // List of reviewers as User objects or UUIDs
     title: string;
     abstract: string;
@@ -110,14 +132,27 @@ export type Paper = {
     rejectedBy?: User | string; // Who rejected it
     paymentHold?: {
         stripePaymentIntentId?: string;
-        status?: 'pending' | 'authorized' | 'captured' | 'released' | 'failed';
+        purpose?: string;
+        paymentMethodId?: string;
+        customerId?: string;
+        captureMethod?: 'automatic' | 'manual';
+        status?: 'pending' | 'authorized' | 'captured' | 'released' | 'failed' | 'cancelled' | 'expired';
         amount?: number;
         currency?: string;
         authorizedAt?: Date;
         capturedAt?: Date;
         releasedAt?: Date;
+        authorizationExpiresAt?: Date;
+        renewalCount?: number;
         failureReason?: string;
         receiptUrl?: string;
+    };
+    paymentPolicyAcceptance?: {
+        policyVersion?: string;
+        acceptedAt?: Date;
+        userId?: string;
+        paperId?: string;
+        hubId?: string | null;
     };
     supplementaryMaterials?: Array<{
         id: string; // Unique ID for this item

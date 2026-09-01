@@ -11,6 +11,7 @@ import { resolveUserIdentifiers } from '$lib/helpers/userIdentifiers';
 import { authorize } from '$lib/server/authorization/authorizationService';
 import { resolveEffectiveHubRoles } from '$lib/server/authorization/effectiveHubRoles';
 import { emitPaperReviewInvitationEvent } from '$lib/server/reviewInvitationLifecycle';
+import { getReviewerInvitationPaymentGate } from '$lib/server/payments/paperPaymentService';
 import {
 	buildDuplicateInvitationDetails,
 	findActiveReviewInvitation,
@@ -47,16 +48,15 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			return json({ error: 'Paper not found' }, { status: 404 });
 		}
 
-		const isStandalonePaper = !paper.hubId;
-		const hasAuthorizedPaymentHold =
-			!!paper.paymentHold?.stripePaymentIntentId &&
-			(paper.paymentHold?.status === 'authorized' || paper.paymentHold?.status === 'captured');
-
-		if (isStandalonePaper && !hasAuthorizedPaymentHold) {
+		const paymentGate = await getReviewerInvitationPaymentGate(paper);
+		if (!paymentGate.allowed) {
 			return json(
 				{
-					error:
-						'Payment authorization is required before inviting reviewers for standalone papers.'
+					error: 'Captured payment is required before inviting reviewers for this paper.',
+					code: 'payment_required',
+					paymentState: paymentGate.state,
+					paymentPolicy: paymentGate.policy,
+					paymentPurpose: paymentGate.purpose
 				},
 				{ status: 403 }
 			);

@@ -4,6 +4,12 @@ import { start_mongo } from '$lib/db/mongooseConnection';
 import Hubs from '$lib/db/models/Hub';
 import { emitEvent } from '$lib/services/EventService';
 
+function normalizePaperPaymentPolicy(value: unknown) {
+	return value === 'submission' || value === 'review' || value === 'publication'
+		? value
+		: 'publication';
+}
+
 export const PUT: RequestHandler = async ({ request, params }) => {
     await start_mongo();
 
@@ -25,6 +31,8 @@ export const PUT: RequestHandler = async ({ request, params }) => {
             authorInvite,
             identityVisibility,
             reviewVisibility,
+            billing,
+            publicationPolicy,
             socialMedia,
             tracks,
             calendar,
@@ -55,6 +63,19 @@ export const PUT: RequestHandler = async ({ request, params }) => {
         hub.authorInvite = authorInvite;
         hub.identityVisibility = identityVisibility;
         hub.reviewVisibility = reviewVisibility;
+        hub.billing = {
+            ...(hub.billing?.toObject?.() ?? hub.billing ?? {}),
+            paperPaymentPolicy: normalizePaperPaymentPolicy(billing?.paperPaymentPolicy),
+            policyVersion: billing?.policyVersion || hub.billing?.policyVersion || 'hub-billing-v1',
+            updatedAt: new Date()
+        };
+        hub.publicationPolicy = {
+            ...(hub.publicationPolicy?.toObject?.() ?? hub.publicationPolicy ?? {}),
+            text: publicationPolicy?.text || '',
+            version: publicationPolicy?.version || hub.publicationPolicy?.version || 'hub-publication-v1',
+            updatedAt: new Date(),
+            updatedBy: String(hub.createdBy || '')
+        };
         hub.socialMedia = {
             twitter: socialMedia?.twitter || '',
             facebook: socialMedia?.facebook || '',

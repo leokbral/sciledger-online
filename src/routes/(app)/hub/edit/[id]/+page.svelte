@@ -32,6 +32,14 @@
 		authorInvite: hub.authorInvite || '',
 		identityVisibility: hub.identityVisibility || '',
 		reviewVisibility: hub.reviewVisibility || '',
+		billing: {
+			paperPaymentPolicy: hub.billing?.paperPaymentPolicy || 'publication',
+			policyVersion: hub.billing?.policyVersion || 'hub-billing-v1'
+		},
+		publicationPolicy: {
+			text: hub.publicationPolicy?.text || '',
+			version: hub.publicationPolicy?.version || 'hub-publication-v1'
+		},
 		tracks: hub.tracks || '',
 		calendar: hub.calendar || '',
 		showCalendar: hub.showCalendar || false,
@@ -168,7 +176,7 @@
 		if (checkbox.checked) {
 			form.licenses = [...form.licenses, value];
 		} else {
-			form.licenses = form.licenses.filter((l) => l !== value);
+			form.licenses = form.licenses.filter((l: string) => l !== value);
 		}
 	}
 
@@ -443,6 +451,28 @@
 				<option>Authors Only</option>
 				<option>Hidden</option>
 			</select>
+		</div>
+		<div>
+			<label for="paper-payment-policy" class="block mb-1">Paper payment policy</label>
+			<select
+				id="paper-payment-policy"
+				bind:value={form.billing.paperPaymentPolicy}
+				class="w-full p-2 border rounded"
+			>
+				<option value="submission">Submission</option>
+				<option value="review">Review</option>
+				<option value="publication">Publication</option>
+			</select>
+		</div>
+		<div>
+			<label for="publication-policy" class="block mb-1">Publication policy</label>
+			<textarea
+				id="publication-policy"
+				bind:value={form.publicationPolicy.text}
+				class="w-full p-2 border rounded"
+				rows="4"
+				placeholder="Publication rules for this Hub"
+			></textarea>
 		</div>
 	</div>
 

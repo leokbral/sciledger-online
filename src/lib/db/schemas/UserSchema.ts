@@ -63,6 +63,18 @@ export const UserSchema: Schema = new Schema({
         onboardingCompletedAt: { type: Date },
         lastPayoutAt: { type: Date }
     },
+    billingStatus: {
+        type: String,
+        enum: ['current', 'past_due', 'delinquent', 'blocked'],
+        default: 'current',
+        index: true
+    },
+    billingStatusReason: { type: String },
+    billingStatusUpdatedAt: { type: Date },
+    termsVersion: { type: String },
+    termsAcceptedAt: { type: Date },
+    privacyVersion: { type: String },
+    privacyAcceptedAt: { type: Date },
     connections: [{ type: String, ref: 'User' }], // IDs of connected users
     followers: [{ type: String, ref: 'User' }], // IDs of followers
     following: [{ type: String, ref: 'User' }], // IDs of followed users

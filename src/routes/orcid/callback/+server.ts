@@ -1,11 +1,12 @@
 import type { RequestHandler } from './$types';
 import { isRedirect, redirect } from '@sveltejs/kit';
-import { ORCID_CLIENT_ID, ORCID_CLIENT_SECRET, ORCID_REDIRECT_URI } from '$env/static/private';
+import { ORCID_CLIENT_ID, ORCID_CLIENT_SECRET } from '$env/static/private';
 import { env } from '$env/dynamic/private';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import Users from '$lib/db/models/User';
 import { respondWithSession } from '$lib/server/auth/authResponse';
 import { normalizeEmail } from '$lib/server/auth/normalizeEmail';
+import { getOrcidRedirectUri } from '$lib/server/orcid/redirectUri';
 import * as crypto from 'crypto';
 
 /**
@@ -85,11 +86,12 @@ export const GET: RequestHandler = async ({ url, request }) => {
 		}
 
 		// Valida configuração
-		if (!ORCID_CLIENT_ID || !ORCID_CLIENT_SECRET || !ORCID_REDIRECT_URI) {
+		if (!ORCID_CLIENT_ID || !ORCID_CLIENT_SECRET) {
 			console.error('❌ ORCID credentials not configured');
 			throw new Error('ORCID credentials not configured');
 		}
 		const useSandbox = env.ORCID_SANDBOX === 'true';
+		const redirectUri = getOrcidRedirectUri(url.origin);
 
 		// ====================================================================
 		// ETAPA 1: Trocar authorization_code por access_token
@@ -104,7 +106,7 @@ export const GET: RequestHandler = async ({ url, request }) => {
 			client_secret: ORCID_CLIENT_SECRET,
 			grant_type: 'authorization_code',
 			code: code,
-			redirect_uri: ORCID_REDIRECT_URI
+			redirect_uri: redirectUri
 		});
 
 		const tokenResponse = await fetch(ORCID_TOKEN_URL, {

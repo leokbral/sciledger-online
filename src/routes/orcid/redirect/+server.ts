@@ -1,7 +1,8 @@
 import type { RequestHandler } from './$types';
 import { redirect } from '@sveltejs/kit';
-import { ORCID_CLIENT_ID, ORCID_REDIRECT_URI } from '$env/static/private';
+import { ORCID_CLIENT_ID } from '$env/static/private';
 import { env } from '$env/dynamic/private';
+import { getOrcidRedirectUri } from '$lib/server/orcid/redirectUri';
 
 /**
  * Rota para iniciar o fluxo OAuth 2.0 com ORCID
@@ -16,9 +17,9 @@ import { env } from '$env/dynamic/private';
  * 4. Usuário autoriza no ORCID
  * 5. ORCID redireciona para /orcid/callback com authorization_code
  */
-export const GET: RequestHandler = async () => {
+export const GET: RequestHandler = async ({ url }) => {
 	// Valida que as variáveis de ambiente estão configuradas
-	if (!ORCID_CLIENT_ID || !ORCID_REDIRECT_URI) {
+	if (!ORCID_CLIENT_ID) {
 		console.error('❌ ORCID credentials not configured');
 		throw redirect(302, '/login?error=orcid_config_error');
 	}
@@ -27,13 +28,14 @@ export const GET: RequestHandler = async () => {
 	const ORCID_AUTH_URL = useSandbox
 		? 'https://sandbox.orcid.org/oauth/authorize'
 		: 'https://orcid.org/oauth/authorize';
+	const redirectUri = getOrcidRedirectUri(url.origin);
 
 	// Parâmetros necessários para OAuth 2.0
 	const params = new URLSearchParams({
 		client_id: ORCID_CLIENT_ID,
 		response_type: 'code', // Authorization Code Flow
 		scope: '/authenticate', // Permissão para autenticar e obter ORCID iD
-		redirect_uri: ORCID_REDIRECT_URI
+		redirect_uri: redirectUri
 	});
 
 	// Redireciona para página de autorização do ORCID
