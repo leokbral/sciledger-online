@@ -10,6 +10,7 @@ import {
 	EditorialTransitionError,
 	transitionPaperStatus
 } from '$lib/server/authorization/editorialTransitionService';
+import { normalizePaperCoverIds } from '$lib/utils/paperFileValidation';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
 	await start_mongo();
@@ -87,7 +88,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				price,
 				peer_review,
 				selectedReviewers,
-				paperPictures,
+				paperPictures: normalizePaperCoverIds(paperPictures),
 				hubId: hubId ?? null,
 				isLinkedToHub: !!hubId && isLinkedToHub === true,
 				updatedAt: new Date().toISOString()
@@ -148,7 +149,7 @@ export const PUT: RequestHandler = async ({ request, params }) => {
 
 		const paper = await Papers.findByIdAndUpdate(
 			paperId,
-			{ $set: { paperPictures } },
+			{ $set: { paperPictures: normalizePaperCoverIds(paperPictures) } },
 			{ new: true, runValidators: true }
 		)
 			.lean()

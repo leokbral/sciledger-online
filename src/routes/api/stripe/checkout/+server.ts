@@ -8,13 +8,27 @@ function getStripe() {
   if (!stripeSecretKey) {
     return null;
   }
+  if (stripeSecretKey.includes('_live_')) {
+    return 'live_key_not_allowed' as const;
+  }
   return new Stripe(stripeSecretKey, {
-    apiVersion: '2026-02-25.preview'
+    apiVersion: '2026-02-25.clover'
   });
 }
 
+function isTestCheckoutEnabled() {
+  return process.env.NODE_ENV !== 'production' || env.ENABLE_STRIPE_TEST_CHECKOUT === 'true';
+}
+
 export const POST: RequestHandler = async ({ request }) => {
+  if (!isTestCheckoutEnabled()) {
+    return json({ error: 'Stripe checkout test route is disabled' }, { status: 404 });
+  }
+
   const stripe = getStripe();
+  if (stripe === 'live_key_not_allowed') {
+    return json({ error: 'Stripe checkout test route cannot use a live secret key' }, { status: 403 });
+  }
   if (!stripe) {
     return json({ error: 'Stripe not configured' }, { status: 500 });
   }
@@ -34,13 +48,13 @@ export const POST: RequestHandler = async ({ request }) => {
     }, { status: 400 });
   }
 
-  const lineItem = priceId
+  const lineItem: Stripe.Checkout.SessionCreateParams.LineItem = priceId
     ? { price: priceId, quantity }
     : {
         price_data: {
-          currency,
+          currency: currency as string,
           product_data: { name: productName },
-          unit_amount: amount
+          unit_amount: amount as number
         },
         quantity
       };

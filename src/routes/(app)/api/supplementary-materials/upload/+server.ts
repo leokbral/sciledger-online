@@ -4,11 +4,13 @@ import type { RequestHandler } from '@sveltejs/kit';
 import * as crypto from 'crypto';
 import { fsFiles } from '$lib/db/fs';
 import Papers from '$lib/db/models/Paper';
+import { SUPPLEMENTARY_FILES_MAX_TOTAL_BYTES } from '$lib/constants/paperUploadLimits';
+import { validateSupplementaryFilesTotal } from '$lib/utils/paperFileValidation';
 
 const bucket = new GridFSBucket(db);
 
-// Maximum total size for all supplementary files: 10MB
-const MAX_TOTAL_SIZE = 10 * 1024 * 1024; // 10MB in bytes
+// Maximum total size for all supplementary files: 20MB
+const MAX_TOTAL_SIZE = SUPPLEMENTARY_FILES_MAX_TOTAL_BYTES;
 
 async function saveSupplementaryFile(file: File, paperId?: string, uploadedBy?: string) {
     // Calculate total size of existing supplementary files
@@ -24,13 +26,16 @@ async function saveSupplementaryFile(file: File, paperId?: string, uploadedBy?: 
         }
     }
 
-    const newTotalSize = totalExistingSize + file.size;
+    const totalValidation = validateSupplementaryFilesTotal([
+        { fileSize: totalExistingSize },
+        { fileSize: file.size }
+    ]);
 
     // Validate total size
-    if (newTotalSize > MAX_TOTAL_SIZE) {
+    if (!totalValidation.ok) {
         const remainingSpace = MAX_TOTAL_SIZE - totalExistingSize;
         throw new Error(
-            `Total size of supplementary files exceeds 10MB limit. ` +
+            `${totalValidation.message} ` +
             `Current total: ${(totalExistingSize / 1024 / 1024).toFixed(2)}MB, ` +
             `Available space: ${(remainingSpace / 1024 / 1024).toFixed(2)}MB, ` +
             `File size: ${(file.size / 1024 / 1024).toFixed(2)}MB`
@@ -178,14 +183,17 @@ export const POST: RequestHandler = async ({ request }) => {
             }
         }
 
-        const newTotalSize = totalExistingSize + file.size;
+        const totalValidation = validateSupplementaryFilesTotal([
+            { fileSize: totalExistingSize },
+            { fileSize: file.size }
+        ]);
 
         // Validate total size
-        if (newTotalSize > MAX_TOTAL_SIZE) {
+        if (!totalValidation.ok) {
             const remainingSpace = MAX_TOTAL_SIZE - totalExistingSize;
             return new Response(
                 JSON.stringify({
-                    message: 'Total supplementary files size would exceed 10MB limit',
+                    message: totalValidation.message,
                     maxTotalSize: MAX_TOTAL_SIZE,
                     currentTotalSize: totalExistingSize,
                     fileSize: file.size,

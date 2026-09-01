@@ -6,6 +6,7 @@ import {
 	getEffectiveHubMemberForUser,
 	resolveEffectiveHubRoles
 } from '$lib/server/authorization/effectiveHubRoles';
+import { getPaperPaymentGate } from '$lib/server/payments/paperPaymentService';
 
 // Type for MongoDB ObjectId
 interface ObjectId {
@@ -103,9 +104,11 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 	if (paperDoc.status !== 'reviewer assignment') {
 		throw error(400, 'This paper is not awaiting publication approval');
 	}
+	const paymentGate = await getPaperPaymentGate(paperDoc, { action: 'paper.publish' });
 
 	return {
 		paper: sanitize(paperDoc),
-		canFinalizePublication: isHubOwner
+		canFinalizePublication: isHubOwner,
+		paymentGate: sanitize(paymentGate)
 	};
 };

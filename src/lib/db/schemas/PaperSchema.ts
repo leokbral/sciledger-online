@@ -15,6 +15,32 @@ export const PaperSchema: Schema = new Schema({
         department: { type: String, default: '' },
         affiliation: { type: String, default: '' }
     }],
+    creditAuthorStatements: [{
+        _id: false,
+        userId: { type: String, ref: 'User' },
+        authorName: { type: String },
+        roles: [{
+            type: String,
+            enum: [
+                'Conceptualization',
+                'Data curation',
+                'Formal analysis',
+                'Funding acquisition',
+                'Investigation',
+                'Methodology',
+                'Project administration',
+                'Resources',
+                'Software',
+                'Supervision',
+                'Validation',
+                'Visualization',
+                'Writing - original draft',
+                'Writing - review and editing'
+            ]
+        }],
+        statement: { type: String, default: '' },
+        updatedAt: { type: Date, default: () => new Date() }
+    }],
     reviewers: [{ type: String, ref: 'User' }], // List of reviewers as UUIDs
     title: { type: String, required: true },
     abstract: { type: String, required: true },
@@ -165,9 +191,13 @@ export const PaperSchema: Schema = new Schema({
     // Payment Hold System (autorização de fundos similar a aluguel de carro)
     paymentHold: {
         stripePaymentIntentId: { type: String }, // Stripe Payment Intent ID
+        purpose: { type: String },
+        paymentMethodId: { type: String },
+        customerId: { type: String },
+        captureMethod: { type: String, enum: ['automatic', 'manual'] },
         status: { 
             type: String, 
-            enum: ['pending', 'authorized', 'captured', 'released', 'failed'], 
+            enum: ['pending', 'authorized', 'captured', 'released', 'failed', 'cancelled', 'expired'],
             default: 'pending' 
         }, // Status do bloqueio
         amount: { type: Number }, // Valor bloqueado em centavos
@@ -175,10 +205,19 @@ export const PaperSchema: Schema = new Schema({
         authorizedAt: { type: Date }, // Data/hora de autorização
         capturedAt: { type: Date }, // Data/hora de captura do valor
         releasedAt: { type: Date }, // Data/hora de liberação (se não cobrado)
+        authorizationExpiresAt: { type: Date },
+        renewalCount: { type: Number, default: 0 },
         failureReason: { type: String }, // Motivo da falha se houver
         receiptUrl: { type: String } // URL do recebimento do Stripe
     },
-    
+    paymentPolicyAcceptance: {
+        policyVersion: { type: String },
+        acceptedAt: { type: Date },
+        userId: { type: String, ref: 'User' },
+        paperId: { type: String },
+        hubId: { type: String, ref: 'Hub' }
+    },
+
     // Supplementary Material - Links to public repositories
     supplementaryMaterials: [{
         _id: false, // Disable automatic Mongoose _id
@@ -195,7 +234,7 @@ export const PaperSchema: Schema = new Schema({
         updatedAt: { type: Date, default: () => new Date() } // Last update
     }],
 
-    // Supplementary Files - Direct file uploads (up to 10MB each)
+    // Supplementary Files - Direct file uploads (up to 20MB total per paper)
     supplementaryFiles: [{
         _id: false, // Disable automatic Mongoose _id
         id: { type: String, required: true }, // Unique ID for this item

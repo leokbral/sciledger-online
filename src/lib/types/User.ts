@@ -52,6 +52,13 @@ export type User = {
         onboardingCompletedAt?: Date;
         lastPayoutAt?: Date;
     };
+    billingStatus?: 'current' | 'past_due' | 'delinquent' | 'blocked';
+    billingStatusReason?: string;
+    billingStatusUpdatedAt?: Date;
+    termsVersion?: string;
+    termsAcceptedAt?: Date;
+    privacyVersion?: string;
+    privacyAcceptedAt?: Date;
     connections: string[]; // IDs of connected users
     followers: User[]; // IDs of followers
     following: User[]; // IDs of followed users

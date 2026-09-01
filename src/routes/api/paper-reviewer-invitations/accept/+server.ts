@@ -15,6 +15,7 @@ import {
 	EditorialTransitionError,
 	transitionPaperStatus
 } from '$lib/server/authorization/editorialTransitionService';
+import { getReviewerInvitationPaymentGate } from '$lib/server/payments/paperPaymentService';
 
 function normalizeId(value: any): string {
 	if (!value) return '';
@@ -111,6 +112,20 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		const paper = await Papers.findOne({ id: invitation.paper });
 		if (!paper) {
 			return json({ error: 'Paper not found' }, { status: 404 });
+		}
+
+		const paymentGate = await getReviewerInvitationPaymentGate(paper);
+		if (!paymentGate.allowed) {
+			return json(
+				{
+					error: 'Captured payment is required before accepting review invitations for this paper.',
+					code: 'payment_required',
+					paymentState: paymentGate.state,
+					paymentPolicy: paymentGate.policy,
+					paymentPurpose: paymentGate.purpose
+				},
+				{ status: 403 }
+			);
 		}
 
 		const conflictValidation = validateReviewerCanReviewPaper(paper as any, user);

@@ -27,6 +27,7 @@ import {
 	EditorialTransitionError,
 	transitionPaperStatus
 } from '$lib/server/authorization/editorialTransitionService';
+import { getReviewerInvitationPaymentGate } from '$lib/server/payments/paperPaymentService';
 import type { RequestHandler } from './$types';
 import Stripe from 'stripe';
 import { env } from '$env/dynamic/private';
@@ -103,6 +104,20 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 		};
 
 		if (action === 'accept') {
+			const paymentGate = await getReviewerInvitationPaymentGate(paper);
+			if (!paymentGate.allowed) {
+				return json(
+					{
+						error: 'Captured payment is required before accepting review invitations for this paper.',
+						code: 'payment_required',
+						paymentState: paymentGate.state,
+						paymentPolicy: paymentGate.policy,
+						paymentPurpose: paymentGate.purpose
+					},
+					{ status: 403 }
+				);
+			}
+
 			const conflictValidation = validateReviewerCanReviewPaper(paper as any, user);
 			if (!conflictValidation.allowed) {
 				return json({ error: REVIEW_CONFLICT_OF_INTEREST_MESSAGE }, { status: 403 });
@@ -296,7 +311,8 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 				if (
 					acceptedCount >= REQUIRED_REVIEWERS &&
 					paperDoc.paymentHold?.stripePaymentIntentId &&
-					paperDoc.paymentHold?.status === 'authorized'
+					paperDoc.paymentHold?.status === 'authorized' &&
+					(paperDoc.paymentHold as any)?.purpose === 'reviewer_work_hold'
 				) {
 					const stripe = getStripe();
 					if (stripe) {

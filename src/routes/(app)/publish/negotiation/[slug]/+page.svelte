@@ -15,6 +15,7 @@
 	import PaperReviewerInvite from '$lib/components/PaperReviewerInvite/PaperReviewerInvite.svelte';
 	import ManageReviewerDeadline from '$lib/components/ReviewerManagement/ManageReviewerDeadline.svelte';
 	import { hasHubPublication } from '$lib/helpers/paperPublicationModel';
+	import { normalizePaperCoverIds } from '$lib/utils/paperFileValidation';
 
 	interface Props {
 		data: any;
@@ -30,11 +31,13 @@
 	let approvePublicationError = $state('');
 	let isHubPublication = $derived(!!paper && hasHubPublication(paper));
 	let isStandalonePaper = $derived(!!paper && !isHubPublication);
-	let hasStandalonePaymentAuthorization = $derived(
+	let paymentGate = $derived((data as any).paymentGate ?? null);
+	let hasPaperPaymentCaptured = $derived(
+		paymentGate?.state === 'captured' ||
 		!!paper?.paymentHold?.stripePaymentIntentId &&
-		(paper?.paymentHold?.status === 'authorized' || paper?.paymentHold?.status === 'captured')
+		paper?.paymentHold?.status === 'captured'
 	);
-	let requiresPaymentBeforeInviting = $derived(isStandalonePaper && !hasStandalonePaymentAuthorization);
+	let requiresPaymentBeforeInviting = $derived(Boolean(paymentGate?.required && !paymentGate?.allowed));
 	let canEditReviewerAssignments = $derived(isStandalonePaper);
 
 	interface ImageItem {
@@ -54,7 +57,7 @@
 
 	$effect(() => {
 		if (paper?.paperPictures) {
-			imageItems = paper.paperPictures.map((id) => ({
+			imageItems = normalizePaperCoverIds(paper.paperPictures).map((id) => ({
 				id,
 				previewUrl: `/api/images/${id}`
 			}));
@@ -67,7 +70,7 @@
 
 		const reader = new FileReader();
 		reader.onload = (e) => {
-			imageItems = [...imageItems, { file, previewUrl: e.target?.result as string }];
+			imageItems = [{ file, previewUrl: e.target?.result as string }];
 		};
 		reader.readAsDataURL(file);
 	}
@@ -129,7 +132,7 @@
 
 		try {
 			// Se o paper NÃO tem hub, exigir pagamento
-			if (!paper.hubId && !hasStandalonePaymentAuthorization) {
+			if (requiresPaymentBeforeInviting) {
 				goto(`/publish/payment-hold?paperId=${paper.id}`);
 				return;
 			}
@@ -144,31 +147,28 @@
 				return;
 			}
 
-			// Upload pending images
-			const newImageIds = await Promise.all(
-				imageItems
-					.filter((item) => item.file)
-					.map(async (item) => {
-						const formData = new FormData();
-						formData.append('file', item.file!);
-						const response = await fetch('/api/images/upload', {
-							method: 'POST',
-							body: formData
-						});
-						const data = await response.json();
-						return data.id;
-					})
-			);
-
-			const existingImageIds = imageItems.filter((item) => item.id).map((item) => item.id!);
-			const allImageIds = [...existingImageIds, ...newImageIds];
+			let coverImageIds = normalizePaperCoverIds(imageItems.filter((item) => item.id).map((item) => item.id));
+			const newCoverImage = imageItems.find((item) => item.file);
+			if (newCoverImage?.file) {
+				const formData = new FormData();
+				formData.append('image', newCoverImage.file);
+				const response = await fetch('/api/images/upload', {
+					method: 'POST',
+					body: formData
+				});
+				const data = await response.json();
+				if (!response.ok || !data.id) {
+					throw new Error(data.message || 'Failed to upload paper cover image.');
+				}
+				coverImageIds = normalizePaperCoverIds([data.id]);
+			}
 
 			const updatedPaper = {
 				...paper,
 				selectedReviewers,
 				peerReviewType: peer_review,
 				status: 'in review',
-				paperPictures: allImageIds
+				paperPictures: coverImageIds
 			};
 
 			const response = await post(`/publish/reviewer-assignment/${updatedPaper.id}`, updatedPaper);
@@ -209,30 +209,28 @@
 		}
 
 		try {
-			const newImageIds = await Promise.all(
-				imageItems
-					.filter((item) => item.file)
-					.map(async (item) => {
-						const formData = new FormData();
-						formData.append('file', item.file!);
-						const response = await fetch('/api/images/upload', {
-							method: 'POST',
-							body: formData
-						});
-						const data = await response.json();
-						return data.id;
-					})
-			);
-
-			const existingImageIds = imageItems.filter((item) => item.id).map((item) => item.id!);
-			const allImageIds = [...existingImageIds, ...newImageIds];
+			let coverImageIds = normalizePaperCoverIds(imageItems.filter((item) => item.id).map((item) => item.id));
+			const newCoverImage = imageItems.find((item) => item.file);
+			if (newCoverImage?.file) {
+				const formData = new FormData();
+				formData.append('image', newCoverImage.file);
+				const response = await fetch('/api/images/upload', {
+					method: 'POST',
+					body: formData
+				});
+				const data = await response.json();
+				if (!response.ok || !data.id) {
+					throw new Error(data.message || 'Failed to upload paper cover image.');
+				}
+				coverImageIds = normalizePaperCoverIds([data.id]);
+			}
 
 			const draftPaper = {
 				...paper,
 				selectedReviewers,
 				peerReviewType: peer_review,
 				status: 'reviewer assignment',
-				paperPictures: allImageIds
+				paperPictures: coverImageIds
 			};
 
 			const response = await post(`/publish/reviewer-assignment/${draftPaper.id}`, draftPaper);
@@ -240,7 +238,7 @@
 			if (response.paper) {
 				alert('Draft saved successfully');
 				paper = response.paper;
-				imageItems = allImageIds.map((id) => ({
+				imageItems = coverImageIds.map((id) => ({
 					id,
 					previewUrl: `/api/images/${id}`
 				}));
@@ -433,7 +431,7 @@
 					<div class="text-sm text-amber-900">
 						<strong>Payment required before reviewer invitations</strong>
 						<p class="mt-1">
-							For standalone papers, payment authorization is required before inviting reviewers.
+							Payment must be completed before inviting reviewers for this paper.
 						</p>
 						<div class="mt-3">
 							<button class="btn preset-filled-primary-500" onclick={goToPaymentHold}>
@@ -445,14 +443,14 @@
 				</div>
 			</div>
 		{/if}
-		{#if isStandalonePaper && hasStandalonePaymentAuthorization}
+		{#if hasPaperPaymentCaptured}
 			<div class="mb-4 rounded-lg border-l-4 border-green-500 bg-green-50 p-4">
 				<div class="flex gap-3">
 					<Icon icon="mdi:check-decagram-outline" class="h-5 w-5 flex-shrink-0 text-green-700" />
 					<div class="text-sm text-green-900">
 						<strong>Payment already confirmed</strong>
 						<p class="mt-1">
-							Your payment authorization is active. You can proceed to invite reviewers.
+							The required paper payment is complete. You can proceed to invite reviewers.
 						</p>
 					</div>
 				</div>

@@ -16,6 +16,8 @@
 	let { data }: Props = $props();
 	let paper = data.paper as unknown as Paper;
 	const canFinalizePublication = data.canFinalizePublication === true;
+	const paymentGate = (data as any).paymentGate ?? null;
+	const requiresPublicationPayment = Boolean(paymentGate?.required && !paymentGate?.allowed);
 
 	let expanded: Record<string, boolean> = $state({});
 	let isApproving = $state(false);
@@ -81,6 +83,10 @@
 	}
 
 	async function approve() {
+		if (requiresPublicationPayment) {
+			await goto(`/publish/payment-hold?paperId=${(paper as any).id}`);
+			return;
+		}
 		const trimmedDoi = doi?.trim();
 		if (trimmedDoi && !/^10\.\S+\/\S+$/i.test(trimmedDoi)) {
 			actionError = 'Invalid DOI format. Use pattern starting with 10.xxxx/xxxxx.';
@@ -205,9 +211,17 @@
 				Collapse all
 			</button>
 			{#if canFinalizePublication}
+				{#if requiresPublicationPayment}
+					<button
+						class="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
+						onclick={() => goto(`/publish/payment-hold?paperId=${(paper as any).id}`)}
+					>
+						Pay publication fee
+					</button>
+				{/if}
 				<button
 					class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-					disabled={isApproving || isRejecting}
+					disabled={isApproving || isRejecting || requiresPublicationPayment}
 					onclick={approve}
 				>
 					{isApproving ? 'Approving...' : 'Approve'}
@@ -227,6 +241,12 @@
 		<div class="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
 			You can review all publication data, but only the hub owner can approve or reject the final
 			publication.
+		</div>
+	{/if}
+
+	{#if requiresPublicationPayment}
+		<div class="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+			Publication payment is required before this paper can be published.
 		</div>
 	{/if}
 

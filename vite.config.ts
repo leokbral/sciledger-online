@@ -23,6 +23,8 @@ export default defineConfig({
     preview: {
         allowedHosts: [
             'localhost',
+            'dev.sciledger.imd.ufrn.br',
+            'sciledger.imd.ufrn.br',
             'scideep.imd.ufrn.br'
         ]
     },

@@ -7,6 +7,12 @@ import Users from '$lib/db/models/User';
 import { ensureHubOwnerAssignment, ensureHubRoles } from '$lib/server/authorization/bootstrapRbac';
 import { emitEvent } from '$lib/services/EventService';
 
+function normalizePaperPaymentPolicy(value: unknown) {
+	return value === 'submission' || value === 'review' || value === 'publication'
+		? value
+		: 'publication';
+}
+
 export const POST: RequestHandler = async ({ request }) => {
     await start_mongo();
 
@@ -29,6 +35,8 @@ export const POST: RequestHandler = async ({ request }) => {
             authorInvite,
             identityVisibility,
             reviewVisibility,
+            billing,
+            publicationPolicy,
             socialMedia,  // Add this line
             tracks,
             calendar,
@@ -88,6 +96,17 @@ export const POST: RequestHandler = async ({ request }) => {
             authorInvite,
             identityVisibility,
             reviewVisibility,
+            billing: {
+                paperPaymentPolicy: normalizePaperPaymentPolicy(billing?.paperPaymentPolicy),
+                policyVersion: billing?.policyVersion || 'hub-billing-v1',
+                updatedAt: new Date()
+            },
+            publicationPolicy: {
+                text: publicationPolicy?.text || '',
+                version: publicationPolicy?.version || 'hub-publication-v1',
+                updatedAt: new Date(),
+                updatedBy: createdBy.id
+            },
             socialMedia: {
                 twitter: socialMedia?.twitter || '',
                 facebook: socialMedia?.facebook || '',

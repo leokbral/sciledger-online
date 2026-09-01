@@ -118,7 +118,7 @@
 		</div>
 
 		<p class="mt-4 text-xs text-surface-500 dark:text-surface-400">
-			💡 These supplementary materials are directly available for download. Each file is limited to 10MB.
+			These supplementary materials are directly available for download. The total upload limit is 20MB.
 		</p>
 	</section>
 {/if}

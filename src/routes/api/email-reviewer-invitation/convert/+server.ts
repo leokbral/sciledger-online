@@ -37,6 +37,7 @@ import {
 	EditorialTransitionError,
 	transitionPaperStatus
 } from '$lib/server/authorization/editorialTransitionService';
+import { getReviewerInvitationPaymentGate } from '$lib/server/payments/paperPaymentService';
 
 // Import models
 let Invitation: any;
@@ -123,6 +124,19 @@ async function acceptPaperReviewInvite(options: {
 	const paper = await Papers.findOne({ id: paperId }).populate('hubId');
 	if (!paper) {
 		return { ok: false, status: 404, error: 'Paper not found' };
+	}
+
+	const paymentGate = await getReviewerInvitationPaymentGate(paper);
+	if (!paymentGate.allowed) {
+		return {
+			ok: false,
+			status: 403,
+			error: 'Captured payment is required before accepting review invitations for this paper',
+			code: 'payment_required',
+			paymentState: paymentGate.state,
+			paymentPolicy: paymentGate.policy,
+			paymentPurpose: paymentGate.purpose
+		};
 	}
 
 	const user = await Users.findOne({ $or: [{ id: userId }, { _id: userId }] }).lean();
@@ -368,7 +382,8 @@ async function acceptPaperReviewInvite(options: {
 		if (
 			acceptedCount >= REQUIRED_REVIEWERS &&
 			paperDoc.paymentHold?.stripePaymentIntentId &&
-			paperDoc.paymentHold?.status === 'authorized'
+			paperDoc.paymentHold?.status === 'authorized' &&
+			(paperDoc.paymentHold as any)?.purpose === 'reviewer_work_hold'
 		) {
 			const stripe = getStripe();
 			if (stripe) {
@@ -553,15 +568,18 @@ export async function POST({ request }) {
 			// Mark email invitation as accepted (converted)
 			emailInvitation.status = 'accepted';
 			emailInvitation.updatedAt = new Date();
-			await emailInvitation.save();
+			await (emailInvitation as any).save();
 
 			if (emailInvitation.paperId) {
 				const acceptanceResult = await acceptPaperReviewInvite({
 					userId: normalizedUserId,
-					inviterId: emailInvitation.invitedBy || null,
+					inviterId: emailInvitation.invitedBy ? String(emailInvitation.invitedBy) : null,
 					paperId: String(emailInvitation.paperId),
 					hubId: String(emailInvitation.hubId),
-					customDeadlineDays: emailInvitation.customDeadlineDays
+					customDeadlineDays:
+						typeof emailInvitation.customDeadlineDays === 'number'
+							? emailInvitation.customDeadlineDays
+							: null
 				});
 
 				if (!acceptanceResult.ok) {
@@ -650,10 +668,13 @@ export async function POST({ request }) {
 		if (emailInvitation.paperId) {
 			const acceptanceResult = await acceptPaperReviewInvite({
 				userId: normalizedUserId,
-				inviterId: emailInvitation.invitedBy || null,
+				inviterId: emailInvitation.invitedBy ? String(emailInvitation.invitedBy) : null,
 				paperId: String(emailInvitation.paperId),
 				hubId: String(emailInvitation.hubId),
-				customDeadlineDays: emailInvitation.customDeadlineDays
+				customDeadlineDays:
+					typeof emailInvitation.customDeadlineDays === 'number'
+						? emailInvitation.customDeadlineDays
+						: null
 			});
 
 			if (!acceptanceResult.ok) {
@@ -682,7 +703,7 @@ export async function POST({ request }) {
 		// Mark email invitation as accepted (converted to hub invitation)
 		emailInvitation.status = 'accepted';
 		emailInvitation.updatedAt = new Date();
-		await emailInvitation.save();
+		await (emailInvitation as any).save();
 
 		return json({
 			success: true,

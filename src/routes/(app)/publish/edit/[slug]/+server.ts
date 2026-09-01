@@ -9,6 +9,10 @@ import {
     EditorialTransitionError,
     transitionPaperStatus
 } from '$lib/server/authorization/editorialTransitionService';
+import {
+    normalizePaperCoverIds,
+    validateSupplementaryFilesTotal
+} from '$lib/utils/paperFileValidation';
 
 function normalizeId(input: any): string | undefined {
     if (!input) return undefined;
@@ -86,6 +90,18 @@ export const POST: RequestHandler = async ({ request, locals }) => {
         const normalizedMainAuthorId = normalizeId(data.mainAuthor);
         const normalizedCorrespondingAuthorId = normalizeId(data.correspondingAuthor);
         const normalizedSubmittedById = normalizeId(data.submittedBy);
+        const supplementaryValidation = validateSupplementaryFilesTotal(data.supplementaryFiles || []);
+        if (!supplementaryValidation.ok) {
+            return json(
+                {
+                    error: supplementaryValidation.message,
+                    code: 'supplementary_total_limit_exceeded',
+                    maxTotalSize: supplementaryValidation.maxBytes,
+                    currentTotalSize: supplementaryValidation.totalSize
+                },
+                { status: 413 }
+            );
+        }
         const previousStatus = String((existingPaper as any).status || '');
         const requestedStatus = String(data.status || previousStatus);
         const shouldSubmit = previousStatus === 'draft' && requestedStatus === 'reviewer assignment';
@@ -100,7 +116,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
         const updateData = {
             mainAuthor: normalizedMainAuthorId,
             authors: _authors,
-            paperPictures: data.paperPictures,
+            paperPictures: normalizePaperCoverIds(data.paperPictures),
             correspondingAuthor: normalizedCorrespondingAuthorId,
             coAuthors: _coAuthors,
             authorAffiliations: normalizedAuthorAffiliations,

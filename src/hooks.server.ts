@@ -42,6 +42,10 @@ let mongoInitPromise: Promise<void> | null = null;
 // codebase (email links, Stripe redirect URLs) rather than inventing a new
 // multi-origin allowlist mechanism.
 function getAllowedOrigin(requestUrl: URL): string {
+	if (requestUrl.hostname === 'dev.sciledger.imd.ufrn.br') {
+		return requestUrl.origin;
+	}
+
 	const configuredOrigin = env.SITE_URL || env.PUBLIC_SITE_URL;
 	if (configuredOrigin) {
 		return configuredOrigin.replace(/\/+$/, '');
@@ -62,7 +66,8 @@ function getSessionUser(user: any) {
 		bio: user.bio,
 		position: user.position,
 		institution: user.institution,
-		orcid: user.orcid
+		orcid: user.orcid,
+		billingStatus: user.billingStatus
 	};
 }
 

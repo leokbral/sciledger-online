@@ -1,419 +1,614 @@
 <script lang="ts">
-  import { page } from '$app/stores';
-  import { goto } from '$app/navigation';
-  import { onMount } from 'svelte';
-  import Icon from '@iconify/svelte';
+	import { page } from '$app/stores';
+	import { goto } from '$app/navigation';
+	import { onMount, tick } from 'svelte';
+	import Icon from '@iconify/svelte';
 
-  interface Props {
-    data: any;
-  }
+	interface Props {
+		data: any;
+	}
 
-  let { data }: Props = $props();
+	let { data }: Props = $props();
 
-  let stripe: any = null;
-  let elements: any = null;
-  let cardNumberElement: any = null;
-  let cardExpiryElement: any = null;
-  let cardCvcElement: any = null;
-  let isProcessing = $state(false);
-  let error = $state('');
-  let success = $state(false);
-  const paymentAmount = 400_00; // R$ 400,00 fixo
-  const platformFee = 160_00; // R$ 160,00
-  const reviewerFee = 80_00; // R$ 80,00 por revisor
-  let paperId = $derived($page.url.searchParams.get('paperId'));
+	let stripe: any = null;
+	let elements: any = null;
+	let paymentElement: any = null;
+	let billingAddressElement: any = null;
+	let paymentIntentId = $state(data.paymentState?.paymentIntentId ?? '');
+	let paymentElementReady = $state(false);
+	let isInitializing = $state(false);
+	let isProcessing = $state(false);
+	let error = $state('');
+	let statusMessage = $state('');
+	let success = $state(false);
+	let paymentPolicyAccepted = $state(Boolean(data.paymentPolicyAccepted));
+	let activePaymentPurpose = $state(String(data.paymentState?.purpose ?? 'standalone_submission'));
+	let activePaymentPolicy = $state(String(data.paymentState?.policy ?? 'submission'));
+	let paperId = $derived($page.url.searchParams.get('paperId'));
+	let returnedPaymentIntentId = $derived($page.url.searchParams.get('payment_intent'));
+	let paymentAmount = $derived(Number(data.amountCents ?? 40000));
+	let paymentCurrency = $derived(String(data.currency ?? 'brl').toUpperCase());
+	let paymentAlreadyCaptured = $state(data.paymentState?.state === 'captured');
 
-  function formatBrl(valueInCents: number): string {
-    return `R$${(valueInCents / 100).toFixed(2)} BRL`;
-  }
+	function formatMoney(valueInCents: number): string {
+		return new Intl.NumberFormat('pt-BR', {
+			style: 'currency',
+			currency: paymentCurrency
+		}).format(valueInCents / 100);
+	}
 
-  async function initStripe() {
-    if (!data.stripePublicKey) {
-      error = 'Stripe is not configured. Please contact support.';
-      return;
-    }
+	async function waitForStripeJs() {
+		let retries = 0;
+		while (!(window as any).Stripe && retries < 20) {
+			await new Promise((resolve) => setTimeout(resolve, 100));
+			retries++;
+		}
+	}
 
-    // Aguardar o script ser carregado com retry
-    let retries = 0;
-    const maxRetries = 20; // 2 segundos com 100ms entre cada
-    
-    while (!window.Stripe && retries < maxRetries) {
-      await new Promise(resolve => setTimeout(resolve, 100));
-      retries++;
-    }
+	function buildReturnUrl() {
+		const url = new URL('/publish/payment-hold', window.location.origin);
+		if (paperId) {
+			url.searchParams.set('paperId', paperId);
+		}
+		return url.toString();
+	}
 
-    if (!window.Stripe) {
-      error = 'Stripe library failed to load. Please refresh the page.';
-      console.error('Stripe.js failed to load after 2 seconds');
-      return;
-    }
+	function isSubmissionPayment(purpose = activePaymentPurpose) {
+		return purpose === 'standalone_submission' || purpose === 'hub_submission';
+	}
 
-    try {
-      // @ts-ignore
-      stripe = await window.Stripe(data.stripePublicKey);
-      if (!stripe) {
-        error = 'Failed to initialize Stripe';
-        return;
-      }
+	function paymentTitle() {
+		if (activePaymentPurpose === 'hub_review') return 'Review Payment';
+		if (activePaymentPurpose === 'hub_publication') return 'Publication Payment';
+		return 'Submission Payment';
+	}
 
-      // @ts-ignore
-      elements = stripe.elements();
-      
-      // Verificar se elementos existem no DOM
-      const cardNumberContainer = document.getElementById('card-number-element');
-      const cardExpiryContainer = document.getElementById('card-expiry-element');
-      const cardCvcContainer = document.getElementById('card-cvc-element');
-      if (!cardNumberContainer || !cardExpiryContainer || !cardCvcContainer) {
-        error = 'Card form containers not found in page. Please refresh.';
-        return;
-      }
+	function paymentDescription() {
+		if (activePaymentPurpose === 'hub_review') {
+			return 'Payment is required before this Hub paper can move into review.';
+		}
+		if (activePaymentPurpose === 'hub_publication') {
+			return 'Payment is required before this Hub paper can be published.';
+		}
+		return 'Payment is required before this paper can be submitted.';
+	}
 
-      const stripeElementStyle = {
-        style: {
-          base: {
-            fontSize: '16px',
-            color: '#424770',
-            fontFamily: 'ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif',
-            '::placeholder': {
-              color: '#aab7c4'
-            }
-          },
-          invalid: {
-            color: '#fa755a'
-          }
-        }
-      };
+	function paymentInfoText() {
+		if (activePaymentPurpose === 'hub_review') {
+			return 'This Hub charges before review. After Stripe confirms the payment, return to reviewer assignment to continue.';
+		}
+		if (activePaymentPurpose === 'hub_publication') {
+			return 'This Hub charges before publication. After Stripe confirms the payment, return to publication approval to continue.';
+		}
+		return 'This is an immediate submission charge. After Stripe confirms the payment, the paper will be submitted for reviewer assignment.';
+	}
 
-      cardNumberElement = elements.create('cardNumber', stripeElementStyle);
-      cardExpiryElement = elements.create('cardExpiry', stripeElementStyle);
-      cardCvcElement = elements.create('cardCvc', stripeElementStyle);
+	function paymentFeeLabel() {
+		if (activePaymentPurpose === 'hub_review') return 'Review fee';
+		if (activePaymentPurpose === 'hub_publication') return 'Publication fee';
+		return 'Submission fee';
+	}
 
-      cardNumberElement.mount('#card-number-element');
-      cardExpiryElement.mount('#card-expiry-element');
-      cardCvcElement.mount('#card-cvc-element');
-    } catch (err) {
-      error = `Stripe initialization error: ${err instanceof Error ? err.message : 'Unknown error'}`;
-      console.error('Stripe initialization failed:', err);
-    }
-  }
+	function paymentButtonText() {
+		if (activePaymentPurpose === 'hub_review') return `Pay review fee ${formatMoney(paymentAmount)}`;
+		if (activePaymentPurpose === 'hub_publication') {
+			return `Pay publication fee ${formatMoney(paymentAmount)}`;
+		}
+		return `Pay and submit ${formatMoney(paymentAmount)}`;
+	}
 
-  async function handlePaymentHold(e: any) {
-    e.preventDefault();
-    
-    // Verificações iniciais
-    if (!stripe) {
-      error = 'Stripe client not initialized. Please refresh the page.';
-      return;
-    }
-    
-    if (!elements) {
-      error = 'Payment form elements not loaded. Please refresh the page.';
-      return;
-    }
-    
-    if (!cardNumberElement || !cardExpiryElement || !cardCvcElement) {
-      error = 'Card fields are not ready. Please refresh the page and try again.';
-      return;
-    }
+	function destinationAfterPayment(purpose = activePaymentPurpose) {
+		if (purpose === 'hub_publication') return `/publish/publication-approval/${paperId}`;
+		return `/publish/reviewer-assignment/${paperId}`;
+	}
 
-    isProcessing = true;
-    error = '';
+	async function initStripe() {
+		if (!paperId) {
+			error = 'Please save your paper as a draft before starting payment.';
+			return;
+		}
+		if (!data.stripePublicKey) {
+			error = 'Stripe is not configured. Please contact support.';
+			return;
+		}
+		if (paymentAlreadyCaptured && !returnedPaymentIntentId) {
+			statusMessage = 'Payment already confirmed. Continue your paper workflow.';
+			return;
+		}
+		if (!returnedPaymentIntentId && !paymentPolicyAccepted) {
+			statusMessage = 'Review and accept the payment rules before loading the secure form.';
+			return;
+		}
 
-    try {
-      const userEmail = $page.data.user?.email || `user-${Date.now()}@temp.local`;
+		isInitializing = true;
+		error = '';
+		statusMessage = 'Loading secure payment form...';
 
-      // Step 1: Criar o Payment Intent no servidor
-      
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 segundo timeout
+		await waitForStripeJs();
+		if (!(window as any).Stripe) {
+			error = 'Stripe library failed to load. Please refresh the page.';
+			isInitializing = false;
+			return;
+		}
 
-      const holdRes = await fetch('/api/stripe/payment-hold', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount: paymentAmount,
-          currency: 'brl',
-          email: userEmail,
-          paperId: paperId || 'pending',
-          description: 'Publication Fee Authorization Hold'
-        }),
-        signal: controller.signal
-      });
+		try {
+			stripe = await (window as any).Stripe(data.stripePublicKey);
 
-      clearTimeout(timeoutId);
+			if (returnedPaymentIntentId) {
+				try {
+					statusMessage = 'Checking payment result with Stripe...';
+					await submitPaperAfterPayment(returnedPaymentIntentId);
+					success = true;
+					setTimeout(() => goto(destinationAfterPayment()), 1200);
+					return;
+				} catch (redirectError) {
+					error =
+						redirectError instanceof Error
+							? redirectError.message
+							: 'Payment could not be confirmed after authentication.';
+				}
+			}
 
-      if (!holdRes.ok) {
-        let errorMsg = 'Failed to create payment hold';
-        try {
-          const errorData = await holdRes.json();
-          errorMsg = errorData.error || errorMsg;
-        } catch (e) {
-          // Se não conseguir parsear JSON, usar status code
-          errorMsg = `Server error (${holdRes.status}): ${holdRes.statusText}`;
-        }
-        error = errorMsg;
-        console.error('Payment hold error:', errorMsg);
-        isProcessing = false;
-        return;
-      }
+			const holdData = await startPaymentIntent();
+			activePaymentPurpose = holdData.purpose ?? activePaymentPurpose;
+			activePaymentPolicy = holdData.policy ?? activePaymentPolicy;
+			paymentIntentId = holdData.paymentIntentId ?? '';
 
-      let holdData;
-      try {
-        holdData = await holdRes.json();
-      } catch (e) {
-        error = 'Invalid response from server. Please try again.';
-        console.error('Failed to parse payment hold response:', e);
-        isProcessing = false;
-        return;
-      }
+			if (holdData.alreadyPaid && holdData.paymentIntentId) {
+				paymentAlreadyCaptured = true;
+				statusMessage = 'Payment already confirmed. Continue to submit your paper.';
+				return;
+			}
 
-      if (holdData.error) {
-        error = holdData.error;
-        console.error('Payment hold error:', holdData.error);
-        isProcessing = false;
-        return;
-      }
+			if (!holdData.clientSecret) {
+				throw new Error('Payment could not be initialized. Missing client secret.');
+			}
 
-      const paymentIntentId = holdData.paymentIntentId;
-      const clientSecret = holdData.clientSecret;
+			paymentAlreadyCaptured = false;
+			await tick();
+			mountPaymentElements(holdData.clientSecret);
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'Payment form could not be initialized.';
+		} finally {
+			isInitializing = false;
+		}
+	}
 
-      if (!clientSecret) {
-        error = 'Invalid response: missing client secret';
-        console.error('Missing client secret in response');
-        isProcessing = false;
-        return;
-      }
+	async function startPaymentIntent() {
+		if (!paperId) {
+			throw new Error('Missing paperId for payment.');
+		}
 
+		const holdRes = await fetch('/api/stripe/payment-hold', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ paperId, acceptPaymentPolicy: paymentPolicyAccepted })
+		});
+		const holdData = await holdRes.json().catch(() => ({}));
+		if (!holdRes.ok) {
+			throw new Error(holdData.error || 'Failed to start payment.');
+		}
 
-      // Step 2: Confirmar o Payment Intent com o card element
-      // @ts-ignore
-      const confirmRes = await stripe.confirmCardPayment(clientSecret, {
-        payment_method: {
-          card: cardNumberElement,
-          billing_details: {
-            email: userEmail
-          }
-        }
-      });
+		return holdData;
+	}
 
-      if (confirmRes.error) {
-        error = confirmRes.error.message || 'Payment confirmation failed';
-        console.error('Card confirmation error:', confirmRes.error);
-        isProcessing = false;
-        return;
-      }
+	function mountPaymentElements(secret: string) {
+		const paymentContainer = document.getElementById('payment-element');
+		const billingAddressContainer = document.getElementById('billing-address-element');
+		if (!paymentContainer || !billingAddressContainer) {
+			throw new Error('Payment form is not ready. Please refresh the page.');
+		}
 
-      const paymentIntent = confirmRes.paymentIntent;
+		paymentElementReady = false;
+		paymentElement?.unmount?.();
+		billingAddressElement?.unmount?.();
 
-      if (!paymentIntent) {
-        error = 'Payment intent is missing from response';
-        console.error('Missing payment intent in confirmation response');
-        isProcessing = false;
-        return;
-      }
+		elements = stripe.elements({
+			clientSecret: secret,
+			appearance: {
+				theme: 'stripe',
+				variables: {
+					colorPrimary: '#2563eb',
+					colorText: '#1f2937',
+					colorDanger: '#dc2626',
+					fontFamily:
+						'ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif',
+					borderRadius: '8px'
+				}
+			}
+		});
 
+		billingAddressElement = elements.create('address', {
+			mode: 'billing',
+			fields: {
+				phone: 'never'
+			},
+			defaultValues: {
+				address: {
+					country: 'BR'
+				}
+			}
+		});
 
-      if (paymentIntent.status === 'succeeded' || paymentIntent.status === 'requires_capture') {
-        success = true;
+		paymentElement = elements.create('payment', {
+			layout: {
+				type: 'tabs',
+				defaultCollapsed: false
+			},
+			fields: {
+				billingDetails: {
+					name: 'never',
+					address: 'never'
+				}
+			},
+			defaultValues: {
+				billingDetails: {
+					email: data.user?.email || ''
+				}
+			}
+		});
 
-        // Atualizar o paper com o código de autorização quando já existe paper em edição
-        if (paperId) {
-          try {
-            const updateRes = await fetch(`/api/papers/${paperId}/update-payment-auth`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                paymentAuthorizationCode: paymentIntentId
-              })
-            });
-            
-            if (!updateRes.ok) {
-              const updateError = await updateRes.json().catch(() => ({ error: 'Unknown error' }));
-              console.error('Failed to update payment auth code:', updateError);
-              // Não interrompe o fluxo, continua mesmo se falhar
-            } else {
-            }
-          } catch (err) {
-            console.error('Error updating payment auth:', err);
-            // Não interrompe o fluxo
-          }
-        }
+		billingAddressElement.on('change', (event: any) => {
+			if (event?.error?.message) {
+				error = event.error.message;
+			} else if (error) {
+				error = '';
+			}
+		});
+		paymentElement.on('change', (event: any) => {
+			if (event?.error?.message) {
+				error = event.error.message;
+			} else if (error) {
+				error = '';
+			}
+		});
+		paymentElement.on('ready', () => {
+			paymentElementReady = true;
+			statusMessage = 'Payment form ready.';
+		});
 
-        // Redirecionar para o fluxo correto após autorização
-        setTimeout(() => {
-          if (paperId) {
-            goto(`/publish/reviewer-assignment/${paperId}`);
-            return;
-          }
+		billingAddressElement.mount('#billing-address-element');
+		paymentElement.mount('#payment-element');
+	}
 
-          goto(`/publish/new?authorizationCode=${encodeURIComponent(paymentIntentId)}`);
-        }, 2000);
-      } else {
-        error = `Unexpected payment status: ${paymentIntent.status}. Please contact support.`;
-        console.error('Unexpected payment intent status:', paymentIntent.status);
-      }
-    } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') {
-        error = 'Request timeout. Please check your connection and try again.';
-        console.error('Payment request timeout');
-      } else {
-        error = `Error: ${err instanceof Error ? err.message : 'Unknown error'}`;
-        console.error('Payment error:', err);
-      }
-    } finally {
-      isProcessing = false;
-    }
-  }
+	async function reconcilePayment(paymentIntentId: string) {
+		if (!paperId) {
+			throw new Error('Missing paperId for submission.');
+		}
 
-  onMount(() => {
-    initStripe();
-  });
+		const updateRes = await fetch(`/api/papers/${paperId}/update-payment-auth`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ paymentIntentId })
+		});
+		const updateData = await updateRes.json().catch(() => ({}));
+		if (!updateRes.ok) {
+			throw new Error(updateData.error || 'Payment could not be reconciled.');
+		}
+
+		return updateData;
+	}
+
+	async function submitPaperAfterPayment(paymentIntentId: string) {
+		const updateData = await reconcilePayment(paymentIntentId);
+		if (updateData.paymentState !== 'captured') {
+			throw new Error(updateData.error || `Payment is not complete yet. Current status: ${updateData.status}.`);
+		}
+		activePaymentPurpose = updateData.purpose ?? activePaymentPurpose;
+		activePaymentPolicy = updateData.policy ?? activePaymentPolicy;
+
+		if (!isSubmissionPayment(updateData.purpose ?? activePaymentPurpose)) {
+			statusMessage = 'Payment confirmed. Continue your paper workflow.';
+			return;
+		}
+
+		const submitRes = await fetch(`/api/papers/${paperId}/status`, {
+			method: 'PATCH',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				status: 'reviewer assignment',
+				expectedStatus: 'draft',
+				metadata: {
+					paymentIntentId,
+					source: updateData.purpose ?? activePaymentPurpose,
+					paymentPolicy: updateData.policy ?? activePaymentPolicy
+				}
+			})
+		});
+		const submitData = await submitRes.json().catch(() => ({}));
+		if (!submitRes.ok) {
+			throw new Error(submitData.error || 'Payment succeeded, but submission could not be completed.');
+		}
+	}
+
+	async function collectBillingDetails() {
+		if (!billingAddressElement) return null;
+
+		const addressResult = await billingAddressElement.getValue();
+		if (!addressResult?.complete) {
+			throw new Error('Please complete the billing name and address.');
+		}
+
+		return {
+			name: addressResult.value?.name,
+			address: addressResult.value?.address
+		};
+	}
+
+	async function handlePaymentIntentResult(paymentIntent: any) {
+		paymentIntentId = paymentIntent.id;
+
+		if (paymentIntent.status === 'succeeded') {
+			statusMessage = 'Payment approved. Confirming with SciLedger...';
+			await submitPaperAfterPayment(paymentIntent.id);
+			paymentAlreadyCaptured = true;
+			success = true;
+			setTimeout(() => goto(destinationAfterPayment()), 1200);
+			return;
+		}
+
+		if (paymentIntent.status === 'processing') {
+			statusMessage = 'Payment is processing. Your paper remains blocked until Stripe confirms capture.';
+			await reconcilePayment(paymentIntent.id);
+			return;
+		}
+
+		if (paymentIntent.status === 'requires_action') {
+			statusMessage = 'Additional authentication is required before this payment can be completed.';
+			await reconcilePayment(paymentIntent.id);
+			return;
+		}
+
+		if (paymentIntent.status === 'requires_payment_method') {
+			statusMessage = 'Payment was not approved. Please review the details and try another payment method.';
+			await reconcilePayment(paymentIntent.id);
+			return;
+		}
+
+		if (paymentIntent.status === 'canceled') {
+			throw new Error('Payment was canceled. Please start a new attempt.');
+		}
+
+		throw new Error(`Payment is not complete yet. Current status: ${paymentIntent.status}.`);
+	}
+
+	async function handlePayment(e: SubmitEvent) {
+		e.preventDefault();
+
+		if (!paperId) {
+			error = 'Please save your paper as a draft before starting payment.';
+			return;
+		}
+
+		isProcessing = true;
+		error = '';
+
+		try {
+			if (paymentAlreadyCaptured) {
+				statusMessage = isSubmissionPayment()
+					? 'Payment already confirmed. Submitting your paper...'
+					: 'Payment already confirmed. Continuing your paper workflow...';
+				if (paymentIntentId && isSubmissionPayment()) {
+					await submitPaperAfterPayment(paymentIntentId);
+				}
+				success = true;
+				setTimeout(() => goto(destinationAfterPayment()), 1200);
+				return;
+			}
+
+			if (!stripe || !elements || !paymentElement) {
+				throw new Error('Payment form is not ready. Please refresh the page.');
+			}
+
+			statusMessage = 'Validating payment and billing details...';
+			const billingDetails = await collectBillingDetails();
+			const submitResult = await elements.submit();
+			if (submitResult?.error) {
+				throw new Error(submitResult.error.message || 'Please review your payment details.');
+			}
+
+			const confirmParams: Record<string, unknown> = {
+				return_url: buildReturnUrl()
+			};
+			if (billingDetails) {
+				confirmParams.payment_method_data = {
+					billing_details: {
+						...billingDetails,
+						email: data.user?.email || undefined
+					}
+				};
+			}
+
+			statusMessage = 'Confirming payment with Stripe...';
+			const confirmRes = await stripe.confirmPayment({
+				elements,
+				confirmParams,
+				redirect: 'if_required'
+			});
+
+			if (confirmRes.error) {
+				if (confirmRes.error.type === 'card_error') {
+					throw new Error(confirmRes.error.message || 'Payment was declined.');
+				}
+				if (confirmRes.error.type === 'validation_error') {
+					throw new Error(confirmRes.error.message || 'Please review the payment form.');
+				}
+				throw new Error(confirmRes.error.message || 'Payment confirmation failed.');
+			}
+
+			const paymentIntent = confirmRes.paymentIntent;
+			if (!paymentIntent?.id) {
+				throw new Error('Payment intent is missing from Stripe response.');
+			}
+
+			await handlePaymentIntentResult(paymentIntent);
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'Payment failed. Please try again.';
+		} finally {
+			isProcessing = false;
+		}
+	}
+
+	onMount(() => {
+		if (returnedPaymentIntentId || paymentAlreadyCaptured || paymentPolicyAccepted) {
+			initStripe();
+		}
+	});
 </script>
 
 <svelte:head>
-  <title>Authorization Hold | SciLedger</title>
-  <script src="https://js.stripe.com/v3/"></script>
+	<title>Submission Payment | SciLedger</title>
+	<script src="https://js.stripe.com/v3/"></script>
 </svelte:head>
 
-<div class="min-h-screen bg-gradient-to-br from-primary-50 to-primary-100 flex items-center justify-center px-4 py-8">
-  <div class="w-full max-w-md bg-white rounded-2xl shadow-2xl p-8">
-    <!-- Header -->
-    <div class="text-center mb-8">
-      <div class="flex justify-center mb-4">
-        <div class="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center">
-          <Icon icon="mdi:lock-outline" class="w-8 h-8 text-primary-600" />
-        </div>
-      </div>
-      <h1 class="text-3xl font-bold text-gray-900 mb-2">Authorization Hold</h1>
-      <p class="text-gray-600">Authorize payment before submitting your paper</p>
-    </div>
+<div class="min-h-screen bg-surface-100 flex items-center justify-center px-4 py-8">
+	<div class="w-full max-w-md bg-white rounded-lg shadow-xl p-8">
+		<div class="text-center mb-8">
+			<div class="flex justify-center mb-4">
+				<div class="w-14 h-14 bg-primary-100 rounded-full flex items-center justify-center">
+					<Icon icon="mdi:credit-card-check-outline" class="w-7 h-7 text-primary-600" />
+				</div>
+			</div>
+			<h1 class="text-2xl font-bold text-gray-900 mb-2">{paymentTitle()}</h1>
+			<p class="text-gray-600">{paymentDescription()}</p>
+		</div>
 
-    {#if data?.error}
-      <!-- Configuration Error -->
-      <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded">
-        <p class="text-sm text-red-900 font-semibold">Configuration Error</p>
-        <p class="text-sm text-red-700 mt-1">{data.error}</p>
-        <p class="text-xs text-red-600 mt-2">
-          Please ensure your administrator has configured Stripe in the system.
-        </p>
-      </div>
-    {:else}
-      <!-- Info Card -->
-      <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 rounded">
-        <p class="text-sm text-blue-900">
-          <strong>ℹ️ How it works:</strong> We'll authorize (block) a temporary hold on your card. The actual charge
-          will only happen when your paper is published. You won't be charged during the review process.
-        </p>
-      </div>
+		{#if data?.error}
+			<div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded">
+				<p class="text-sm text-red-900 font-semibold">Configuration Error</p>
+				<p class="text-sm text-red-700 mt-1">{data.error}</p>
+			</div>
+		{:else if !paperId}
+			<div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 mb-6 rounded">
+				<p class="text-sm text-yellow-900 font-semibold">Draft required</p>
+				<p class="text-sm text-yellow-800 mt-1">Save your paper as a draft before starting payment.</p>
+			</div>
+		{:else}
+			<div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 rounded">
+				<p class="text-sm text-blue-900">
+					{paymentInfoText()}
+				</p>
+			</div>
 
-      <!-- Amount Display -->
-      <div class="bg-gray-50 rounded-lg p-6 mb-6">
-        <div class="flex justify-between items-center mb-2">
-          <span class="text-gray-600">Publication Fee</span>
-          <span class="text-3xl font-bold text-primary-600">{formatBrl(paymentAmount)}</span>
-        </div>
-        <p class="text-xs text-gray-500">Fixed fee split: {formatBrl(platformFee)} platform + 3 x {formatBrl(reviewerFee)} reviewers</p>
-      </div>
+			<div class="bg-gray-50 rounded-lg p-5 mb-6">
+				<div class="flex justify-between items-center gap-4">
+					<span class="text-gray-600">{paymentFeeLabel()}</span>
+					<span class="text-2xl font-bold text-primary-700">{formatMoney(paymentAmount)}</span>
+				</div>
+				<p class="text-xs text-gray-500 mt-2">Policy: {activePaymentPolicy}</p>
+				{#if data.paymentState?.state === 'retry_required'}
+					<p class="text-sm text-red-700 mt-3">The previous payment attempt was not completed.</p>
+				{:else if data.paymentState?.state === 'processing'}
+					<p class="text-sm text-blue-700 mt-3">A payment attempt is currently processing.</p>
+				{/if}
+			</div>
 
-      {#if success}
-        <!-- Success Message -->
-        <div class="bg-green-50 border-l-4 border-green-500 p-4 mb-6 rounded">
-          <div class="flex items-center gap-3">
-            <Icon icon="mdi:check-circle" class="w-6 h-6 text-green-600" />
-            <div>
-              <p class="font-semibold text-green-900">Authorization Successful!</p>
-              <p class="text-sm text-green-700">Redirecting to submission form...</p>
-            </div>
-          </div>
-        </div>
-      {:else}
-        <!-- Form -->
-        <form onsubmit={handlePaymentHold} class="space-y-6">
-          {#if error}
-            <div class="bg-red-50 border-l-4 border-red-500 p-4 rounded">
-              <p class="text-sm text-red-700 font-semibold">Error</p>
-              <p class="text-sm text-red-600">{error}</p>
-            </div>
-          {/if}
+			{#if statusMessage}
+				<div class="bg-surface-50 border border-surface-200 p-4 mb-6 rounded text-sm text-surface-700">
+					{statusMessage}
+				</div>
+			{/if}
 
-          <!-- Card Elements -->
-          <div class="space-y-3">
-            <label for="card-number-element" class="block text-sm font-medium text-gray-700">Card Details</label>
-            <div class="border border-gray-300 rounded-xl px-4 py-3 bg-white shadow-sm">
-              <div id="card-number-element"></div>
-            </div>
-            <div class="grid grid-cols-2 gap-3">
-              <div class="border border-gray-300 rounded-xl px-4 py-3 bg-white shadow-sm">
-                <div id="card-expiry-element"></div>
-              </div>
-              <div class="border border-gray-300 rounded-xl px-4 py-3 bg-white shadow-sm">
-                <div id="card-cvc-element"></div>
-              </div>
-            </div>
-          </div>
+			{#if success}
+				<div class="bg-green-50 border-l-4 border-green-500 p-4 mb-6 rounded">
+					<div class="flex items-center gap-3">
+						<Icon icon="mdi:check-circle" class="w-6 h-6 text-green-600" />
+						<div>
+							<p class="font-semibold text-green-900">Payment complete</p>
+							<p class="text-sm text-green-700">Submitting your paper...</p>
+						</div>
+					</div>
+				</div>
+			{:else}
+				<form onsubmit={handlePayment} class="space-y-6">
+					{#if error}
+						<div class="bg-red-50 border-l-4 border-red-500 p-4 rounded">
+							<p class="text-sm text-red-700 font-semibold">Payment issue</p>
+							<p class="text-sm text-red-600">{error}</p>
+						</div>
+					{/if}
 
-          <!-- Payment Method Selection -->
-          <div class="border-t pt-4">
-            <p class="text-xs text-gray-500 mb-3">Accepted payment methods:</p>
-            <div class="flex gap-2 text-gray-600 text-xs">
-              <div class="flex items-center gap-1">
-                <Icon icon="mdi:credit-card" class="w-4 h-4" />
-                <span>Credit Card</span>
-              </div>
-              <div class="flex items-center gap-1">
-                <Icon icon="mdi:credit-card" class="w-4 h-4" />
-                <span>Debit Card</span>
-              </div>
-            </div>
-          </div>
+					{#if paymentAlreadyCaptured}
+						<div class="bg-green-50 border border-green-200 p-4 rounded text-sm text-green-800">
+							Payment has already been confirmed for this paper.
+						</div>
+					{:else}
+						<div class="space-y-3 rounded border border-gray-200 bg-gray-50 p-4">
+							<label class="flex gap-3 text-sm text-gray-700">
+								<input
+									type="checkbox"
+									bind:checked={paymentPolicyAccepted}
+									class="mt-1 h-4 w-4 rounded border-gray-300 text-primary-600"
+								/>
+								<span>Li e aceito as regras de pagamento aplicaveis a este Paper.</span>
+							</label>
+							{#if !paymentElementReady && !isInitializing}
+								<button
+									type="button"
+									onclick={initStripe}
+									disabled={!paymentPolicyAccepted}
+									class="w-full rounded-lg border border-primary-600 px-4 py-2 text-sm font-semibold text-primary-700 disabled:border-gray-300 disabled:text-gray-400"
+								>
+									Load secure payment form
+								</button>
+							{/if}
+						</div>
 
-          <!-- Submit Button -->
-          <button
-            type="submit"
-            disabled={isProcessing}
-            class="w-full bg-primary-600 text-white py-3 rounded-lg font-semibold hover:bg-primary-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-          >
-            {#if isProcessing}
-              <span class="flex items-center justify-center gap-2">
-                <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                Processing...
-              </span>
-            {:else}
-              Authorize {formatBrl(paymentAmount)}
-            {/if}
-          </button>
+						<div class="space-y-3">
+							<label for="billing-address-element" class="block text-sm font-medium text-gray-700">
+								Billing details
+							</label>
+							<div class="border border-gray-300 rounded-lg px-4 py-3 bg-white shadow-sm">
+								<div id="billing-address-element"></div>
+							</div>
+						</div>
 
-          <!-- Additional Info -->
-          <div class="bg-gray-50 p-4 rounded text-xs text-gray-600 space-y-2">
-            <p>
-              <strong>✓ Secure:</strong> Your payment is processed by Stripe, the industry standard for secure payments.
-            </p>
-            <p>
-              <strong>✓ Temporary:</strong> This is an authorization hold that doesn't charge your card immediately.
-            </p>
-            <p>
-              <strong>✓ Flexible:</strong> The hold will be released if your paper is rejected.
-            </p>
-          </div>
-        </form>
-      {/if}
-    {/if}
+						<div class="space-y-3">
+							<label for="payment-element" class="block text-sm font-medium text-gray-700">
+								Payment method
+							</label>
+							<div class="border border-gray-300 rounded-lg px-4 py-3 bg-white shadow-sm">
+								{#if isInitializing}
+									<p class="text-sm text-gray-500">Loading payment form...</p>
+								{/if}
+								<div id="payment-element"></div>
+							</div>
+						</div>
+					{/if}
 
-    <!-- Footer -->
-    <div class="mt-6 pt-6 border-t text-center text-xs text-gray-600">
-      <p>Questions? Contact our support team.</p>
-    </div>
-  </div>
+					<button
+						type="submit"
+						disabled={isInitializing || isProcessing || (!paymentAlreadyCaptured && (!paymentElementReady || !paymentPolicyAccepted))}
+						class="w-full bg-primary-600 text-white py-3 rounded-lg font-semibold hover:bg-primary-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+					>
+						{#if isProcessing}
+							<span class="flex items-center justify-center gap-2">
+								<span class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+								Processing payment...
+							</span>
+						{:else if paymentAlreadyCaptured}
+							Continue submission
+						{:else}
+							{paymentButtonText()}
+						{/if}
+					</button>
+
+					<div class="bg-gray-50 p-4 rounded text-xs text-gray-600">
+						<p>Your payment is processed by Stripe. SciLedger does not store card details.</p>
+					</div>
+				</form>
+			{/if}
+		{/if}
+	</div>
 </div>
 
 <style>
-  :global(#card-number-element),
-  :global(#card-expiry-element),
-  :global(#card-cvc-element) {
-    min-height: 24px;
-  }
+	:global(#payment-element),
+	:global(#billing-address-element) {
+		min-height: 24px;
+	}
 
-  :global(.StripeElement) {
-    width: 100%;
-  }
+	:global(.StripeElement) {
+		width: 100%;
+	}
 </style>

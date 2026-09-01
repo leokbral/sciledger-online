@@ -25,7 +25,7 @@ pm2 delete sciledger || true
 # Start new instance with environment variables
 # BODY_SIZE_LIMIT sets max upload size (adapter-node)
 # PORT and HOST configure the server
-BODY_SIZE_LIMIT=10485760 PORT=3000 HOST=0.0.0.0 pm2 start build/index.js --name "sciledger"
+BODY_SIZE_LIMIT=20971520 PORT=3000 HOST=0.0.0.0 pm2 start build/index.js --name "sciledger"
 
 # Save PM2 process list
 pm2 save

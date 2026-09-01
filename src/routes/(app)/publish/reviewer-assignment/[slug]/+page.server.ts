@@ -9,6 +9,7 @@ import {
 	getEffectiveHubMemberForUser,
 	resolveEffectiveHubRoles
 } from '$lib/server/authorization/effectiveHubRoles';
+import { getReviewerInvitationPaymentGate } from '$lib/server/payments/paperPaymentService';
 interface ObjectId {
 	toString(): string;
 	constructor: { name: string };
@@ -176,6 +177,7 @@ export async function load({ locals, params }) {
 	const pendingReviewerIds = pendingPaperReviewInvitations
 		.map((invitation: any) => String(invitation?.reviewerId || invitation?.reviewer || '').trim())
 		.filter(Boolean);
+	const paymentGate = await getReviewerInvitationPaymentGate(paperDoc);
 
 	// Block authors from performing reviewer assignment when paper is linked to a hub
 	const paperStatus = String(paperDoc.status || '').toLowerCase();
@@ -193,6 +195,7 @@ export async function load({ locals, params }) {
 		currentUserHubMember: sanitize(currentUserHubMember),
 		effectiveReviewers: sanitize(effectiveHubRoles?.reviewers ?? []),
 		assignmentLockedForAuthor,
+		paymentGate: sanitize(paymentGate),
 		reviewAssignments: sanitize(reviewAssignments),
 		pendingReviewerIds
 	};

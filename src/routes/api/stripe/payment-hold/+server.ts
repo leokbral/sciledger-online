@@ -1,125 +1,83 @@
-import Stripe from 'stripe';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { env } from '$env/dynamic/private';
+import {
+	createPaperPaymentIntent,
+	loadPaperPaymentState,
+	reconcilePaperPayment
+} from '$lib/server/payments/paperPaymentService';
+import { paymentErrorResponse } from '$lib/server/payments/paymentHttp';
 
-const TOTAL_AMOUNT_BRL_CENTS = 40000; // R$ 400,00
-const PLATFORM_FEE_BRL_CENTS = 16000; // R$ 160,00
-const REVIEWER_FEE_BRL_CENTS = 8000; // R$ 80,00 por revisor
-const REVIEWERS_COUNT = 3;
+export const POST: RequestHandler = async ({ request, locals }) => {
+	try {
+		const user = locals.user;
+		if (!user) {
+			return json({ error: 'User not authenticated', code: 'unauthenticated' }, { status: 401 });
+		}
 
-function getStripe() {
-  const stripeSecretKey = env.STRIPE_SECRET_KEY;
-  if (!stripeSecretKey) {
-    return null;
-  }
-  return new Stripe(stripeSecretKey);
-}
+		const body = await request.json().catch(() => ({}));
+		const paperId = body?.paperId ? String(body.paperId) : '';
+		const acceptPaymentPolicy = body?.acceptPaymentPolicy === true;
 
-export const POST: RequestHandler = async ({ request }) => {
-  try {
-    const stripe = getStripe();
-    if (!stripe) {
-      console.error('STRIPE_SECRET_KEY not found in environment');
-      return json({
-        error: 'Stripe is not configured on the server'
-      }, { status: 500 });
-    }
+		if (!paperId) {
+			return json({ error: 'paperId is required', code: 'paper_id_required' }, { status: 400 });
+		}
 
-    let body;
-    try {
-      body = await request.json();
-    } catch (e) {
-      console.error('Failed to parse request body:', e);
-      return json({
-        error: 'Invalid request body'
-      }, { status: 400 });
-    }
+		const result = await createPaperPaymentIntent({ paperId, user, acceptPaymentPolicy });
 
-    const amount = TOTAL_AMOUNT_BRL_CENTS;
-    const currency = 'brl';
-    const email = body?.email as string | undefined;
-    const paperId = body?.paperId as string | undefined;
-    const description = body?.description as string | undefined;
-
-    if (!email) {
-      console.warn('Email not provided in payment hold request. Using placeholder.');
-      // Use placeholder email if not provided
-    }
-
-    // Criar um Payment Intent com confirmação automática
-    // Este vai autorizar o valor sem capturar imediatamente
-    const paymentIntentData: any = {
-      amount,
-      currency: currency as any,
-      payment_method_types: ['card'],
-      capture_method: 'manual',
-      statement_descriptor_suffix: 'Payment Hold',
-      metadata: {
-        paperId: paperId || 'pending',
-        type: 'payment_hold',
-        description: description || 'Publication Fee Hold',
-        feeModel: 'fixed_400_brl',
-        platformFeeBrlCents: String(PLATFORM_FEE_BRL_CENTS),
-        reviewerFeeBrlCents: String(REVIEWER_FEE_BRL_CENTS),
-        reviewersCount: String(REVIEWERS_COUNT)
-      }
-    };
-
-    // Only include receipt_email if email is provided
-    if (email) {
-      paymentIntentData.receipt_email = email;
-    }
-
-    const paymentIntent = await stripe.paymentIntents.create(paymentIntentData);
-
-    return json({ 
-      paymentIntentId: paymentIntent.id,
-      clientSecret: paymentIntent.client_secret,
-      amount,
-      currency,
-      status: paymentIntent.status
-    });
-  } catch (error) {
-    console.error('Stripe error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return json({
-      error: `Failed to create payment hold: ${errorMessage}`
-    }, { status: 500 });
-  }
+		return json({
+			success: true,
+			alreadyPaid: result.alreadyPaid,
+			paymentIntentId: result.paymentIntentId,
+			clientSecret: result.clientSecret,
+			amount: result.amountCents,
+			amountCents: result.amountCents,
+			currency: result.currency,
+			status: result.status,
+			paymentState: result.paymentState,
+			policy: result.policy,
+			purpose: result.purpose,
+			policyVersion: result.policyVersion,
+			paymentAttemptId: String(result.attempt.id || result.attempt._id)
+		});
+	} catch (error) {
+		return paymentErrorResponse(error, 'Failed to create paper payment');
+	}
 };
 
-export const GET: RequestHandler = async ({ request, url }) => {
-  try {
-    const stripe = getStripe();
-    if (!stripe) {
-      return json({
-        error: 'Stripe is not configured on the server'
-      }, { status: 500 });
-    }
+export const GET: RequestHandler = async ({ url, locals }) => {
+	try {
+		const user = locals.user;
+		if (!user) {
+			return json({ error: 'User not authenticated', code: 'unauthenticated' }, { status: 401 });
+		}
 
-    const paymentIntentId = url.searchParams.get('id') as string | undefined;
+		const paperId = url.searchParams.get('paperId');
+		const paymentIntentId = url.searchParams.get('id');
 
-    if (!paymentIntentId) {
-      return json({
-        error: 'Must provide `id` parameter with Payment Intent ID'
-      }, { status: 400 });
-    }
+		if (!paperId) {
+			return json({ error: 'paperId is required', code: 'paper_id_required' }, { status: 400 });
+		}
 
-    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-    
-    return json({
-      id: paymentIntent.id,
-      status: paymentIntent.status,
-      amount: paymentIntent.amount,
-      currency: paymentIntent.currency,
-      metadata: paymentIntent.metadata
-    });
-  } catch (error) {
-    console.error('Stripe error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return json({
-      error: `Failed to retrieve payment intent: ${errorMessage}`
-    }, { status: 500 });
-  }
+		const state: any = paymentIntentId
+			? await reconcilePaperPayment({ paperId, user, paymentIntentId })
+			: await loadPaperPaymentState(paperId, user);
+
+		const attempt = state.attempt as any;
+		return json({
+			success: true,
+			paperId,
+			paymentState: state.paymentState ?? state.state,
+			amount: state.amountCents ?? attempt?.amountCents,
+			amountCents: state.amountCents ?? attempt?.amountCents,
+			currency: state.currency ?? attempt?.currency,
+			status: attempt?.status,
+			providerStatus: attempt?.providerStatus,
+			policy: state.policy,
+			purpose: state.purpose,
+			policyVersion: state.policyVersion,
+			receiptUrl: attempt?.receiptUrl
+		});
+	} catch (error) {
+		return paymentErrorResponse(error, 'Failed to retrieve paper payment');
+	}
 };

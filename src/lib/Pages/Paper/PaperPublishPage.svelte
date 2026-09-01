@@ -10,14 +10,39 @@
 	import IconDropzone from '@lucide/svelte/icons/image-plus';
 	import IconFile from '@lucide/svelte/icons/paperclip';
 	import IconRemove from '@lucide/svelte/icons/circle-x';
-	import Icon from '@iconify/svelte';
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import OrcidProfile from '$lib/components/OrcidProfile/OrcidProfile.svelte';
 	import { getSubAreasForArea, getAllAreaNames } from '$lib/constants/scopusAreas';
-
+	import {
+		MAIN_PAPER_FILE_LIMIT_LABEL,
+		SUPPLEMENTARY_FILES_MAX_TOTAL_BYTES,
+		SUPPLEMENTARY_FILES_TOTAL_LIMIT_LABEL,
+		formatUploadBytes
+	} from '$lib/constants/paperUploadLimits';
+	import {
+		getSupplementaryFilesTotal,
+		normalizePaperCoverIds,
+		validateMainPaperFileSize,
+		validateSupplementaryFilesTotal
+	} from '$lib/utils/paperFileValidation';
 	// Add these new variables
 	let docxPreview = $state();
 	let docxFile: File | null = $state(null);
+	let mainDocumentUploadState = $state<
+		| 'idle'
+		| 'selected'
+		| 'uploading'
+		| 'converting'
+		| 'extracting'
+		| 'processing_images'
+		| 'updating_preview'
+		| 'success'
+		| 'error'
+	>('idle');
+	let mainDocumentStatusMessage = $state('');
+	let mainDocumentError = $state('');
+	let mainDocumentWarning = $state('');
+	let activeDocxProcessingToken = 0;
 
 	// ORCID search variables
 	let orcidId = $state('');
@@ -175,74 +200,6 @@
 		$store.scopusClassifications = scopusClassifications;
 	}
 
-	// ========== Material Suplementar ========== //
-	interface SupplementaryMaterialForm {
-		title: string;
-		url: string;
-		type: 'github' | 'figshare' | 'zenodo' | 'osf' | 'dataverse' | 'other';
-		description: string;
-	}
-	
-	let supplementaryMaterials = $state<any[]>(
-		inicialValue.supplementaryMaterials ? [...inicialValue.supplementaryMaterials] : []
-	);
-	
-	let newSupplementaryMaterial = $state<SupplementaryMaterialForm>({
-		title: '',
-		url: '',
-		type: 'github',
-		description: ''
-	});
-
-	const supplementaryRepositoryIcons: Record<string, string> = {
-		github: 'mdi:github',
-		figshare: 'simple-icons:figshare',
-		zenodo: 'simple-icons:zenodo',
-		osf: 'simple-icons:openscienceframework',
-		dataverse: 'mdi:database-outline',
-		other: 'mdi:link-variant'
-	};
-	
-	function addSupplementaryMaterial() {
-		if (!newSupplementaryMaterial.title.trim() || !newSupplementaryMaterial.url.trim()) {
-			alert('Por favor preencha o título e a URL do material suplementar.');
-			return;
-		}
-		
-		// Validar URL
-		try {
-			new URL(newSupplementaryMaterial.url);
-		} catch {
-			alert('Por favor insira uma URL válida.');
-			return;
-		}
-		
-		const material = {
-			id: crypto.randomUUID(),
-			title: newSupplementaryMaterial.title,
-			url: newSupplementaryMaterial.url,
-			type: newSupplementaryMaterial.type,
-			description: newSupplementaryMaterial.description,
-			createdAt: new Date(),
-			updatedAt: new Date()
-		};
-		
-		supplementaryMaterials = [...supplementaryMaterials, material];
-		$store.supplementaryMaterials = supplementaryMaterials;
-		
-		// Reset form
-		newSupplementaryMaterial = {
-			title: '',
-			url: '',
-			type: 'github',
-			description: ''
-		};
-	}
-	
-	function removeSupplementaryMaterial(index: number) {
-		supplementaryMaterials = supplementaryMaterials.filter((_, i) => i !== index);
-		$store.supplementaryMaterials = supplementaryMaterials;
-	}
 		// ========== Material Suplementar - Arquivos ========== //
 		interface SupplementaryFileUpload {
 			id?: string;
@@ -258,7 +215,7 @@
 			uploadError?: string;
 		}
 
-		const MAX_TOTAL_SIZE = 10 * 1024 * 1024; // 10MB total for all supplementary files
+		const MAX_TOTAL_SIZE = SUPPLEMENTARY_FILES_MAX_TOTAL_BYTES;
 
 		let supplementaryFiles = $state<SupplementaryFileUpload[]>(
 			inicialValue.supplementaryFiles ? [...inicialValue.supplementaryFiles] : []
@@ -270,20 +227,15 @@
 
 		// Calculate current total size of uploaded files
 		const getCurrentUsedSize = () => {
-			return supplementaryFiles.reduce((sum, f) => sum + (f.fileSize || 0), 0);
+			return getSupplementaryFilesTotal([...supplementaryFiles, ...pendingSupplementaryFiles]);
 		};
 
 		const getAvailableSpace = () => {
-			const usedSize = getCurrentUsedSize();
-			return MAX_TOTAL_SIZE - usedSize;
+			return Math.max(0, MAX_TOTAL_SIZE - getCurrentUsedSize());
 		};
 
 		const getFormattedSize = (bytes: number) => {
-			if (bytes === 0) return '0 B';
-			const k = 1024;
-			const sizes = ['B', 'KB', 'MB'];
-			const i = Math.floor(Math.log(bytes) / Math.log(k));
-			return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+			return formatUploadBytes(bytes);
 		};
 
 		function getTitleFromFilename(filename: string): string {
@@ -299,14 +251,15 @@
 
 			const validFiles: SupplementaryFileUpload[] = [];
 			let oversizedCount = 0;
-			const availableSpace = getAvailableSpace();
+			let projectedTotalSize = getCurrentUsedSize();
 
 			for (const file of files) {
-				if (file.size > availableSpace) {
+				if (projectedTotalSize + file.size > MAX_TOTAL_SIZE) {
 					oversizedCount += 1;
 					continue;
 				}
 
+				projectedTotalSize += file.size;
 				validFiles.push({
 					id: crypto.randomUUID(),
 					file,
@@ -324,8 +277,7 @@
 			}
 
 			if (oversizedCount > 0) {
-				const usedSize = getCurrentUsedSize();
-				supplementaryUploadError = `${oversizedCount} file(s) were ignored because they exceed available space. Used: ${getFormattedSize(usedSize)} / 10 MB.`;
+				supplementaryUploadError = `Os arquivos suplementares excedem o limite total de ${SUPPLEMENTARY_FILES_TOTAL_LIMIT_LABEL}.`;
 			}
 
 			// Allow selecting the same file again if needed
@@ -347,6 +299,14 @@
 			const uploadedItems: SupplementaryFileUpload[] = [];
 
 			try {
+				const totalValidation = validateSupplementaryFilesTotal([
+					...supplementaryFiles,
+					...pendingSupplementaryFiles
+				]);
+				if (!totalValidation.ok) {
+					throw new Error(totalValidation.message);
+				}
+
 				for (const pendingFile of pendingSupplementaryFiles) {
 					if (!pendingFile.file) continue;
 
@@ -365,7 +325,7 @@
 						
 						// Handle different error status codes
 						if (response.status === 413) {
-							errorMessage = 'File or total size exceeds the 10MB limit';
+							errorMessage = `File or total size exceeds the ${SUPPLEMENTARY_FILES_TOTAL_LIMIT_LABEL} limit`;
 						}
 						
 						// Try to parse error response as JSON
@@ -607,7 +567,8 @@
 		const root = doc.body.firstElementChild;
 		if (!root) return '';
 
-		type Segment = { text: string; bold: boolean; italic: boolean };
+		type ScriptPosition = 'normal' | 'sup' | 'sub';
+		type Segment = { text: string; bold: boolean; italic: boolean; script: ScriptPosition };
 		const segments: Segment[] = [];
 		const blockTags = new Set([
 			'p',
@@ -638,11 +599,18 @@
 			return /font-style\s*:\s*italic/.test(style);
 		};
 
-		const walk = (node: Node, bold: boolean, italic: boolean) => {
+		const getScriptStyle = (el: Element): ScriptPosition | null => {
+			const style = (el.getAttribute('style') || '').toLowerCase();
+			if (/vertical-align\s*:\s*(super|text-top)/.test(style)) return 'sup';
+			if (/vertical-align\s*:\s*(sub|text-bottom)/.test(style)) return 'sub';
+			return null;
+		};
+
+		const walk = (node: Node, bold: boolean, italic: boolean, script: ScriptPosition) => {
 			if (node.nodeType === Node.TEXT_NODE) {
 				const text = (node.textContent || '').replace(/\s+/g, ' ');
 				if (!text) return;
-				segments.push({ text, bold, italic });
+				segments.push({ text, bold, italic, script });
 				return;
 			}
 
@@ -652,30 +620,37 @@
 			const tag = el.tagName.toLowerCase();
 			const nextBold = bold || tag === 'strong' || tag === 'b' || hasBoldStyle(el);
 			const nextItalic = italic || tag === 'em' || tag === 'i' || hasItalicStyle(el);
+			const nextScript =
+				tag === 'sup' ? 'sup' : tag === 'sub' ? 'sub' : getScriptStyle(el) || script;
 
 			if (tag === 'br') {
-				segments.push({ text: ' ', bold: nextBold, italic: nextItalic });
+				segments.push({ text: ' ', bold: nextBold, italic: nextItalic, script: nextScript });
 				return;
 			}
 
 			for (const child of Array.from(el.childNodes)) {
-				walk(child, nextBold, nextItalic);
+				walk(child, nextBold, nextItalic, nextScript);
 			}
 
 			if (blockTags.has(tag)) {
-				segments.push({ text: ' ', bold: false, italic: false });
+				segments.push({ text: ' ', bold: false, italic: false, script: 'normal' });
 			}
 		};
 
 		for (const child of Array.from(root.childNodes)) {
-			walk(child, false, false);
+			walk(child, false, false, 'normal');
 		}
 
 		const merged: Segment[] = [];
 		for (const seg of segments) {
 			if (!seg.text) continue;
 			const last = merged[merged.length - 1];
-			if (last && last.bold === seg.bold && last.italic === seg.italic) {
+			if (
+				last &&
+				last.bold === seg.bold &&
+				last.italic === seg.italic &&
+				last.script === seg.script
+			) {
 				last.text += seg.text;
 			} else {
 				merged.push({ ...seg });
@@ -695,12 +670,16 @@
 				let value = escapeHtml(cleaned);
 				if (seg.italic) value = `<em>${value}</em>`;
 				if (seg.bold) value = `<strong>${value}</strong>`;
+				if (seg.script === 'sup') value = `<sup>${value}</sup>`;
+				if (seg.script === 'sub') value = `<sub>${value}</sub>`;
 				return value;
 			})
 			.join('')
 			.replace(/\s+/g, ' ')
 			.replace(/\s*<\/em>\s*<em>\s*/g, ' ')
 			.replace(/\s*<\/strong>\s*<strong>\s*/g, ' ')
+			.replace(/\s*<\/sup>\s*<sup>\s*/g, '')
+			.replace(/\s*<\/sub>\s*<sub>\s*/g, '')
 			.replace(/([A-Za-zÀ-ÿ])\s*-\s*([A-Za-zÀ-ÿ])/g, '$1-$2')
 			.trim();
 
@@ -963,7 +942,7 @@
 			while ((paragraphMatch = paragraphRegex.exec(sectionUntilNextHeading)) !== null) {
 				const text = cleanHtmlText(paragraphMatch[1]);
 				if (text.length > 20) {
-					return text;
+					return normalizeToInlineHtml(paragraphMatch[1]);
 				}
 			}
 		}
@@ -971,22 +950,25 @@
 		// Fallback: use only the first valid paragraph after the detected title paragraph.
 		const extractedTitle = extractTitleFromHtml(html).trim().toLowerCase();
 		const paragraphRegex = /<p[^>]*>([\s\S]*?)<\/p>/gi;
-		const paragraphs = [...html.matchAll(paragraphRegex)].map((m) => cleanHtmlText(m[1]));
+		const paragraphs = [...html.matchAll(paragraphRegex)].map((m) => ({
+			html: m[1],
+			text: cleanHtmlText(m[1])
+		}));
 
 		const titleParagraphIndex = extractedTitle
-			? paragraphs.findIndex((p) => p.trim().toLowerCase() === extractedTitle)
+			? paragraphs.findIndex((p) => p.text.trim().toLowerCase() === extractedTitle)
 			: -1;
 
 		const startIndex = titleParagraphIndex >= 0 ? titleParagraphIndex + 1 : 0;
 
 		for (let i = startIndex; i < paragraphs.length; i++) {
-			const text = paragraphs[i].trim();
+			const text = paragraphs[i].text.trim();
 			const normalized = text.toLowerCase();
 
 			if (text.length <= 20) continue;
 			if (normalized === extractedTitle) continue;
 			if (/^(abstract|resumo|keywords?|palavras[-\s]?chave)\s*:?$/i.test(text)) continue;
-			return text;
+			return normalizeToInlineHtml(paragraphs[i].html);
 		}
 		return '';
 	}
@@ -1057,7 +1039,26 @@
 		return uniqueKeywords;
 	}
 
-	async function convertDocument(file: any) {
+	function isMainDocumentBusy() {
+		return (
+			mainDocumentUploadState === 'uploading' ||
+			mainDocumentUploadState === 'converting' ||
+			mainDocumentUploadState === 'extracting' ||
+			mainDocumentUploadState === 'processing_images' ||
+			mainDocumentUploadState === 'updating_preview'
+		);
+	}
+
+	function resetExtractedDocumentMetadata() {
+		$store.title = '';
+		$store.abstract = '';
+		$store.keywords = [];
+		content = '';
+		$store.content = '';
+		mainDocumentWarning = '';
+	}
+
+	async function convertDocument(file: File, token: number) {
 		if (!file) {
 			console.error('No file provided');
 			return;
@@ -1067,58 +1068,76 @@
 		formData.append('file', file);
 
 		try {
-			// const response = await fetch('http://127.0.0.1:8000/api/convert', {
-			const response = await fetch('https://scideep.imd.ufrn.br/dth/api/convert', {
-				//modify this to the server in VM
+			mainDocumentUploadState = 'converting';
+			mainDocumentStatusMessage = 'Converting document...';
+			mainDocumentWarning = '';
+			await tick();
+
+			const response = await fetch('/api/dth/convert', {
 				method: 'POST',
 				body: formData,
-				mode: 'cors',
-				credentials: 'same-origin',
 				headers: {
 					Accept: 'application/json'
 				}
 			});
 
 			if (!response.ok) {
-				throw new Error(`Conversion failed: ${response.status}`);
+				const errorData = await response.json().catch(() => ({}));
+				throw new Error(
+					errorData.message ||
+						errorData.error ||
+						'Unable to process the document. Please try again.'
+				);
 			}
 
 			const data = await response.json();
-			content = data.html;
-
-			// Automatically extract and fill abstract
-			if (data.html) {
-				const firstSentenceSplit = extractFirstSentenceSplitFromHtml(data.html);
-				const extractedTitle = firstSentenceSplit.title || extractTitleFromHtml(data.html);
-
-				if (extractedTitle && isEffectivelyEmptyText($store.title)) {
-					$store.title = extractedTitle;
-				} else if (extractedTitle && $store.title) {
-				} else {
-				}
-
-				const extractedAbstract = firstSentenceSplit.abstract || extractAbstractFromHtml(data.html);
-				
-				if (extractedAbstract && isEffectivelyEmptyText($store.abstract)) {
-					$store.abstract = extractedAbstract;
-				} else if (extractedAbstract && $store.abstract) {
-				} else {
-				}
-
-				const extractedKeywords = extractKeywordsFromHtml(data.html);
-
-				if (extractedKeywords.length > 0 && (!$store.keywords || $store.keywords.length === 0)) {
-					$store.keywords = extractedKeywords;
-				} else if (extractedKeywords.length > 0 && $store.keywords?.length) {
-				} else {
-				}
+			const convertedHtml = data.html || data.result || '';
+			if (token !== activeDocxProcessingToken || docxFile !== file) {
+				return;
 			}
 
-			// with open(filename, "w", encoding="utf-8") as f:
-			// f.write(content)
-			// downloadFile('./meuarquivo.html', content);
+			mainDocumentUploadState = 'processing_images';
+			mainDocumentStatusMessage = 'Processing images...';
+			mainDocumentWarning = data.imageProcessingWarning || '';
+			await tick();
+
+			mainDocumentUploadState = 'extracting';
+			mainDocumentStatusMessage = 'Extracting content...';
+			content = convertedHtml;
+			$store.content = convertedHtml;
+
+			// Automatically extract and fill abstract
+			if (convertedHtml) {
+				const firstSentenceSplit = extractFirstSentenceSplitFromHtml(convertedHtml);
+				const extractedTitle = firstSentenceSplit.title || extractTitleFromHtml(convertedHtml);
+				const extractedAbstract =
+					firstSentenceSplit.abstract || extractAbstractFromHtml(convertedHtml);
+				const extractedKeywords = extractKeywordsFromHtml(convertedHtml);
+
+				$store.title = extractedTitle || '';
+				$store.abstract = extractedAbstract || '';
+				$store.keywords = extractedKeywords;
+			}
+
+			mainDocumentUploadState = 'updating_preview';
+			mainDocumentStatusMessage = 'Updating preview...';
+			await tick();
+
+			if (token === activeDocxProcessingToken) {
+				mainDocumentUploadState = 'success';
+				mainDocumentStatusMessage = 'Document processed successfully.';
+				mainDocumentError = '';
+			}
 		} catch (error) {
 			console.error('Error:', error);
+			if (token === activeDocxProcessingToken) {
+				mainDocumentUploadState = 'error';
+				mainDocumentStatusMessage = '';
+				mainDocumentError =
+					error instanceof Error
+						? error.message
+						: 'Unable to process the document. Please try again.';
+			}
 			throw error;
 		}
 	}
@@ -1144,25 +1163,27 @@
 			// 	$store.pdfUrl = uploadResult.result;
 			// }
 			$store.pdfUrl = 'nope';
-			const newImageIds = await Promise.all(
-				imageItems
-					.filter((item) => item.file)
-					.map(async (item) => {
-						const formData = new FormData();
-						formData.append('image', item.file!);
-						const response = await fetch('/api/images/upload', {
-							method: 'POST',
-							body: formData
-						});
-						const data = await response.json();
-						return data.id;
-					})
-			);
+			let coverImageIds = normalizePaperCoverIds(imageItems.filter((item) => item.id).map((item) => item.id));
+			const newCoverImage = imageItems.find((item) => item.file);
+			if (newCoverImage?.file) {
+				const formData = new FormData();
+				formData.append('image', newCoverImage.file);
+				const response = await fetch('/api/images/upload', {
+					method: 'POST',
+					body: formData
+				});
+				const data = await response.json();
+				if (!response.ok || !data.id) {
+					throw new Error(data.message || 'Failed to upload paper cover image.');
+				}
+				coverImageIds = normalizePaperCoverIds([data.id]);
+				imageItems = coverImageIds.map((id) => ({
+					id,
+					previewUrl: `/api/images/${id}`
+				}));
+			}
 
-			const existingImageIds = imageItems.filter((item) => item.id).map((item) => item.id!);
-			const allImageIds = [...existingImageIds, ...newImageIds];
-
-			$store.paperPictures = allImageIds;
+			$store.paperPictures = coverImageIds;
 			$store.content = content;
 			await savePaper($store);
 
@@ -1212,19 +1233,57 @@
 
 
 	function generateDocxPreview(event: any) {
-		if (event.acceptedFiles.length === 0) {
-			docxPreview = null;
+		if (isMainDocumentBusy()) {
 			return;
 		}
-		const reader = new FileReader();
-		reader.onload = (event) => {
-			docxPreview = event.target?.result;
-		};
+
+		if (event.acceptedFiles.length === 0) {
+			docxPreview = null;
+			docxFile = null;
+			return;
+		}
 
 		const _file = event.acceptedFiles[0];
+		const sizeValidation = validateMainPaperFileSize(_file);
+		if (!sizeValidation.ok) {
+			activeDocxProcessingToken++;
+			docxPreview = null;
+			docxFile = null;
+			mainDocumentUploadState = 'error';
+			mainDocumentStatusMessage = '';
+			mainDocumentError = sizeValidation.message;
+			mainDocumentWarning = '';
+			return;
+		}
+
+		const token = ++activeDocxProcessingToken;
 		docxFile = _file;
+		mainDocumentUploadState = 'selected';
+		mainDocumentStatusMessage = 'Document selected. Preparing upload...';
+		mainDocumentError = '';
+		mainDocumentWarning = '';
+		resetExtractedDocumentMetadata();
+
+		const reader = new FileReader();
+		reader.onload = (event) => {
+			if (token === activeDocxProcessingToken) {
+				docxPreview = event.target?.result;
+				mainDocumentUploadState = 'uploading';
+				mainDocumentStatusMessage = 'Uploading document...';
+			}
+		};
+		reader.onerror = () => {
+			if (token === activeDocxProcessingToken) {
+				mainDocumentUploadState = 'error';
+				mainDocumentStatusMessage = '';
+				mainDocumentError = 'Unable to read the selected document. Please try again.';
+				mainDocumentWarning = '';
+			}
+		};
 		reader.readAsDataURL(_file);
-		convertDocument(_file);
+		convertDocument(_file, token).catch(() => {
+			// convertDocument already set the user-facing error state.
+		});
 	}
 
 	interface ImageItem {
@@ -1234,7 +1293,7 @@
 	}
 
 	let imageItems: ImageItem[] = $state(
-		inicialValue.paperPictures.map((id) => ({
+		normalizePaperCoverIds(inicialValue.paperPictures).map((id) => ({
 			id,
 			previewUrl: `/api/images/${id}`
 		}))
@@ -1255,7 +1314,7 @@
 
 		const reader = new FileReader();
 		reader.onload = (e) => {
-			imageItems = [...imageItems, { file, previewUrl: e.target?.result as string }];
+			imageItems = [{ file, previewUrl: e.target?.result as string }];
 		};
 		reader.readAsDataURL(file);
 	}
@@ -1368,7 +1427,7 @@
 							coAuthorEmail: newUser.email,
 							inviterName: `${author.firstName} ${author.lastName}`,
 							projectTitle: $store.title,
-							loginUrl: 'https://scideep.imd.ufrn.br/recovery'
+							loginUrl: `${window.location.origin}/recovery`
 						})
 					});
 				} catch (emailError) {
@@ -1420,22 +1479,49 @@
 			<div class="mb-6 w-full bg-surface-50 dark:bg-surface-800 border border-surface-300 dark:border-surface-700 rounded-lg p-4">
 				<h5 class="text-lg font-semibold mb-1">Upload Paper Document *</h5>
 				<p class="text-xs text-surface-600 dark:text-surface-400 mb-3">
-					Upload your paper in DOCX format first. Title, abstract, and keywords will be auto-filled when available.
+					Upload your paper in DOCX format first. Title, abstract, and keywords will be auto-filled when available. Maximum size: {MAIN_PAPER_FILE_LIMIT_LABEL}.
 				</p>
-				<FileUpload
-					name="docx-files"
-					accept=".docx,.doc"
-					maxFiles={1}
-					subtext="Attach only 1 DOCX file."
-					onFileChange={generateDocxPreview}
-					onFileReject={console.error}
-					classes="w-full"
-					allowDrop
-				>
-					{#snippet iconInterface()}<IconDropzone class="size-8" />{/snippet}
-					{#snippet iconFile()}<IconFile class="size-4" />{/snippet}
-					{#snippet iconFileRemove()}<IconRemove class="size-4" />{/snippet}
-				</FileUpload>
+				<div class:pointer-events-none={isMainDocumentBusy()} class:opacity-60={isMainDocumentBusy()}>
+					<FileUpload
+						name="docx-files"
+						accept=".docx,.doc"
+						maxFiles={1}
+						subtext="Attach only 1 DOCX file."
+						onFileChange={generateDocxPreview}
+						onFileReject={() => {
+							mainDocumentUploadState = 'error';
+							mainDocumentStatusMessage = '';
+							mainDocumentError = 'Please select a valid DOCX file.';
+							mainDocumentWarning = '';
+						}}
+						classes="w-full"
+						allowDrop
+					>
+						{#snippet iconInterface()}<IconDropzone class="size-8" />{/snippet}
+						{#snippet iconFile()}<IconFile class="size-4" />{/snippet}
+						{#snippet iconFileRemove()}<IconRemove class="size-4" />{/snippet}
+					</FileUpload>
+				</div>
+				{#if mainDocumentStatusMessage}
+					<div class="mt-3 rounded-lg border border-primary-200 bg-primary-50 px-3 py-2 text-sm text-primary-800">
+						{mainDocumentStatusMessage}
+					</div>
+				{/if}
+				{#if mainDocumentUploadState === 'success' && docxFile}
+					<div class="mt-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
+						{docxFile.name} processed. Metadata and preview were updated from this document.
+					</div>
+				{/if}
+				{#if mainDocumentWarning}
+					<div class="mt-3 rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 text-sm text-yellow-800">
+						{mainDocumentWarning}
+					</div>
+				{/if}
+				{#if mainDocumentError}
+					<div class="mt-3 rounded-lg border border-error-200 bg-error-50 px-3 py-2 text-sm text-error-700">
+						{mainDocumentError}
+					</div>
+				{/if}
 			</div>
 			<section class="mb-4 w-full">
 				<!-- <input
@@ -1797,156 +1883,6 @@
 				</div>
 			</section>
 
-			<!-- Material Suplementar Section -->
-			<section class="w-full bg-white/95 dark:bg-surface-900/95 backdrop-blur-sm border border-surface-200/80 dark:border-surface-700 rounded-2xl p-5 mb-6 shadow-[0_10px_35px_-20px_rgba(0,0,0,0.45)]">
-				<div class="mb-4 pb-4 border-b border-surface-200 dark:border-surface-700">
-					<h3 class="text-xl font-semibold text-surface-900 dark:text-surface-100 tracking-tight">
-						Supplementary Materials
-					</h3>
-					<p class="text-sm text-surface-600 dark:text-surface-400 mt-1">
-						Add links to public repositories (GitHub, Figshare, Zenodo, OSF, etc.) with complementary data, code, and extra files.
-					</p>
-				</div>
-
-				<!-- Display added materials -->
-				{#if supplementaryMaterials.length > 0}
-					<div class="mb-5 space-y-2">
-						<div class="block text-sm font-semibold text-surface-700 dark:text-surface-300 mb-2">
-							Added Materials:
-						</div>
-						<div class="space-y-3">
-							{#each supplementaryMaterials as material, index}
-								<div class="bg-gradient-to-r from-surface-50 to-white dark:from-surface-800 dark:to-surface-800/80 border border-surface-200 dark:border-surface-700 rounded-xl p-4 group hover:border-primary-300 dark:hover:border-primary-600 hover:shadow-md transition-all duration-200">
-									<div class="flex justify-between items-start mb-2">
-										<div class="flex-1">
-											<div class="flex items-center gap-2 mb-1">
-												<div class="w-6 h-6 rounded-md border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-900 text-surface-700 dark:text-surface-300 flex items-center justify-center">
-													<Icon icon={supplementaryRepositoryIcons[material.type] || supplementaryRepositoryIcons.other} class="w-3.5 h-3.5" />
-												</div>
-												<span class="inline-block px-2.5 py-1 text-xs font-medium rounded-full bg-primary-100 dark:bg-primary-900/40 text-primary-800 dark:text-primary-200 border border-primary-200 dark:border-primary-800">
-													{material.type.toUpperCase()}
-												</span>
-												<h4 class="font-semibold text-surface-900 dark:text-surface-100 tracking-tight">
-													{material.title}
-												</h4>
-											</div>
-											<a
-												href={material.url}
-												target="_blank"
-												rel="noopener noreferrer"
-												class="text-primary-600 dark:text-primary-400 hover:underline text-sm break-all font-mono"
-											>
-												{material.url}
-											</a>
-											{#if material.description}
-												<p class="text-sm text-surface-600 dark:text-surface-400 mt-2 leading-relaxed">
-													{material.description}
-												</p>
-											{/if}
-										</div>
-										<button
-											type="button"
-											onclick={() => removeSupplementaryMaterial(index)}
-											class="ml-2 text-error-600 hover:text-error-800 dark:text-error-400 dark:hover:text-error-300 transition-colors flex-shrink-0 p-1 rounded-md hover:bg-error-50 dark:hover:bg-error-900/20"
-											title="Remove material"
-											aria-label="Remove material"
-										>
-											<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-												<path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
-											</svg>
-										</button>
-									</div>
-								</div>
-							{/each}
-						</div>
-					</div>
-				{/if}
-
-				<!-- Form to add new material -->
-				<div class="bg-gradient-to-b from-surface-50 to-white dark:from-surface-800 dark:to-surface-900 rounded-xl p-4 border border-surface-200 dark:border-surface-700">
-					<div class="block text-sm font-semibold text-surface-700 dark:text-surface-300 mb-3">
-						Add New Material:
-					</div>
-					<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-						<!-- Title -->
-						<div class="md:col-span-2">
-							<label for="material-title" class="block mb-1 text-xs font-medium text-surface-600 dark:text-surface-400">
-								Title/Description *
-							</label>
-							<input
-								id="material-title"
-								type="text"
-								bind:value={newSupplementaryMaterial.title}
-								placeholder="e.g., Source Code Repository, Dataset, Supplementary Figures"
-								class="w-full p-2.5 border border-surface-300 dark:border-surface-600 rounded-lg text-sm bg-white dark:bg-surface-800 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-							/>
-						</div>
-
-						<!-- Repository Type -->
-						<div>
-							<label for="material-type" class="block mb-1 text-xs font-medium text-surface-600 dark:text-surface-400">
-								Repository Type *
-							</label>
-							<select
-								id="material-type"
-								bind:value={newSupplementaryMaterial.type}
-								class="w-full p-2.5 border border-surface-300 dark:border-surface-600 rounded-lg text-sm bg-white dark:bg-surface-800 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-							>
-								<option value="github">GitHub</option>
-								<option value="figshare">Figshare</option>
-								<option value="zenodo">Zenodo</option>
-								<option value="osf">Open Science Framework (OSF)</option>
-								<option value="dataverse">Dataverse</option>
-								<option value="other">Other</option>
-							</select>
-						</div>
-
-						<!-- URL -->
-						<div class="md:col-span-2">
-							<label for="material-url" class="block mb-1 text-xs font-medium text-surface-600 dark:text-surface-400">
-								URL *
-							</label>
-							<input
-								id="material-url"
-								type="url"
-								bind:value={newSupplementaryMaterial.url}
-								placeholder="https://github.com/username/repo or https://figshare.com/..."
-								class="w-full p-2.5 border border-surface-300 dark:border-surface-600 rounded-lg text-sm bg-white dark:bg-surface-800 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-							/>
-						</div>
-
-						<!-- Description -->
-						<div class="md:col-span-2">
-							<label for="material-desc" class="block mb-1 text-xs font-medium text-surface-600 dark:text-surface-400">
-								Description (optional)
-							</label>
-							<textarea
-								id="material-desc"
-								bind:value={newSupplementaryMaterial.description}
-								placeholder="Describe what this material contains..."
-								rows="3"
-								class="w-full p-2.5 border border-surface-300 dark:border-surface-600 rounded-lg text-sm bg-white dark:bg-surface-800 focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
-							></textarea>
-						</div>
-
-						<button
-							type="button"
-							onclick={addSupplementaryMaterial}
-							class="md:col-span-2 w-full bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
-						>
-							<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-								<path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
-							</svg>
-							Add Material
-						</button>
-					</div>
-				</div>
-
-				<p class="mt-4 text-xs text-surface-500 dark:text-surface-400">
-					💡 Tip: Providing supplementary materials increases the transparency and reproducibility of your research.
-				</p>
-			</section>
-
 			<section>
 				{#if page.url.pathname.includes('edit')}
 					<!-- <PapersImages /> AKI MUDAR DEPOIS DA DEFESA -->
@@ -1957,10 +1893,10 @@
 			<section class="w-full bg-white/95 dark:bg-surface-900/95 backdrop-blur-sm border border-surface-200/80 dark:border-surface-700 rounded-2xl p-5 mb-6 shadow-[0_10px_35px_-20px_rgba(0,0,0,0.45)]">
 				<div class="mb-4 pb-4 border-b border-surface-200 dark:border-surface-700">
 					<h3 class="text-xl font-semibold text-surface-900 dark:text-surface-100 tracking-tight">
-						Supplementary Files (max 10MB per file)
+						Supplementary Files (max {SUPPLEMENTARY_FILES_TOTAL_LIMIT_LABEL} total)
 					</h3>
 					<p class="text-sm text-surface-600 dark:text-surface-400 mt-1">
-						Upload any file format up to 10MB. Larger materials should be shared using the supplementary links section above.
+						Upload direct supplementary files up to {SUPPLEMENTARY_FILES_TOTAL_LIMIT_LABEL} combined.
 					</p>
 				</div>
 
@@ -2027,7 +1963,7 @@
 						<div class="flex items-center justify-between mb-2">
 							<span class="text-xs font-medium text-surface-600 dark:text-surface-400">Total Storage Used</span>
 							<span class="text-xs font-semibold text-surface-700 dark:text-surface-300">
-								{getFormattedSize(getCurrentUsedSize())} / 10 MB
+								{getFormattedSize(getCurrentUsedSize())} / {SUPPLEMENTARY_FILES_TOTAL_LIMIT_LABEL}
 							</span>
 						</div>
 						<div class="w-full bg-surface-200 dark:bg-surface-700 rounded-full h-2">
@@ -2104,7 +2040,7 @@
 			<div class="mt-4">
 				<h5 class="text-lg font-semibold mb-1">Paper Cover Image <span class="text-primary-600 dark:text-primary-400">(Main/Featured)</span></h5>
 				<p class="text-xs text-surface-600 dark:text-surface-400 mb-3">
-					Upload a main image that will appear at the very beginning of your article (PNG format recommended). Choose an image that best represents your paper, or use a graphical abstract. This field is optional.
+					Upload one main image that will appear at the beginning of your article. Selecting a new image replaces the current cover. This field is optional.
 				</p>
 				<div class="grid grid-cols-2 gap-4">
 					<div class="border-2 border-dashed border-surface-300 rounded-lg p-4">
@@ -2115,13 +2051,13 @@
 							accept="image/*"
 						>
 							<button class="btn variant-filled">
-								<span>Add Image</span>
+								<span>{imageItems.length > 0 ? 'Replace Image' : 'Add Image'}</span>
 							</button>
 						</FileUpload>
 					</div>
 
 					{#if imageItems.length > 0}
-						<div class="grid grid-cols-2 gap-2 mt-4">
+						<div class="grid grid-cols-1 gap-2 mt-4">
 							{#each imageItems as item, index}
 								<div class="relative group">
 									<img
@@ -2274,17 +2210,18 @@
 
 	<!-- Submission Confirmation Modal -->
 	{#if showSubmitModal}
-		<div class="fixed inset-0 z-50">
+		<div class="fixed inset-0 z-50 overflow-y-auto">
 			<button
 				type="button"
 				class="absolute inset-0 w-full h-full bg-black bg-opacity-50"
 				onclick={cancelSubmit}
 				aria-label="Close confirmation modal"
 			></button>
-			<div class="relative z-10 flex min-h-full items-center justify-center p-4">
-				<div class="bg-white rounded-lg p-6 max-w-md w-full mx-4" role="dialog" aria-modal="true" aria-labelledby="submit-confirmation-title">
-				<h2 id="submit-confirmation-title" class="text-2xl font-bold text-gray-900 mb-4">⚠️ Confirm Submission</h2>
-				
+			<div class="relative z-10 flex min-h-full items-start justify-center p-4 py-8 sm:items-center">
+				<div class="flex max-h-[calc(100dvh-4rem)] w-full max-w-md flex-col overflow-hidden rounded-lg bg-white shadow-xl" role="dialog" aria-modal="true" aria-labelledby="submit-confirmation-title">
+				<div class="overflow-y-auto p-6">
+				<h2 id="submit-confirmation-title" class="text-2xl font-bold text-gray-900 mb-4">Confirm Submission</h2>
+
 				<div class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
 					<p class="text-yellow-800 font-semibold mb-2">Important: This action cannot be undone!</p>
 					<p class="text-gray-700">Once you submit your article for review, you will not be able to edit it until the review process is complete.</p>
@@ -2327,14 +2264,15 @@
 					</label>
 				</div>
 
-				<div class="flex gap-3 justify-end">
-					<button 
+				</div>
+				<div class="flex flex-shrink-0 gap-3 justify-end border-t border-gray-200 bg-white p-4">
+					<button
 						class="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300"
 						onclick={cancelSubmit}
 					>
 						Cancel
 					</button>
-					<button 
+					<button
 						class="px-4 py-2 text-white rounded-lg {(confirmInformationAccurate && confirmPoliciesAgreed && !isSavingPaper) ? 'bg-primary-500 hover:bg-primary-600' : 'bg-gray-400 cursor-not-allowed'}"
 						onclick={confirmSubmit}
 						disabled={!confirmInformationAccurate || !confirmPoliciesAgreed || isSavingPaper}

@@ -20,6 +20,17 @@ export type Hub = {
     authorInvite: 'Yes' | 'No';
     identityVisibility: 'Everyone' | 'Reviewers Only' | 'Hidden';
     reviewVisibility: 'Everyone' | 'Authors Only' | 'Hidden';
+    billing?: {
+        paperPaymentPolicy?: 'submission' | 'review' | 'publication';
+        policyVersion?: string;
+        updatedAt?: Date;
+    };
+    publicationPolicy?: {
+        text?: string;
+        version?: string;
+        updatedAt?: Date;
+        updatedBy?: string | User;
+    };
     socialMedia?: {
         twitter?: string;
         facebook?: string;

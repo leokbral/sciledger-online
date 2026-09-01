@@ -13,18 +13,25 @@
 	let { data }: Props = $props();
 	let userProfiles = data.users;
 	//let articleComponent: PaperPublishPage;
-	
+
 	let hubId = $derived($page.url.searchParams.get('hubId'));
-	let paymentAuthorizationCodeFromUrl = $derived($page.url.searchParams.get('authorizationCode'));
 
 	async function savePaper( store: any) {
 		const paper = {
 			...store,
-			...(hubId && { hubId, isLinkedToHub: true }),
-			...(paymentAuthorizationCodeFromUrl && { paymentAuthorizationCode: paymentAuthorizationCodeFromUrl })
+			...(hubId && { hubId, isLinkedToHub: true })
 		};
 		try {
 			const response = await post(`/publish/new`, paper);
+
+			if (response?.code === 'payment_required') {
+				alert('Please save this standalone paper as a draft before starting payment.');
+				return;
+			}
+			if (response?.code === 'supplementary_total_limit_exceeded') {
+				alert(response.error || 'Os arquivos suplementares excedem o limite total de 20 MB.');
+				return;
+			}
 
 			if (response.paper) {
 				const isSubmitted = store?.status === 'reviewer assignment';
