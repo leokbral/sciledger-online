@@ -25,6 +25,16 @@
 		validateMainPaperFileSize,
 		validateSupplementaryFilesTotal
 	} from '$lib/utils/paperFileValidation';
+	import {
+		authorSnapshotMatchesReference,
+		extractOrcidAffiliations,
+		formatAffiliationDisplayName,
+		normalizeAffiliationSnapshot,
+		normalizeAuthorSnapshot,
+		validateCorrespondingAuthorSelection,
+		type PaperAuthorAffiliationSnapshot,
+		type PaperAuthorSnapshot
+	} from '$lib/utils/paperAuthorAffiliations';
 	// Add these new variables
 	let docxPreview = $state();
 	let docxFile: File | null = $state(null);
@@ -65,12 +75,11 @@
 		savePaper: (paper: PaperPublishStoreData) => void | Promise<void>;
 	}
 
-	interface AuthorAffiliationForm {
-		userId?: string;
-		username?: string;
-		name: string;
+	interface AuthorAffiliationForm extends PaperAuthorSnapshot {
 		department: string;
 		affiliation: string;
+		affiliations: PaperAuthorAffiliationSnapshot[];
+		isCorresponding: boolean;
 	}
 
 	let {
@@ -370,18 +379,123 @@
 			$store.supplementaryFiles = supplementaryFiles;
 		}
 
+	function getUsernameForAuthorValue(value: any): string {
+		if (!value) return '';
+		if (typeof value === 'object' && value.username) return String(value.username);
+
+		const id = typeof value === 'string' ? value : value.id || value._id;
+		const matchedAuthor = authorsOptions.find((option: User) => option.id === id || option._id === id);
+		return matchedAuthor?.username || '';
+	}
+
+	function getInitialAuthorUsernames(): string[] {
+		const authorsFromPaper =
+			inicialValue.authors?.length > 0
+				? inicialValue.authors
+				: [inicialValue.mainAuthor, ...(inicialValue.coAuthors || [])].filter(Boolean);
+		const usernames = authorsFromPaper
+			.map((item) => getUsernameForAuthorValue(item))
+			.filter(Boolean);
+
+		if (usernames.length > 0) return [...new Set(usernames)];
+		return author?.username ? [author.username] : [];
+	}
+
 	let inputAuthor = $state('');
-	let inputAuthorList = $state(
-		inicialValue.authors?.length > 0
-			? inicialValue.authors.map((a) => a.username)
-			: author?.username
-				? [author.username]
-				: []
-	);
+	let inputAuthorList = $state(getInitialAuthorUsernames());
 	let selected = $state({ value: '' });
 	let content = $state(inicialValue.content || '');
 	let authorAffiliations = $state<Record<string, AuthorAffiliationForm>>({});
 	// let inputComponent: TagsInput = $state();
+
+	function createAffiliationId() {
+		return globalThis.crypto?.randomUUID?.() ?? `affiliation-${Date.now()}-${Math.random()}`;
+	}
+
+	function createEmptyAffiliation(): PaperAuthorAffiliationSnapshot {
+		return {
+			id: createAffiliationId(),
+			organization: '',
+			department: '',
+			roleTitle: '',
+			city: '',
+			region: '',
+			country: '',
+			rorId: '',
+			displayName: ''
+		};
+	}
+
+	function normalizeAffiliationForm(
+		affiliation: unknown,
+		fallbackId?: string
+	): PaperAuthorAffiliationSnapshot {
+		return normalizeAffiliationSnapshot(affiliation, fallbackId) ?? {
+			...createEmptyAffiliation(),
+			id: fallbackId || createAffiliationId()
+		};
+	}
+
+	function buildLegacyAffiliation(selectedAuthor?: User): PaperAuthorAffiliationSnapshot[] {
+		const profileAffiliation = normalizeAffiliationSnapshot(
+			{
+				id: 'profile-affiliation',
+				department: selectedAuthor?.position,
+				organization: selectedAuthor?.institution,
+				displayName: formatAffiliationDisplayName({
+					department: selectedAuthor?.position,
+					organization: selectedAuthor?.institution
+				})
+			},
+			'profile-affiliation'
+		);
+
+		return profileAffiliation ? [profileAffiliation] : [];
+	}
+
+	function getAuthorOrcidAffiliations(selectedAuthor?: User): PaperAuthorAffiliationSnapshot[] {
+		const authorRecord = selectedAuthor as User & { affiliations?: unknown[] };
+		if (!Array.isArray(authorRecord?.affiliations)) return [];
+
+		return authorRecord.affiliations
+			.map((affiliation, index) => normalizeAffiliationSnapshot(affiliation, `orcid-affiliation-${index + 1}`))
+			.filter((affiliation): affiliation is PaperAuthorAffiliationSnapshot => Boolean(affiliation));
+	}
+
+	function getAuthorReferenceByUsername(username: string): User | string | null {
+		const selectedAuthor = getAuthorByUsername(username);
+		return selectedAuthor || authorAffiliations[username]?.userId || null;
+	}
+
+	function normalizeAffiliationEntry(entry: AuthorAffiliationForm): AuthorAffiliationForm {
+		const normalized = normalizeAuthorSnapshot(entry);
+		const affiliations = (normalized?.affiliations ?? entry.affiliations ?? [])
+			.map((affiliation, index) => normalizeAffiliationForm(affiliation, affiliation.id || `affiliation-${index + 1}`))
+			.filter((affiliation) => {
+				return Boolean(
+					affiliation.organization ||
+						affiliation.department ||
+						affiliation.roleTitle ||
+						affiliation.city ||
+						affiliation.region ||
+						affiliation.country ||
+						affiliation.rorId ||
+						affiliation.displayName
+				);
+			});
+		const firstAffiliation = affiliations[0];
+
+		return {
+			...entry,
+			name: (normalized?.name || entry.name || entry.username || '').trim(),
+			email: normalized?.email || entry.email || '',
+			orcid: normalized?.orcid || entry.orcid || '',
+			department: firstAffiliation?.department || normalized?.department || '',
+			affiliation: firstAffiliation?.organization || firstAffiliation?.displayName || normalized?.affiliation || '',
+			affiliations,
+			isCorresponding: Boolean(entry.isCorresponding)
+		};
+	}
 
 	function syncAuthorAffiliationsForUsernames(usernames: string[]) {
 		const nextAffiliations: Record<string, AuthorAffiliationForm> = {};
@@ -389,14 +503,46 @@
 		for (const username of usernames) {
 			const baseValues = getInitialAffiliationForUsername(username);
 			const previousValues = authorAffiliations[username];
+			const affiliations =
+				previousValues?.affiliations?.length
+					? previousValues.affiliations
+					: baseValues.affiliations;
 			nextAffiliations[username] = {
 				...baseValues,
 				...previousValues,
 				username,
 				name: (previousValues?.name || baseValues.name || username).trim(),
 				department: previousValues?.department ?? baseValues.department,
-				affiliation: previousValues?.affiliation ?? baseValues.affiliation
+				affiliation: previousValues?.affiliation ?? baseValues.affiliation,
+				affiliations,
+				isCorresponding:
+					previousValues?.isCorresponding ??
+					authorSnapshotMatchesReference(baseValues, $store.correspondingAuthor)
 			};
+		}
+
+		const markedAuthors = Object.values(nextAffiliations).filter((entry) => entry.isCorresponding);
+		const hasMatchingCorrespondingAuthor =
+			$store.correspondingAuthor &&
+			Object.values(nextAffiliations).some((entry) =>
+				authorSnapshotMatchesReference(entry, $store.correspondingAuthor)
+			);
+
+		if ($store.correspondingAuthor && hasMatchingCorrespondingAuthor) {
+			for (const username of Object.keys(nextAffiliations)) {
+				nextAffiliations[username].isCorresponding = authorSnapshotMatchesReference(
+					nextAffiliations[username],
+					$store.correspondingAuthor
+				);
+			}
+		} else if ($store.correspondingAuthor && !hasMatchingCorrespondingAuthor) {
+			$store.correspondingAuthor = null;
+		} else if (markedAuthors.length > 1) {
+			for (const username of Object.keys(nextAffiliations)) {
+				nextAffiliations[username].isCorresponding = false;
+			}
+		} else if (markedAuthors.length === 1) {
+			$store.correspondingAuthor = getAuthorReferenceByUsername(markedAuthors[0].username || '');
 		}
 
 		authorAffiliations = nextAffiliations;
@@ -420,36 +566,144 @@
 				item.username === username ||
 				(Boolean(item.userId) && Boolean(selectedAuthor?.id) && item.userId === selectedAuthor?.id)
 		);
+		const normalizedExisting = normalizeAuthorSnapshot(existing);
 
 		const displayName = [selectedAuthor?.firstName, selectedAuthor?.lastName]
 			.filter(Boolean)
 			.join(' ')
 			.trim();
+		const authorAffiliationList =
+			normalizedExisting?.affiliations?.length
+				? normalizedExisting.affiliations
+				: getAuthorOrcidAffiliations(selectedAuthor).length
+					? getAuthorOrcidAffiliations(selectedAuthor)
+					: buildLegacyAffiliation(selectedAuthor);
+		const firstAffiliation = authorAffiliationList[0];
 
 		return {
-			userId: selectedAuthor?.id || existing?.userId,
+			userId: selectedAuthor?.id || normalizedExisting?.userId,
 			username,
-			name: existing?.name || displayName || username,
-			department: existing?.department || selectedAuthor?.position || '',
-			affiliation: existing?.affiliation || selectedAuthor?.institution || ''
+			name: normalizedExisting?.name || displayName || username,
+			email: normalizedExisting?.email || selectedAuthor?.email || '',
+			orcid: normalizedExisting?.orcid || selectedAuthor?.orcid || '',
+			isCorresponding:
+				normalizedExisting?.isCorresponding ||
+				authorSnapshotMatchesReference(
+					{
+						userId: selectedAuthor?.id || normalizedExisting?.userId,
+						username,
+						name: normalizedExisting?.name || displayName || username
+					},
+					$store.correspondingAuthor
+				),
+			department: normalizedExisting?.department || firstAffiliation?.department || selectedAuthor?.position || '',
+			affiliation:
+				normalizedExisting?.affiliation ||
+				firstAffiliation?.organization ||
+				firstAffiliation?.displayName ||
+				selectedAuthor?.institution ||
+				'',
+			affiliations: authorAffiliationList
 		};
 	}
 
 	function serializeAuthorAffiliations(): AuthorAffiliationForm[] {
-		return inputAuthorList
+		const snapshots = inputAuthorList
 			.map((username) => {
 				const selectedAuthor = getAuthorByUsername(username);
 				const values = authorAffiliations[username] || getInitialAffiliationForUsername(username);
+				const normalizedValues = normalizeAffiliationEntry(values);
+				const firstAffiliation = normalizedValues.affiliations[0];
 
 				return {
 					userId: selectedAuthor?.id || values.userId,
 					username,
-					name: values.name.trim(),
-					department: values.department.trim(),
-					affiliation: values.affiliation.trim()
+					name: normalizedValues.name.trim(),
+					email: normalizedValues.email || selectedAuthor?.email || '',
+					orcid: normalizedValues.orcid || selectedAuthor?.orcid || '',
+					isCorresponding: normalizedValues.isCorresponding,
+					department: (firstAffiliation?.department || normalizedValues.department || '').trim(),
+					affiliation: (
+						firstAffiliation?.organization ||
+						firstAffiliation?.displayName ||
+						normalizedValues.affiliation ||
+						''
+					).trim(),
+					affiliations: normalizedValues.affiliations.map((affiliation, index) =>
+						normalizeAffiliationForm(affiliation, affiliation.id || `affiliation-${index + 1}`)
+					)
 				};
 			})
 			.filter((item) => item.name.length > 0);
+
+		return $store.correspondingAuthor
+			? snapshots.map((snapshot) => ({
+					...snapshot,
+					isCorresponding: authorSnapshotMatchesReference(snapshot, $store.correspondingAuthor)
+				}))
+			: snapshots;
+	}
+
+	function setCorrespondingAuthor(username: string) {
+		const reference = getAuthorReferenceByUsername(username);
+		if (!reference) return;
+
+		$store.correspondingAuthor = reference;
+		authorAffiliations = Object.fromEntries(
+			Object.entries(authorAffiliations).map(([key, values]) => [
+				key,
+				{
+					...values,
+					isCorresponding: key === username
+				}
+			])
+		);
+	}
+
+	function clearCorrespondingAuthor() {
+		$store.correspondingAuthor = null;
+		authorAffiliations = Object.fromEntries(
+			Object.entries(authorAffiliations).map(([key, values]) => [
+				key,
+				{
+					...values,
+					isCorresponding: false
+				}
+			])
+		);
+	}
+
+	function addAffiliation(username: string) {
+		const values = authorAffiliations[username] || getInitialAffiliationForUsername(username);
+		authorAffiliations = {
+			...authorAffiliations,
+			[username]: {
+				...values,
+				affiliations: [...(values.affiliations || []), createEmptyAffiliation()]
+			}
+		};
+	}
+
+	function removeAffiliation(username: string, index: number) {
+		const values = authorAffiliations[username] || getInitialAffiliationForUsername(username);
+		authorAffiliations = {
+			...authorAffiliations,
+			[username]: {
+				...values,
+				affiliations: (values.affiliations || []).filter((_, currentIndex) => currentIndex !== index)
+			}
+		};
+	}
+
+	function validateCorrespondingAuthorForSubmission() {
+		const validation = validateCorrespondingAuthorSelection(serializeAuthorAffiliations(), {
+			requireOne: true
+		});
+		if (!validation.ok) {
+			alert(validation.message);
+			return false;
+		}
+		return true;
 	}
 
 	authorsOptions = authorsOptions.map((a: User) => {
@@ -1149,12 +1403,23 @@
 
 		isSavingPaper = true;
 		try {
-			$store.authors = inputAuthorList.map(
-				(i) => authorsOptions.filter((a: User) => a.username === i)[0]
+			const selectedAuthors = inputAuthorList
+				.map((username) => getAuthorByUsername(username))
+				.filter((item): item is User => Boolean(item));
+			const serializedAuthorAffiliations = serializeAuthorAffiliations();
+			const markedCorrespondingAuthor = serializedAuthorAffiliations.find(
+				(item) => item.isCorresponding
 			);
+
+			$store.authors = selectedAuthors;
 			$store.mainAuthor = $store.authors[0];
 			$store.coAuthors = $store.authors.slice(1, $store.authors.length);
-			$store.authorAffiliations = serializeAuthorAffiliations();
+			$store.authorAffiliations = serializedAuthorAffiliations;
+			$store.correspondingAuthor = markedCorrespondingAuthor
+				? getAuthorByUsername(markedCorrespondingAuthor.username || '') ||
+					markedCorrespondingAuthor.userId ||
+					null
+				: null;
 			//const uploadResult = await uploadFile();
 			// if (
 			// 	!$store.pdfUrl ||
@@ -1210,6 +1475,10 @@
 
 		if (!confirmPoliciesAgreed) {
 			alert('Please confirm that you have read and agree to the platform policies.');
+			return;
+		}
+
+		if (!validateCorrespondingAuthorForSubmission()) {
 			return;
 		}
 
@@ -1367,6 +1636,7 @@
 	// Function to add ORCID profile as co-author
 	async function addOrcidAsCoauthor(event: any) {
 		const { profile, email } = event.detail;
+		const profileAffiliations = extractOrcidAffiliations(profile);
 
 		if (!selectedOrcidProfile) {
 			orcidError = 'Please select the profile first';
@@ -1391,9 +1661,15 @@
 				const errorData = await response.json();
 				if (response.status === 409) {
 					// User already exists, add them anyway
-					const existingUser = errorData.user;
+					const existingUser = {
+						...errorData.user,
+						affiliations: errorData.user?.affiliations?.length
+							? errorData.user.affiliations
+							: profileAffiliations
+					};
 					authorsOptions = [...authorsOptions, { ...existingUser, label: existingUser.username }];
 					inputAuthorList = [...inputAuthorList, existingUser.username];
+					syncAuthorAffiliationsForUsernames(inputAuthorList);
 					clearOrcidSearch();
 					alert(
 						`${existingUser.firstName} ${existingUser.lastName} added as co-author (existing user)!`
@@ -1404,13 +1680,17 @@
 			}
 
 			const data = await response.json();
-			const newUser = data.user;
+			const newUser = {
+				...data.user,
+				affiliations: data.user?.affiliations?.length ? data.user.affiliations : profileAffiliations
+			};
 
 			// Adicionar o novo usuário às opções de autores
 			authorsOptions = [...authorsOptions, { ...newUser, label: newUser.username }];
 
 			// Adicionar o usuário à lista de autores
 			inputAuthorList = [...inputAuthorList, newUser.username];
+			syncAuthorAffiliationsForUsernames(inputAuthorList);
 
 			// Limpar a busca ORCID
 			clearOrcidSearch();
@@ -1586,11 +1866,10 @@
 			<section class="mb-4 w-full">
 				<div class="bg-surface-50 dark:bg-surface-800 rounded-lg p-4 border">
 					<h3 class="text-lg font-semibold mb-2 text-surface-900 dark:text-surface-100">
-						Author Affiliations and Departments
+						Author Details
 					</h3>
 					<p class="text-xs text-surface-600 dark:text-surface-400 mb-3">
-						Define how each author should appear in the paper: full name, department, and
-						affiliation/institution.
+						Define how each author should appear in the paper, including the corresponding author and paper-specific affiliations.
 					</p>
 
 					{#if inputAuthorList.length === 0}
@@ -1600,11 +1879,47 @@
 							{#each inputAuthorList as username (username)}
 								{#if authorAffiliations[username]}
 									<div class="rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-900 p-3">
-										<p class="text-sm font-semibold text-surface-800 dark:text-surface-100 mb-2">
-											{authorAffiliations[username].name || username}
-											<span class="text-surface-500 font-normal"> (@{username})</span>
-										</p>
-										<div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+										<div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+											<div>
+												<p class="text-sm font-semibold text-surface-800 dark:text-surface-100">
+													{authorAffiliations[username].name || username}
+													<span class="text-surface-500 font-normal"> (@{username})</span>
+												</p>
+												{#if authorAffiliations[username].orcid}
+													<a
+														href={`https://orcid.org/${authorAffiliations[username].orcid}`}
+														target="_blank"
+														rel="noopener"
+														class="mt-1 inline-flex text-xs font-medium text-primary-600 hover:text-primary-700 hover:underline"
+													>
+														ORCID {authorAffiliations[username].orcid}
+													</a>
+												{/if}
+											</div>
+											<div class="flex flex-wrap items-center gap-2">
+												<label class="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-surface-300 px-3 py-2 text-xs font-medium text-surface-700 hover:bg-surface-50 dark:border-surface-600 dark:text-surface-200 dark:hover:bg-surface-800">
+													<input
+														type="radio"
+														name="corresponding-author"
+														checked={authorAffiliations[username].isCorresponding}
+														onchange={() => setCorrespondingAuthor(username)}
+														class="h-4 w-4 text-primary-500"
+													/>
+													Corresponding Author
+												</label>
+												{#if authorAffiliations[username].isCorresponding}
+													<button
+														type="button"
+														onclick={clearCorrespondingAuthor}
+														class="rounded-lg border border-surface-300 px-3 py-2 text-xs font-medium text-surface-600 hover:bg-surface-100 dark:border-surface-600 dark:text-surface-300 dark:hover:bg-surface-800"
+													>
+														Clear
+													</button>
+												{/if}
+											</div>
+										</div>
+
+										<div class="grid grid-cols-1 gap-3">
 											<div>
 												<label for={`author-display-name-${username}`} class="block text-xs font-medium text-surface-600 dark:text-surface-400 mb-1">
 													Display name
@@ -1617,30 +1932,133 @@
 													class="w-full p-2 border border-surface-300 dark:border-surface-600 rounded-lg text-sm bg-white dark:bg-surface-800"
 												/>
 											</div>
-											<div>
-												<label for={`author-department-${username}`} class="block text-xs font-medium text-surface-600 dark:text-surface-400 mb-1">
-													Department
-												</label>
-												<input
-													id={`author-department-${username}`}
-													type="text"
-													bind:value={authorAffiliations[username].department}
-													placeholder="Computer Science Department"
-													class="w-full p-2 border border-surface-300 dark:border-surface-600 rounded-lg text-sm bg-white dark:bg-surface-800"
-												/>
+										</div>
+
+										<div class="mt-4">
+											<div class="mb-2 flex items-center justify-between gap-3">
+												<p class="text-xs font-semibold uppercase text-surface-500">Affiliations</p>
+												<button
+													type="button"
+													onclick={() => addAffiliation(username)}
+													class="rounded-lg border border-primary-200 px-3 py-1.5 text-xs font-medium text-primary-700 hover:bg-primary-50 dark:border-primary-700 dark:text-primary-200 dark:hover:bg-primary-900/30"
+												>
+													+ Add affiliation
+												</button>
 											</div>
-											<div>
-												<label for={`author-affiliation-${username}`} class="block text-xs font-medium text-surface-600 dark:text-surface-400 mb-1">
-													Affiliation / Institution
-												</label>
-												<input
-													id={`author-affiliation-${username}`}
-													type="text"
-													bind:value={authorAffiliations[username].affiliation}
-													placeholder="Federal University"
-													class="w-full p-2 border border-surface-300 dark:border-surface-600 rounded-lg text-sm bg-white dark:bg-surface-800"
-												/>
-											</div>
+
+											{#if authorAffiliations[username].affiliations.length === 0}
+												<p class="rounded-lg border border-dashed border-surface-300 p-3 text-sm text-surface-500 dark:border-surface-600">
+													No affiliations added for this paper.
+												</p>
+											{:else}
+												<div class="space-y-3">
+													{#each authorAffiliations[username].affiliations as affiliation, affiliationIndex (affiliation.id || affiliationIndex)}
+														<div class="rounded-lg border border-surface-200 bg-surface-50 p-3 dark:border-surface-700 dark:bg-surface-800">
+															<div class="mb-3 flex items-center justify-between gap-3">
+																<p class="text-xs font-semibold text-surface-600 dark:text-surface-300">
+																	Affiliation {affiliationIndex + 1}
+																</p>
+																<button
+																	type="button"
+																	onclick={() => removeAffiliation(username, affiliationIndex)}
+																	class="rounded p-1 text-surface-500 hover:bg-surface-200 hover:text-error-600 dark:hover:bg-surface-700"
+																	aria-label={`Remove affiliation ${affiliationIndex + 1}`}
+																>
+																	<IconRemove size={16} />
+																</button>
+															</div>
+															<div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+																<div>
+																	<label for={`author-affiliation-organization-${username}-${affiliationIndex}`} class="block text-xs font-medium text-surface-600 dark:text-surface-400 mb-1">
+																		Organization / Institution
+																	</label>
+																	<input
+																		id={`author-affiliation-organization-${username}-${affiliationIndex}`}
+																		type="text"
+																		bind:value={affiliation.organization}
+																		placeholder="Federal University"
+																		class="w-full p-2 border border-surface-300 dark:border-surface-600 rounded-lg text-sm bg-white dark:bg-surface-900"
+																	/>
+																</div>
+																<div>
+																	<label for={`author-affiliation-department-${username}-${affiliationIndex}`} class="block text-xs font-medium text-surface-600 dark:text-surface-400 mb-1">
+																		Department
+																	</label>
+																	<input
+																		id={`author-affiliation-department-${username}-${affiliationIndex}`}
+																		type="text"
+																		bind:value={affiliation.department}
+																		placeholder="Computer Science Department"
+																		class="w-full p-2 border border-surface-300 dark:border-surface-600 rounded-lg text-sm bg-white dark:bg-surface-900"
+																	/>
+																</div>
+																<div>
+																	<label for={`author-affiliation-role-${username}-${affiliationIndex}`} class="block text-xs font-medium text-surface-600 dark:text-surface-400 mb-1">
+																		Role / title
+																	</label>
+																	<input
+																		id={`author-affiliation-role-${username}-${affiliationIndex}`}
+																		type="text"
+																		bind:value={affiliation.roleTitle}
+																		placeholder="Researcher"
+																		class="w-full p-2 border border-surface-300 dark:border-surface-600 rounded-lg text-sm bg-white dark:bg-surface-900"
+																	/>
+																</div>
+																<div>
+																	<label for={`author-affiliation-ror-${username}-${affiliationIndex}`} class="block text-xs font-medium text-surface-600 dark:text-surface-400 mb-1">
+																		ROR ID
+																	</label>
+																	<input
+																		id={`author-affiliation-ror-${username}-${affiliationIndex}`}
+																		type="text"
+																		bind:value={affiliation.rorId}
+																		placeholder="https://ror.org/..."
+																		class="w-full p-2 border border-surface-300 dark:border-surface-600 rounded-lg text-sm bg-white dark:bg-surface-900"
+																	/>
+																</div>
+																<div>
+																	<label for={`author-affiliation-city-${username}-${affiliationIndex}`} class="block text-xs font-medium text-surface-600 dark:text-surface-400 mb-1">
+																		City
+																	</label>
+																	<input
+																		id={`author-affiliation-city-${username}-${affiliationIndex}`}
+																		type="text"
+																		bind:value={affiliation.city}
+																		placeholder="Natal"
+																		class="w-full p-2 border border-surface-300 dark:border-surface-600 rounded-lg text-sm bg-white dark:bg-surface-900"
+																	/>
+																</div>
+																<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+																	<div>
+																		<label for={`author-affiliation-region-${username}-${affiliationIndex}`} class="block text-xs font-medium text-surface-600 dark:text-surface-400 mb-1">
+																			Region
+																		</label>
+																		<input
+																			id={`author-affiliation-region-${username}-${affiliationIndex}`}
+																			type="text"
+																			bind:value={affiliation.region}
+																			placeholder="RN"
+																			class="w-full p-2 border border-surface-300 dark:border-surface-600 rounded-lg text-sm bg-white dark:bg-surface-900"
+																		/>
+																	</div>
+																	<div>
+																		<label for={`author-affiliation-country-${username}-${affiliationIndex}`} class="block text-xs font-medium text-surface-600 dark:text-surface-400 mb-1">
+																			Country
+																		</label>
+																		<input
+																			id={`author-affiliation-country-${username}-${affiliationIndex}`}
+																			type="text"
+																			bind:value={affiliation.country}
+																			placeholder="Brazil"
+																			class="w-full p-2 border border-surface-300 dark:border-surface-600 rounded-lg text-sm bg-white dark:bg-surface-900"
+																		/>
+																	</div>
+																</div>
+															</div>
+														</div>
+													{/each}
+												</div>
+											{/if}
 										</div>
 									</div>
 								{/if}
@@ -2172,7 +2590,7 @@
 			<div class="border border-gray-300 p-4 h-[80vh] w-full overflow-auto">
 				{#if content}
 					<div
-						class="mt-4 text-surface-950 prose prose-m max-w-none [&>p]:text-lg [&>ol>li]:text-base [&>ol>li]:marker:text-primary-500 paper-content"
+						class="mt-4 text-surface-950 prose prose-m max-w-none [&>p]:text-lg [&>ol>li]:text-base [&>ol>li]:marker:text-primary-500 [&>*:first-child]:mb-7 [&>*:first-child]:border-b [&>*:first-child]:border-surface-200 [&>*:first-child]:pb-4 [&>*:first-child]:text-3xl [&>*:first-child]:font-bold [&>*:first-child]:leading-tight [&>*:first-child]:tracking-normal [&>*:first-child]:text-surface-950 [&>*:first-child]:break-words md:[&>*:first-child]:text-4xl paper-content paper-preview-content"
 					>
 						{@html content}
 					</div>

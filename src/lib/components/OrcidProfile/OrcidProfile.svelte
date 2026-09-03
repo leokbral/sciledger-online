@@ -1,5 +1,9 @@
 <script lang="ts">
     import { createEventDispatcher } from 'svelte';
+    import {
+        extractOrcidAffiliations,
+        formatAffiliationDisplayName
+    } from '$lib/utils/paperAuthorAffiliations';
     const dispatch = createEventDispatcher();
 
     // Props
@@ -13,12 +17,21 @@
     $: name = profile?.person?.name;
     $: biography = profile?.person?.biography?.content;
     $: orcidId = profile?.['orcid-identifier']?.path;
-    $: affiliations = profile?.['activities-summary']?.employments?.['affiliation-group'] ?? [];
+    $: affiliations = extractOrcidAffiliations(profile);
     $: country = profile?.person?.addresses?.address?.[0]?.country?.value;
     $: works = profile?.['activities-summary']?.works?.group ?? [];
     $: emails = profile?.person?.emails?.email ?? [];
     $: primaryEmail = emails.find((email: any) => email.primary)?.email || emails[0]?.email || null;
-    $: mainAffiliation = affiliations?.[0]?.['summaries']?.[0]?.['employment-summary'] ?? null;
+    $: mainAffiliation = affiliations?.[0]
+        ? {
+            organization: {
+                name:
+                    affiliations[0].displayName ||
+                    formatAffiliationDisplayName(affiliations[0]) ||
+                    affiliations[0].organization
+            }
+        }
+        : null;
     $: hasValidData = profile && (name || orcidId || biography || mainAffiliation);
 
     // States para formulário
@@ -165,6 +178,19 @@
             <div class="text-gray-700 dark:text-gray-300">
                 🏛️ <strong>Affiliation:</strong>
                 {mainAffiliation?.organization?.name || 'Not specified'}
+            </div>
+        {/if}
+
+        {#if affiliations.length > 1}
+            <div class="text-gray-700 dark:text-gray-300">
+                <strong>Additional affiliations:</strong>
+                <ul class="mt-1 list-disc space-y-1 pl-5 text-sm">
+                    {#each affiliations.slice(1) as affiliation}
+                        <li>
+                            {affiliation.displayName || formatAffiliationDisplayName(affiliation) || affiliation.organization || 'Not specified'}
+                        </li>
+                    {/each}
+                </ul>
             </div>
         {/if}
 

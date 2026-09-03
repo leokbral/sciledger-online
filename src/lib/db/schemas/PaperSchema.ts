@@ -5,16 +5,39 @@ export const PaperSchema: Schema = new Schema({
     _id: { type: String, required: true },
     id: { type: String, default: () => crypto.randomUUID(), unique: true }, // Generating a UUID as default for id
     mainAuthor: { type: String, required: true, ref: 'User' }, // Main author as UUID
-    correspondingAuthor: { type: String, required: true, ref: 'User' }, // Corresponding author as UUID
+    correspondingAuthor: { type: String, required: false, ref: 'User' }, // Corresponding author as UUID
     coAuthors: [{ type: String, ref: 'User' }], // List of co-authors as UUIDs
-    authorAffiliations: [{
-        _id: false,
-        userId: { type: String, ref: 'User' },
-        username: { type: String },
-        name: { type: String, required: true },
-        department: { type: String, default: '' },
-        affiliation: { type: String, default: '' }
-    }],
+    authorAffiliations: {
+        type: [{
+            _id: false,
+            userId: { type: String, ref: 'User' },
+            username: { type: String },
+            name: { type: String, required: true },
+            email: { type: String, default: '' },
+            orcid: { type: String, default: '' },
+            isCorresponding: { type: Boolean, default: false },
+            department: { type: String, default: '' },
+            affiliation: { type: String, default: '' },
+            affiliations: [{
+                _id: false,
+                id: { type: String },
+                organization: { type: String, default: '' },
+                department: { type: String, default: '' },
+                roleTitle: { type: String, default: '' },
+                city: { type: String, default: '' },
+                region: { type: String, default: '' },
+                country: { type: String, default: '' },
+                rorId: { type: String, default: '' },
+                displayName: { type: String, default: '' }
+            }]
+        }],
+        validate: {
+            validator(value: Array<{ isCorresponding?: boolean }> = []) {
+                return value.filter((author) => author?.isCorresponding === true).length <= 1;
+            },
+            message: 'Only one paper author can be marked as corresponding author.'
+        }
+    },
     creditAuthorStatements: [{
         _id: false,
         userId: { type: String, ref: 'User' },

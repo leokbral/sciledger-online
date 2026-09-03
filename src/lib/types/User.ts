@@ -1,4 +1,5 @@
 import type { Paper } from "./Paper";
+import type { PaperAuthorAffiliationSnapshot } from "$lib/utils/paperAuthorAffiliations";
 
 export type User = {
 	_id: string; // Internal MongoDB ID
@@ -68,6 +69,7 @@ export type User = {
     orcid?: string; // User's ORCID iD (e.g. 0000-0001-2345-6789)
     orcidAccessToken?: string; // ORCID access token for APIs
     orcidRefreshToken?: string; // ORCID refresh token for renewal
+    affiliations?: PaperAuthorAffiliationSnapshot[]; // Transient paper-author affiliation suggestions
     createdAt: Date; // Creation date
     updatedAt: Date; // Last update date
 };

@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>SciLedger — Article PDF Template</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   SciLedger — Published Article PDF Template
+   A4 · single column · print-first
+   Brand: navy #172554 · accent #1D4ED8 · tint #EFF6FF
+   ============================================================ */
+
+:root{
+  --ink:          #172554;   /* brand text (theme --theme-font-color-base) */
+  --ink-soft:     #3A4A7A;
+  --muted:        #6B7280;   /* surface-500 */
+  --rule:         #E5E7EB;   /* surface-200 */
+  --accent:       #1D4ED8;   /* primary-700 */
+  --accent-mid:   #3B82F6;   /* primary-500 */
+  --tint:         #EFF6FF;   /* primary-50 */
+  --oa:           #C2410C;   /* open-access amber/orange */
+  --serif: "Source Serif 4","Charter",Georgia,"Times New Roman",serif;
+  --sans:  "Inter","Helvetica Neue",Arial,sans-serif;
+}
+
+@page{ size: A4; margin: 18mm 17mm 20mm 17mm; }
+
+*{ box-sizing:border-box; }
+html,body{ margin:0; padding:0; }
+body{
+  font-family: var(--serif);
+  font-size: 9.6pt;
+  line-height: 1.46;
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* screen preview only: simulate the sheet */
+@media screen{
+  body{ background:#F3F4F6; }
+  .sheet{ width:210mm; min-height:297mm; margin:24px auto; padding:18mm 17mm 20mm;
+          background:#fff; box-shadow:0 2px 18px rgba(23,37,84,.13); }
+}
+@media print{ .sheet{ padding:0; } }
+
+
+/* ── 1. MASTHEAD (page 1 only) ────────────────────────────── */
+.masthead{
+  display:flex; justify-content:space-between; align-items:flex-start;
+  padding-bottom:3mm; border-bottom:1.6pt solid var(--accent);
+}
+.brand{ display:flex; align-items:center; gap:2.6mm; }
+.brand-mark{ flex:none; }
+.brand-name{ font-family:var(--sans); font-weight:700; font-size:14pt;
+  letter-spacing:-.022em; color:var(--ink); line-height:1; }
+.brand-tag{ font-family:var(--sans); font-size:6.6pt; font-weight:500; color:var(--muted);
+  letter-spacing:.10em; text-transform:uppercase; margin-top:1.2mm; }
+.mast-right{ text-align:right; font-family:var(--sans); }
+.badge{
+  display:inline-block; font-size:6.6pt; font-weight:700; letter-spacing:.09em;
+  text-transform:uppercase; padding:1.1mm 2.2mm; border-radius:2pt;
+}
+.badge-oa{ color:#fff; background:var(--oa); }
+.badge-type{ color:var(--accent); background:var(--tint); border:.5pt solid #BFDBFE; }
+.mast-doi{ margin-top:2.2mm; font-size:7.4pt; color:var(--ink-soft); }
+.mast-doi a{ color:var(--accent); text-decoration:none; }
+
+/* ── 2. METADATA STRIP ────────────────────────────────────── */
+.meta-strip{
+  display:grid; grid-template-columns:1fr 1fr; gap:0 8mm;
+  font-family:var(--sans); font-size:7.2pt; color:var(--muted);
+  padding:2.4mm 0 3mm; border-bottom:.5pt solid var(--rule);
+}
+.meta-strip b{ color:var(--ink); font-weight:600; }
+.meta-strip .row{ display:flex; gap:1.6mm; padding:.5mm 0; }
+.meta-strip .k{ min-width:19mm; color:var(--muted); }
+
+/* ── 3. TITLE BLOCK ───────────────────────────────────────── */
+.title{
+  font-family:var(--sans); font-weight:700; font-size:19pt; line-height:1.16;
+  letter-spacing:-.02em; color:var(--ink); margin:6mm 0 0;
+}
+.subtitle{ font-family:var(--sans); font-weight:400; font-size:11pt; color:var(--ink-soft);
+  line-height:1.3; margin:2mm 0 0; }
+.authors{ font-family:var(--sans); font-size:9.6pt; line-height:1.5; margin:4mm 0 0; color:var(--ink); }
+.authors .au{ font-weight:600; }
+.authors sup{ font-weight:400; color:var(--accent); font-size:6.8pt; }
+.orcid{ display:inline-block; width:6.5pt; height:6.5pt; vertical-align:-.5pt; margin-left:.6mm; }
+.affil{ font-family:var(--sans); font-size:7.4pt; line-height:1.5; color:var(--muted); margin:2.4mm 0 0; }
+.affil sup{ color:var(--accent); }
+.affil .corr{ color:var(--ink-soft); }
+.affil .corr a{ color:var(--accent); text-decoration:none; }
+
+/* ── 4. ABSTRACT ──────────────────────────────────────────── */
+.abstract{
+  margin:5mm 0 0; padding:3.4mm 4mm; background:var(--tint);
+  border-left:2.2pt solid var(--accent); border-radius:0 3pt 3pt 0;
+}
+.abstract h2{
+  font-family:var(--sans); font-size:7.4pt; font-weight:700; letter-spacing:.10em;
+  text-transform:uppercase; color:var(--accent); margin:0 0 1.6mm;
+}
+.abstract p{ margin:0; text-align:justify; hyphens:auto; font-size:9.1pt; line-height:1.44; }
+.keywords{ font-family:var(--sans); font-size:7.8pt; margin:3mm 0 0; color:var(--ink-soft); }
+.keywords b{ color:var(--ink); font-weight:600; }
+
+/* ── 5. CITE BOX ──────────────────────────────────────────── */
+.cite{
+  margin:3.4mm 0 0; padding:2.6mm 3mm; border:.5pt solid var(--rule);
+  border-radius:3pt; font-family:var(--sans); font-size:7.2pt; color:var(--ink-soft); line-height:1.45;
+}
+.cite b{ color:var(--ink); font-weight:600; }
+.cite a{ color:var(--accent); text-decoration:none; }
+
+/* ── 6. BODY ──────────────────────────────────────────────── */
+.body{ margin-top:6mm; }
+h2.sec{
+  font-family:var(--sans); font-size:10.6pt; font-weight:700; color:var(--ink);
+  margin:6mm 0 2mm; letter-spacing:-.008em; break-after:avoid;
+}
+h2.sec .n{ color:var(--accent); margin-right:1.8mm; }
+h3.sub{
+  font-family:var(--sans); font-size:9.2pt; font-weight:600; color:var(--ink-soft);
+  margin:4mm 0 1.4mm; break-after:avoid;
+}
+.body p{ margin:0 0 2.4mm; text-align:justify; hyphens:auto; }
+.body p.first{ text-indent:0; }
+.lead::first-letter{ /* optional drop-cap hook, off by default */ }
+
+figure{ margin:4mm 0; break-inside:avoid; }
+figure .ph{
+  height:38mm; border:.5pt dashed #BFDBFE; background:
+    repeating-linear-gradient(45deg,#F8FAFF,#F8FAFF 6px,#EFF6FF 6px,#EFF6FF 12px);
+  border-radius:3pt; display:flex; align-items:center; justify-content:center;
+  font-family:var(--sans); font-size:7.4pt; color:#93A8D0;
+}
+figcaption{ font-family:var(--sans); font-size:7.4pt; color:var(--muted);
+  line-height:1.42; margin-top:1.8mm; text-align:justify; }
+figcaption b{ color:var(--ink); font-weight:600; }
+
+table.data{ width:100%; border-collapse:collapse; margin:4mm 0; font-size:7.8pt;
+  font-family:var(--sans); break-inside:avoid; }
+table.data caption{ caption-side:top; text-align:left; font-size:7.4pt; color:var(--muted);
+  margin-bottom:1.6mm; }
+table.data caption b{ color:var(--ink); font-weight:600; }
+table.data th{ text-align:left; font-weight:600; color:var(--ink);
+  border-top:.8pt solid var(--ink); border-bottom:.5pt solid var(--rule); padding:1.6mm 2mm; }
+table.data td{ padding:1.5mm 2mm; border-bottom:.4pt solid var(--rule); color:var(--ink-soft); }
+table.data tr:last-child td{ border-bottom:.8pt solid var(--ink); }
+
+blockquote.pull{
+  margin:4mm 0; padding:0 0 0 4mm; border-left:2pt solid var(--accent-mid);
+  font-size:10.4pt; line-height:1.4; color:var(--ink-soft); font-style:italic;
+}
+
+/* ── 7. BACK MATTER ───────────────────────────────────────── */
+.backmatter{ margin-top:6mm; padding-top:3mm; border-top:.5pt solid var(--rule);
+  font-family:var(--sans); font-size:7.4pt; color:var(--muted); line-height:1.5; }
+.backmatter h3{ font-size:7.4pt; font-weight:700; color:var(--ink);
+  letter-spacing:.06em; text-transform:uppercase; margin:0 0 1.2mm; }
+.backmatter .blk{ margin-bottom:2.6mm; break-inside:avoid; }
+.backmatter a{ color:var(--accent); text-decoration:none; }
+
+ol.refs{ margin:2mm 0 0; padding-left:5.5mm; font-size:7.8pt; line-height:1.45; color:var(--ink-soft); }
+ol.refs li{ margin-bottom:1.5mm; break-inside:avoid; }
+ol.refs a{ color:var(--accent); text-decoration:none; }
+
+/* ── 8. VERIFICATION PANEL (SciLedger signature element) ──── */
+.verify{
+  margin-top:5mm; break-inside:avoid;
+  border:.6pt solid #BFDBFE; border-radius:4pt; overflow:hidden;
+}
+.verify-hd{
+  background:var(--tint); padding:2mm 3mm; border-bottom:.5pt solid #BFDBFE;
+  font-family:var(--sans); font-size:7pt; font-weight:700; letter-spacing:.09em;
+  text-transform:uppercase; color:var(--accent);
+  display:flex; justify-content:space-between; align-items:center;
+}
+.verify-hd .hash{ font-weight:500; letter-spacing:.02em; text-transform:none;
+  color:var(--ink-soft); font-size:6.8pt; }
+.verify-bd{ display:flex; gap:4mm; padding:3mm; align-items:flex-start; }
+.verify-qr{ flex:none; width:20mm; height:20mm; border:.5pt solid var(--rule); border-radius:2pt; }
+.verify-qr img{ width:100%; height:100%; display:block; }
+.verify-info{ flex:1; font-family:var(--sans); font-size:7.2pt; color:var(--muted); line-height:1.5; }
+.verify-info .vrow{ display:flex; gap:2mm; }
+.verify-info .vk{ min-width:24mm; color:var(--muted); }
+.verify-info .vv{ color:var(--ink); font-weight:600; }
+.verify-info a{ color:var(--accent); text-decoration:none; }
+.verify-info .note{ margin-top:1.6mm; color:var(--muted); font-style:italic; }
+
+/* ── 9. FOOTER (page 1 identity block) ────────────────────── */
+.pg1-footer{
+  margin-top:5mm; padding-top:2.4mm; border-top:.5pt solid var(--rule);
+  display:flex; justify-content:space-between; align-items:center;
+  font-family:var(--sans); font-size:6.8pt; color:var(--muted);
+}
+.pg1-footer .lic{ display:flex; align-items:center; gap:1.6mm; }
+.pg1-footer a{ color:var(--accent); text-decoration:none; }
+.cc{ height:7pt; }
+
+/* ══ FALLBACK — conteúdo cru vindo do editor / DOCX ══════ */
+/* O corpo do artigo chega do mammoth sem classes. Estas regras garantem que
+   qualquer <h1>, lista, imagem ou tabela que o normalizador não tenha marcado
+   ainda saia com a tipografia do template, e não com a do navegador. */
+.body h1,.body h2,.body h3,.body h4,.body h5,.body h6,
+.cols h1,.cols h2,.cols h3,.cols h4,.cols h5,.cols h6{
+  font-family:var(--sans);color:var(--ink);letter-spacing:-.01em;break-after:avoid}
+.body h1,.cols h1{font-size:12pt;font-weight:700;margin:8mm 0 3mm}
+.body h2:not(.sec),.cols h2:not(.sec){font-size:11pt;font-weight:700;margin:7mm 0 2.6mm}
+.body h3:not(.sub),.cols h3:not(.sub){font-size:9pt;font-weight:600;margin:5mm 0 1.6mm}
+.body h4,.body h5,.body h6,.cols h4,.cols h5,.cols h6{font-size:8.4pt;font-weight:600;margin:4mm 0 1.4mm}
+.body ul,.body ol,.cols ul,.cols ol{margin:0 0 3mm;padding-left:5.5mm}
+.body li,.cols li{margin-bottom:1.2mm}
+.body img,.cols img{max-width:100%;height:auto;display:block;border-radius:2pt}
+.body figure img,.cols figure img{width:100%}
+.body sup,.cols sup{font-size:.68em;vertical-align:super;line-height:0}
+.body sub,.cols sub{font-size:.68em;vertical-align:sub;line-height:0}
+.body a,.cols a{color:var(--accent);text-decoration:none}
+.body blockquote:not(.pull),.cols blockquote:not(.pull){margin:4mm 0;padding-left:4mm;
+  border-left:2pt solid var(--accent);color:var(--soft,#44548A)}
+.body table:not(.data),.cols table:not(.data){width:100%;border-collapse:collapse;
+  font-family:var(--sans);font-size:7.6pt;margin:4mm 0;break-inside:avoid}
+.body table:not(.data) th,.cols table:not(.data) th{text-align:left;font-weight:600;padding:1.8mm 2.2mm;
+  border-top:.8pt solid var(--ink);border-bottom:.4pt solid var(--hair,var(--rule,#DFE5F0))}
+.body table:not(.data) td,.cols table:not(.data) td{padding:1.6mm 2.2mm;
+  border-bottom:.4pt solid var(--hair,var(--rule,#DFE5F0))}
+
+/* ══ REFERÊNCIAS CRUZADAS ════════════════════════════════ */
+/* `[3]` no texto ➜ salto para a entrada 3; `↩` na entrada ➜ volta ao texto.
+   O Chromium registra cada id como destino nomeado no PDF, então o salto
+   funciona em qualquer leitor. */
+a.xref{color:var(--accent);text-decoration:none;font-weight:600;
+  font-variant-numeric:lining-nums tabular-nums}
+.backrefs{white-space:nowrap}
+a.backref{color:var(--accent);text-decoration:none;margin-left:1.2mm;font-size:.9em}
+ol.refs li{scroll-margin-top:8mm}
+</style>
+</head>
+<body>
+<div class="sheet">
+
+    <div class="r-right">SciLedger <span>· {{YEAR}} · {{VOLUME}} · {{PAGES}}</span></div>
+  </div>
+
+  <!-- 1 · MASTHEAD -->
+  <header class="masthead">
+    <div class="brand">
+      <svg class="brand-mark" width="26" height="26" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <rect x="1.2" y="1.2" width="29.6" height="29.6" rx="7" fill="#172554"/>
+        <path d="M8.5 21.5V10.5" stroke="#3B82F6" stroke-width="2.4" stroke-linecap="round"/>
+        <path d="M8.5 21.5H16" stroke="#3B82F6" stroke-width="2.4" stroke-linecap="round"/>
+        <path d="M14.2 10.5h4.6a3.6 3.6 0 0 1 0 7.2h-2.3" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="23.2" cy="20.4" r="2.3" fill="#3B82F6"/>
+      </svg>
+      <div>
+        <div class="brand-name">SciLedger</div>
+        <div class="brand-tag">Open Science Publishing</div>
+      </div>
+    </div>
+    <div class="mast-right">
+      <span class="badge badge-oa">Open Access</span>
+      <span class="badge badge-type">{{ARTICLE_TYPE}}</span>
+      <div class="mast-doi">
+        <a href="{{DOI}}">{{DOI}}</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- 2 · METADATA STRIP -->
+  <section class="meta-strip">
+    <div>
+      <div class="row"><span class="k">Received</span><b>{{DATE_RECEIVED}}</b></div>
+      <div class="row"><span class="k">Revised</span><b>{{DATE_REVISED}}</b></div>
+      <div class="row"><span class="k">Accepted</span><b>{{DATE_ACCEPTED}}</b></div>
+      <div class="row"><span class="k">Published</span><b>{{DATE_PUBLISHED}}</b></div>
+    </div>
+    <div>
+      <div class="row"><span class="k">Article ID</span><b>{{ARTICLE_ID}}</b></div>
+      <div class="row"><span class="k">Volume</span><b>{{VOLUME}}, {{PAGES}}</b></div>
+      <div class="row"><span class="k">Peer review</span><b>{{REVIEW_MODEL}} · {{REVIEW_ROUNDS}} rounds</b></div>
+      <div class="row"><span class="k">License</span><b>{{LICENSE}}</b></div>
+    </div>
+  </section>
+
+  <!-- 3 · TITLE BLOCK -->
+  <h1 class="title">{{TITLE}}</h1>
+  <p class="subtitle">{{SUBTITLE}}</p>
+
+  <p class="authors">{{AUTHORS}}</p>
+
+  <p class="affil">{{AFFILIATIONS}}</p>
+
+  <!-- 4 · ABSTRACT -->
+  <section class="abstract">
+    <h2>Abstract</h2>
+    <p>{{ABSTRACT}}</p>
+  </section>
+
+  <p class="keywords"><b>Keywords:</b> {{KEYWORDS}}</p>
+
+  <!-- 5 · CITE -->
+  <div class="cite"><b>How to cite:</b> {{CITATION}}</div>
+
+  <!-- 6 · BODY -->
+  <div class="body paper-content">{{BODY}}
+  </div>
+
+  <!-- 7 · BACK MATTER -->
+  <div class="backmatter">
+    <div class="blk">
+      <h3>Author contributions</h3>{{CONTRIBUTIONS}}</div>
+    <div class="blk">
+      <h3>Funding</h3>{{FUNDING}}</div>
+    <div class="blk">
+      <h3>Data availability</h3>{{DATA_AVAILABILITY}}</div>
+    <div class="blk">
+      <h3>Conflicts of interest</h3>{{CONFLICTS}}</div>
+
+    <h3 style="margin-top:4mm">References</h3>
+    <ol class="refs paper-references">{{REFERENCES}}</ol>
+  </div>
+
+  <!-- 8 · VERIFICATION PANEL — the SciLedger signature -->
+  <section class="verify">
+    <div class="verify-hd">
+      <span>Verified editorial record</span>
+      <span class="hash">Record digest · {{VERIFY_DIGEST}}</span>
+    </div>
+    <div class="verify-bd">
+      <div class="verify-qr"><img src="{{VERIFY_QR}}" alt="Scan to verify this record on SciLedger"></div>
+      <div class="verify-info">
+        <div class="vrow"><span class="vk">Verify at</span><span class="vv">{{VERIFY_LINK}}</span></div>
+        <div class="vrow"><span class="vk">Review rounds</span><span class="vv">{{REVIEW_ROUNDS}} · {{REVIEW_REPORTS}} referee reports</span></div>
+        <div class="vrow"><span class="vk">Decision</span><span class="vv">Accepted {{DATE_ACCEPTED}} by the handling editor</span></div>
+        <div class="vrow"><span class="vk">Events recorded</span><span class="vv">{{VERIFY_EVENTS}} transitions · append-only</span></div>
+        <div class="note">Scan or open the link to inspect the complete, tamper-evident editorial history of this article.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 9 · PAGE-1 IDENTITY FOOTER -->
+  <div class="pg1-footer">
+    <div class="lic">
+      <svg class="cc" viewBox="0 0 64 22" aria-hidden="true">
+        <rect x="0.5" y="0.5" width="21" height="21" rx="10.5" fill="none" stroke="#6B7280"/>
+        <text x="11" y="15.5" font-family="Inter,Arial" font-size="11" font-weight="700" fill="#6B7280" text-anchor="middle">cc</text>
+        <rect x="24.5" y="0.5" width="21" height="21" rx="10.5" fill="none" stroke="#6B7280"/>
+        <text x="35" y="15.5" font-family="Inter,Arial" font-size="11" font-weight="700" fill="#6B7280" text-anchor="middle">by</text>
+      </svg>
+      <span>© {{YEAR}} The Authors. Published by <b style="color:#172554">SciLedger</b> under
+        <a href="https://creativecommons.org/licenses/by/4.0/">{{LICENSE}}</a>.</span>
+    </div>
+    <div><a href="https://sciledger.org">sciledger.org</a></div>
+  </div>
+
+</div>
+</body>
+</html>

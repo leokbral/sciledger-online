@@ -1,5 +1,14 @@
 <script lang="ts">
 	import { Avatar } from '@skeletonlabs/skeleton-svelte';
+	import {
+		authorSnapshotMatchesReference,
+		buildPaperAffiliationIndex,
+		formatAffiliationIndexes,
+		formatAffiliationDisplayName,
+		normalizeAuthorSnapshot,
+		normalizeAuthorSnapshots,
+		type PaperAuthorSnapshot
+	} from '$lib/utils/paperAuthorAffiliations';
 
 	interface Props {
 		paper: any;
@@ -39,39 +48,6 @@
 		return username ? `/profile/${username}` : null;
 	}
 
-	function getAuthorAcademicInfo(
-		paperData: any,
-		author: any
-	): { department: string; university: string } {
-		if (!author) return { department: '', university: '' };
-
-		const authorId = String(author?.id || author?._id || '').trim();
-		const authorUsername = String(author?.username || '').trim();
-
-		if (Array.isArray(paperData?.authorAffiliations)) {
-			const matchedAffiliation = paperData.authorAffiliations.find((item: any) => {
-				const affiliationUserId = String(item?.userId || '').trim();
-				const affiliationUsername = String(item?.username || '').trim();
-
-				if (authorId && affiliationUserId && authorId === affiliationUserId) return true;
-				if (authorUsername && affiliationUsername && authorUsername === affiliationUsername) return true;
-				return false;
-			});
-
-			const department = String(matchedAffiliation?.department || '').trim();
-			const university = String(matchedAffiliation?.affiliation || '').trim();
-
-			if (department || university) {
-				return { department, university };
-			}
-		}
-
-		return {
-			department: String(author?.position || '').trim(),
-			university: String(author?.institution || '').trim()
-		};
-	}
-
 	function getPaperAuthors(paperData: any): Array<{ author: any; role: string }> {
 		const authors: Array<{ author: any; role: string }> = [];
 
@@ -87,12 +63,62 @@
 		return authors;
 	}
 
-	function getAuthorMetaLine(academicInfo: { department: string; university: string }): string {
-		return [academicInfo.department, academicInfo.university].filter(Boolean).join(' / ');
+	function getPaperAuthorSnapshot(
+		paperData: any,
+		author: any
+	): PaperAuthorSnapshot {
+		const storedSnapshots = normalizeAuthorSnapshots(paperData?.authorAffiliations);
+		const matchedSnapshot = storedSnapshots.find((snapshot) =>
+			authorSnapshotMatchesReference(snapshot, author)
+		);
+		const profileSnapshot = normalizeAuthorSnapshot(author) ?? {
+			name: getDisplayName(author),
+			affiliations: []
+		};
+		const isCorresponding =
+			Boolean(matchedSnapshot?.isCorresponding) ||
+			authorSnapshotMatchesReference(profileSnapshot, paperData?.correspondingAuthor);
+
+		return {
+			...profileSnapshot,
+			...matchedSnapshot,
+			name: matchedSnapshot?.name || profileSnapshot.name,
+			orcid: matchedSnapshot?.orcid || profileSnapshot.orcid,
+			affiliations:
+				matchedSnapshot?.affiliations?.length
+					? matchedSnapshot.affiliations
+					: profileSnapshot.affiliations || [],
+			isCorresponding
+		};
 	}
+
+	function getPaperAuthorRenderData(paperData: any) {
+		const items = getPaperAuthors(paperData).map((item) => ({
+			...item,
+			snapshot: getPaperAuthorSnapshot(paperData, item.author)
+		}));
+		const affiliationIndex = buildPaperAffiliationIndex(items.map((item) => item.snapshot));
+		const hasCorrespondingAuthor = items.some((item) => item.snapshot.isCorresponding);
+
+		return {
+			items,
+			affiliationEntries: affiliationIndex.entries,
+			authorAffiliationIndexes: affiliationIndex.authorAffiliationIndexes,
+			hasCorrespondingAuthor
+		};
+	}
+
+	function getAuthorMetaLine(snapshot: PaperAuthorSnapshot): string {
+		return (snapshot.affiliations ?? [])
+			.map((affiliation) => affiliation.displayName || formatAffiliationDisplayName(affiliation))
+			.filter(Boolean)
+			.join(' / ');
+	}
+
+	let authorData = $derived(getPaperAuthorRenderData(paper));
 </script>
 
-{#if getPaperAuthors(paper).length > 0}
+{#if authorData.items.length > 0}
 	<div class={rootClass}>
 		{#if headingText}
 			<p class="mb-2 text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
@@ -103,12 +129,13 @@
 		<div
 			class="paper-export-authors grid grid-cols-1 gap-x-8 gap-y-3 rounded-2xl border border-slate-200/80 bg-slate-50/60 px-4 py-3 lg:grid-cols-2"
 		>
-			{#each getPaperAuthors(paper) as item, index (`${item.role}-${item.author?.id || item.author?._id || item.author?.username || index}`)}
+			{#each authorData.items as item, index (`${item.role}-${item.author?.id || item.author?._id || item.author?.username || index}`)}
 				{@const author = item.author}
-				{@const displayName = getDisplayName(author)}
+				{@const snapshot = item.snapshot}
+				{@const displayName = snapshot.name || getDisplayName(author)}
 				{@const profileUrl = getProfileUrl(author)}
-				{@const academicInfo = getAuthorAcademicInfo(paper, author)}
-				{@const metaLine = getAuthorMetaLine(academicInfo)}
+				{@const affiliationMarks = formatAffiliationIndexes(authorData.authorAffiliationIndexes[index] ?? [])}
+				{@const metaLine = getAuthorMetaLine(snapshot)}
 
 				<article class="paper-export-author min-w-0 py-1.5">
 					<div class="flex items-start gap-3">
@@ -136,13 +163,36 @@
 										href={profileUrl}
 									>
 										{displayName}
+										{#if affiliationMarks}
+											<sup class="ml-0.5 text-[10px] leading-none">{affiliationMarks}</sup>
+										{/if}
+										{#if snapshot.isCorresponding}
+											<sup class="ml-0.5 text-[10px] leading-none">*</sup>
+										{/if}
 									</a>
 								{:else}
 									<span class="block break-words text-[15px] font-medium leading-snug text-slate-800">
 										{displayName}
+										{#if affiliationMarks}
+											<sup class="ml-0.5 text-[10px] leading-none">{affiliationMarks}</sup>
+										{/if}
+										{#if snapshot.isCorresponding}
+											<sup class="ml-0.5 text-[10px] leading-none">*</sup>
+										{/if}
 									</span>
 								{/if}
 							</div>
+
+							{#if snapshot.orcid}
+								<a
+									class="mt-1 inline-flex break-all text-[11px] font-medium text-primary-600 hover:text-primary-700 hover:underline"
+									href={`https://orcid.org/${snapshot.orcid}`}
+									target="_blank"
+									rel="noopener"
+								>
+									ORCID {snapshot.orcid}
+								</a>
+							{/if}
 
 							{#if metaLine}
 								<p class="paper-export-author-meta mt-1 break-words text-xs leading-5 text-slate-500">
@@ -154,5 +204,22 @@
 				</article>
 			{/each}
 		</div>
+
+		{#if authorData.affiliationEntries.length > 0}
+			<ol class="paper-export-affiliations mt-3 space-y-1 text-xs leading-5 text-slate-500">
+				{#each authorData.affiliationEntries as item (item.key)}
+					<li class="flex gap-1.5">
+						<sup class="mt-0.5 text-[10px] leading-none">{item.index}</sup>
+						<span>{item.displayName}</span>
+					</li>
+				{/each}
+			</ol>
+		{/if}
+
+		{#if authorData.hasCorrespondingAuthor}
+			<p class="paper-export-corresponding-author mt-2 text-xs leading-5 text-slate-500">
+				* Corresponding author
+			</p>
+		{/if}
 	</div>
 {/if}

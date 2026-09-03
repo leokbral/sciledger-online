@@ -745,6 +745,16 @@
 									</button>
 								{/if}
 							{/if}
+							{#if paper?.status === 'published'}
+								<a
+									href={`/api/papers/${paper.id}/pdf`}
+									class="btn btn-sm flex items-center gap-1 rounded-full border border-surface-200 bg-white text-surface-700 transition hover:border-surface-300 hover:bg-surface-50"
+									title="Download the published article as a SciLedger PDF"
+								>
+									<Icon icon="mdi:file-pdf-box" width="20" height="20" />
+									Download PDF
+								</a>
+							{/if}
 							<a
 								href={getReadMoreHref(paper)}
 								class="btn btn-sm flex items-center gap-1 rounded-full bg-primary-50 text-primary-700 transition hover:bg-primary-100 hover:text-primary-800"

@@ -5,6 +5,15 @@ import { Readable } from 'node:stream';
 import { chromium } from 'playwright';
 import { db } from '$lib/db/mongo';
 import { fsFiles } from '$lib/db/fs';
+import {
+	authorSnapshotMatchesReference,
+	buildPaperAffiliationIndex,
+	formatAffiliationDisplayName,
+	formatAffiliationIndexes,
+	normalizeAuthorSnapshot,
+	normalizeAuthorSnapshots,
+	type PaperAuthorSnapshot
+} from '$lib/utils/paperAuthorAffiliations';
 
 type PaperRecord = {
 	_id?: unknown;
@@ -19,20 +28,19 @@ type PaperRecord = {
 	correspondingAuthor?: unknown;
 	coAuthors?: unknown[];
 	hubId?: unknown;
-	authorAffiliations?: Array<{
-		userId?: string;
-		username?: string;
-		name?: string;
-		department?: string;
-		affiliation?: string;
-	}>;
+	authorAffiliations?: PaperAuthorSnapshot[];
 	createdAt?: unknown;
+};
+
+type MongoRecord = Record<string, unknown> & {
+	_id: string | ObjectId;
+	id?: string;
 };
 
 const bucket = new GridFSBucket(db);
 const papers = db.collection<PaperRecord>('papers');
-const users = db.collection<Record<string, unknown>>('users');
-const hubs = db.collection<Record<string, unknown>>('hubs');
+const users = db.collection<MongoRecord>('users');
+const hubs = db.collection<MongoRecord>('hubs');
 
 function stripHtml(value: unknown): string {
 	const source = typeof value === 'string' ? value : '';
@@ -251,6 +259,70 @@ function getPaperAuthorItems(authors: {
 	});
 }
 
+function getPaperAuthorSnapshot(paper: PaperRecord, author: Record<string, unknown>): PaperAuthorSnapshot {
+	const storedSnapshots = normalizeAuthorSnapshots(paper.authorAffiliations);
+	const matchedSnapshot = storedSnapshots.find((snapshot) =>
+		authorSnapshotMatchesReference(snapshot, author)
+	);
+	const profileSnapshot = normalizeAuthorSnapshot(author) ?? {
+		name: normalizeName(author),
+		affiliations: []
+	};
+	const isCorresponding =
+		Boolean(matchedSnapshot?.isCorresponding) ||
+		authorSnapshotMatchesReference(profileSnapshot, paper.correspondingAuthor);
+
+	return {
+		...profileSnapshot,
+		...matchedSnapshot,
+		name: matchedSnapshot?.name || profileSnapshot.name,
+		orcid: matchedSnapshot?.orcid || profileSnapshot.orcid,
+		affiliations:
+			matchedSnapshot?.affiliations?.length
+				? matchedSnapshot.affiliations
+				: profileSnapshot.affiliations || [],
+		isCorresponding
+	};
+}
+
+function buildAuthorSectionHtml(
+	paper: PaperRecord,
+	authors: {
+		mainAuthor: Record<string, unknown> | null;
+		correspondingAuthor: Record<string, unknown> | null;
+		coAuthors: Record<string, unknown>[];
+	}
+): string {
+	const authorItems = getPaperAuthorItems(authors);
+	if (authorItems.length === 0) return '';
+
+	const snapshots = authorItems.map((author) => getPaperAuthorSnapshot(paper, author));
+	const affiliationIndex = buildPaperAffiliationIndex(snapshots);
+	const authorNames = snapshots.map((snapshot, index) => {
+		const affiliationMarks = formatAffiliationIndexes(
+			affiliationIndex.authorAffiliationIndexes[index] ?? []
+		);
+		return [
+			escapeHtml(snapshot.name || normalizeName(authorItems[index])),
+			affiliationMarks ? `<sup>${escapeHtml(affiliationMarks)}</sup>` : '',
+			snapshot.isCorresponding ? '<sup>*</sup>' : ''
+		].join('');
+	});
+	const affiliationsHtml = affiliationIndex.entries.length
+		? `<ol class="paper-affiliations">${affiliationIndex.entries
+				.map((item) => {
+					const displayName = item.displayName || formatAffiliationDisplayName(item.affiliation);
+					return `<li><sup>${item.index}</sup> ${escapeHtml(displayName)}</li>`;
+				})
+				.join('')}</ol>`
+		: '';
+	const correspondingHtml = snapshots.some((snapshot) => snapshot.isCorresponding)
+		? '<div class="paper-corresponding-note">* Corresponding author</div>'
+		: '';
+
+	return `<div class="paper-line-numbered-block paper-author-block"><div class="paper-authors-inline">${authorNames.join(', ')}</div>${affiliationsHtml}${correspondingHtml}</div>`;
+}
+
 function buildPaperHtml(
 	paper: PaperRecord,
 	baseUrl: string,
@@ -273,11 +345,7 @@ function buildPaperHtml(
 	const keywordsHtml = keywords.length
 		? `<div class="keywords"><strong>Keywords:</strong> ${keywords.join(', ')}</div>`
 		: '';
-	const authorItems = getPaperAuthorItems(authors);
-	const authorNames = authorItems.map((author) => normalizeName(author)).filter(Boolean);
-	const authorSectionHtml = authorNames.length
-		? `<div class="paper-line-numbered-block paper-authors-inline">${escapeHtml(authorNames.join(', '))}</div>`
-		: '';
+	const authorSectionHtml = buildAuthorSectionHtml(paper, authors);
 	const publishedDate = paper.createdAt ? new Date(String(paper.createdAt)).toDateString() : '';
 	const hubBadgeHtml = hubName
 		? `<div class="paper-hub-badge paper-line-number-exempt">${escapeHtml(hubName)}</div>`
@@ -357,11 +425,35 @@ function buildPaperHtml(
 			}
 
 			.paper-authors-inline {
-				margin: 0 0 10pt;
+				margin: 0 0 4pt;
 				font-size: 11pt;
 				font-weight: 500;
 				line-height: 1.4;
 				color: #475569;
+			}
+
+			.paper-author-block {
+				margin: 0 0 10pt;
+			}
+
+			.paper-authors-inline sup,
+			.paper-affiliations sup,
+			.paper-corresponding-note {
+				color: #64748b;
+			}
+
+			.paper-affiliations {
+				margin: 0 0 2pt;
+				padding: 0;
+				list-style: none;
+				font-size: 8.5pt;
+				line-height: 1.35;
+				color: #64748b;
+			}
+
+			.paper-corresponding-note {
+				font-size: 8.5pt;
+				line-height: 1.35;
 			}
 
 			.paper-line-numbered-root {

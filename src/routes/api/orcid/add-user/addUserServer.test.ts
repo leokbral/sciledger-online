@@ -124,6 +124,20 @@ describe('ORCID co-author user creation', () => {
 		expect(user.emailVerified).toBe(true);
 		expect(user.emailVerifiedAt).toBeInstanceOf(Date);
 		expect(user.verificationSource).toBe('orcid');
+		expect(user.orcid).toBe('0000-0001-0002-0003');
+		expect(user.institution).toBe('Analytical Engine Lab');
+		expect(user.position).toBe('Researcher');
+		expect(body.user).toMatchObject({
+			orcid: '0000-0001-0002-0003',
+			affiliations: [
+				expect.objectContaining({
+					organization: 'Analytical Engine Lab',
+					roleTitle: 'Researcher'
+				})
+			]
+		});
+		expect(body.user.password).toBeUndefined();
+		expect(body.user.orcidAccessToken).toBeUndefined();
 	});
 
 	it('keeps manually supplied co-author email unverified when ORCID has no public email', async () => {
@@ -143,5 +157,39 @@ describe('ORCID co-author user creation', () => {
 		expect(user.emailVerified).toBe(false);
 		expect(user.emailVerifiedAt).toBeUndefined();
 		expect(user.verificationSource).toBeUndefined();
+	});
+
+	it('returns sanitized ORCID affiliation suggestions for an existing user', async () => {
+		mocks.findOne.mockResolvedValue({
+			id: 'existing-1',
+			firstName: 'Ada',
+			lastName: 'Lovelace',
+			username: '@ada',
+			email: 'ada@example.com',
+			password: 'secret',
+			orcidAccessToken: 'private-token',
+			institution: '',
+			position: ''
+		});
+		const { POST } = await import('./+server');
+
+		const response = await POST({
+			request: createRequest({ orcidProfile: createOrcidProfile('ada@example.com') }),
+			locals: { user: { id: 'creator-1' } }
+		} as any);
+		const body = await response.json();
+
+		expect(response.status).toBe(409);
+		expect(body.user).toMatchObject({
+			id: 'existing-1',
+			orcid: '0000-0001-0002-0003',
+			affiliations: [
+				expect.objectContaining({
+					organization: 'Analytical Engine Lab'
+				})
+			]
+		});
+		expect(body.user.password).toBeUndefined();
+		expect(body.user.orcidAccessToken).toBeUndefined();
 	});
 });

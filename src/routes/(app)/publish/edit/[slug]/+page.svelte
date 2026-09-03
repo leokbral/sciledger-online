@@ -69,12 +69,17 @@
 			title: 'Title',
 			abstract: 'Abstract',
 			mainAuthor: 'Main Author',
-			correspondingAuthor: 'Corresponding Author',
 			keywords: 'Keywords',
 			pdfUrl: 'PDF URL'
 		};
+		const fieldsToValidate = {
+			...requiredFields,
+			...(store?.status === 'reviewer assignment'
+				? { correspondingAuthor: 'Corresponding Author' }
+				: {})
+		};
 
-		const missingFields = Object.entries(requiredFields)
+		const missingFields = Object.entries(fieldsToValidate)
 			.filter(([key]) => !store[key])
 			.map(([, label]) => label);
 

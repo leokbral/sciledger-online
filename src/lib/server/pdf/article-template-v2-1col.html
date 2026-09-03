@@ -1,0 +1,271 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<title>SciLedger — Article Template · One Column</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&display=swap" rel="stylesheet">
+<style>:root{
+  --ink:#101A3D; --ink-2:#172554; --soft:#46557F; --muted:#7C8AA8;
+  --rule:#E4E8F0; --accent:#2563EB; --accent-2:#60A5FA; --tint:#EFF5FF;
+  --oa:#EA580C;
+  --sans:"Inter","Helvetica Neue",Arial,sans-serif;
+  --serif:"Source Serif 4","Charter",Georgia,"Times New Roman",serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{font-family:var(--serif);color:var(--ink);-webkit-font-smoothing:antialiased;
+     text-rendering:optimizeLegibility;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+.page{padding:0 18mm}
+/* full-bleed helper: side page margins are 0, so pull out by the content padding */
+.bleed{margin:0 -18mm;padding:0 18mm}
+
+/* ── MASTHEAD BAND ───────────────────────────────────────── */
+.mast{background:var(--ink);color:#fff;padding-top:7mm;padding-bottom:6mm;position:relative}
+.mast::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1.6mm;
+  background:linear-gradient(90deg,var(--accent) 0%,var(--accent-2) 55%,#A5C9FF 100%)}
+.mast-in{display:flex;justify-content:space-between;align-items:flex-start}
+.brand{display:flex;align-items:center;gap:3mm}
+.brand-name{font-family:var(--sans);font-weight:700;font-size:16pt;letter-spacing:-.028em;line-height:1;color:#fff}
+.brand-tag{font-family:var(--sans);font-size:6.4pt;font-weight:500;letter-spacing:.18em;
+  text-transform:uppercase;color:#93B4F5;margin-top:1.6mm}
+.mast-r{text-align:right;font-family:var(--sans)}
+.chip{display:inline-block;font-size:6.4pt;font-weight:700;letter-spacing:.10em;text-transform:uppercase;
+  padding:1.2mm 2.4mm;border-radius:99px;margin-left:1.5mm}
+.chip-oa{background:var(--oa);color:#fff}
+.chip-type{background:rgba(255,255,255,.14);color:#DCE9FF;border:.4pt solid rgba(255,255,255,.28)}
+.mast-doi{margin-top:3mm;font-size:7.2pt;color:#A9C4F7;letter-spacing:.01em}
+
+/* ── TITLE ───────────────────────────────────────────────── */
+.title{font-family:var(--serif);font-weight:700;font-size:26pt;line-height:1.08;
+  letter-spacing:-.014em;color:var(--ink);margin:9mm 0 0}
+.subtitle{font-family:var(--serif);font-size:12pt;line-height:1.32;color:var(--soft);margin:3mm 0 0;font-weight:400}
+.authors{font-family:var(--sans);font-size:9.8pt;font-weight:600;line-height:1.55;margin:6mm 0 0;color:var(--ink)}
+.authors sup{font-weight:500;color:var(--accent);font-size:6.8pt}
+.affil{font-family:var(--sans);font-size:7.3pt;line-height:1.55;color:var(--muted);margin:2.4mm 0 0}
+.affil sup{color:var(--accent)}
+.affil a{color:var(--accent);text-decoration:none}
+
+/* ── SECTION HEADINGS (numbered chips) ───────────────────── */
+h2.sec{font-family:var(--sans);font-size:11pt;font-weight:700;color:var(--ink);
+  margin:7mm 0 2.4mm;letter-spacing:-.012em;break-after:avoid;display:flex;align-items:center;gap:2.6mm}
+h2.sec .num{flex:none;font-size:6.8pt;font-weight:700;color:#fff;background:var(--accent);
+  border-radius:2.4pt;padding:1mm 1.8mm;letter-spacing:.04em}
+h3.sub{font-family:var(--sans);font-size:9.2pt;font-weight:600;color:var(--soft);
+  margin:4.5mm 0 1.4mm;break-after:avoid}
+p{margin:0 0 2.6mm;text-align:justify;hyphens:auto}
+
+/* ── PULL QUOTE ──────────────────────────────────────────── */
+blockquote.pull{margin:5mm 0;padding:0 0 0 5mm;border-left:2.4pt solid var(--accent);
+  font-size:13pt;line-height:1.34;color:var(--ink);font-weight:600;letter-spacing:-.008em}
+
+/* ── FIGURES / TABLES ────────────────────────────────────── */
+figure{margin:5mm 0;break-inside:avoid}
+figure .ph{height:42mm;border-radius:4pt;border:.5pt solid #D3E1FA;
+  background:repeating-linear-gradient(135deg,#F7FAFF,#F7FAFF 7px,#EDF4FF 7px,#EDF4FF 14px);
+  display:flex;align-items:center;justify-content:center;font-family:var(--sans);font-size:7.4pt;color:#9FB6DC}
+figcaption{font-family:var(--sans);font-size:7.3pt;color:var(--muted);line-height:1.45;margin-top:2mm;text-align:justify}
+figcaption b{color:var(--ink);font-weight:600}
+table.data{width:100%;border-collapse:collapse;margin:4.5mm 0;font-size:7.7pt;font-family:var(--sans);break-inside:avoid}
+table.data caption{caption-side:top;text-align:left;font-size:7.3pt;color:var(--muted);margin-bottom:1.8mm}
+table.data caption b{color:var(--ink);font-weight:600}
+table.data th{text-align:left;font-weight:600;color:#fff;background:var(--ink);padding:1.8mm 2.2mm}
+table.data th:first-child{border-radius:2.5pt 0 0 0}
+table.data th:last-child{border-radius:0 2.5pt 0 0}
+table.data td{padding:1.6mm 2.2mm;border-bottom:.4pt solid var(--rule);color:var(--soft)}
+table.data tbody tr:nth-child(even){background:#F8FAFF}
+
+/* ── BACK MATTER / REFS ──────────────────────────────────── */
+.backmatter{margin-top:7mm;padding-top:3.4mm;border-top:2pt solid var(--ink);
+  font-family:var(--sans);font-size:7.3pt;color:var(--muted);line-height:1.55}
+.backmatter h3{font-size:7pt;font-weight:700;color:var(--ink);letter-spacing:.10em;
+  text-transform:uppercase;margin:0 0 1.2mm}
+.backmatter .blk{margin-bottom:2.8mm;break-inside:avoid}
+.backmatter a{color:var(--accent);text-decoration:none}
+ol.refs{margin:2mm 0 0;padding-left:5.5mm;font-size:7.6pt;line-height:1.5;color:var(--soft)}
+ol.refs li{margin-bottom:1.6mm;break-inside:avoid}
+ol.refs a{color:var(--accent);text-decoration:none}
+
+/* ── VERIFY CARD (dark, signature element) ───────────────── */
+.verify{margin-top:6mm;background:var(--ink);border-radius:5pt;overflow:hidden;break-inside:avoid;color:#fff}
+.verify-hd{padding:2.6mm 4mm;border-bottom:.5pt solid rgba(255,255,255,.14);
+  display:flex;justify-content:space-between;align-items:center;font-family:var(--sans)}
+.verify-hd .t{font-size:6.8pt;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#93B4F5}
+.verify-hd .h{font-size:6.6pt;color:#8595B8;font-family:var(--sans)}
+.verify-bd{display:flex;gap:4.5mm;padding:4mm;align-items:center}
+.verify-qr{flex:none;width:21mm;height:21mm;background:#fff;border-radius:3pt;padding:1.2mm}
+.verify-qr img{width:100%;height:100%;display:block}
+.verify-info{flex:1;font-family:var(--sans);font-size:7.2pt;line-height:1.6}
+.verify-info .vrow{display:flex;gap:2mm}
+.verify-info .vk{min-width:25mm;color:#8FA2C6}
+.verify-info .vv{color:#fff;font-weight:600}
+.verify-info .note{margin-top:2mm;color:#8FA2C6;font-style:italic;font-size:6.9pt}
+
+/* ── CLOSING BAND ────────────────────────────────────────── */
+.endband{margin-top:5mm;background:var(--tint);padding-top:3mm;padding-bottom:3mm;
+  display:flex;justify-content:space-between;align-items:center;
+  font-family:var(--sans);font-size:6.9pt;color:var(--soft)}
+.endband b{color:var(--ink)}
+.endband a{color:var(--accent);text-decoration:none}
+
+.lead-grid{display:grid;grid-template-columns:44mm 1fr;gap:0 9mm;margin-top:8mm;
+  padding-top:4.5mm;border-top:.5pt solid var(--rule)}
+.rail{font-family:var(--sans);border-right:.5pt solid var(--rule);padding-right:6mm}
+.rail .g{margin-bottom:3.4mm}
+.rail .k{color:var(--muted);font-size:6.2pt;letter-spacing:.12em;text-transform:uppercase;font-weight:600}
+.rail .v{color:var(--ink);font-weight:600;font-size:7.6pt;margin-top:.8mm;font-family:var(--sans)}
+.abs h2{font-family:var(--sans);font-size:6.9pt;font-weight:700;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--accent);margin:0 0 2.2mm}
+.abs p{font-size:9.7pt;line-height:1.5;margin:0}
+.kw{font-family:var(--sans);font-size:7.4pt;color:var(--soft);margin-top:3.4mm;line-height:1.5}
+.kw b{color:var(--ink)}
+.cite{margin-top:5mm;padding:3mm 3.6mm;background:#F7F9FF;border-left:2.2pt solid var(--accent-2);
+  border-radius:0 3pt 3pt 0;font-family:var(--sans);font-size:7.2pt;color:var(--soft);line-height:1.5}
+.cite b{color:var(--ink)} .cite a{color:var(--accent);text-decoration:none}
+.body{margin-top:3mm;font-size:9.7pt;line-height:1.5}
+</style></head><body><div class="page">
+  <header class="mast bleed">
+    <div class="mast-in">
+      <div class="brand">
+        <svg width="30" height="30" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+          <rect x="0" y="0" width="32" height="32" rx="8" fill="#fff" fill-opacity=".10"/>
+          <path d="M8.6 21.8V10.2" stroke="#60A5FA" stroke-width="2.5" stroke-linecap="round"/>
+          <path d="M8.6 21.8H16.2" stroke="#60A5FA" stroke-width="2.5" stroke-linecap="round"/>
+          <path d="M14.4 10.2h4.5a3.7 3.7 0 0 1 0 7.4h-2.2" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="23.4" cy="20.6" r="2.4" fill="#60A5FA"/>
+        </svg>
+        <div>
+          <div class="brand-name">SciLedger</div>
+          <div class="brand-tag">Open Science Publishing</div>
+        </div>
+      </div>
+      <div class="mast-r">
+        <span class="chip chip-type">Research Article</span>
+        <span class="chip chip-oa">Open Access</span>
+        <div class="mast-doi">doi.org/10.63000/sciledger.2026.118 &nbsp;·&nbsp; Vol. 4 (2) &nbsp;·&nbsp; 118–131</div>
+      </div>
+    </div>
+  </header>
+  <h1 class="title">Ledger-based provenance for peer&nbsp;review</h1>
+  <p class="subtitle">A verifiable record of editorial decisions across 12,400 manuscripts</p>
+  <p class="authors">
+    Leonardo Ferreira Cabral<sup>1,*</sup>&nbsp;&nbsp; Marina Alves Ribeiro<sup>1,2</sup>&nbsp;&nbsp;
+    Tomás Nogueira<sup>3</sup>&nbsp;&nbsp; Helena Vasconcelos<sup>2</sup>
+  </p>
+  <p class="affil">
+    <sup>1</sup> Instituto Metrópole Digital, Universidade Federal do Rio Grande do Norte, Natal, RN, Brazil &nbsp;·&nbsp;
+    <sup>2</sup> Department of Information Science, University of Coimbra, Portugal &nbsp;·&nbsp;
+    <sup>3</sup> Centre for Open Research Infrastructure, Amsterdam, The Netherlands<br>
+    <sup>*</sup> Correspondence: <a href="mailto:leonardo.cabral@sciledger.org">leonardo.cabral@sciledger.org</a>
+  </p>
+  <div class="lead-grid">
+    <aside class="rail">
+      <div class="g"><div class="k">Received</div><div class="v">14 Jan 2026</div></div>
+      <div class="g"><div class="k">Accepted</div><div class="v">19 Mar 2026</div></div>
+      <div class="g"><div class="k">Published</div><div class="v">27 Mar 2026</div></div>
+      <div class="g"><div class="k">Peer review</div><div class="v">Double-anonymised<br>2 rounds</div></div>
+      <div class="g"><div class="k">Article ID</div><div class="v">2026.118</div></div>
+      <div class="g"><div class="k">License</div><div class="v">CC BY 4.0</div></div>
+    </aside>
+    <div class="abs">
+      <h2>Abstract</h2>
+      <p>Peer review remains the principal quality signal in scholarly communication, yet the record of how a
+decision was reached is rarely available to readers. We introduce a ledger-based provenance model in which every
+editorial transition — submission, reviewer assignment, review round, correction and final decision — is recorded as
+an append-only event bound to the published article. Applying the model to 12,400 manuscripts, we show that
+verifiable provenance reduces post-publication disputes by 38% and shortens median time-to-decision by 11 days,
+without increasing editorial workload.</p>
+      <p class="kw"><b>Keywords:</b> peer review; provenance; open science; editorial workflow; research integrity</p>
+    </div>
+  </div>
+  <div class="cite"><b>How to cite:</b> Ferreira Cabral, L., Alves Ribeiro, M., Nogueira, T., &amp; Vasconcelos, H.
+    (2026). Ledger-based provenance for peer review. <i>SciLedger</i>, 4(2), 118–131.
+    <a href="#">doi.org/10.63000/sciledger.2026.118</a></div>
+  <div class="body"><h2 class="sec"><span class="num">01</span>Introduction</h2>
+    <p>The credibility of a published result rests less on the result itself than on the process that produced it.
+    Readers are asked to trust that a manuscript was examined by competent referees, that criticism was addressed,
+    and that the final decision followed from the evidence rather than from convenience. In practice this process is
+    opaque: the reader sees an outcome and must infer the reasoning behind it.</p>
+    <p>Several initiatives have attempted to open parts of this record — published referee reports, transparent
+    decision letters, registered reports. Each addresses a symptom, but none produces a machine-verifiable account of
+    the editorial process as a whole. What is missing is not more disclosure, but a <i>structure</i> for it.</p>
+
+    <blockquote class="pull">A decision trail that cannot be verified is a claim, not a record.</blockquote>
+
+    <h2 class="sec"><span class="num">02</span>Materials and Methods</h2>
+    <h3 class="sub">2.1 Data sources</h3>
+    <p>We analysed 12,400 manuscripts submitted between 2021 and 2025 across seven open-access venues. Each
+    manuscript contributed a complete editorial event stream, from initial submission to final decision, comprising
+    184,930 discrete transitions in total.</p>
+
+    <figure>
+      <div class="ph">Figure placeholder — replace with the article figure</div>
+      <figcaption><b>Figure 1.</b> Editorial event stream for a representative manuscript. Each node is an
+      append-only transition; shaded regions mark review rounds. Identities are withheld while the structure of the
+      decision remains fully auditable.</figcaption>
+    </figure>
+
+    <h3 class="sub">2.2 Provenance model</h3>
+    <p>Every transition is recorded as an immutable event carrying an actor role (not identity), a timestamp, the
+    prior and resulting states, and a content digest of any attached artefact. Events are chained, so any retroactive
+    edit invalidates all subsequent links and is detectable by a third party.</p>
+
+    <table class="data">
+      <caption><b>Table 1.</b> Outcome measures before and after adoption.</caption>
+      <thead><tr><th>Measure</th><th>Before</th><th>After</th><th>Δ</th></tr></thead>
+      <tbody>
+        <tr><td>Median time to first decision (days)</td><td>63</td><td>52</td><td>−11</td></tr>
+        <tr><td>Post-publication disputes (per 1,000)</td><td>8.4</td><td>5.2</td><td>−38%</td></tr>
+        <tr><td>Reviewer response rate</td><td>41%</td><td>47%</td><td>+6 pp</td></tr>
+        <tr><td>Editorial hours per manuscript</td><td>4.1</td><td>4.0</td><td>−0.1</td></tr>
+      </tbody>
+    </table>
+
+    <h2 class="sec"><span class="num">03</span>Results</h2>
+    <p>Adoption was associated with a reduction in median time-to-decision from 63 to 52 days. The effect was
+    concentrated in the reviewer-assignment phase, where visibility of prior invitation attempts reduced duplicated
+    outreach. Editorial workload was unchanged within measurement error, indicating that the gains came from
+    coordination rather than from additional effort.</p>
+
+    <h2 class="sec"><span class="num">04</span>Discussion</h2>
+    <p>The central finding is that transparency and anonymity are not in tension when provenance is published at the
+    level of events. Readers gain a verifiable account of process; referees retain the protection that candid
+    criticism requires.</p>
+
+    <h2 class="sec"><span class="num">05</span>Conclusions</h2>
+    <p>A verifiable editorial record is achievable with existing infrastructure and modest process change. We release
+    the specification openly so that it can be adopted independently of any single platform.</p></div>
+  <div class="backmatter">
+    <div class="blk"><h3>Author contributions</h3>Conceptualisation, L.F.C. and M.A.R.; methodology, L.F.C.;
+      formal analysis, T.N.; data curation, H.V.; writing — original draft, L.F.C.; writing — review &amp; editing,
+      all authors.</div>
+    <div class="blk"><h3>Funding</h3>This research received no external funding.</div>
+    <div class="blk"><h3>Data availability</h3>Dataset and analysis code openly available at
+      <a href="#">doi.org/10.5281/zenodo.0000000</a>.</div>
+    <div class="blk"><h3>Conflicts of interest</h3>The authors declare no conflict of interest.</div>
+    <h3 style="margin-top:4mm">References</h3>
+    <ol class="refs">
+      <li>Tennant, J. P., &amp; Ross-Hellauer, T. (2020). The limitations to our understanding of peer review.
+        <i>Research Integrity and Peer Review</i>, 5(6), 1–14.</li>
+      <li>Ross-Hellauer, T. (2017). What is open peer review? A systematic review. <i>F1000Research</i>, 6, 588.</li>
+      <li>Polka, J. K., et&nbsp;al. (2018). Publish peer reviews. <i>Nature</i>, 560, 545–547.</li>
+      <li>Nosek, B. A., et&nbsp;al. (2015). Promoting an open research culture. <i>Science</i>, 348(6242), 1422–1425.</li>
+      <li>Fanelli, D. (2018). Is science really facing a reproducibility crisis? <i>PNAS</i>, 115(11), 2628–2631.</li>
+    </ol>
+  </div>
+  <section class="verify">
+    <div class="verify-hd">
+      <span class="t">Verified editorial record</span>
+      <span class="h">digest a7f3c9e1b482…d05f</span>
+    </div>
+    <div class="verify-bd">
+      <div class="verify-qr"><img src="data:image/png;base64,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" alt="Verify this record"></div>
+      <div class="verify-info">
+        <div class="vrow"><span class="vk">Verify at</span><span class="vv">sciledger.org/verify/2026.118</span></div>
+        <div class="vrow"><span class="vk">Review rounds</span><span class="vv">2 · 4 referee reports</span></div>
+        <div class="vrow"><span class="vk">Decision</span><span class="vv">Accepted 19 March 2026</span></div>
+        <div class="vrow"><span class="vk">Events recorded</span><span class="vv">31 transitions · append-only</span></div>
+        <div class="note">Scan to inspect the complete, tamper-evident editorial history of this article.</div>
+      </div>
+    </div>
+  </section>
+  <div class="endband bleed">
+    <span>© 2026 The Authors. Published by <b>SciLedger</b> under CC BY 4.0.</span>
+    <a href="https://sciledger.org">sciledger.org</a>
+  </div>
+</div></body></html>

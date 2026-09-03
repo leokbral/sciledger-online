@@ -3,6 +3,14 @@ import Papers from '$lib/db/models/Paper.js';
 import Users from '$lib/db/models/User.js';
 import '$lib/db/mongooseConnection.js';
 
+function getReferenceId(value: any): string {
+	if (!value) return '';
+	if (typeof value === 'string') return value;
+	if (value.id) return String(value.id);
+	if (value._id) return String(value._id);
+	return '';
+}
+
 export async function load({ locals, params }) {
 	if (!locals.user) redirect(302, `/login`);
 
@@ -20,9 +28,9 @@ export async function load({ locals, params }) {
 
 		// Verificar se o usuário tem permissão para editar este paper
 		const userId = locals.user.id;
-		const canEdit = paper.mainAuthor._id.toString() === userId || 
-			paper.coAuthors.some((author: { _id: { toString: () => string } }) => author._id.toString() === userId) ||
-			paper.correspondingAuthor._id.toString() === userId;
+		const canEdit = getReferenceId(paper.mainAuthor) === userId ||
+			(Array.isArray(paper.coAuthors) && paper.coAuthors.some((author: any) => getReferenceId(author) === userId)) ||
+			getReferenceId(paper.correspondingAuthor) === userId;
 
 		if (!canEdit) {
 			throw error(403, 'You do not have permission to edit this paper');

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import PaperAuthorsSection from '$lib/components/Paper/PaperAuthorsSection.svelte';
+	import DownloadArticlePdf from '$lib/components/Paper/DownloadArticlePdf.svelte';
 	import SupplementaryMaterials from '$lib/components/SupplementaryMaterials.svelte';
 	import SupplementaryFiles from '$lib/components/SupplementaryFiles.svelte';
 	import type { PageData } from './$types';
@@ -163,6 +164,7 @@
 			<h2 class="text-3xl font-semibold text-gray-800 mb-4">{@html paper.title}</h2>
 
 			<PaperAuthorsSection paper={paper} rootClass="mb-4" />
+			<DownloadArticlePdf paperId={paper.id} status={paper.status} class="mb-4" />
 
 			<span class="text-xs">Created: {new Date(paper.createdAt).toDateString()}</span>
 

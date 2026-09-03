@@ -1,0 +1,283 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<title>SciLedger — Article Template v3 · One Column</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0B1533; --ink-2:#16224A; --soft:#44548A; --muted:#8492B4;
+  --hair:#DFE5F0; --accent:#2563EB; --sky:#7DAAFB; --pale:#F4F8FF; --oa:#F97316;
+  --sans:"Inter","Helvetica Neue",Arial,sans-serif;
+  --serif:"Source Serif 4",Charter,Georgia,"Times New Roman",serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{font-family:var(--serif);color:var(--ink);font-size:10pt;line-height:1.52;
+  print-color-adjust:exact;-webkit-print-color-adjust:exact;
+  font-variant-numeric:oldstyle-nums proportional-nums;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+.page{padding:0 20mm}
+.bleed{margin:0 -20mm;padding:0 20mm}
+
+/* ══ HERO ════════════════════════════════════════════════ */
+.hero{background:var(--ink);color:#fff;padding-top:9mm;padding-bottom:10mm;position:relative;overflow:hidden}
+.hero::before{content:"";position:absolute;inset:0;
+  background-image:radial-gradient(rgba(125,170,251,.16) .6px,transparent .6px);
+  background-size:3.2mm 3.2mm;opacity:.75}
+.hero::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1.4mm;
+  background:linear-gradient(90deg,#2563EB,#7DAAFB 60%,#CFE0FF)}
+.hero>*{position:relative}
+.hero-top{display:flex;justify-content:space-between;align-items:center;
+  padding-bottom:7mm;border-bottom:.4pt solid rgba(255,255,255,.16)}
+.brand{display:flex;align-items:center;gap:2.8mm}
+.brand-name{font-family:var(--sans);font-weight:700;font-size:12.5pt;letter-spacing:-.03em;line-height:1}
+.brand-tag{font-family:var(--sans);font-size:5.8pt;font-weight:500;letter-spacing:.22em;
+  text-transform:uppercase;color:var(--sky);margin-top:1.3mm}
+.chips{font-family:var(--sans)}
+.chip{display:inline-block;font-size:6pt;font-weight:600;letter-spacing:.14em;text-transform:uppercase;
+  padding:1.3mm 2.6mm;border-radius:99px;margin-left:1.6mm}
+.chip-t{border:.4pt solid rgba(255,255,255,.34);color:#DCE8FF}
+.chip-oa{background:var(--oa);color:#fff}
+.kicker{font-family:var(--sans);font-size:6.2pt;font-weight:600;letter-spacing:.26em;
+  text-transform:uppercase;color:var(--sky);margin:8mm 0 4mm}
+.h-title{font-family:var(--serif);font-weight:700;font-size:29pt;line-height:1.06;
+  letter-spacing:-.018em;color:#fff;margin:0;max-width:150mm}
+.h-sub{font-family:var(--serif);font-size:12.5pt;line-height:1.34;color:#B9CCF4;
+  margin:4mm 0 0;max-width:140mm;font-weight:400}
+.h-authors{font-family:var(--sans);font-size:8.6pt;font-weight:500;color:#E6EEFF;
+  margin:8mm 0 0;line-height:1.6}
+.h-authors sup{color:var(--sky);font-size:6pt}
+.h-doi{font-family:var(--sans);font-size:6.8pt;color:#8FAEE8;margin-top:5mm;letter-spacing:.02em}
+.h-doi a{color:inherit;text-decoration:none}
+
+/* ══ META STRIP ══════════════════════════════════════════ */
+.meta{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));margin-top:8mm;
+  border-top:.4pt solid var(--hair);border-bottom:.4pt solid var(--hair)}
+.meta>div{padding:3.4mm 2mm 3.4mm 3mm;border-left:.4pt solid var(--hair)}
+.meta>div:first-child{padding-left:0;border-left:none}
+.meta .k{font-family:var(--sans);font-size:5.6pt;font-weight:600;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--muted)}
+.meta .v{font-family:var(--sans);font-size:7.6pt;font-weight:600;color:var(--ink);margin-top:1.4mm;
+  font-variant-numeric:tabular-nums}
+
+/* ══ AFFILIATIONS ════════════════════════════════════════ */
+.affil{font-family:var(--sans);font-size:6.9pt;line-height:1.65;color:var(--muted);margin:4mm 0 0}
+.affil sup{color:var(--accent)}
+.affil a{color:var(--accent);text-decoration:none}
+
+/* ══ ABSTRACT ════════════════════════════════════════════ */
+.abs{margin:8mm 0 0;display:grid;grid-template-columns:24mm 1fr;gap:0 6mm}
+.abs .lbl{font-family:var(--sans);font-size:5.9pt;font-weight:700;letter-spacing:.2em;
+  text-transform:uppercase;color:var(--accent);padding-top:1.4mm}
+.abs p{margin:0;font-size:10.4pt;line-height:1.55;color:var(--ink-2);max-width:128mm}
+.kw{font-family:var(--sans);font-size:7.1pt;color:var(--soft);margin:4mm 0 0 30mm;line-height:1.6}
+.kw b{color:var(--ink);font-weight:600;letter-spacing:.02em}
+
+.rule-soft{border:0;border-top:.4pt solid var(--hair);margin:8mm 0 0}
+
+/* ══ BODY + SIDENOTES ════════════════════════════════════ */
+.body{margin-top:7mm;padding-right:54mm;position:relative}
+/* As fichas geradas pela plataforma ficam FORA do fluxo de floats: um float
+   anterior mais alto empurraria a capitular do primeiro parágrafo para baixo
+   (CSS 9.5.1 — o topo de um float não pode subir acima do topo de um float
+   anterior). Posicionadas em absoluto, elas ocupam a calha sem esse efeito. */
+.sn-stack{position:absolute;top:0;right:-54mm;width:46mm}
+.sn-stack .sn{float:none;clear:none;width:100%;margin:0 0 4mm}
+.body p{margin:0 0 3mm;text-align:justify;hyphens:auto}
+.sn{float:right;clear:right;width:46mm;margin-right:-54mm;margin-bottom:4mm;
+  font-family:var(--sans);font-size:6.9pt;line-height:1.55;color:var(--muted);
+  border-top:.4pt solid var(--hair);padding-top:1.8mm}
+.sn b{color:var(--ink);font-weight:600}
+.sn a{color:var(--accent);text-decoration:none}
+
+h2.sec{margin:9mm -54mm 3.4mm 0;padding:2.6mm 54mm 0 0;break-after:avoid;border-top:.8pt solid var(--ink);
+  font-family:var(--sans);font-size:11.5pt;font-weight:700;letter-spacing:-.015em;color:var(--ink);
+  display:flex;align-items:baseline;gap:3mm}
+h2.sec .n{font-family:var(--sans);font-size:6.4pt;font-weight:700;letter-spacing:.16em;
+  color:var(--accent);position:relative;top:-.6mm}
+h3.sub{font-family:var(--sans);font-size:8.8pt;font-weight:600;color:var(--soft);
+  margin:5mm 0 1.6mm;letter-spacing:.01em;break-after:avoid}
+
+.lead::first-letter{float:left;font-family:var(--serif);font-weight:700;font-size:34pt;
+  line-height:.84;padding:.6mm 2.2mm 0 0;color:var(--accent)}
+
+blockquote.pull{margin:6mm -54mm 6mm 0;padding:0;font-family:var(--serif);font-weight:600;
+  font-size:15pt;line-height:1.28;letter-spacing:-.012em;color:var(--ink);
+  border-top:.8pt solid var(--accent);border-bottom:.8pt solid var(--accent);padding:4mm 0;text-align:left}
+
+/* figures extend into the sidenote column */
+figure{margin:6mm -54mm 6mm 0;break-inside:avoid}
+figure .ph{height:44mm;border-radius:3pt;border:.4pt solid #D8E4FA;
+  background:repeating-linear-gradient(135deg,#FAFCFF,#FAFCFF 8px,#F0F6FF 8px,#F0F6FF 16px);
+  display:flex;align-items:center;justify-content:center;font-family:var(--sans);font-size:7pt;color:#A9BDDF}
+figcaption{font-family:var(--sans);font-size:6.9pt;color:var(--muted);line-height:1.55;margin-top:2.2mm}
+figcaption b{color:var(--ink);font-weight:600}
+
+table.data{width:calc(100% + 54mm);margin:6mm -54mm 6mm 0;border-collapse:collapse;
+  font-family:var(--sans);font-size:7.4pt;break-inside:avoid;font-variant-numeric:tabular-nums}
+table.data caption{caption-side:top;text-align:left;font-size:6.9pt;color:var(--muted);margin-bottom:2mm}
+table.data caption b{color:var(--ink);font-weight:600}
+table.data th{text-align:left;font-weight:600;color:var(--ink);padding:2mm 2.4mm;
+  border-top:.8pt solid var(--ink);border-bottom:.4pt solid var(--hair)}
+table.data td{padding:1.9mm 2.4mm;border-bottom:.4pt solid var(--hair);color:var(--soft)}
+table.data tr:last-child td{border-bottom:.8pt solid var(--ink)}
+
+/* ══ BACK MATTER ═════════════════════════════════════════ */
+.back{margin-top:9mm;padding-top:3.6mm;border-top:.8pt solid var(--ink);
+  display:grid;grid-template-columns:1fr 1fr;gap:0 9mm;
+  font-family:var(--sans);font-size:6.9pt;color:var(--muted);line-height:1.62}
+.back h3{font-size:5.9pt;font-weight:700;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--ink);margin:0 0 1.4mm}
+.back .blk{margin-bottom:3.4mm;break-inside:avoid}
+.back a{color:var(--accent);text-decoration:none}
+ol.refs{margin:1.6mm 0 0;padding-left:5mm;font-size:6.9pt;line-height:1.6;color:var(--soft)}
+ol.refs li{margin-bottom:1.6mm;break-inside:avoid}
+ol.refs i{color:var(--ink-2)}
+ol.refs a{color:var(--accent);text-decoration:none}
+
+/* ══ VERIFY ══════════════════════════════════════════════ */
+.verify{margin-top:8mm;background:var(--ink);border-radius:4pt;overflow:hidden;
+  break-inside:avoid;color:#fff;position:relative}
+.verify::before{content:"";position:absolute;inset:0;
+  background-image:radial-gradient(rgba(125,170,251,.14) .6px,transparent .6px);background-size:3.2mm 3.2mm}
+.verify>*{position:relative}
+.verify-hd{padding:3mm 5mm;border-bottom:.4pt solid rgba(255,255,255,.14);
+  display:flex;justify-content:space-between;align-items:center;font-family:var(--sans)}
+.verify-hd .t{font-size:6.1pt;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:var(--sky)}
+.verify-hd .h{font-size:6.2pt;color:#7E90B8;font-variant-numeric:tabular-nums}
+.verify-bd{display:flex;gap:5mm;padding:5mm;align-items:center}
+.verify-qr{flex:none;width:22mm;height:22mm;background:#fff;border-radius:2.5pt;padding:1.4mm}
+.verify-qr img{width:100%;height:100%;display:block}
+.verify-info{flex:1;font-family:var(--sans);font-size:7pt;line-height:1.75}
+.verify-info .r{display:flex;gap:2mm}
+.verify-info .k{min-width:26mm;color:#8095BE;letter-spacing:.04em}
+.verify-info .v{color:#fff;font-weight:600}
+.verify-info a{color:#fff;text-decoration:none}
+.verify-info .note{margin-top:2.4mm;color:#8095BE;font-style:italic;font-size:6.6pt}
+
+/* ══ END BAND ════════════════════════════════════════════ */
+.endband{margin-top:6mm;background:var(--pale);padding-top:3.4mm;padding-bottom:3.4mm;
+  display:flex;justify-content:space-between;align-items:center;
+  font-family:var(--sans);font-size:6.6pt;color:var(--soft)}
+.endband b{color:var(--ink)}
+.endband a{color:var(--accent);text-decoration:none}
+
+/* ══ FALLBACK — conteúdo cru vindo do editor / DOCX ══════ */
+/* O corpo do artigo chega do mammoth sem classes. Estas regras garantem que
+   qualquer <h1>, lista, imagem ou tabela que o normalizador não tenha marcado
+   ainda saia com a tipografia do template, e não com a do navegador. */
+.body h1,.body h2,.body h3,.body h4,.body h5,.body h6,
+.cols h1,.cols h2,.cols h3,.cols h4,.cols h5,.cols h6{
+  font-family:var(--sans);color:var(--ink);letter-spacing:-.01em;break-after:avoid}
+.body h1,.cols h1{font-size:12pt;font-weight:700;margin:8mm 0 3mm}
+.body h2:not(.sec),.cols h2:not(.sec){font-size:11pt;font-weight:700;margin:7mm 0 2.6mm}
+.body h3:not(.sub),.cols h3:not(.sub){font-size:9pt;font-weight:600;margin:5mm 0 1.6mm}
+.body h4,.body h5,.body h6,.cols h4,.cols h5,.cols h6{font-size:8.4pt;font-weight:600;margin:4mm 0 1.4mm}
+.body ul,.body ol,.cols ul,.cols ol{margin:0 0 3mm;padding-left:5.5mm}
+.body li,.cols li{margin-bottom:1.2mm}
+.body img,.cols img{max-width:100%;height:auto;display:block;border-radius:2pt}
+.body figure img,.cols figure img{width:100%}
+.body sup,.cols sup{font-size:.68em;vertical-align:super;line-height:0}
+.body sub,.cols sub{font-size:.68em;vertical-align:sub;line-height:0}
+.body a,.cols a{color:var(--accent);text-decoration:none}
+.body blockquote:not(.pull),.cols blockquote:not(.pull){margin:4mm 0;padding-left:4mm;
+  border-left:2pt solid var(--accent);color:var(--soft,#44548A)}
+.body table:not(.data),.cols table:not(.data){width:100%;border-collapse:collapse;
+  font-family:var(--sans);font-size:7.6pt;margin:4mm 0;break-inside:avoid}
+.body table:not(.data) th,.cols table:not(.data) th{text-align:left;font-weight:600;padding:1.8mm 2.2mm;
+  border-top:.8pt solid var(--ink);border-bottom:.4pt solid var(--hair,var(--rule,#DFE5F0))}
+.body table:not(.data) td,.cols table:not(.data) td{padding:1.6mm 2.2mm;
+  border-bottom:.4pt solid var(--hair,var(--rule,#DFE5F0))}
+
+/* ══ REFERÊNCIAS CRUZADAS ════════════════════════════════ */
+/* `[3]` no texto ➜ salto para a entrada 3; `↩` na entrada ➜ volta ao texto.
+   O Chromium registra cada id como destino nomeado no PDF, então o salto
+   funciona em qualquer leitor. */
+a.xref{color:var(--accent);text-decoration:none;font-weight:600;
+  font-variant-numeric:lining-nums tabular-nums}
+.backrefs{white-space:nowrap}
+a.backref{color:var(--accent);text-decoration:none;margin-left:1.2mm;font-size:.9em}
+ol.refs li{scroll-margin-top:8mm}
+</style></head><body><div class="page">
+
+  <header class="hero bleed">
+    <div class="hero-top">
+      <div class="brand">
+        <svg width="26" height="26" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+          <rect width="32" height="32" rx="8" fill="#fff" fill-opacity=".12"/>
+          <path d="M8.6 21.8V10.2" stroke="#7DAAFB" stroke-width="2.5" stroke-linecap="round"/>
+          <path d="M8.6 21.8H16.2" stroke="#7DAAFB" stroke-width="2.5" stroke-linecap="round"/>
+          <path d="M14.4 10.2h4.5a3.7 3.7 0 0 1 0 7.4h-2.2" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="23.4" cy="20.6" r="2.4" fill="#7DAAFB"/>
+        </svg>
+        <div><div class="brand-name">SciLedger</div><div class="brand-tag">Open Science Publishing</div></div>
+      </div>
+      <div class="chips">
+        <span class="chip chip-t">{{ARTICLE_TYPE}}</span><span class="chip chip-oa">Open Access</span>
+      </div>
+    </div>
+
+    <div class="kicker">{{KICKER}}</div>
+    <h1 class="h-title">{{TITLE}}</h1>
+    <p class="h-sub">{{SUBTITLE}}</p>
+    <p class="h-authors">{{AUTHORS}}</p>
+    <div class="h-doi">{{DOI_LINK}} &nbsp;·&nbsp; SciLedger {{VOLUME}} &nbsp;·&nbsp; {{PAGES}}</div>
+  </header>
+
+  <section class="meta">
+    <div><div class="k">Received</div><div class="v">{{DATE_RECEIVED}}</div></div>
+    <div><div class="k">Accepted</div><div class="v">{{DATE_ACCEPTED}}</div></div>
+    <div><div class="k">Published</div><div class="v">{{DATE_PUBLISHED}}</div></div>
+    <div><div class="k">Peer review</div><div class="v">{{REVIEW_ROUNDS}} rounds</div></div>
+    <div><div class="k">License</div><div class="v">{{LICENSE}}</div></div>
+  </section>
+
+  <p class="affil">{{AFFILIATIONS}}</p>
+
+  <section class="abs">
+    <div class="lbl">Abstract</div>
+    <p>{{ABSTRACT}}</p>
+  </section>
+  <p class="kw"><b>Keywords</b>&nbsp;&nbsp;{{KEYWORDS}}</p>
+
+  <hr class="rule-soft">
+
+  <div class="body paper-content"><div class="sn-stack">{{SIDENOTES}}</div>{{BODY}}
+  </div>
+
+  <div class="back">
+    <div>
+      <div class="blk"><h3>Author contributions</h3>{{CONTRIBUTIONS}}</div>
+      <div class="blk"><h3>Funding</h3>{{FUNDING}}</div>
+      <div class="blk"><h3>Data availability</h3>{{DATA_AVAILABILITY}}</div>
+      <div class="blk"><h3>Conflicts of interest</h3>{{CONFLICTS}}</div>
+    </div>
+    <div>
+      <h3>References</h3>
+      <ol class="refs paper-references">{{REFERENCES}}</ol>
+    </div>
+  </div>
+
+  <section class="verify">
+    <div class="verify-hd">
+      <span class="t">Verified editorial record</span>
+      <span class="h">digest {{VERIFY_DIGEST}}</span>
+    </div>
+    <div class="verify-bd">
+      <div class="verify-qr"><img src="{{VERIFY_QR}}" alt="Verify this record"></div>
+      <div class="verify-info">
+        <div class="r"><span class="k">Verify at</span><span class="v">{{VERIFY_LINK}}</span></div>
+        <div class="r"><span class="k">Review rounds</span><span class="v">{{REVIEW_ROUNDS}} · {{REVIEW_REPORTS}} referee reports</span></div>
+        <div class="r"><span class="k">Decision</span><span class="v">Accepted {{DATE_ACCEPTED}}</span></div>
+        <div class="r"><span class="k">Events recorded</span><span class="v">{{VERIFY_EVENTS}} transitions · append-only</span></div>
+        <div class="note">Scan to inspect the complete, tamper-evident editorial history of this article.</div>
+      </div>
+    </div>
+  </section>
+
+  <div class="endband bleed">
+    <span>© {{YEAR}} The Authors. Published by <b>SciLedger</b> under {{LICENSE}}.</span>
+    <a href="https://sciledger.org">sciledger.org</a>
+  </div>
+
+</div></body></html>

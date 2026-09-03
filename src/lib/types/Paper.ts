@@ -1,20 +1,22 @@
 import type { Hub } from "./Hub";
 import type { User } from "./User";
 import type { Review } from "./Review";
+import type {
+    PaperAuthorAffiliationSnapshot,
+    PaperAuthorSnapshot
+} from "$lib/utils/paperAuthorAffiliations";
 
 export type Paper = {
     _id: string; // Internal MongoDB ID
     id: string; // Unique paper ID
     mainAuthor: User; // Main author as UUID
-    correspondingAuthor: User; // Corresponding author as UUID
+    correspondingAuthor?: User | string | null; // Corresponding author as UUID
     coAuthors: User[]; // List of co-authors as UUIDs
-    authorAffiliations?: Array<{
-        userId?: string;
-        username?: string;
-        name: string;
-        department?: string;
-        affiliation?: string;
-    }>;
+    authorAffiliations?: Array<
+        PaperAuthorSnapshot & {
+            affiliations?: PaperAuthorAffiliationSnapshot[];
+        }
+    >;
     creditAuthorStatements?: Array<{
         userId?: string;
         authorName?: string;

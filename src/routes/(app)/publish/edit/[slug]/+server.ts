@@ -13,6 +13,12 @@ import {
     normalizePaperCoverIds,
     validateSupplementaryFilesTotal
 } from '$lib/utils/paperFileValidation';
+import {
+    countCorrespondingAuthors,
+    getMarkedCorrespondingAuthor,
+    markCorrespondingAuthor,
+    normalizeAuthorSnapshots
+} from '$lib/utils/paperAuthorAffiliations';
 
 function normalizeId(input: any): string | undefined {
     if (!input) return undefined;
@@ -24,24 +30,55 @@ function normalizeId(input: any): string | undefined {
     return undefined;
 }
 
-function normalizeAuthorAffiliations(input: unknown) {
-    if (!Array.isArray(input)) return [];
+function reconcileCorrespondingAuthor(
+    authorAffiliations: ReturnType<typeof normalizeAuthorSnapshots>,
+    correspondingAuthor: unknown,
+    authorIds: Set<string>,
+    requireOne: boolean
+) {
+    const markedCount = countCorrespondingAuthors(authorAffiliations);
+    if (markedCount > 1) {
+        return {
+            error: 'Only one author can be marked as corresponding author.',
+            status: 400
+        };
+    }
 
-    return input
-        .map((item) => {
-            const affiliation = item as Record<string, unknown>;
-            const name = String(affiliation.name ?? '').trim();
-            if (!name) return null;
+    const markedAuthor = getMarkedCorrespondingAuthor(authorAffiliations);
+    let correspondingAuthorId = normalizeId(correspondingAuthor);
+    const markedAuthorId = markedAuthor?.userId || '';
 
-            return {
-                userId: affiliation.userId ? String(affiliation.userId) : undefined,
-                username: affiliation.username ? String(affiliation.username) : undefined,
-                name,
-                department: String(affiliation.department ?? '').trim(),
-                affiliation: String(affiliation.affiliation ?? '').trim()
-            };
-        })
-        .filter(Boolean);
+    if (markedAuthorId && correspondingAuthorId && markedAuthorId !== correspondingAuthorId) {
+        return {
+            error: 'Corresponding author selection does not match the marked author snapshot.',
+            status: 400
+        };
+    }
+
+    if (!correspondingAuthorId && markedAuthorId) {
+        correspondingAuthorId = markedAuthorId;
+    }
+
+    if (requireOne && !correspondingAuthorId) {
+        return {
+            error: 'Select exactly one corresponding author before submitting.',
+            status: 400
+        };
+    }
+
+    if (correspondingAuthorId && authorIds.size > 0 && !authorIds.has(correspondingAuthorId)) {
+        return {
+            error: 'Corresponding author must be one of the paper authors.',
+            status: 400
+        };
+    }
+
+    return {
+        correspondingAuthorId,
+        authorAffiliations: correspondingAuthorId
+            ? markCorrespondingAuthor(authorAffiliations, correspondingAuthorId)
+            : authorAffiliations
+    };
 }
 
 export const POST: RequestHandler = async ({ request, locals }) => {
@@ -73,10 +110,14 @@ export const POST: RequestHandler = async ({ request, locals }) => {
             );
         }
 
+        const previousStatus = String((existingPaper as any).status || '');
+        const requestedStatus = String(data.status || previousStatus);
+        const shouldSubmit = previousStatus === 'draft' && requestedStatus === 'reviewer assignment';
+
         // Validate required fields
-        const requiredFields = ['mainAuthor', 'correspondingAuthor', 'title', 'abstract', 'keywords', 'pdfUrl', 'submittedBy'];
+        const requiredFields = ['mainAuthor', 'title', 'abstract', 'keywords', 'pdfUrl', 'submittedBy'];
         const missingFields = requiredFields.filter(field => !data[field]);
-        
+
         if (missingFields.length > 0) {
             return json({ 
                 error: `Missing required fields: ${missingFields.join(', ')}` 
@@ -84,12 +125,21 @@ export const POST: RequestHandler = async ({ request, locals }) => {
         }
 
         // Safely handle arrays with optional chaining
-        const _coAuthors = data.coAuthors?.map((a: User) => a.id) || [];
-        const _authors = data.authors?.map((a: User) => a.id) || [];
-        const normalizedAuthorAffiliations = normalizeAuthorAffiliations(data.authorAffiliations);
+        const _coAuthors = data.coAuthors?.map((a: User) => normalizeId(a)).filter(Boolean) || [];
+        const _authors = data.authors?.map((a: User) => normalizeId(a)).filter(Boolean) || [];
+        const normalizedAuthorAffiliations = normalizeAuthorSnapshots(data.authorAffiliations);
         const normalizedMainAuthorId = normalizeId(data.mainAuthor);
-        const normalizedCorrespondingAuthorId = normalizeId(data.correspondingAuthor);
         const normalizedSubmittedById = normalizeId(data.submittedBy);
+        const authorIds = new Set([normalizedMainAuthorId, ..._coAuthors, ..._authors].filter(Boolean) as string[]);
+        const correspondingResolution = reconcileCorrespondingAuthor(
+            normalizedAuthorAffiliations,
+            data.correspondingAuthor,
+            authorIds,
+            shouldSubmit
+        );
+        if ('error' in correspondingResolution) {
+            return json({ error: correspondingResolution.error }, { status: correspondingResolution.status });
+        }
         const supplementaryValidation = validateSupplementaryFilesTotal(data.supplementaryFiles || []);
         if (!supplementaryValidation.ok) {
             return json(
@@ -102,10 +152,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
                 { status: 413 }
             );
         }
-        const previousStatus = String((existingPaper as any).status || '');
-        const requestedStatus = String(data.status || previousStatus);
-        const shouldSubmit = previousStatus === 'draft' && requestedStatus === 'reviewer assignment';
-
         if (requestedStatus !== previousStatus && !shouldSubmit && requestedStatus !== 'draft') {
             return json(
                 { error: 'Status changes must use the editorial transition endpoints.' },
@@ -117,9 +163,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
             mainAuthor: normalizedMainAuthorId,
             authors: _authors,
             paperPictures: normalizePaperCoverIds(data.paperPictures),
-            correspondingAuthor: normalizedCorrespondingAuthorId,
+            correspondingAuthor: correspondingResolution.correspondingAuthorId || undefined,
             coAuthors: _coAuthors,
-            authorAffiliations: normalizedAuthorAffiliations,
+            authorAffiliations: correspondingResolution.authorAffiliations,
             status: shouldSubmit ? previousStatus : requestedStatus,
             content: data.content,
             title: data.title,

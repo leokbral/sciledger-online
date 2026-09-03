@@ -4,6 +4,40 @@ import { start_mongo } from '$lib/db/mongooseConnection';
 import { AUTH_CONFIG_SECRET } from '$env/static/private';
 import User from '$lib/db/models/User';
 import { normalizeAndValidateEmail } from '$lib/server/auth/normalizeEmail';
+import {
+	extractOrcidAffiliations,
+	formatAffiliationDisplayName,
+	normalizeAffiliationSnapshot
+} from '$lib/utils/paperAuthorAffiliations';
+
+function getPublicOrcidUser(user: any, affiliations: unknown[] = [], orcid?: string) {
+	const fallbackAffiliation = normalizeAffiliationSnapshot(
+		{
+			id: 'profile-affiliation',
+			department: user?.position,
+			organization: user?.institution,
+			displayName: formatAffiliationDisplayName({
+				department: user?.position,
+				organization: user?.institution
+			})
+		},
+		'profile-affiliation'
+	);
+
+	return {
+		id: user?.id,
+		firstName: user?.firstName,
+		lastName: user?.lastName,
+		username: user?.username,
+		email: user?.email,
+		institution: user?.institution,
+		position: user?.position,
+		bio: user?.bio,
+		country: user?.country,
+		orcid: user?.orcid || orcid,
+		affiliations: affiliations.length ? affiliations : fallbackAffiliation ? [fallbackAffiliation] : []
+	};
+}
 
 export const POST: RequestHandler = async ({ request, locals }) => {
     try {
@@ -23,7 +57,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
         const name = orcidProfile?.person?.name;
         const biography = orcidProfile?.person?.biography?.content;
         const orcidId = orcidProfile?.['orcid-identifier']?.path;
-        const affiliations = orcidProfile?.['activities-summary']?.employments?.['affiliation-group'] ?? [];
+        const orcidAffiliations = extractOrcidAffiliations(orcidProfile);
         const country = orcidProfile?.person?.addresses?.address?.[0]?.country?.value;
         const emails = orcidProfile?.person?.emails?.email ?? [];
         const primaryEmail = emails.find((email: unknown) => {
@@ -32,7 +66,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
             }
             return false;
         })?.email || emails[0]?.email;
-        const mainAffiliation = affiliations?.[0]?.['summaries']?.[0]?.['employment-summary'];
+        const mainAffiliation = orcidAffiliations[0];
 
         const hasPublicOrcidEmail = Boolean(primaryEmail);
         // Public ORCID email proves ownership through ORCID. A manually supplied co-author
@@ -55,9 +89,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
         });
 
         if (existingUser) {
-            return json({ 
+            return json({
                 error: 'User already exists',
-                user: existingUser 
+                user: getPublicOrcidUser(existingUser, orcidAffiliations, orcidId)
             }, { status: 409 });
         }
 
@@ -94,8 +128,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
             },
             bio: biography || '',
             profilePictureUrl: '',
-            institution: mainAffiliation?.organization?.name || '',
-            position: mainAffiliation?.['role-title'] || '',
+            orcid: orcidId,
+            institution: mainAffiliation?.organization || mainAffiliation?.displayName || '',
+            position: mainAffiliation?.roleTitle || mainAffiliation?.department || '',
             performanceReviews: {
                 averageReviewDays: 0,
                 recommendations: [],
@@ -118,17 +153,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
         // Return success response
         return json({
             success: true,
-            user: {
-                id: newUser.id,
-                firstName: newUser.firstName,
-                lastName: newUser.lastName,
-                username: newUser.username,
-                email: newUser.email,
-                institution: newUser.institution,
-                position: newUser.position,
-                bio: newUser.bio,
-                country: newUser.country
-            },
+            user: getPublicOrcidUser(newUser, orcidAffiliations, orcidId),
             hasEmail: !!primaryEmail,
             isPreRegistration: !primaryEmail,
             tempPassword: hasPublicOrcidEmail ? tempPassword : null // Only return temp password if ORCID exposes email

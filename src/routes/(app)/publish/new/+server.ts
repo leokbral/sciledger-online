@@ -17,26 +17,12 @@ import {
 	normalizePaperCoverIds,
 	validateSupplementaryFilesTotal
 } from '$lib/utils/paperFileValidation';
-
-function normalizeAuthorAffiliations(input: unknown) {
-	if (!Array.isArray(input)) return [];
-
-	return input
-		.map((item) => {
-			const affiliation = item as Record<string, unknown>;
-			const name = String(affiliation.name ?? '').trim();
-			if (!name) return null;
-
-			return {
-				userId: affiliation.userId ? String(affiliation.userId) : undefined,
-				username: affiliation.username ? String(affiliation.username) : undefined,
-				name,
-				department: String(affiliation.department ?? '').trim(),
-				affiliation: String(affiliation.affiliation ?? '').trim()
-			};
-		})
-		.filter(Boolean);
-}
+import {
+	countCorrespondingAuthors,
+	getMarkedCorrespondingAuthor,
+	markCorrespondingAuthor,
+	normalizeAuthorSnapshots
+} from '$lib/utils/paperAuthorAffiliations';
 
 function normalizeUserId(input: any): string {
 	if (!input) return '';
@@ -44,6 +30,57 @@ function normalizeUserId(input: any): string {
 	if (input.id) return String(input.id);
 	if (input._id) return String(input._id);
 	return String(input);
+}
+
+function reconcileCorrespondingAuthor(
+	authorAffiliations: ReturnType<typeof normalizeAuthorSnapshots>,
+	correspondingAuthor: unknown,
+	authorIds: Set<string>,
+	requireOne: boolean
+) {
+	const markedCount = countCorrespondingAuthors(authorAffiliations);
+	if (markedCount > 1) {
+		return {
+			error: 'Only one author can be marked as corresponding author.',
+			status: 400
+		};
+	}
+
+	const markedAuthor = getMarkedCorrespondingAuthor(authorAffiliations);
+	let correspondingAuthorId = normalizeUserId(correspondingAuthor);
+	const markedAuthorId = markedAuthor?.userId || '';
+
+	if (markedAuthorId && correspondingAuthorId && markedAuthorId !== correspondingAuthorId) {
+		return {
+			error: 'Corresponding author selection does not match the marked author snapshot.',
+			status: 400
+		};
+	}
+
+	if (!correspondingAuthorId && markedAuthorId) {
+		correspondingAuthorId = markedAuthorId;
+	}
+
+	if (requireOne && !correspondingAuthorId) {
+		return {
+			error: 'Select exactly one corresponding author before submitting.',
+			status: 400
+		};
+	}
+
+	if (correspondingAuthorId && authorIds.size > 0 && !authorIds.has(correspondingAuthorId)) {
+		return {
+			error: 'Corresponding author must be one of the paper authors.',
+			status: 400
+		};
+	}
+
+	return {
+		correspondingAuthorId,
+		authorAffiliations: correspondingAuthorId
+			? markCorrespondingAuthor(authorAffiliations, correspondingAuthorId)
+			: authorAffiliations
+	};
 }
 
 async function getHubPaperPaymentPolicy(hubId: string | undefined) {
@@ -88,10 +125,12 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			supplementaryFiles
 		} = await request.json();
 
-		if (!mainAuthor || !correspondingAuthor || !title || !abstract || !keywords || !pdfUrl || !submittedBy) {
+		const currentStatus = status || 'draft';
+
+		if (!mainAuthor || !title || !abstract || !keywords || !pdfUrl || !submittedBy) {
 			return json(
 				{
-					error: `Todos os campos sao obrigatorios. ${mainAuthor}, ${correspondingAuthor}, ${title}, ${abstract}, ${keywords}, ${pdfUrl}, ${submittedBy}`
+					error: `Todos os campos sao obrigatorios. ${mainAuthor}, ${title}, ${abstract}, ${keywords}, ${pdfUrl}, ${submittedBy}`
 				},
 				{ status: 400 }
 			);
@@ -107,7 +146,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			return json({ error: 'Insufficient permissions' }, { status: 403 });
 		}
 
-		const currentStatus = status || 'draft';
 		const isStandaloneSubmission = !hubId && !isLinkedToHub;
 		if (isStandaloneSubmission && currentStatus !== 'draft') {
 			return json(
@@ -143,9 +181,20 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			);
 		}
 
+		const normalizedMainAuthorId = normalizeUserId(mainAuthor);
 		const normalizedCoAuthors = coAuthors.map((author: User) => normalizeUserId(author)).filter(Boolean);
 		const normalizedAuthors = authors?.map((author: User) => normalizeUserId(author)).filter(Boolean) || [];
-		const normalizedAuthorAffiliations = normalizeAuthorAffiliations(authorAffiliations);
+		const normalizedAuthorAffiliations = normalizeAuthorSnapshots(authorAffiliations);
+		const authorIds = new Set([normalizedMainAuthorId, ...normalizedCoAuthors, ...normalizedAuthors].filter(Boolean));
+		const correspondingResolution = reconcileCorrespondingAuthor(
+			normalizedAuthorAffiliations,
+			correspondingAuthor,
+			authorIds,
+			currentStatus !== 'draft'
+		);
+		if ('error' in correspondingResolution) {
+			return json({ error: correspondingResolution.error }, { status: correspondingResolution.status });
+		}
 		const supplementaryValidation = validateSupplementaryFilesTotal(supplementaryFiles || []);
 		if (!supplementaryValidation.ok) {
 			return json(
@@ -163,10 +212,10 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		const newPaper = new Papers({
 			_id: id,
 			id,
-			mainAuthor: normalizeUserId(mainAuthor),
-			correspondingAuthor: normalizeUserId(correspondingAuthor),
+			mainAuthor: normalizedMainAuthorId,
+			correspondingAuthor: correspondingResolution.correspondingAuthorId || undefined,
 			coAuthors: normalizedCoAuthors,
-			authorAffiliations: normalizedAuthorAffiliations,
+			authorAffiliations: correspondingResolution.authorAffiliations,
 			authors: normalizedAuthors,
 			status: currentStatus,
 			content,
