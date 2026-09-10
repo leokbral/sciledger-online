@@ -21,6 +21,34 @@
     </p>
   </div>
 
+  <div class="rounded-xl border border-gray-200 bg-white p-6">
+    <h3 class="text-lg font-semibold text-gray-900 mb-2">Changing your mind</h3>
+    <p class="text-gray-600 mb-4">
+      Two different situations, with two different policies. Read the one that matches your
+      manuscript's current state before requesting anything.
+    </p>
+    <div class="grid gap-3 sm:grid-cols-2">
+      <a
+        href="/policies/submission-withdrawal"
+        class="block rounded-lg border border-gray-200 p-4 transition hover:border-primary-400 hover:shadow-sm"
+      >
+        <p class="font-semibold text-gray-900">Submission Withdrawal</p>
+        <p class="text-sm text-gray-600 mt-1">
+          Withdrawing while the manuscript is still in the editorial process.
+        </p>
+      </a>
+      <a
+        href="/policies/publication-withdrawal"
+        class="block rounded-lg border border-gray-200 p-4 transition hover:border-primary-400 hover:shadow-sm"
+      >
+        <p class="font-semibold text-gray-900">Publication Withdrawal</p>
+        <p class="text-sm text-gray-600 mt-1">
+          Deciding not to publish after the manuscript has been accepted.
+        </p>
+      </a>
+    </div>
+  </div>
+
   <div class="flex gap-3">
     <a href="/publish/new" class="btn preset-filled-primary-500">Go to Submission</a>
     <a href="/help" class="btn preset-outlined">Back to Help</a>

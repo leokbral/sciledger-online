@@ -107,6 +107,7 @@
 			{inicialValue}
 			author={data.user as User}
 			authorsOptions={userProfiles}
+			knownAffiliations={data.knownAffiliations ?? []}
 		/>
 	</div>
 </main>

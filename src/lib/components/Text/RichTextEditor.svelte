@@ -85,6 +85,10 @@
 			: [
 				[{ header: [1, 2, 3, false] }],
 				['bold', 'italic', 'underline'],
+				// Scientific notation (H2O, x^2, 10^-9) is routine in an abstract.
+				// Quill's `script` format emits <sub>/<sup>, which the sanitizer below
+				// already allows through, so only the toolbar buttons were missing.
+				...(id === 'abstract' ? [[{ script: 'sub' }, { script: 'super' }]] : []),
 				[{ list: 'ordered' }, { list: 'bullet' }],
 				['link', 'blockquote', 'code-block'],
 				[{ align: [] }],

@@ -124,6 +124,42 @@
 				</p>
 			</div>
 		</a>
+
+		<!-- Submission Withdrawal -->
+		<a href="/policies/submission-withdrawal" class="block group">
+			<div class="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow h-full border border-gray-200 hover:border-primary-500">
+				<div class="flex items-center gap-3 mb-4">
+					<div class="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center text-2xl">
+						↩️
+					</div>
+					<h2 class="text-xl font-semibold text-gray-900 group-hover:text-primary-500">
+						Submission Withdrawal
+					</h2>
+				</div>
+				<p class="text-gray-600 text-sm leading-relaxed">
+					Withdrawing a manuscript while it is still in the editorial process. Covers what happens to
+					the manuscript, to reviewers already involved, and to services performed and not performed.
+				</p>
+			</div>
+		</a>
+
+		<!-- Publication Withdrawal -->
+		<a href="/policies/publication-withdrawal" class="block group">
+			<div class="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow h-full border border-gray-200 hover:border-primary-500">
+				<div class="flex items-center gap-3 mb-4">
+					<div class="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center text-2xl">
+						🛑
+					</div>
+					<h2 class="text-xl font-semibold text-gray-900 group-hover:text-primary-500">
+						Publication Withdrawal
+					</h2>
+				</div>
+				<p class="text-gray-600 text-sm leading-relaxed">
+					A separate situation: the editorial process is complete and the manuscript was accepted, but
+					the author decides not to publish. Applies up to publication, never after it.
+				</p>
+			</div>
+		</a>
 	</div>
 
 	<!-- Additional Information -->

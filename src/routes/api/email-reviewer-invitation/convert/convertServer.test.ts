@@ -22,6 +22,15 @@ vi.mock('$lib/db/models/User', () => ({
 	}
 }));
 
+// Imported statically, not with `await import()` inside each test: this route
+// pulls in mongoose, the mongodb driver and stripe, and that cold module load
+// costs tens of seconds on a first run. Inside a test body the whole cost is
+// billed against that single test's 5s timeout, so the first test in the file
+// times out while the rest reuse the cached module and pass. At module scope
+// the load happens during collection, which testTimeout does not govern.
+// `vi.mock` is hoisted above this import, so the mocks above still apply.
+import { POST } from './+server';
+
 function createRequestEvent(body: Record<string, unknown>) {
 	return {
 		request: {
@@ -41,8 +50,6 @@ describe('email-reviewer-invitation convert: invitation and pairing guard', () =
 	});
 
 	it('requires both token and userId', async () => {
-		const { POST } = await import('./+server');
-
 		const response = await POST(createRequestEvent({ token: 'tok' }));
 		const body = await response.json();
 
@@ -53,8 +60,6 @@ describe('email-reviewer-invitation convert: invitation and pairing guard', () =
 
 	it('rejects when the token does not resolve to an active invitation', async () => {
 		mocks.findEmailReviewerInvitationByToken.mockResolvedValue(null);
-		const { POST } = await import('./+server');
-
 		const response = await POST(createRequestEvent({ token: 'bad-token', userId: 'user-1' }));
 		const body = await response.json();
 
@@ -71,8 +76,6 @@ describe('email-reviewer-invitation convert: invitation and pairing guard', () =
 			expiresAt: new Date('2099-01-01T00:00:00.000Z')
 		});
 		mocks.isEmailReviewerInvitationActive.mockReturnValue(false);
-		const { POST } = await import('./+server');
-
 		const response = await POST(createRequestEvent({ token: 'used-token', userId: 'user-1' }));
 		const body = await response.json();
 
@@ -89,8 +92,6 @@ describe('email-reviewer-invitation convert: invitation and pairing guard', () =
 		});
 		mocks.isEmailReviewerInvitationActive.mockReturnValue(true);
 		mocks.userFindOne.mockReturnValue({ lean: vi.fn().mockResolvedValue(null) });
-		const { POST } = await import('./+server');
-
 		const response = await POST(createRequestEvent({ token: 'valid-token', userId: 'ghost-user' }));
 		const body = await response.json();
 
@@ -114,8 +115,6 @@ describe('email-reviewer-invitation convert: invitation and pairing guard', () =
 				lastName: 'Hopper'
 			})
 		});
-		const { POST } = await import('./+server');
-
 		const response = await POST(createRequestEvent({ token: 'valid-token', userId: 'user-1' }));
 		const body = await response.json();
 
@@ -139,8 +138,6 @@ describe('email-reviewer-invitation convert: invitation and pairing guard', () =
 				lastName: 'Lovelace'
 			})
 		});
-		const { POST } = await import('./+server');
-
 		const response = await POST(createRequestEvent({ token: 'valid-token', userId: 'user-1' }));
 		const body = await response.json();
 

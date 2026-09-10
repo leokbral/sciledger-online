@@ -157,4 +157,5 @@
 	{inicialValue}
 	author={data.user}
 	authorsOptions={userProfiles}
+	knownAffiliations={data.knownAffiliations ?? []}
 />

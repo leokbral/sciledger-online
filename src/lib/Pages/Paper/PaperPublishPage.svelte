@@ -32,6 +32,9 @@
 		normalizeAffiliationSnapshot,
 		normalizeAuthorSnapshot,
 		validateCorrespondingAuthorSelection,
+		collectReusableAffiliations,
+		hasAffiliation,
+		MAX_AFFILIATIONS_PER_AUTHOR,
 		type PaperAuthorAffiliationSnapshot,
 		type PaperAuthorSnapshot
 	} from '$lib/utils/paperAuthorAffiliations';
@@ -73,6 +76,8 @@
 		author: User;
 		inicialValue?: PaperPublishStoreData;
 		savePaper: (paper: PaperPublishStoreData) => void | Promise<void>;
+		/** Affiliations this user already used on their other papers, offered for reuse. */
+		knownAffiliations?: PaperAuthorAffiliationSnapshot[];
 	}
 
 	interface AuthorAffiliationForm extends PaperAuthorSnapshot {
@@ -85,6 +90,7 @@
 	let {
 		authorsOptions = $bindable(),
 		author,
+		knownAffiliations = [],
 		inicialValue = {
 			title: '',
 			authors: [],
@@ -673,13 +679,56 @@
 		);
 	}
 
+	function affiliationsFor(username: string): PaperAuthorAffiliationSnapshot[] {
+		return authorAffiliations[username]?.affiliations || [];
+	}
+
+	function affiliationLimitReached(username: string): boolean {
+		return affiliationsFor(username).length >= MAX_AFFILIATIONS_PER_AUTHOR;
+	}
+
+	// Everything already known about the people on this paper, offered so the same
+	// institution never has to be typed twice. Sources are the authors' own snapshots,
+	// their earlier papers, their ORCID records and their profiles -- never a global
+	// directory, and never another user's private data.
+	let reusableAffiliations = $derived(
+		collectReusableAffiliations([
+			...Object.values(authorAffiliations).flatMap((entry) => entry.affiliations || []),
+			...inputAuthorList.flatMap((username) => {
+				const selectedAuthor = getAuthorByUsername(username);
+				return [
+					...getAuthorOrcidAffiliations(selectedAuthor),
+					...buildLegacyAffiliation(selectedAuthor)
+				];
+			}),
+			...knownAffiliations
+		])
+	);
+
 	function addAffiliation(username: string) {
 		const values = authorAffiliations[username] || getInitialAffiliationForUsername(username);
+		// The server rejects a fourth as well; this only keeps the form honest.
+		if ((values.affiliations || []).length >= MAX_AFFILIATIONS_PER_AUTHOR) return;
 		authorAffiliations = {
 			...authorAffiliations,
 			[username]: {
 				...values,
 				affiliations: [...(values.affiliations || []), createEmptyAffiliation()]
+			}
+		};
+	}
+
+	function reuseAffiliation(username: string, affiliation: PaperAuthorAffiliationSnapshot) {
+		const values = authorAffiliations[username] || getInitialAffiliationForUsername(username);
+		const existing = values.affiliations || [];
+		if (existing.length >= MAX_AFFILIATIONS_PER_AUTHOR) return;
+		if (hasAffiliation(existing, affiliation)) return;
+		authorAffiliations = {
+			...authorAffiliations,
+			[username]: {
+				...values,
+				// copied into this paper's snapshot; the source record is never mutated
+				affiliations: [...existing, { ...affiliation, id: createAffiliationId() }]
 			}
 		};
 	}
@@ -1936,15 +1985,49 @@
 
 										<div class="mt-4">
 											<div class="mb-2 flex items-center justify-between gap-3">
-												<p class="text-xs font-semibold uppercase text-surface-500">Affiliations</p>
+												<p class="text-xs font-semibold uppercase text-surface-500">
+													Affiliations ({affiliationsFor(username).length}/{MAX_AFFILIATIONS_PER_AUTHOR})
+												</p>
 												<button
 													type="button"
 													onclick={() => addAffiliation(username)}
-													class="rounded-lg border border-primary-200 px-3 py-1.5 text-xs font-medium text-primary-700 hover:bg-primary-50 dark:border-primary-700 dark:text-primary-200 dark:hover:bg-primary-900/30"
+													disabled={affiliationLimitReached(username)}
+													title={affiliationLimitReached(username)
+														? `An author can have at most ${MAX_AFFILIATIONS_PER_AUTHOR} affiliations.`
+														: 'Add a blank affiliation'}
+													class="rounded-lg border border-primary-200 px-3 py-1.5 text-xs font-medium text-primary-700 hover:bg-primary-50 disabled:cursor-not-allowed disabled:border-surface-200 disabled:text-surface-400 disabled:hover:bg-transparent dark:border-primary-700 dark:text-primary-200 dark:hover:bg-primary-900/30"
 												>
 													+ Add affiliation
 												</button>
 											</div>
+
+											{#if affiliationLimitReached(username)}
+												<p class="mb-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-100">
+													Limit reached: an author can have at most {MAX_AFFILIATIONS_PER_AUTHOR} affiliations.
+													Remove one to add another.
+												</p>
+											{:else if reusableAffiliations.length > 0}
+												<div class="mb-2 rounded-lg border border-surface-200 bg-surface-50 p-2 dark:border-surface-700 dark:bg-surface-800">
+													<p class="mb-1.5 text-xs text-surface-600 dark:text-surface-400">
+														Reuse an affiliation already on file:
+													</p>
+													<div class="flex flex-wrap gap-1.5">
+														{#each reusableAffiliations as reusable (reusable.key)}
+															<button
+																type="button"
+																onclick={() => reuseAffiliation(username, reusable.affiliation)}
+																disabled={hasAffiliation(affiliationsFor(username), reusable.affiliation)}
+																title={hasAffiliation(affiliationsFor(username), reusable.affiliation)
+																	? 'Already added for this author'
+																	: 'Add this affiliation to the author'}
+																class="rounded-full border border-surface-300 bg-white px-2.5 py-1 text-xs text-surface-700 hover:border-primary-400 hover:text-primary-700 disabled:cursor-not-allowed disabled:border-surface-200 disabled:bg-surface-100 disabled:text-surface-400 dark:border-surface-600 dark:bg-surface-900 dark:text-surface-200"
+															>
+																+ {reusable.displayName}
+															</button>
+														{/each}
+													</div>
+												</div>
+											{/if}
 
 											{#if authorAffiliations[username].affiliations.length === 0}
 												<p class="rounded-lg border border-dashed border-surface-300 p-3 text-sm text-surface-500 dark:border-surface-600">

@@ -17,7 +17,8 @@ import {
     countCorrespondingAuthors,
     getMarkedCorrespondingAuthor,
     markCorrespondingAuthor,
-    normalizeAuthorSnapshots
+    normalizeAuthorSnapshots,
+    validateAuthorAffiliationLimits
 } from '$lib/utils/paperAuthorAffiliations';
 
 function normalizeId(input: any): string | undefined {
@@ -128,6 +129,10 @@ export const POST: RequestHandler = async ({ request, locals }) => {
         const _coAuthors = data.coAuthors?.map((a: User) => normalizeId(a)).filter(Boolean) || [];
         const _authors = data.authors?.map((a: User) => normalizeId(a)).filter(Boolean) || [];
         const normalizedAuthorAffiliations = normalizeAuthorSnapshots(data.authorAffiliations);
+        const affiliationLimit = validateAuthorAffiliationLimits(normalizedAuthorAffiliations);
+        if (!affiliationLimit.ok) {
+            return json({ error: affiliationLimit.message }, { status: 400 });
+        }
         const normalizedMainAuthorId = normalizeId(data.mainAuthor);
         const normalizedSubmittedById = normalizeId(data.submittedBy);
         const authorIds = new Set([normalizedMainAuthorId, ..._coAuthors, ..._authors].filter(Boolean) as string[]);

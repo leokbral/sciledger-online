@@ -2,6 +2,7 @@ import { error, redirect } from '@sveltejs/kit';
 import Papers from '$lib/db/models/Paper.js';
 import Users from '$lib/db/models/User.js';
 import '$lib/db/mongooseConnection.js';
+import { collectReusableAffiliations } from '$lib/utils/paperAuthorAffiliations';
 
 function getReferenceId(value: any): string {
 	if (!value) return '';
@@ -9,6 +10,29 @@ function getReferenceId(value: any): string {
 	if (value.id) return String(value.id);
 	if (value._id) return String(value._id);
 	return '';
+}
+
+/**
+ * Affiliations this user already used on their own papers, offered in the editor so the same
+ * institution never has to be retyped. Only the requesting user's own author snapshots are
+ * read: this is not a global institution directory, and no other author's data is exposed.
+ */
+async function loadKnownAffiliations(userId: string) {
+	if (!userId) return [];
+
+	const papers = await Papers.find({ 'authorAffiliations.userId': userId }, { authorAffiliations: 1 })
+		.sort({ updatedAt: -1 })
+		.limit(50)
+		.lean()
+		.exec();
+
+	const affiliations = papers.flatMap((paper: any) =>
+		(paper?.authorAffiliations ?? [])
+			.filter((author: any) => String(author?.userId ?? '') === userId)
+			.flatMap((author: any) => author?.affiliations ?? [])
+	);
+
+	return collectReusableAffiliations(affiliations).map((entry) => entry.affiliation);
 }
 
 export async function load({ locals, params }) {
@@ -39,10 +63,13 @@ export async function load({ locals, params }) {
 		// Buscar todos os usuários para as opções de autores
 		const users = await Users.find({}).lean();
 
+		const knownAffiliations = await loadKnownAffiliations(String(locals.user.id ?? ''));
+
 		return {
 			paper: JSON.parse(JSON.stringify(paper)),
 			users: JSON.parse(JSON.stringify(users)),
-			user: locals.user
+			user: locals.user,
+			knownAffiliations: JSON.parse(JSON.stringify(knownAffiliations))
 		};
 	} catch (err) {
 		console.error('Error loading paper:', err);

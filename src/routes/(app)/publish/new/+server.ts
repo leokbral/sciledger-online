@@ -21,7 +21,8 @@ import {
 	countCorrespondingAuthors,
 	getMarkedCorrespondingAuthor,
 	markCorrespondingAuthor,
-	normalizeAuthorSnapshots
+	normalizeAuthorSnapshots,
+	validateAuthorAffiliationLimits
 } from '$lib/utils/paperAuthorAffiliations';
 
 function normalizeUserId(input: any): string {
@@ -185,6 +186,10 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		const normalizedCoAuthors = coAuthors.map((author: User) => normalizeUserId(author)).filter(Boolean);
 		const normalizedAuthors = authors?.map((author: User) => normalizeUserId(author)).filter(Boolean) || [];
 		const normalizedAuthorAffiliations = normalizeAuthorSnapshots(authorAffiliations);
+		const affiliationLimit = validateAuthorAffiliationLimits(normalizedAuthorAffiliations);
+		if (!affiliationLimit.ok) {
+			return json({ error: affiliationLimit.message }, { status: 400 });
+		}
 		const authorIds = new Set([normalizedMainAuthorId, ...normalizedCoAuthors, ...normalizedAuthors].filter(Boolean));
 		const correspondingResolution = reconcileCorrespondingAuthor(
 			normalizedAuthorAffiliations,

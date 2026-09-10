@@ -219,9 +219,11 @@ export function normalizeAuthorSnapshot(input: unknown): PaperAuthorSnapshot | n
 	const legacyAffiliation =
 		normalizeAuthorText(record.affiliation) || normalizeAuthorText(record.institution);
 	const rawAffiliations = Array.isArray(record.affiliations) ? record.affiliations : [];
-	let affiliations = rawAffiliations
-		.map((affiliation, index) => normalizeAffiliationSnapshot(affiliation, `affiliation-${index + 1}`))
-		.filter((affiliation): affiliation is PaperAuthorAffiliationSnapshot => Boolean(affiliation));
+	let affiliations = dedupeAffiliations(
+		rawAffiliations
+			.map((affiliation, index) => normalizeAffiliationSnapshot(affiliation, `affiliation-${index + 1}`))
+			.filter((affiliation): affiliation is PaperAuthorAffiliationSnapshot => Boolean(affiliation))
+	);
 
 	if (affiliations.length === 0 && (legacyDepartment || legacyAffiliation)) {
 		const legacySnapshot = normalizeAffiliationSnapshot(
@@ -324,7 +326,7 @@ export function validateCorrespondingAuthorSelection(
 	};
 }
 
-function affiliationDedupeKey(affiliation: PaperAuthorAffiliationSnapshot): string {
+export function affiliationDedupeKey(affiliation: PaperAuthorAffiliationSnapshot): string {
 	const rorKey = normalizeRorId(affiliation.rorId);
 	if (rorKey) return `ror:${normalizeIdentity(rorKey)}`;
 
@@ -458,4 +460,113 @@ export function extractOrcidAffiliations(profile: unknown): PaperAuthorAffiliati
 	}
 
 	return affiliations;
+}
+
+/**
+ * An author may carry at most this many affiliations. Enforced in the UI, which stops
+ * offering the "add" control, and again in both save endpoints, because a client can
+ * post whatever it likes regardless of what the form allowed.
+ */
+export const MAX_AFFILIATIONS_PER_AUTHOR = 3;
+
+/**
+ * Collapses repeats of the same institution for one author, keeping the first occurrence.
+ * `affiliationDedupeKey` is the project's existing notion of "same affiliation" (ROR id,
+ * else organization, else display name), so this agrees with how `buildPaperAffiliationIndex`
+ * already numbers them for display.
+ */
+export function dedupeAffiliations(
+	affiliations: PaperAuthorAffiliationSnapshot[]
+): PaperAuthorAffiliationSnapshot[] {
+	const seen = new Set<string>();
+	const result: PaperAuthorAffiliationSnapshot[] = [];
+
+	for (const affiliation of affiliations ?? []) {
+		if (!affiliation) continue;
+		const key = affiliationDedupeKey(affiliation);
+		if (!key || key === 'display:' || seen.has(key)) continue;
+		seen.add(key);
+		result.push(affiliation);
+	}
+
+	return result;
+}
+
+export interface AuthorAffiliationLimitResult {
+	ok: boolean;
+	message: string;
+	authorName?: string;
+	count?: number;
+}
+
+/**
+ * The limit is per author, not per paper: a paper with five authors may legitimately carry
+ * fifteen affiliations. Counting runs over deduped entries, so repeating one institution is
+ * ignored rather than consuming a slot.
+ */
+export function validateAuthorAffiliationLimits(
+	authors: PaperAuthorSnapshot[]
+): AuthorAffiliationLimitResult {
+	for (const author of authors ?? []) {
+		const count = dedupeAffiliations(author?.affiliations ?? []).length;
+		if (count > MAX_AFFILIATIONS_PER_AUTHOR) {
+			return {
+				ok: false,
+				message: `${author?.name || 'An author'} has ${count} affiliations. Each author can have at most ${MAX_AFFILIATIONS_PER_AUTHOR}.`,
+				authorName: author?.name,
+				count
+			};
+		}
+	}
+
+	return { ok: true, message: '' };
+}
+
+export interface ReusableAffiliation {
+	key: string;
+	displayName: string;
+	affiliation: PaperAuthorAffiliationSnapshot;
+}
+
+/**
+ * Builds the "affiliations already known for these people" list offered for reuse, so the
+ * same institution never has to be typed twice.
+ *
+ * This deliberately does not create a global directory of institutions. The sources are only
+ * what already belongs to the people involved: the authors on this paper, the same author's
+ * snapshots on their earlier papers, their ORCID record and their profile. Nothing here writes
+ * to a user profile, and nothing leaks between users who are not already on the paper.
+ */
+export function collectReusableAffiliations(
+	sources: Array<PaperAuthorAffiliationSnapshot | null | undefined>
+): ReusableAffiliation[] {
+	const seen = new Set<string>();
+	const result: ReusableAffiliation[] = [];
+
+	for (const raw of sources ?? []) {
+		const affiliation = raw ? normalizeAffiliationSnapshot(raw) : null;
+		if (!affiliation) continue;
+
+		const displayName = affiliation.displayName || formatAffiliationDisplayName(affiliation);
+		if (!displayName) continue;
+
+		const key = affiliationDedupeKey(affiliation);
+		if (seen.has(key)) continue;
+		seen.add(key);
+		result.push({ key, displayName, affiliation });
+	}
+
+	return result.sort((a, b) => a.displayName.localeCompare(b.displayName));
+}
+
+/**
+ * Whether `candidate` is already among `existing` for the same author. The UI uses this to
+ * disable an entry in the reuse list, so the client applies the same rule the server does.
+ */
+export function hasAffiliation(
+	existing: PaperAuthorAffiliationSnapshot[],
+	candidate: PaperAuthorAffiliationSnapshot
+): boolean {
+	const key = affiliationDedupeKey(candidate);
+	return (existing ?? []).some((affiliation) => affiliationDedupeKey(affiliation) === key);
 }

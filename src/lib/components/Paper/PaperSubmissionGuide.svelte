@@ -48,6 +48,43 @@
 		<div class="border-t border-surface-200 dark:border-surface-700">
 			<div class="p-6 space-y-6">
 
+				<!-- Submission essentials: official template and reference style -->
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+					<div class="bg-primary-50 dark:bg-primary-900/20 rounded-xl p-6 border border-primary-200 dark:border-primary-700">
+						<div class="flex items-center gap-3 mb-3">
+							<Icon icon="mdi:file-word-outline" class="size-5 text-primary-700 dark:text-primary-300" />
+							<h5 class="text-lg font-semibold text-surface-900 dark:text-surface-100">Paper Template</h5>
+						</div>
+						<p class="text-surface-700 dark:text-surface-300 mb-4 leading-relaxed">
+							Write your manuscript on the official SciLedger template. It already carries the heading
+							styles the converter expects.
+						</p>
+						<a
+							href="/paper-template.docx"
+							download="SciLedger_Paper_Template.docx"
+							class="btn inline-flex items-center justify-center gap-2 rounded-full border border-primary-300 bg-white px-3.5 py-2 text-sm font-medium text-primary-700 transition hover:bg-primary-50 dark:bg-surface-900 dark:text-primary-300"
+						>
+							<Icon icon="mdi:download" class="size-4" />
+							<span>Download template (.docx)</span>
+						</a>
+					</div>
+
+					<div class="bg-green-50 dark:bg-green-900/20 rounded-xl p-6 border border-green-200 dark:border-green-700">
+						<div class="flex items-center gap-3 mb-3">
+							<Icon icon="mdi:format-quote-close" class="size-5 text-green-700 dark:text-green-300" />
+							<h5 class="text-lg font-semibold text-surface-900 dark:text-surface-100">Reference Style</h5>
+						</div>
+						<p class="text-surface-700 dark:text-surface-300 mb-4 leading-relaxed">
+							References must follow the
+							<strong class="text-surface-900 dark:text-surface-100">IEEE</strong>
+							style (Institute of Electrical and Electronics Engineers).
+						</p>
+						<span class="inline-flex items-center gap-2 rounded-full border border-green-300 bg-white px-3.5 py-2 text-sm font-semibold text-green-800 dark:bg-surface-900 dark:text-green-300">
+							Reference style: IEEE
+						</span>
+					</div>
+				</div>
+
 				<!-- Section 1: Preparing Your Paper -->
 				<div class="bg-surface-50 dark:bg-surface-800 rounded-xl border border-surface-200 dark:border-surface-700 overflow-hidden">
 					<button
@@ -92,7 +129,13 @@
 										<h5 class="text-lg font-semibold text-surface-900 dark:text-surface-100">Paper Information</h5>
 									</div>
 									<p class="text-surface-700 dark:text-surface-300 mb-4 leading-relaxed">
-										Edit the template and replace the placeholder content with your own paper information. Make sure to:
+										Start from the
+										<a
+											href="/paper-template.docx"
+											download="SciLedger_Paper_Template.docx"
+											class="font-semibold text-primary-700 underline dark:text-primary-300"
+										>official paper template</a>
+										and replace the placeholder content with your own paper information. Make sure to:
 									</p>
 									<div class="space-y-3">
 										<div class="flex items-start gap-3 p-3 bg-white dark:bg-surface-900 rounded-lg border border-surface-200 dark:border-surface-600">
@@ -428,7 +471,7 @@
 									Citations and References
 								</h4>
 								<p class="text-sm text-surface-600 dark:text-surface-400 mt-1">
-									Citation format and references section
+									Citation format and IEEE reference style
 								</p>
 							</div>
 						</div>
@@ -559,13 +602,25 @@
 										</div>
 									</div>
 
+									<div class="mt-4 bg-green-50 dark:bg-green-900/20 rounded-lg p-4 border border-green-200 dark:border-green-700">
+										<div class="flex items-center gap-3 mb-3">
+											<Icon icon="mdi:format-quote-close" class="size-5 text-green-700 dark:text-green-300" />
+											<p class="font-semibold text-green-900 dark:text-green-100">Reference style: IEEE</p>
+										</div>
+										<p class="text-sm leading-relaxed text-green-900 dark:text-green-100">
+											References must follow the IEEE (Institute of Electrical and Electronics Engineers)
+											style: author initials before the surname, the work title in quotation marks, and the
+											source abbreviated and italicised.
+										</p>
+									</div>
+
 									<div class="mt-4 bg-surface-50 dark:bg-surface-800 rounded-lg p-4 border border-surface-200 dark:border-surface-600">
-										<p class="font-semibold text-surface-900 dark:text-surface-100 mb-3">Example:</p>
+										<p class="font-semibold text-surface-900 dark:text-surface-100 mb-3">IEEE examples:</p>
 										<div class="bg-white dark:bg-surface-900 rounded-lg p-4 border border-surface-200 dark:border-surface-600">
 											<ol class="list-decimal list-inside space-y-2 text-sm text-surface-700 dark:text-surface-300">
-												<li>Author A. Title of the paper. Journal Name, Volume(Issue), Pages, Year.</li>
-												<li>Author B, Author C. Another paper title. Conference Proceedings, Location, Year.</li>
-												<li>Author D. Book title. Publisher, City, Year.</li>
+												<li>A. Author, "Title of the paper," <em>Journal Name</em>, vol. 12, no. 3, pp. 45-58, 2023.</li>
+												<li>B. Author and C. Author, "Title of the conference paper," in <em>Proc. Conference Name</em>, City, Country, 2022, pp. 101-110.</li>
+												<li>D. Author, <em>Book Title</em>, 2nd ed. City, Country: Publisher, 2021.</li>
 											</ol>
 										</div>
 									</div>
