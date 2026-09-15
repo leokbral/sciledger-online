@@ -18,9 +18,7 @@ import {
 	validateSupplementaryFilesTotal
 } from '$lib/utils/paperFileValidation';
 import {
-	countCorrespondingAuthors,
-	getMarkedCorrespondingAuthor,
-	markCorrespondingAuthor,
+	reconcileCorrespondingAuthors,
 	normalizeAuthorSnapshots,
 	validateAuthorAffiliationLimits
 } from '$lib/utils/paperAuthorAffiliations';
@@ -39,48 +37,24 @@ function reconcileCorrespondingAuthor(
 	authorIds: Set<string>,
 	requireOne: boolean
 ) {
-	const markedCount = countCorrespondingAuthors(authorAffiliations);
-	if (markedCount > 1) {
-		return {
-			error: 'Only one author can be marked as corresponding author.',
-			status: 400
-		};
-	}
+	// The rule itself lives in $lib/utils/paperAuthorAffiliations so that this endpoint and
+	// the other save endpoint cannot drift apart. Up to MAX_CORRESPONDING_AUTHORS authors may
+	// be marked; the paper's single `correspondingAuthor` reference keeps the primary one.
+	const resolution = reconcileCorrespondingAuthors({
+		authors: authorAffiliations,
+		correspondingAuthor,
+		authorIds,
+		requireOne
+	});
 
-	const markedAuthor = getMarkedCorrespondingAuthor(authorAffiliations);
-	let correspondingAuthorId = normalizeUserId(correspondingAuthor);
-	const markedAuthorId = markedAuthor?.userId || '';
-
-	if (markedAuthorId && correspondingAuthorId && markedAuthorId !== correspondingAuthorId) {
-		return {
-			error: 'Corresponding author selection does not match the marked author snapshot.',
-			status: 400
-		};
-	}
-
-	if (!correspondingAuthorId && markedAuthorId) {
-		correspondingAuthorId = markedAuthorId;
-	}
-
-	if (requireOne && !correspondingAuthorId) {
-		return {
-			error: 'Select exactly one corresponding author before submitting.',
-			status: 400
-		};
-	}
-
-	if (correspondingAuthorId && authorIds.size > 0 && !authorIds.has(correspondingAuthorId)) {
-		return {
-			error: 'Corresponding author must be one of the paper authors.',
-			status: 400
-		};
+	if (!resolution.ok) {
+		return { error: resolution.message, status: 400 };
 	}
 
 	return {
-		correspondingAuthorId,
-		authorAffiliations: correspondingAuthorId
-			? markCorrespondingAuthor(authorAffiliations, correspondingAuthorId)
-			: authorAffiliations
+		correspondingAuthorId: resolution.primaryCorrespondingAuthorId,
+		correspondingAuthorIds: resolution.correspondingAuthorIds,
+		authorAffiliations: resolution.authors
 	};
 }
 

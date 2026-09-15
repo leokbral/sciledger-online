@@ -1,5 +1,6 @@
 import { Schema } from 'mongoose';
 import * as crypto from 'crypto';
+import { MAX_CORRESPONDING_AUTHORS } from '$lib/utils/paperAuthorAffiliations';
 
 export const PaperSchema: Schema = new Schema({
     _id: { type: String, required: true },
@@ -33,9 +34,12 @@ export const PaperSchema: Schema = new Schema({
         }],
         validate: {
             validator(value: Array<{ isCorresponding?: boolean }> = []) {
-                return value.filter((author) => author?.isCorresponding === true).length <= 1;
+                return (
+                    value.filter((author) => author?.isCorresponding === true).length <=
+                    MAX_CORRESPONDING_AUTHORS
+                );
             },
-            message: 'Only one paper author can be marked as corresponding author.'
+            message: `A paper can have at most ${MAX_CORRESPONDING_AUTHORS} corresponding authors.`
         }
     },
     creditAuthorStatements: [{

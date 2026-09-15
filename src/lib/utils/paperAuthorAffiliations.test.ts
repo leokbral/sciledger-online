@@ -88,20 +88,28 @@ describe('paper author affiliations', () => {
 		]);
 	});
 
-	it('rejects two corresponding authors before persistence', () => {
-		const result = validateCorrespondingAuthorSelection([
-			author({ userId: 'author-1', isCorresponding: true }),
-			author({ userId: 'author-2', isCorresponding: true })
-		]);
+	it('accepts up to three corresponding authors and rejects a fourth, in step with the schema', () => {
+		const marked = (count: number) =>
+			Array.from({ length: count }, (_unused, i) =>
+				author({ userId: `author-${i + 1}`, isCorresponding: true })
+			);
+		// The mongoose validator is the last line of defence; it must agree with the pure rule,
+		// otherwise a payload could pass validation and still be refused at write time.
 		const schemaValidator = (PaperSchema.path('authorAffiliations') as any).validators.find(
-			(validator: any) => String(validator.message).includes('Only one paper author')
+			(validator: any) => String(validator.message).includes('corresponding authors')
 		);
 
-		expect(result.ok).toBe(false);
-		expect(schemaValidator.validator([{ isCorresponding: true }, { isCorresponding: true }])).toBe(false);
+		for (const count of [0, 1, 2, 3]) {
+			expect(validateCorrespondingAuthorSelection(marked(count)).ok).toBe(true);
+			expect(schemaValidator.validator(marked(count))).toBe(true);
+		}
+
+		expect(validateCorrespondingAuthorSelection(marked(4)).ok).toBe(false);
+		expect(validateCorrespondingAuthorSelection(marked(4)).message).toContain('at most 3');
+		expect(schemaValidator.validator(marked(4))).toBe(false);
 	});
 
-	it('requires exactly one corresponding author for submission validation', () => {
+	it('requires at least one corresponding author for submission validation', () => {
 		expect(validateCorrespondingAuthorSelection([author()], { requireOne: true })).toMatchObject({
 			ok: false
 		});

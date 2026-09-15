@@ -283,6 +283,18 @@ export function authorSnapshotMatchesReference(
 	);
 }
 
+/**
+ * A paper may name at most this many corresponding authors. This is a different rule from
+ * MAX_AFFILIATIONS_PER_AUTHOR: that one caps affiliations *within* one author, this one caps
+ * how many authors carry the corresponding flag across the whole paper.
+ */
+export const MAX_CORRESPONDING_AUTHORS = 3;
+
+/**
+ * Marks exactly the author matching `reference` and clears the rest. Kept for the legacy path
+ * where a paper carries a single `correspondingAuthor` id and no per-author flags; anything
+ * that supports several corresponding authors should use `markCorrespondingAuthors`.
+ */
 export function markCorrespondingAuthor(
 	authors: PaperAuthorSnapshot[],
 	reference: unknown
@@ -293,12 +305,115 @@ export function markCorrespondingAuthor(
 	}));
 }
 
+/** Marks every author matching any of `references`, clearing the rest. */
+export function markCorrespondingAuthors(
+	authors: PaperAuthorSnapshot[],
+	references: unknown[]
+): PaperAuthorSnapshot[] {
+	const list = (references ?? []).filter(Boolean);
+	return authors.map((author) => ({
+		...author,
+		isCorresponding: list.some((reference) => authorSnapshotMatchesReference(author, reference))
+	}));
+}
+
 export function countCorrespondingAuthors(authors: PaperAuthorSnapshot[]): number {
 	return authors.filter((author) => author.isCorresponding === true).length;
 }
 
+/**
+ * The first marked author, in author order. With several corresponding authors this is the
+ * "primary" one, which is what the paper's single `correspondingAuthor` reference stores so
+ * that readers written before multiple corresponding authors existed keep working.
+ */
 export function getMarkedCorrespondingAuthor(authors: PaperAuthorSnapshot[]): PaperAuthorSnapshot | null {
 	return authors.find((author) => author.isCorresponding === true) ?? null;
+}
+
+/** Every marked author, in author order. */
+export function getMarkedCorrespondingAuthors(authors: PaperAuthorSnapshot[]): PaperAuthorSnapshot[] {
+	return (authors ?? []).filter((author) => author?.isCorresponding === true);
+}
+
+export interface CorrespondingAuthorsReconcileResult {
+	ok: boolean;
+	message: string;
+	/** Goes into the paper's single `correspondingAuthor` reference: the first marked author. */
+	primaryCorrespondingAuthorId: string;
+	/** Every marked author's id, in author order. */
+	correspondingAuthorIds: string[];
+	/** The snapshots with their marks settled. Marks are preserved, never flattened to one. */
+	authors: PaperAuthorSnapshot[];
+}
+
+/**
+ * Settles who the corresponding authors are, shared by every endpoint that accepts an author
+ * payload so the rule cannot drift between them.
+ *
+ * The per-author `isCorresponding` flags are the source of truth. The paper's single
+ * `correspondingAuthor` reference is kept in step as the *primary* (first marked) author, which
+ * is what papers written before multiple corresponding authors existed still read.
+ */
+export function reconcileCorrespondingAuthors(input: {
+	authors: PaperAuthorSnapshot[];
+	correspondingAuthor?: unknown;
+	authorIds?: Set<string>;
+	requireOne?: boolean;
+}): CorrespondingAuthorsReconcileResult {
+	const fail = (message: string): CorrespondingAuthorsReconcileResult => ({
+		ok: false,
+		message,
+		primaryCorrespondingAuthorId: '',
+		correspondingAuthorIds: [],
+		authors: input.authors ?? []
+	});
+
+	let authors = input.authors ?? [];
+	const requestedId = getAuthorReferenceId(input.correspondingAuthor);
+
+	const selection = validateCorrespondingAuthorSelection(authors, {
+		requireOne: Boolean(input.requireOne) && !requestedId
+	});
+	if (!selection.ok) return fail(selection.message);
+
+	let marked = getMarkedCorrespondingAuthors(authors);
+
+	// Legacy payload: a single reference and no per-author flags. Mark that author.
+	if (!marked.length && requestedId) {
+		authors = markCorrespondingAuthor(authors, requestedId);
+		marked = getMarkedCorrespondingAuthors(authors);
+	}
+
+	// A reference that disagrees with the flags is a client bug, not something to silently fix.
+	if (requestedId && marked.length) {
+		const isAmongMarked = marked.some(
+			(author) => author.userId === requestedId || author.username === requestedId
+		);
+		if (!isAmongMarked) {
+			return fail('Corresponding author selection does not match the marked author snapshots.');
+		}
+	}
+
+	const correspondingAuthorIds = marked.map((author) => author.userId || '').filter(Boolean);
+	const primaryCorrespondingAuthorId = correspondingAuthorIds[0] ?? '';
+
+	if (input.requireOne && !marked.length) {
+		return fail('Select at least one corresponding author before submitting.');
+	}
+
+	const authorIds = input.authorIds;
+	if (authorIds && authorIds.size > 0) {
+		const outsider = correspondingAuthorIds.find((id) => !authorIds.has(id));
+		if (outsider) return fail('Corresponding authors must be among the paper authors.');
+	}
+
+	return {
+		ok: true,
+		message: '',
+		primaryCorrespondingAuthorId,
+		correspondingAuthorIds,
+		authors
+	};
 }
 
 export function validateCorrespondingAuthorSelection(
@@ -306,17 +421,18 @@ export function validateCorrespondingAuthorSelection(
 	options: { requireOne?: boolean } = {}
 ) {
 	const count = countCorrespondingAuthors(authors);
-	if (count > 1) {
+	if (count > MAX_CORRESPONDING_AUTHORS) {
 		return {
 			ok: false,
-			message: 'Only one author can be marked as corresponding author.'
+			message: `A paper can have at most ${MAX_CORRESPONDING_AUTHORS} corresponding authors.`
 		};
 	}
 
-	if (options.requireOne && count !== 1) {
+	// `requireOne` asks for at least one, not exactly one: two or three are equally valid.
+	if (options.requireOne && count < 1) {
 		return {
 			ok: false,
-			message: 'Select exactly one corresponding author before submitting.'
+			message: 'Select at least one corresponding author before submitting.'
 		};
 	}
 

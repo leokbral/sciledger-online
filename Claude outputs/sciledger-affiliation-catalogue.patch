@@ -1,0 +1,1609 @@
+diff --git a/src/lib/Pages/Paper/PaperPublishPage.svelte b/src/lib/Pages/Paper/PaperPublishPage.svelte
+index 00bc831..88490ff 100644
+--- a/src/lib/Pages/Paper/PaperPublishPage.svelte
++++ b/src/lib/Pages/Paper/PaperPublishPage.svelte
+@@ -33,8 +33,10 @@
+ 		normalizeAuthorSnapshot,
+ 		validateCorrespondingAuthorSelection,
+ 		collectReusableAffiliations,
++		affiliationDedupeKey,
+ 		hasAffiliation,
+ 		MAX_AFFILIATIONS_PER_AUTHOR,
++		MAX_CORRESPONDING_AUTHORS,
+ 		type PaperAuthorAffiliationSnapshot,
+ 		type PaperAuthorSnapshot
+ 	} from '$lib/utils/paperAuthorAffiliations';
+@@ -535,19 +537,21 @@
+ 			);
+ 
+ 		if ($store.correspondingAuthor && hasMatchingCorrespondingAuthor) {
+-			for (const username of Object.keys(nextAffiliations)) {
+-				nextAffiliations[username].isCorresponding = authorSnapshotMatchesReference(
+-					nextAffiliations[username],
+-					$store.correspondingAuthor
+-				);
++			// A paper saved before multiple corresponding authors existed carries the reference but
++			// no per-author flags. Seed the flag from it, without clearing marks already made here.
++			if (!markedAuthors.length) {
++				for (const username of Object.keys(nextAffiliations)) {
++					nextAffiliations[username].isCorresponding = authorSnapshotMatchesReference(
++						nextAffiliations[username],
++						$store.correspondingAuthor
++					);
++				}
+ 			}
+ 		} else if ($store.correspondingAuthor && !hasMatchingCorrespondingAuthor) {
+ 			$store.correspondingAuthor = null;
+-		} else if (markedAuthors.length > 1) {
+-			for (const username of Object.keys(nextAffiliations)) {
+-				nextAffiliations[username].isCorresponding = false;
+-			}
+-		} else if (markedAuthors.length === 1) {
++		} else if (markedAuthors.length) {
++			// Several authors may correspond. Keep the paper's single reference pointing at the
++			// first of them, which is what readers written before this expect to find.
+ 			$store.correspondingAuthor = getAuthorReferenceByUsername(markedAuthors[0].username || '');
+ 		}
+ 
+@@ -650,50 +654,78 @@
+ 			: snapshots;
+ 	}
+ 
+-	function setCorrespondingAuthor(username: string) {
+-		const reference = getAuthorReferenceByUsername(username);
+-		if (!reference) return;
+-
+-		$store.correspondingAuthor = reference;
+-		authorAffiliations = Object.fromEntries(
+-			Object.entries(authorAffiliations).map(([key, values]) => [
+-				key,
+-				{
+-					...values,
+-					isCorresponding: key === username
+-				}
+-			])
+-		);
++	function correspondingUsernames(): string[] {
++		return Object.entries(authorAffiliations)
++			.filter(([, values]) => values.isCorresponding)
++			.map(([key]) => key);
+ 	}
+ 
+-	function clearCorrespondingAuthor() {
+-		$store.correspondingAuthor = null;
+-		authorAffiliations = Object.fromEntries(
+-			Object.entries(authorAffiliations).map(([key, values]) => [
+-				key,
+-				{
+-					...values,
+-					isCorresponding: false
+-				}
+-			])
+-		);
++	function correspondingCount(): number {
++		return correspondingUsernames().length;
++	}
++
++	/** True when this author cannot be ticked because the paper already names the maximum. */
++	function correspondingLimitReached(username: string): boolean {
++		if (authorAffiliations[username]?.isCorresponding) return false;
++		return correspondingCount() >= MAX_CORRESPONDING_AUTHORS;
++	}
++
++	/**
++	 * Ticks or unticks one author. A fourth tick is refused outright rather than silently
++	 * stealing the mark from someone already selected, and unticking never touches the others.
++	 */
++	function toggleCorrespondingAuthor(username: string) {
++		const turningOn = !authorAffiliations[username]?.isCorresponding;
++		if (turningOn && correspondingCount() >= MAX_CORRESPONDING_AUTHORS) return;
++
++		authorAffiliations = {
++			...authorAffiliations,
++			[username]: { ...authorAffiliations[username], isCorresponding: turningOn }
++		};
++
++		// The paper's single reference follows the first author still ticked.
++		const [primary] = correspondingUsernames();
++		$store.correspondingAuthor = primary ? getAuthorReferenceByUsername(primary) : null;
+ 	}
+ 
+ 	function affiliationsFor(username: string): PaperAuthorAffiliationSnapshot[] {
+ 		return authorAffiliations[username]?.affiliations || [];
+ 	}
+ 
++	/**
++	 * The tags shown under Author details, derived straight from the author's affiliation list
++	 * in the order it is stored. Adding, removing or reordering an affiliation renumbers them
++	 * with no separate bookkeeping, so the user never types a number or an institution twice.
++	 */
++	function affiliationTags(username: string): Array<{ n: number; label: string }> {
++		return affiliationsFor(username).map((affiliation, position) => ({
++			n: position + 1,
++			label:
++				affiliation.displayName ||
++				formatAffiliationDisplayName(affiliation) ||
++				'Untitled affiliation'
++		}));
++	}
++
+ 	function affiliationLimitReached(username: string): boolean {
+ 		return affiliationsFor(username).length >= MAX_AFFILIATIONS_PER_AUTHOR;
+ 	}
+ 
+-	// Everything already known about the people on this paper, offered so the same
+-	// institution never has to be typed twice. Sources are the authors' own snapshots,
+-	// their earlier papers, their ORCID records and their profiles -- never a global
+-	// directory, and never another user's private data.
+-	let reusableAffiliations = $derived(
++	// ══ CATALOGUE ════════════════════════════════════════════════════════════════
++	// The affiliations available to THIS submission. Two different things live here and
++	// the code keeps them apart on purpose:
++	//   catalogue   -- which institutions this submission may draw on;
++	//   association -- which of them each author uses, and in what order (see below).
++	// The catalogue is derived, so selecting or removing an author recomputes it. An
++	// affiliation another author is still using stays, because assigned affiliations are
++	// themselves one of the sources.
++	let addedAffiliations = $state<PaperAuthorAffiliationSnapshot[]>([]);
++
++	let affiliationCatalogue = $derived(
+ 		collectReusableAffiliations([
++			// already assigned on this paper -- keeps in-use entries from disappearing
+ 			...Object.values(authorAffiliations).flatMap((entry) => entry.affiliations || []),
++			// what the selected authors already carry: ORCID record and profile
+ 			...inputAuthorList.flatMap((username) => {
+ 				const selectedAuthor = getAuthorByUsername(username);
+ 				return [
+@@ -701,46 +733,80 @@
+ 					...buildLegacyAffiliation(selectedAuthor)
+ 				];
+ 			}),
+-			...knownAffiliations
++			// the same authors' earlier papers
++			...knownAffiliations,
++			// and whatever was typed into the catalogue form on this page
++			...addedAffiliations
+ 		])
+ 	);
+ 
+-	function addAffiliation(username: string) {
+-		const values = authorAffiliations[username] || getInitialAffiliationForUsername(username);
+-		// The server rejects a fourth as well; this only keeps the form honest.
+-		if ((values.affiliations || []).length >= MAX_AFFILIATIONS_PER_AUTHOR) return;
+-		authorAffiliations = {
+-			...authorAffiliations,
+-			[username]: {
+-				...values,
+-				affiliations: [...(values.affiliations || []), createEmptyAffiliation()]
+-			}
+-		};
++	let newAffiliation = $state<PaperAuthorAffiliationSnapshot>(createEmptyAffiliation());
++
++	function canAddNewAffiliation(): boolean {
++		return Boolean(normalizeAffiliationSnapshot(newAffiliation));
+ 	}
+ 
+-	function reuseAffiliation(username: string, affiliation: PaperAuthorAffiliationSnapshot) {
+-		const values = authorAffiliations[username] || getInitialAffiliationForUsername(username);
+-		const existing = values.affiliations || [];
+-		if (existing.length >= MAX_AFFILIATIONS_PER_AUTHOR) return;
+-		if (hasAffiliation(existing, affiliation)) return;
+-		authorAffiliations = {
+-			...authorAffiliations,
+-			[username]: {
+-				...values,
+-				// copied into this paper's snapshot; the source record is never mutated
+-				affiliations: [...existing, { ...affiliation, id: createAffiliationId() }]
+-			}
+-		};
++	/** Adds a typed institution to the catalogue. It is not assigned to anyone yet. */
++	function addAffiliationToCatalogue() {
++		// Same normalisation every other source goes through -- no parallel structure.
++		const normalized = normalizeAffiliationSnapshot(newAffiliation, createAffiliationId());
++		if (!normalized) return;
++		if (affiliationCatalogue.some((entry) => entry.key === affiliationDedupeKey(normalized))) {
++			newAffiliation = createEmptyAffiliation();
++			return;
++		}
++		addedAffiliations = [...addedAffiliations, normalized];
++		newAffiliation = createEmptyAffiliation();
++	}
++
++	// ══ ASSOCIATION ══════════════════════════════════════════════════════════════
++	// Which catalogue entries an author uses, in the order the user chose. The order is
++	// the array order, which is what gets persisted in the snapshot and what the PDF
++	// numbers 1..n -- never alphabetical, never the order the catalogue happens to be in.
++
++	/** The catalogue key currently sitting in one of an author's ordered slots. */
++	function slotKey(username: string, slot: number): string {
++		const affiliation = affiliationsFor(username)[slot];
++		return affiliation ? affiliationDedupeKey(affiliation) : '';
++	}
++
++	/** A slot can only be used once the one before it is filled, so 1/2/3 stay contiguous. */
++	function slotEnabled(username: string, slot: number): boolean {
++		return slot <= affiliationsFor(username).length;
++	}
++
++	/** Keys this author already uses elsewhere, so the same institution is not offered twice. */
++	function slotTaken(username: string, slot: number, key: string): boolean {
++		return affiliationsFor(username).some(
++			(affiliation, position) => position !== slot && affiliationDedupeKey(affiliation) === key
++		);
+ 	}
+ 
+-	function removeAffiliation(username: string, index: number) {
++	/**
++	 * Sets or clears one ordered slot. Clearing compacts the list, so removing the 2nd of
++	 * three promotes the 3rd to 2nd and the tags renumber with it -- never 1 then 3.
++	 */
++	function setAffiliationSlot(username: string, slot: number, key: string) {
+ 		const values = authorAffiliations[username] || getInitialAffiliationForUsername(username);
++		const next = [...(values.affiliations || [])];
++
++		if (!key) {
++			if (slot >= next.length) return;
++			next.splice(slot, 1);
++		} else {
++			const entry = affiliationCatalogue.find((candidate) => candidate.key === key);
++			if (!entry) return;
++			if (slotTaken(username, slot, key)) return;
++			// copied into this paper's snapshot; the catalogue entry is never mutated
++			const copy = { ...entry.affiliation, id: createAffiliationId() };
++			if (slot < next.length) next[slot] = copy;
++			else next.push(copy);
++		}
++
++		if (next.length > MAX_AFFILIATIONS_PER_AUTHOR) return;
+ 		authorAffiliations = {
+ 			...authorAffiliations,
+-			[username]: {
+-				...values,
+-				affiliations: (values.affiliations || []).filter((_, currentIndex) => currentIndex !== index)
+-			}
++			[username]: { ...values, affiliations: next }
+ 		};
+ 	}
+ 
+@@ -1912,6 +1978,110 @@
+ 				</div>
+ 			</section>
+ 
++			<section id="affiliations" class="mb-4 w-full">
++				<div class="bg-surface-50 dark:bg-surface-800 rounded-lg p-4 border">
++					<h3 class="text-lg font-semibold mb-2 text-surface-900 dark:text-surface-100">Affiliations</h3>
++					<p class="text-xs text-surface-600 dark:text-surface-400 mb-3">
++						The institutions available to this submission, gathered from the authors you selected.
++						Add any that are missing here, then assign them to each author below.
++					</p>
++
++					{#if inputAuthorList.length === 0}
++						<p class="text-sm text-surface-500">
++							Select the authors first — their existing affiliations are gathered here automatically.
++						</p>
++					{:else}
++						{#if affiliationCatalogue.length === 0}
++							<p class="rounded-lg border border-dashed border-surface-300 p-3 text-sm text-surface-500 dark:border-surface-600">
++								No affiliation on file for these authors yet. Add the first one below.
++							</p>
++						{:else}
++							<ul class="mb-3 flex flex-wrap gap-1.5">
++								{#each affiliationCatalogue as entry (entry.key)}
++									<li class="inline-flex items-center gap-2 rounded-full border border-surface-300 bg-white px-3 py-1 text-xs text-surface-700 dark:border-surface-600 dark:bg-surface-900 dark:text-surface-200">
++										{entry.displayName}
++									</li>
++								{/each}
++							</ul>
++						{/if}
++
++						<div class="rounded-lg border border-surface-200 bg-white p-3 dark:border-surface-700 dark:bg-surface-900">
++							<p class="mb-2 text-xs font-semibold uppercase tracking-wide text-surface-500">Add affiliation</p>
++							<div class="grid grid-cols-1 gap-3 md:grid-cols-2">
++							<div>
++								<label for="new-affiliation-organization" class="mb-1 block text-xs font-medium text-surface-600 dark:text-surface-400">
++									Organization / Institution
++								</label>
++								<input
++									id="new-affiliation-organization"
++									type="text"
++									bind:value={newAffiliation.organization}
++									placeholder="Universidade Federal do Rio Grande do Norte"
++									class="w-full rounded-lg border border-surface-300 bg-white p-2 text-sm dark:border-surface-600 dark:bg-surface-900"
++								/>
++							</div>
++							<div>
++								<label for="new-affiliation-department" class="mb-1 block text-xs font-medium text-surface-600 dark:text-surface-400">
++									Department
++								</label>
++								<input
++									id="new-affiliation-department"
++									type="text"
++									bind:value={newAffiliation.department}
++									placeholder="Instituto Metrópole Digital"
++									class="w-full rounded-lg border border-surface-300 bg-white p-2 text-sm dark:border-surface-600 dark:bg-surface-900"
++								/>
++							</div>
++							<div>
++								<label for="new-affiliation-city" class="mb-1 block text-xs font-medium text-surface-600 dark:text-surface-400">
++									City
++								</label>
++								<input
++									id="new-affiliation-city"
++									type="text"
++									bind:value={newAffiliation.city}
++									placeholder="Natal"
++									class="w-full rounded-lg border border-surface-300 bg-white p-2 text-sm dark:border-surface-600 dark:bg-surface-900"
++								/>
++							</div>
++							<div>
++								<label for="new-affiliation-country" class="mb-1 block text-xs font-medium text-surface-600 dark:text-surface-400">
++									Country
++								</label>
++								<input
++									id="new-affiliation-country"
++									type="text"
++									bind:value={newAffiliation.country}
++									placeholder="Brasil"
++									class="w-full rounded-lg border border-surface-300 bg-white p-2 text-sm dark:border-surface-600 dark:bg-surface-900"
++								/>
++							</div>
++							<div>
++								<label for="new-affiliation-rorId" class="mb-1 block text-xs font-medium text-surface-600 dark:text-surface-400">
++									ROR ID
++								</label>
++								<input
++									id="new-affiliation-rorId"
++									type="text"
++									bind:value={newAffiliation.rorId}
++									placeholder="https://ror.org/..."
++									class="w-full rounded-lg border border-surface-300 bg-white p-2 text-sm dark:border-surface-600 dark:bg-surface-900"
++								/>
++							</div>
++							</div>
++							<button
++								type="button"
++								onclick={addAffiliationToCatalogue}
++								disabled={!canAddNewAffiliation()}
++								class="mt-3 rounded-lg border border-primary-200 px-3 py-1.5 text-xs font-medium text-primary-700 hover:bg-primary-50 disabled:cursor-not-allowed disabled:border-surface-200 disabled:text-surface-400 dark:border-primary-700 dark:text-primary-200"
++							>
++								+ Add affiliation
++							</button>
++						</div>
++					{/if}
++				</div>
++			</section>
++
+ 			<section class="mb-4 w-full">
+ 				<div class="bg-surface-50 dark:bg-surface-800 rounded-lg p-4 border">
+ 					<h3 class="text-lg font-semibold mb-2 text-surface-900 dark:text-surface-100">
+@@ -1948,199 +2118,94 @@
+ 											<div class="flex flex-wrap items-center gap-2">
+ 												<label class="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-surface-300 px-3 py-2 text-xs font-medium text-surface-700 hover:bg-surface-50 dark:border-surface-600 dark:text-surface-200 dark:hover:bg-surface-800">
+ 													<input
+-														type="radio"
+-														name="corresponding-author"
++														type="checkbox"
+ 														checked={authorAffiliations[username].isCorresponding}
+-														onchange={() => setCorrespondingAuthor(username)}
+-														class="h-4 w-4 text-primary-500"
++														disabled={correspondingLimitReached(username)}
++														onchange={() => toggleCorrespondingAuthor(username)}
++														class="h-4 w-4 rounded text-primary-500 disabled:cursor-not-allowed"
+ 													/>
+ 													Corresponding Author
+ 												</label>
+-												{#if authorAffiliations[username].isCorresponding}
+-													<button
+-														type="button"
+-														onclick={clearCorrespondingAuthor}
+-														class="rounded-lg border border-surface-300 px-3 py-2 text-xs font-medium text-surface-600 hover:bg-surface-100 dark:border-surface-600 dark:text-surface-300 dark:hover:bg-surface-800"
+-													>
+-														Clear
+-													</button>
++												{#if correspondingLimitReached(username)}
++													<span class="text-xs text-amber-700 dark:text-amber-300">
++														This paper already names {MAX_CORRESPONDING_AUTHORS} corresponding authors. Untick one to choose another.
++													</span>
++												{:else}
++													<span class="text-xs text-surface-500 dark:text-surface-400">
++														{correspondingCount()}/{MAX_CORRESPONDING_AUTHORS} selected
++													</span>
+ 												{/if}
+ 											</div>
+ 										</div>
+ 
+-										<div class="grid grid-cols-1 gap-3">
+-											<div>
+-												<label for={`author-display-name-${username}`} class="block text-xs font-medium text-surface-600 dark:text-surface-400 mb-1">
+-													Display name
+-												</label>
+-												<input
+-													id={`author-display-name-${username}`}
+-													type="text"
+-													bind:value={authorAffiliations[username].name}
+-													placeholder="Full author name"
+-													class="w-full p-2 border border-surface-300 dark:border-surface-600 rounded-lg text-sm bg-white dark:bg-surface-800"
+-												/>
+-											</div>
+-										</div>
+-
+ 										<div class="mt-4">
+-											<div class="mb-2 flex items-center justify-between gap-3">
+-												<p class="text-xs font-semibold uppercase text-surface-500">
+-													Affiliations ({affiliationsFor(username).length}/{MAX_AFFILIATIONS_PER_AUTHOR})
+-												</p>
+-												<button
+-													type="button"
+-													onclick={() => addAffiliation(username)}
+-													disabled={affiliationLimitReached(username)}
+-													title={affiliationLimitReached(username)
+-														? `An author can have at most ${MAX_AFFILIATIONS_PER_AUTHOR} affiliations.`
+-														: 'Add a blank affiliation'}
+-													class="rounded-lg border border-primary-200 px-3 py-1.5 text-xs font-medium text-primary-700 hover:bg-primary-50 disabled:cursor-not-allowed disabled:border-surface-200 disabled:text-surface-400 disabled:hover:bg-transparent dark:border-primary-700 dark:text-primary-200 dark:hover:bg-primary-900/30"
+-												>
+-													+ Add affiliation
+-												</button>
+-											</div>
+-
+-											{#if affiliationLimitReached(username)}
+-												<p class="mb-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-100">
+-													Limit reached: an author can have at most {MAX_AFFILIATIONS_PER_AUTHOR} affiliations.
+-													Remove one to add another.
+-												</p>
+-											{:else if reusableAffiliations.length > 0}
+-												<div class="mb-2 rounded-lg border border-surface-200 bg-surface-50 p-2 dark:border-surface-700 dark:bg-surface-800">
+-													<p class="mb-1.5 text-xs text-surface-600 dark:text-surface-400">
+-														Reuse an affiliation already on file:
+-													</p>
+-													<div class="flex flex-wrap gap-1.5">
+-														{#each reusableAffiliations as reusable (reusable.key)}
+-															<button
+-																type="button"
+-																onclick={() => reuseAffiliation(username, reusable.affiliation)}
+-																disabled={hasAffiliation(affiliationsFor(username), reusable.affiliation)}
+-																title={hasAffiliation(affiliationsFor(username), reusable.affiliation)
+-																	? 'Already added for this author'
+-																	: 'Add this affiliation to the author'}
+-																class="rounded-full border border-surface-300 bg-white px-2.5 py-1 text-xs text-surface-700 hover:border-primary-400 hover:text-primary-700 disabled:cursor-not-allowed disabled:border-surface-200 disabled:bg-surface-100 disabled:text-surface-400 dark:border-surface-600 dark:bg-surface-900 dark:text-surface-200"
+-															>
+-																+ {reusable.displayName}
+-															</button>
+-														{/each}
+-													</div>
+-												</div>
+-											{/if}
+-
+-											{#if authorAffiliations[username].affiliations.length === 0}
++											<p class="mb-2 text-xs font-semibold uppercase tracking-wide text-surface-500">Affiliation</p>
++											{#if affiliationCatalogue.length === 0}
+ 												<p class="rounded-lg border border-dashed border-surface-300 p-3 text-sm text-surface-500 dark:border-surface-600">
+-													No affiliations added for this paper.
++													The submission has no affiliations yet. Add one in <strong>Affiliations</strong> above,
++													then assign it here.
+ 												</p>
+ 											{:else}
+-												<div class="space-y-3">
+-													{#each authorAffiliations[username].affiliations as affiliation, affiliationIndex (affiliation.id || affiliationIndex)}
+-														<div class="rounded-lg border border-surface-200 bg-surface-50 p-3 dark:border-surface-700 dark:bg-surface-800">
+-															<div class="mb-3 flex items-center justify-between gap-3">
+-																<p class="text-xs font-semibold text-surface-600 dark:text-surface-300">
+-																	Affiliation {affiliationIndex + 1}
+-																</p>
+-																<button
+-																	type="button"
+-																	onclick={() => removeAffiliation(username, affiliationIndex)}
+-																	class="rounded p-1 text-surface-500 hover:bg-surface-200 hover:text-error-600 dark:hover:bg-surface-700"
+-																	aria-label={`Remove affiliation ${affiliationIndex + 1}`}
++												<div class="space-y-2">
++													{#each Array(MAX_AFFILIATIONS_PER_AUTHOR) as _slot, slot (slot)}
++														{#if slotEnabled(username, slot)}
++															<div class="flex items-center gap-2">
++																<span class="w-7 shrink-0 text-xs font-semibold text-surface-500">{slot + 1}<sup>a</sup></span>
++																<select
++																	aria-label={`Affiliation ${slot + 1} for ${username}`}
++																	value={slotKey(username, slot)}
++																	onchange={(event) => setAffiliationSlot(username, slot, event.currentTarget.value)}
++																	class="w-full rounded-lg border border-surface-300 bg-white p-2 text-sm dark:border-surface-600 dark:bg-surface-900"
+ 																>
+-																	<IconRemove size={16} />
+-																</button>
++																	<option value="">— not set —</option>
++																	{#each affiliationCatalogue as entry (entry.key)}
++																		<option value={entry.key} disabled={slotTaken(username, slot, entry.key)}>
++																			{entry.displayName}
++																		</option>
++																	{/each}
++																</select>
+ 															</div>
+-															<div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+-																<div>
+-																	<label for={`author-affiliation-organization-${username}-${affiliationIndex}`} class="block text-xs font-medium text-surface-600 dark:text-surface-400 mb-1">
+-																		Organization / Institution
+-																	</label>
+-																	<input
+-																		id={`author-affiliation-organization-${username}-${affiliationIndex}`}
+-																		type="text"
+-																		bind:value={affiliation.organization}
+-																		placeholder="Federal University"
+-																		class="w-full p-2 border border-surface-300 dark:border-surface-600 rounded-lg text-sm bg-white dark:bg-surface-900"
+-																	/>
+-																</div>
+-																<div>
+-																	<label for={`author-affiliation-department-${username}-${affiliationIndex}`} class="block text-xs font-medium text-surface-600 dark:text-surface-400 mb-1">
+-																		Department
+-																	</label>
+-																	<input
+-																		id={`author-affiliation-department-${username}-${affiliationIndex}`}
+-																		type="text"
+-																		bind:value={affiliation.department}
+-																		placeholder="Computer Science Department"
+-																		class="w-full p-2 border border-surface-300 dark:border-surface-600 rounded-lg text-sm bg-white dark:bg-surface-900"
+-																	/>
+-																</div>
+-																<div>
+-																	<label for={`author-affiliation-role-${username}-${affiliationIndex}`} class="block text-xs font-medium text-surface-600 dark:text-surface-400 mb-1">
+-																		Role / title
+-																	</label>
+-																	<input
+-																		id={`author-affiliation-role-${username}-${affiliationIndex}`}
+-																		type="text"
+-																		bind:value={affiliation.roleTitle}
+-																		placeholder="Researcher"
+-																		class="w-full p-2 border border-surface-300 dark:border-surface-600 rounded-lg text-sm bg-white dark:bg-surface-900"
+-																	/>
+-																</div>
+-																<div>
+-																	<label for={`author-affiliation-ror-${username}-${affiliationIndex}`} class="block text-xs font-medium text-surface-600 dark:text-surface-400 mb-1">
+-																		ROR ID
+-																	</label>
+-																	<input
+-																		id={`author-affiliation-ror-${username}-${affiliationIndex}`}
+-																		type="text"
+-																		bind:value={affiliation.rorId}
+-																		placeholder="https://ror.org/..."
+-																		class="w-full p-2 border border-surface-300 dark:border-surface-600 rounded-lg text-sm bg-white dark:bg-surface-900"
+-																	/>
+-																</div>
+-																<div>
+-																	<label for={`author-affiliation-city-${username}-${affiliationIndex}`} class="block text-xs font-medium text-surface-600 dark:text-surface-400 mb-1">
+-																		City
+-																	</label>
+-																	<input
+-																		id={`author-affiliation-city-${username}-${affiliationIndex}`}
+-																		type="text"
+-																		bind:value={affiliation.city}
+-																		placeholder="Natal"
+-																		class="w-full p-2 border border-surface-300 dark:border-surface-600 rounded-lg text-sm bg-white dark:bg-surface-900"
+-																	/>
+-																</div>
+-																<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+-																	<div>
+-																		<label for={`author-affiliation-region-${username}-${affiliationIndex}`} class="block text-xs font-medium text-surface-600 dark:text-surface-400 mb-1">
+-																			Region
+-																		</label>
+-																		<input
+-																			id={`author-affiliation-region-${username}-${affiliationIndex}`}
+-																			type="text"
+-																			bind:value={affiliation.region}
+-																			placeholder="RN"
+-																			class="w-full p-2 border border-surface-300 dark:border-surface-600 rounded-lg text-sm bg-white dark:bg-surface-900"
+-																		/>
+-																	</div>
+-																	<div>
+-																		<label for={`author-affiliation-country-${username}-${affiliationIndex}`} class="block text-xs font-medium text-surface-600 dark:text-surface-400 mb-1">
+-																			Country
+-																		</label>
+-																		<input
+-																			id={`author-affiliation-country-${username}-${affiliationIndex}`}
+-																			type="text"
+-																			bind:value={affiliation.country}
+-																			placeholder="Brazil"
+-																			class="w-full p-2 border border-surface-300 dark:border-surface-600 rounded-lg text-sm bg-white dark:bg-surface-900"
+-																		/>
+-																	</div>
+-																</div>
+-															</div>
+-														</div>
++														{/if}
++													{/each}
++												</div>
++												{#if affiliationLimitReached(username)}
++													<p class="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-100">
++														Limit reached: an author can use at most {MAX_AFFILIATIONS_PER_AUTHOR} affiliations.
++														Clear one to choose another.
++													</p>
++												{/if}
++											{/if}
++										</div>
++
++										<div class="mt-4">
++											<p class="mb-2 text-xs font-semibold uppercase tracking-wide text-surface-500">Author details</p>
++											<div class="grid grid-cols-1 gap-3">
++												<div>
++													<label for={`author-display-name-${username}`} class="block text-xs font-medium text-surface-600 dark:text-surface-400 mb-1">
++														Display name
++													</label>
++													<input
++														id={`author-display-name-${username}`}
++														type="text"
++														bind:value={authorAffiliations[username].name}
++														placeholder="Full author name"
++														class="w-full p-2 border border-surface-300 dark:border-surface-600 rounded-lg text-sm bg-white dark:bg-surface-800"
++													/>
++												</div>
++											</div>
++											{#if affiliationTags(username).length}
++												<div class="mt-3 flex flex-wrap gap-1.5">
++													{#each affiliationTags(username) as tag (tag.n)}
++														<span class="inline-flex items-center gap-1.5 rounded-full border border-surface-300 bg-surface-50 px-2.5 py-1 text-xs text-surface-700 dark:border-surface-600 dark:bg-surface-800 dark:text-surface-200">
++															<sup class="font-semibold text-primary-700 dark:text-primary-300">{tag.n}</sup>
++															{tag.label}
++														</span>
+ 													{/each}
+ 												</div>
++											{:else}
++												<p class="mt-3 text-xs text-surface-500 dark:text-surface-400">
++													Affiliation tags appear here automatically once this author has an affiliation.
++												</p>
+ 											{/if}
+ 										</div>
+ 									</div>
+diff --git a/src/lib/components/Paper/PaperAuthorsSection.svelte b/src/lib/components/Paper/PaperAuthorsSection.svelte
+index aa2c650..85d764d 100644
+--- a/src/lib/components/Paper/PaperAuthorsSection.svelte
++++ b/src/lib/components/Paper/PaperAuthorsSection.svelte
+@@ -98,13 +98,16 @@
+ 			snapshot: getPaperAuthorSnapshot(paperData, item.author)
+ 		}));
+ 		const affiliationIndex = buildPaperAffiliationIndex(items.map((item) => item.snapshot));
+-		const hasCorrespondingAuthor = items.some((item) => item.snapshot.isCorresponding);
++		// A paper may name several corresponding authors; each already carries its own `*`
++		// beside the name, so the legend below only has to agree in number.
++		const correspondingCount = items.filter((item) => item.snapshot.isCorresponding).length;
+ 
+ 		return {
+ 			items,
+ 			affiliationEntries: affiliationIndex.entries,
+ 			authorAffiliationIndexes: affiliationIndex.authorAffiliationIndexes,
+-			hasCorrespondingAuthor
++			hasCorrespondingAuthor: correspondingCount > 0,
++			correspondingCount
+ 		};
+ 	}
+ 
+@@ -218,7 +221,7 @@
+ 
+ 		{#if authorData.hasCorrespondingAuthor}
+ 			<p class="paper-export-corresponding-author mt-2 text-xs leading-5 text-slate-500">
+-				* Corresponding author
++				* {authorData.correspondingCount > 1 ? 'Corresponding authors' : 'Corresponding author'}
+ 			</p>
+ 		{/if}
+ 	</div>
+diff --git a/src/lib/db/schemas/PaperSchema.ts b/src/lib/db/schemas/PaperSchema.ts
+index cd3db00..cfc8cc5 100644
+--- a/src/lib/db/schemas/PaperSchema.ts
++++ b/src/lib/db/schemas/PaperSchema.ts
+@@ -1,5 +1,6 @@
+ import { Schema } from 'mongoose';
+ import * as crypto from 'crypto';
++import { MAX_CORRESPONDING_AUTHORS } from '$lib/utils/paperAuthorAffiliations';
+ 
+ export const PaperSchema: Schema = new Schema({
+     _id: { type: String, required: true },
+@@ -33,9 +34,12 @@ export const PaperSchema: Schema = new Schema({
+         }],
+         validate: {
+             validator(value: Array<{ isCorresponding?: boolean }> = []) {
+-                return value.filter((author) => author?.isCorresponding === true).length <= 1;
++                return (
++                    value.filter((author) => author?.isCorresponding === true).length <=
++                    MAX_CORRESPONDING_AUTHORS
++                );
+             },
+-            message: 'Only one paper author can be marked as corresponding author.'
++            message: `A paper can have at most ${MAX_CORRESPONDING_AUTHORS} corresponding authors.`
+         }
+     },
+     creditAuthorStatements: [{
+diff --git a/src/lib/server/pdf/article-template-v3-1col.tpl.html b/src/lib/server/pdf/article-template-v3-1col.tpl.html
+index 209229c..3b8fc8b 100644
+--- a/src/lib/server/pdf/article-template-v3-1col.tpl.html
++++ b/src/lib/server/pdf/article-template-v3-1col.tpl.html
+@@ -81,7 +81,7 @@ body{font-family:var(--serif);color:var(--ink);font-size:10pt;line-height:1.52;
+    anterior mais alto empurraria a capitular do primeiro parágrafo para baixo
+    (CSS 9.5.1 — o topo de um float não pode subir acima do topo de um float
+    anterior). Posicionadas em absoluto, elas ocupam a calha sem esse efeito. */
+-.sn-stack{position:absolute;top:0;right:-54mm;width:46mm}
++.sn-stack{position:absolute;top:0;right:0;width:46mm}
+ .sn-stack .sn{float:none;clear:none;width:100%;margin:0 0 4mm}
+ .body p{margin:0 0 3mm;text-align:justify;hyphens:auto}
+ .sn{float:right;clear:right;width:46mm;margin-right:-54mm;margin-bottom:4mm;
+diff --git a/src/lib/server/pdf/articleViewModel.ts b/src/lib/server/pdf/articleViewModel.ts
+index 9fa55d2..1485c21 100644
+--- a/src/lib/server/pdf/articleViewModel.ts
++++ b/src/lib/server/pdf/articleViewModel.ts
+@@ -13,6 +13,7 @@ import { autolinkHtml } from './autolink';
+ import { parseReferenceNumber } from './crossReference';
+ import {
+ 	buildPaperAffiliationIndex,
++	getMarkedCorrespondingAuthors,
+ 	formatAffiliationDisplayName,
+ 	type PaperAuthorSnapshot
+ } from '$lib/utils/paperAuthorAffiliations';
+@@ -102,20 +103,30 @@ function buildAuthorsHtml(authors: PaperAuthorSnapshot[]) {
+ 		})
+ 		.join(' &nbsp;·&nbsp; ');
+ 
+-	const corresponding = authors.find((a) => a.isCorresponding);
++	// A paper may name several corresponding authors, and every one of them carries the same
++	// `*` next to their name above. The legend has to list them all, otherwise the PDF would
++	// silently claim a single corresponding author where the record says three.
++	const corresponding = getMarkedCorrespondingAuthors(authors);
++	const reachable = corresponding.filter((author) => author.email);
++	const correspondingLine = reachable.length
++		? `<sup>*</sup> Corresponding author${reachable.length > 1 ? 's' : ''}: ` +
++			reachable
++				.map((author) => `<a href="mailto:${esc(author.email)}">${esc(author.email)}</a>`)
++				.join(', ')
++		: '';
++
+ 	const affilHtml = [
+ 		...index.entries.map(
+ 			(entry) =>
+ 				`<sup>${entry.index}</sup> ${esc(entry.displayName || formatAffiliationDisplayName(entry.affiliation))}`
+ 		),
+-		corresponding?.email
+-			? `<sup>*</sup> Corresponding author: <a href="mailto:${esc(corresponding.email)}">${esc(corresponding.email)}</a>`
+-			: ''
++		correspondingLine
+ 	]
+ 		.filter(Boolean)
+ 		.join(' &nbsp;·&nbsp; ');
+ 
+-	return { authorsHtml, affilHtml, correspondingEmail: corresponding?.email ?? '' };
++	// The single token stays the primary author's address, for templates that show just one.
++	return { authorsHtml, affilHtml, correspondingEmail: reachable[0]?.email ?? '' };
+ }
+ 
+ /** CRediT (creditAuthorStatements) ➜ parágrafo "Author contributions". */
+diff --git a/src/lib/server/pdf/authorsAndAffiliationsPdf.test.ts b/src/lib/server/pdf/authorsAndAffiliationsPdf.test.ts
+new file mode 100644
+index 0000000..d7e5018
+--- /dev/null
++++ b/src/lib/server/pdf/authorsAndAffiliationsPdf.test.ts
+@@ -0,0 +1,115 @@
++/**
++ * Renders a real PDF from a fixture and checks how authors, corresponding authors and
++ * affiliations actually come out the far end of the pipeline. Everything here is the
++ * production code path from tokens onward -- only the database lookup is replaced by the
++ * fixture, so a regression in the template or the view model fails this test.
++ */
++import { mkdirSync, writeFileSync } from 'node:fs';
++import { fileURLToPath } from 'node:url';
++import { describe, expect, it } from 'vitest';
++import { buildArticleTokens } from './articleViewModel';
++import { renderTemplateHtml, renderTokensToPdf } from './renderArticlePdf';
++import {
++	normalizeAffiliationSnapshot,
++	type PaperAuthorSnapshot
++} from '$lib/utils/paperAuthorAffiliations';
++
++// Accented names and a deliberately long institution: the PDF must not drop diacritics,
++// clip names or break the affiliation legend.
++const UFRN = { organization: 'Universidade Federal do Rio Grande do Norte', city: 'Natal', country: 'Brasil' };
++const IMD = { organization: 'Instituto Metrópole Digital', city: 'Natal', country: 'Brasil' };
++const LAB = {
++	organization: 'Laboratório de Bioinformática Comparativa e Genômica Evolutiva Aplicada à Saúde Pública',
++	city: 'Natal'
++};
++// Typed into the catalogue on the submission page rather than coming from a profile or ORCID:
++// it must reach the PDF through exactly the same normalisation as the others.
++const NOVA = normalizeAffiliationSnapshot({
++	organization: 'Universidade Nova',
++	department: 'Departamento de Pesquisa',
++	city: 'Natal',
++	country: 'Brasil'
++})!;
++
++/** The shape the task asks for: 3 corresponding authors with 1, 2 and 3 affiliations, plus one who is not. */
++export const AUTHORS: PaperAuthorSnapshot[] = [
++	{ userId: 'a1', username: '@ada', name: 'Ada Lovelace', email: 'ada@ufrn.br', isCorresponding: true, affiliations: [UFRN] },
++	{ userId: 'a2', username: '@grace', name: 'Grace Hopper', email: 'grace@imd.ufrn.br', isCorresponding: true, affiliations: [UFRN, IMD] },
++	{
++		userId: 'a3', username: '@tetsu',
++		name: 'Tetsu Sakamoto de Albuquerque Nascimento Gonçalves',
++		email: 'tetsu@imd.ufrn.br', isCorresponding: true,
++		affiliations: [UFRN, IMD, LAB]
++	},
++	{ userId: 'a4', username: '@leo', name: 'Leonardo Ferreira Cabral', email: 'leo@ufrn.br', isCorresponding: false, affiliations: [NOVA] }
++];
++
++const PAPER = {
++	id: 'fixture-authors-affiliations',
++	title: 'Multiple corresponding authors and ordered affiliations',
++	abstract: '<p>A fixture exercising the author, corresponding-author and affiliation rendering path.</p>',
++	keywords: ['affiliations', 'corresponding authors'],
++	content: '<h1>Introduction</h1><p>Body text for the fixture paper.</p>',
++	status: 'published',
++	createdAt: '2026-01-05T00:00:00.000Z',
++	updatedAt: '2026-03-01T00:00:00.000Z',
++	statusHistory: [{ action: 'paper.publish', newStatus: 'published', createdAt: '2026-03-01T00:00:00.000Z' }]
++};
++
++const tokens = buildArticleTokens(PAPER, { authors: AUTHORS, baseUrl: 'https://sciledger.org' });
++
++describe('authors and affiliations in the generated document', () => {
++	it('numbers each author with their own affiliations, in the order the author stored them', () => {
++		// Ada: 1 -- Grace: 1,2 -- Tetsu: 1,2,3 -- Leonardo: 2
++		expect(tokens.AUTHORS).toContain('Ada Lovelace<sup>1,*</sup>');
++		expect(tokens.AUTHORS).toContain('Grace Hopper<sup>1,2,*</sup>');
++		expect(tokens.AUTHORS).toContain('Tetsu Sakamoto de Albuquerque Nascimento Gonçalves<sup>1,2,3,*</sup>');
++		expect(tokens.AUTHORS).toContain('Leonardo Ferreira Cabral<sup>4</sup>');
++	});
++
++	it('lists every distinct affiliation once, numbered in first-use order', () => {
++		expect(tokens.AFFILIATIONS).toContain('<sup>1</sup> Universidade Federal do Rio Grande do Norte');
++		expect(tokens.AFFILIATIONS).toContain('<sup>2</sup> Instituto Metrópole Digital');
++		expect(tokens.AFFILIATIONS).toContain('<sup>3</sup> Laboratório de Bioinformática');
++		expect(tokens.AFFILIATIONS).toContain('<sup>4</sup> Departamento de Pesquisa, Universidade Nova');
++		expect(tokens.AFFILIATIONS.match(/<sup>\d<\/sup>/g)).toHaveLength(4);
++	});
++
++	it('names all three corresponding authors in the legend, not just the first', () => {
++		expect(tokens.AFFILIATIONS).toContain('Corresponding authors:');
++		for (const email of ['ada@ufrn.br', 'grace@imd.ufrn.br', 'tetsu@imd.ufrn.br']) {
++			expect(tokens.AFFILIATIONS).toContain(`mailto:${email}`);
++		}
++		expect(tokens.AFFILIATIONS).not.toContain('mailto:leo@ufrn.br');
++	});
++
++	it('leaves no marker without a matching entry', () => {
++		const markers = new Set([...tokens.AUTHORS.matchAll(/<sup>([^<]+)<\/sup>/g)]
++			.flatMap((m) => m[1].split(',')).filter((mark) => mark !== '*'));
++		const entries = new Set([...tokens.AFFILIATIONS.matchAll(/<sup>(\d+)<\/sup>/g)].map((m) => m[1]));
++		expect([...markers].sort()).toEqual([...entries].sort());
++	});
++
++	it('singularises the legend when only one author corresponds', () => {
++		const single = buildArticleTokens(PAPER, {
++			authors: AUTHORS.map((a, i) => ({ ...a, isCorresponding: i === 0 }))
++		});
++		expect(single.AFFILIATIONS).toContain('Corresponding author:');
++		expect(single.AFFILIATIONS).not.toContain('Corresponding authors:');
++	});
++
++	it('renders a real PDF carrying all four authors and all three affiliations', async () => {
++		const { pdf } = await renderTokensToPdf(tokens, 'v3-1col');
++		expect(pdf.length).toBeGreaterThan(1000);
++
++		const html = renderTemplateHtml(tokens, 'v3-1col');
++		for (const accented of ['Metrópole', 'Laboratório de Bioinformática', 'Gonçalves', 'Brasil', 'Universidade Nova']) {
++			expect(html).toContain(accented);
++		}
++
++		const out = fileURLToPath(new URL('./__fixtures__/', import.meta.url));
++		mkdirSync(out, { recursive: true });
++		writeFileSync(out + 'authors-affiliations.pdf', pdf);
++		writeFileSync(out + 'authors-affiliations.html', renderTemplateHtml(tokens, 'v3-1col'));
++	}, 180000);
++});
+diff --git a/src/lib/utils/affiliationCatalogue.test.ts b/src/lib/utils/affiliationCatalogue.test.ts
+new file mode 100644
+index 0000000..007e85c
+--- /dev/null
++++ b/src/lib/utils/affiliationCatalogue.test.ts
+@@ -0,0 +1,172 @@
++/**
++ * The submission has one catalogue of institutions and, separately, an association saying
++ * which of them each author uses and in what order. These are different things, and the
++ * tests keep them apart the same way the editor does.
++ */
++import { readFileSync } from 'node:fs';
++import { fileURLToPath } from 'node:url';
++import { describe, expect, it } from 'vitest';
++import {
++	MAX_AFFILIATIONS_PER_AUTHOR,
++	affiliationDedupeKey,
++	buildPaperAffiliationIndex,
++	collectReusableAffiliations,
++	extractOrcidAffiliations,
++	normalizeAffiliationSnapshot,
++	normalizeAuthorSnapshots
++} from './paperAuthorAffiliations';
++
++const UFRN = { organization: 'Universidade Federal do Rio Grande do Norte' };
++const IMD = { organization: 'Instituto Metrópole Digital' };
++const LAB = { organization: 'Laboratório X' };
++
++const author = (id: string, affiliations: unknown[] = []) => ({
++	userId: id, username: `@${id}`, name: id, affiliations
++});
++
++/** What the editor derives: the catalogue is assembled from the selected authors. */
++const catalogue = (authors: any[], extra: unknown[] = []) =>
++	collectReusableAffiliations([
++		...normalizeAuthorSnapshots(authors).flatMap((a) => a.affiliations ?? []),
++		...extra
++	]);
++
++describe('catalogue: the institutions this submission may draw on', () => {
++	it('is empty when no selected author has an affiliation', () => {
++		expect(catalogue([author('ada'), author('grace')])).toEqual([]);
++	});
++
++	it('holds the one affiliation of a single author', () => {
++		expect(catalogue([author('ada', [UFRN])]).map((e) => e.affiliation.organization)).toEqual([
++			'Universidade Federal do Rio Grande do Norte'
++		]);
++	});
++
++	it('lists a shared institution once, however many authors carry it', () => {
++		const entries = catalogue([
++			author('ada', [UFRN]), author('grace', [UFRN]),
++			author('tetsu', [UFRN]), author('leo', [UFRN])
++		]);
++		expect(entries).toHaveLength(1);
++	});
++
++	it('gathers the union when authors carry different institutions', () => {
++		const entries = catalogue([
++			author('ada', [UFRN]), author('grace', [UFRN, IMD]), author('tetsu', [UFRN, IMD, LAB])
++		]);
++		expect(entries.map((e) => e.affiliation.organization).sort()).toEqual([
++			'Instituto Metrópole Digital', 'Laboratório X', 'Universidade Federal do Rio Grande do Norte'
++		]);
++	});
++
++	it('takes in an affiliation typed on the page, through the same normalisation', () => {
++		const typed = normalizeAffiliationSnapshot({
++			organization: 'Universidade Nova', department: 'Departamento de Pesquisa',
++			city: 'Natal', country: 'Brasil'
++		});
++		const entries = catalogue([author('ada', [UFRN])], [typed]);
++		expect(entries.map((e) => e.affiliation.organization)).toContain('Universidade Nova');
++		expect(entries.find((e) => e.affiliation.organization === 'Universidade Nova')!.displayName)
++			.toContain('Departamento de Pesquisa');
++	});
++
++	it('grows when an author joins', () => {
++		const before = catalogue([author('ada', [UFRN])]);
++		const after = catalogue([author('ada', [UFRN]), author('tetsu', [UFRN, IMD, LAB])]);
++		expect(before).toHaveLength(1);
++		expect(after).toHaveLength(3);
++	});
++
++	it('keeps an institution another author is still using when one author leaves', () => {
++		// Grace leaves; Ada still uses UFRN, so UFRN must not fall out of the catalogue.
++		const after = catalogue([author('ada', [UFRN])]);
++		expect(after.map((e) => e.affiliation.organization)).toEqual([
++			'Universidade Federal do Rio Grande do Norte'
++		]);
++	});
++
++	it('drops an institution once nobody uses it any more', () => {
++		expect(catalogue([author('ada', [UFRN])]).some((e) => e.affiliation.organization === 'Laboratório X'))
++			.toBe(false);
++	});
++
++	it('is not capped at three: the cap is per author', () => {
++		const many = catalogue([
++			author('ada', [UFRN, IMD, LAB]),
++			author('grace', [{ organization: 'Universidade Y' }, { organization: 'Instituto Z' }])
++		]);
++		expect(many.length).toBe(5);
++		expect(MAX_AFFILIATIONS_PER_AUTHOR).toBe(3);
++	});
++
++	it('folds an ORCID affiliation into the same catalogue rather than a parallel list', () => {
++		const orcid = extractOrcidAffiliations({
++			'activities-summary': {
++				employments: { 'affiliation-group': [
++					{ summaries: [{ 'employment-summary': { organization: { name: 'Instituto Metrópole Digital' } } }] }
++				] }
++			}
++		});
++		expect(catalogue([author('ada', [IMD])], orcid)).toHaveLength(1);
++	});
++});
++
++describe('association: which catalogue entries an author uses, in order', () => {
++	const assign = (affiliations: unknown[]) => normalizeAuthorSnapshots([author('ada', affiliations)])[0];
++
++	it('records one, two or three affiliations for an author', () => {
++		for (const list of [[UFRN], [UFRN, IMD], [UFRN, IMD, LAB]]) {
++			expect(assign(list).affiliations).toHaveLength(list.length);
++		}
++	});
++
++	it('keeps the chosen order rather than the catalogue order', () => {
++		expect(assign([LAB, UFRN]).affiliations?.map((a) => a.organization)).toEqual([
++			'Laboratório X', 'Universidade Federal do Rio Grande do Norte'
++		]);
++	});
++
++	it('renumbers 1..n when a middle affiliation is cleared', () => {
++		const before = buildPaperAffiliationIndex([assign([UFRN, IMD, LAB])]);
++		expect(before.authorAffiliationIndexes[0]).toEqual([1, 2, 3]);
++		const after = buildPaperAffiliationIndex([assign([UFRN, LAB])]);
++		expect(after.authorAffiliationIndexes[0]).toEqual([1, 2]);
++		expect(after.entries[1].affiliation.organization).toBe('Laboratório X');
++	});
++
++	it('reuses a catalogue entry by copying it, so the two are not the same object', () => {
++		const [entry] = collectReusableAffiliations([UFRN]);
++		const copy = { ...entry.affiliation, id: 'fresh-id' };
++		expect(affiliationDedupeKey(copy)).toBe(entry.key);
++		expect(copy).not.toBe(entry.affiliation);
++	});
++});
++
++describe('the editor keeps catalogue and association apart', () => {
++	const page = readFileSync(
++		fileURLToPath(new URL('../Pages/Paper/PaperPublishPage.svelte', import.meta.url)), 'utf8'
++	);
++
++	it('derives one catalogue for the submission', () => {
++		expect(page).toContain('let affiliationCatalogue = $derived(');
++		expect(page).toContain('function addAffiliationToCatalogue()');
++	});
++
++	it('assigns from that catalogue into ordered slots, capped per author', () => {
++		expect(page).toContain('function setAffiliationSlot(username: string, slot: number, key: string)');
++		expect(page).toContain('if (next.length > MAX_AFFILIATIONS_PER_AUTHOR) return;');
++		expect(page).toContain('next.splice(slot, 1);');
++		expect(page).toContain('if (slotTaken(username, slot, key)) return;');
++	});
++
++	it('no longer edits institution fields inside each author card', () => {
++		expect(page).not.toContain('author-affiliation-organization-');
++		expect(page).not.toContain('author-affiliation-country-');
++	});
++
++	it('shows the catalogue only once authors are selected', () => {
++		const section = page.indexOf('<section id="affiliations"');
++		expect(section).toBeGreaterThan(-1);
++		expect(page.slice(section, section + 1400)).toContain('{#if inputAuthorList.length === 0}');
++	});
++});
+diff --git a/src/lib/utils/correspondingAuthorsAndTags.test.ts b/src/lib/utils/correspondingAuthorsAndTags.test.ts
+new file mode 100644
+index 0000000..48f90dc
+--- /dev/null
++++ b/src/lib/utils/correspondingAuthorsAndTags.test.ts
+@@ -0,0 +1,175 @@
++import { readFileSync } from 'node:fs';
++import { fileURLToPath } from 'node:url';
++import { describe, expect, it } from 'vitest';
++import {
++	MAX_CORRESPONDING_AUTHORS,
++	buildPaperAffiliationIndex,
++	extractOrcidAffiliations,
++	getMarkedCorrespondingAuthors,
++	normalizeAuthorSnapshots,
++	reconcileCorrespondingAuthors
++} from './paperAuthorAffiliations';
++
++const UFRN = { organization: 'Universidade Federal do Rio Grande do Norte' };
++const IMD = { organization: 'Instituto Metrópole Digital' };
++const LAB = { organization: 'Laboratório X' };
++
++const author = (id: string, isCorresponding = false, affiliations: unknown[] = []) => ({
++	userId: id,
++	username: `@${id}`,
++	name: id,
++	isCorresponding,
++	affiliations
++});
++
++const ids = (authors: any[]) => new Set(authors.map((a) => a.userId));
++
++describe('corresponding authors: how many a paper may name', () => {
++	for (const count of [0, 1, 2, 3]) {
++		it(`accepts ${count}`, () => {
++			const authors = normalizeAuthorSnapshots(
++				Array.from({ length: 4 }, (_u, i) => author(`a${i + 1}`, i < count))
++			);
++			const result = reconcileCorrespondingAuthors({ authors, authorIds: ids(authors) });
++			expect(result.ok).toBe(true);
++			expect(result.correspondingAuthorIds).toHaveLength(count);
++		});
++	}
++
++	it('rejects a fourth', () => {
++		const authors = normalizeAuthorSnapshots(
++			Array.from({ length: 4 }, (_u, i) => author(`a${i + 1}`, true))
++		);
++		const result = reconcileCorrespondingAuthors({ authors, authorIds: ids(authors) });
++		expect(result.ok).toBe(false);
++		expect(result.message).toContain(`at most ${MAX_CORRESPONDING_AUTHORS}`);
++	});
++
++	it('keeps every mark instead of collapsing them to the single reference', () => {
++		const authors = normalizeAuthorSnapshots([author('a1', true), author('a2', true), author('a3', false)]);
++		const result = reconcileCorrespondingAuthors({
++			authors,
++			correspondingAuthor: 'a1',
++			authorIds: ids(authors)
++		});
++		expect(result.ok).toBe(true);
++		expect(getMarkedCorrespondingAuthors(result.authors).map((a) => a.userId)).toEqual(['a1', 'a2']);
++		expect(result.primaryCorrespondingAuthorId).toBe('a1');
++	});
++
++	it('seeds the flag from a legacy paper that only carries the single reference', () => {
++		const authors = normalizeAuthorSnapshots([author('a1'), author('a2')]);
++		const result = reconcileCorrespondingAuthors({ authors, correspondingAuthor: 'a2', authorIds: ids(authors) });
++		expect(result.ok).toBe(true);
++		expect(result.correspondingAuthorIds).toEqual(['a2']);
++	});
++
++	it('refuses a reference that contradicts the marks rather than quietly picking one', () => {
++		const authors = normalizeAuthorSnapshots([author('a1', true), author('a2')]);
++		const result = reconcileCorrespondingAuthors({ authors, correspondingAuthor: 'a2', authorIds: ids(authors) });
++		expect(result.ok).toBe(false);
++		expect(result.message).toContain('does not match');
++	});
++
++	it('refuses a corresponding author who is not on the paper', () => {
++		const authors = normalizeAuthorSnapshots([author('a1', true)]);
++		const result = reconcileCorrespondingAuthors({ authors, authorIds: new Set(['someone-else']) });
++		expect(result.ok).toBe(false);
++		expect(result.message).toContain('among the paper authors');
++	});
++
++	it('still demands at least one when the paper is being submitted', () => {
++		const authors = normalizeAuthorSnapshots([author('a1'), author('a2')]);
++		expect(reconcileCorrespondingAuthors({ authors, requireOne: true }).ok).toBe(false);
++		const marked = normalizeAuthorSnapshots([author('a1', true), author('a2', true)]);
++		expect(reconcileCorrespondingAuthors({ authors: marked, requireOne: true }).ok).toBe(true);
++	});
++});
++
++describe('affiliation order and the tags derived from it', () => {
++	it('keeps the order the author chose, rather than sorting it', () => {
++		const [snapshot] = normalizeAuthorSnapshots([author('a1', false, [LAB, UFRN, IMD])]);
++		expect(snapshot.affiliations?.map((a) => a.organization)).toEqual([
++			'Laboratório X',
++			'Universidade Federal do Rio Grande do Norte',
++			'Instituto Metrópole Digital'
++		]);
++	});
++
++	it('numbers an author 1..n contiguously, and renumbers when one is removed', () => {
++		const three = normalizeAuthorSnapshots([author('a1', false, [UFRN, IMD, LAB])]);
++		expect(buildPaperAffiliationIndex(three).authorAffiliationIndexes[0]).toEqual([1, 2, 3]);
++
++		// drop the middle one: the third must become the second, never stay "3"
++		const two = normalizeAuthorSnapshots([author('a1', false, [UFRN, LAB])]);
++		const index = buildPaperAffiliationIndex(two);
++		expect(index.authorAffiliationIndexes[0]).toEqual([1, 2]);
++		expect(index.entries.map((e) => e.affiliation.organization)).toEqual([
++			'Universidade Federal do Rio Grande do Norte',
++			'Laboratório X'
++		]);
++	});
++
++	it('renumbers on reorder', () => {
++		const reordered = normalizeAuthorSnapshots([author('a1', false, [IMD, UFRN])]);
++		expect(buildPaperAffiliationIndex(reordered).entries.map((e) => e.affiliation.organization)).toEqual([
++			'Instituto Metrópole Digital',
++			'Universidade Federal do Rio Grande do Norte'
++		]);
++	});
++
++	it('treats manual, reused and ORCID affiliations through the same normalisation', () => {
++		const orcid = extractOrcidAffiliations({
++			'activities-summary': {
++				employments: {
++					'affiliation-group': [
++						{ summaries: [{ 'employment-summary': { organization: { name: 'Instituto Metrópole Digital' } } }] }
++					]
++				}
++			}
++		});
++		// the ORCID entry and the typed one are the same institution, so they collapse
++		const [snapshot] = normalizeAuthorSnapshots([author('a1', false, [UFRN, ...orcid, IMD])]);
++		expect(snapshot.affiliations).toHaveLength(2);
++		expect(buildPaperAffiliationIndex([snapshot]).authorAffiliationIndexes[0]).toEqual([1, 2]);
++	});
++
++	it('survives a save/reload round trip with order and marks intact', () => {
++		const saved = normalizeAuthorSnapshots([author('a1', true, [UFRN, IMD]), author('a2', true, [LAB])]);
++		const reloaded = normalizeAuthorSnapshots(JSON.parse(JSON.stringify(saved)));
++		expect(reloaded).toEqual(saved);
++		expect(getMarkedCorrespondingAuthors(reloaded)).toHaveLength(2);
++		expect(reloaded[0].affiliations?.map((a) => a.organization)).toEqual([
++			'Universidade Federal do Rio Grande do Norte',
++			'Instituto Metrópole Digital'
++		]);
++	});
++});
++
++describe('the editor derives tags instead of asking the user to type them', () => {
++	const page = readFileSync(
++		fileURLToPath(new URL('../Pages/Paper/PaperPublishPage.svelte', import.meta.url)),
++		'utf8'
++	);
++
++	it('builds the tags from the author\'s own affiliation list, numbered by position', () => {
++		expect(page).toContain('function affiliationTags(username: string)');
++		expect(page).toContain('return affiliationsFor(username).map((affiliation, position) => ({');
++		expect(page).toContain('n: position + 1');
++	});
++
++	it('shows affiliation as its own section, ahead of the author details', () => {
++		const affiliationAt = page.indexOf('>Affiliation</p>');
++		const detailsAt = page.indexOf('>Author details</p>');
++		expect(affiliationAt).toBeGreaterThan(-1);
++		expect(detailsAt).toBeGreaterThan(affiliationAt);
++	});
++
++	it('caps the corresponding-author checkboxes and says why the next one is blocked', () => {
++		expect(page).toContain('function toggleCorrespondingAuthor(username: string)');
++		expect(page).toContain('if (turningOn && correspondingCount() >= MAX_CORRESPONDING_AUTHORS) return;');
++		expect(page).toContain('This paper already names {MAX_CORRESPONDING_AUTHORS} corresponding authors.');
++		// a radio group could never hold more than one
++		expect(page).not.toContain('name="corresponding-author"');
++	});
++});
+diff --git a/src/lib/utils/paperAuthorAffiliations.test.ts b/src/lib/utils/paperAuthorAffiliations.test.ts
+index aee326a..b3329c6 100644
+--- a/src/lib/utils/paperAuthorAffiliations.test.ts
++++ b/src/lib/utils/paperAuthorAffiliations.test.ts
+@@ -88,20 +88,28 @@ describe('paper author affiliations', () => {
+ 		]);
+ 	});
+ 
+-	it('rejects two corresponding authors before persistence', () => {
+-		const result = validateCorrespondingAuthorSelection([
+-			author({ userId: 'author-1', isCorresponding: true }),
+-			author({ userId: 'author-2', isCorresponding: true })
+-		]);
++	it('accepts up to three corresponding authors and rejects a fourth, in step with the schema', () => {
++		const marked = (count: number) =>
++			Array.from({ length: count }, (_unused, i) =>
++				author({ userId: `author-${i + 1}`, isCorresponding: true })
++			);
++		// The mongoose validator is the last line of defence; it must agree with the pure rule,
++		// otherwise a payload could pass validation and still be refused at write time.
+ 		const schemaValidator = (PaperSchema.path('authorAffiliations') as any).validators.find(
+-			(validator: any) => String(validator.message).includes('Only one paper author')
++			(validator: any) => String(validator.message).includes('corresponding authors')
+ 		);
+ 
+-		expect(result.ok).toBe(false);
+-		expect(schemaValidator.validator([{ isCorresponding: true }, { isCorresponding: true }])).toBe(false);
++		for (const count of [0, 1, 2, 3]) {
++			expect(validateCorrespondingAuthorSelection(marked(count)).ok).toBe(true);
++			expect(schemaValidator.validator(marked(count))).toBe(true);
++		}
++
++		expect(validateCorrespondingAuthorSelection(marked(4)).ok).toBe(false);
++		expect(validateCorrespondingAuthorSelection(marked(4)).message).toContain('at most 3');
++		expect(schemaValidator.validator(marked(4))).toBe(false);
+ 	});
+ 
+-	it('requires exactly one corresponding author for submission validation', () => {
++	it('requires at least one corresponding author for submission validation', () => {
+ 		expect(validateCorrespondingAuthorSelection([author()], { requireOne: true })).toMatchObject({
+ 			ok: false
+ 		});
+diff --git a/src/lib/utils/paperAuthorAffiliations.ts b/src/lib/utils/paperAuthorAffiliations.ts
+index 842a4b2..a9702ce 100644
+--- a/src/lib/utils/paperAuthorAffiliations.ts
++++ b/src/lib/utils/paperAuthorAffiliations.ts
+@@ -283,6 +283,18 @@ export function authorSnapshotMatchesReference(
+ 	);
+ }
+ 
++/**
++ * A paper may name at most this many corresponding authors. This is a different rule from
++ * MAX_AFFILIATIONS_PER_AUTHOR: that one caps affiliations *within* one author, this one caps
++ * how many authors carry the corresponding flag across the whole paper.
++ */
++export const MAX_CORRESPONDING_AUTHORS = 3;
++
++/**
++ * Marks exactly the author matching `reference` and clears the rest. Kept for the legacy path
++ * where a paper carries a single `correspondingAuthor` id and no per-author flags; anything
++ * that supports several corresponding authors should use `markCorrespondingAuthors`.
++ */
+ export function markCorrespondingAuthor(
+ 	authors: PaperAuthorSnapshot[],
+ 	reference: unknown
+@@ -293,30 +305,134 @@ export function markCorrespondingAuthor(
+ 	}));
+ }
+ 
++/** Marks every author matching any of `references`, clearing the rest. */
++export function markCorrespondingAuthors(
++	authors: PaperAuthorSnapshot[],
++	references: unknown[]
++): PaperAuthorSnapshot[] {
++	const list = (references ?? []).filter(Boolean);
++	return authors.map((author) => ({
++		...author,
++		isCorresponding: list.some((reference) => authorSnapshotMatchesReference(author, reference))
++	}));
++}
++
+ export function countCorrespondingAuthors(authors: PaperAuthorSnapshot[]): number {
+ 	return authors.filter((author) => author.isCorresponding === true).length;
+ }
+ 
++/**
++ * The first marked author, in author order. With several corresponding authors this is the
++ * "primary" one, which is what the paper's single `correspondingAuthor` reference stores so
++ * that readers written before multiple corresponding authors existed keep working.
++ */
+ export function getMarkedCorrespondingAuthor(authors: PaperAuthorSnapshot[]): PaperAuthorSnapshot | null {
+ 	return authors.find((author) => author.isCorresponding === true) ?? null;
+ }
+ 
++/** Every marked author, in author order. */
++export function getMarkedCorrespondingAuthors(authors: PaperAuthorSnapshot[]): PaperAuthorSnapshot[] {
++	return (authors ?? []).filter((author) => author?.isCorresponding === true);
++}
++
++export interface CorrespondingAuthorsReconcileResult {
++	ok: boolean;
++	message: string;
++	/** Goes into the paper's single `correspondingAuthor` reference: the first marked author. */
++	primaryCorrespondingAuthorId: string;
++	/** Every marked author's id, in author order. */
++	correspondingAuthorIds: string[];
++	/** The snapshots with their marks settled. Marks are preserved, never flattened to one. */
++	authors: PaperAuthorSnapshot[];
++}
++
++/**
++ * Settles who the corresponding authors are, shared by every endpoint that accepts an author
++ * payload so the rule cannot drift between them.
++ *
++ * The per-author `isCorresponding` flags are the source of truth. The paper's single
++ * `correspondingAuthor` reference is kept in step as the *primary* (first marked) author, which
++ * is what papers written before multiple corresponding authors existed still read.
++ */
++export function reconcileCorrespondingAuthors(input: {
++	authors: PaperAuthorSnapshot[];
++	correspondingAuthor?: unknown;
++	authorIds?: Set<string>;
++	requireOne?: boolean;
++}): CorrespondingAuthorsReconcileResult {
++	const fail = (message: string): CorrespondingAuthorsReconcileResult => ({
++		ok: false,
++		message,
++		primaryCorrespondingAuthorId: '',
++		correspondingAuthorIds: [],
++		authors: input.authors ?? []
++	});
++
++	let authors = input.authors ?? [];
++	const requestedId = getAuthorReferenceId(input.correspondingAuthor);
++
++	const selection = validateCorrespondingAuthorSelection(authors, {
++		requireOne: Boolean(input.requireOne) && !requestedId
++	});
++	if (!selection.ok) return fail(selection.message);
++
++	let marked = getMarkedCorrespondingAuthors(authors);
++
++	// Legacy payload: a single reference and no per-author flags. Mark that author.
++	if (!marked.length && requestedId) {
++		authors = markCorrespondingAuthor(authors, requestedId);
++		marked = getMarkedCorrespondingAuthors(authors);
++	}
++
++	// A reference that disagrees with the flags is a client bug, not something to silently fix.
++	if (requestedId && marked.length) {
++		const isAmongMarked = marked.some(
++			(author) => author.userId === requestedId || author.username === requestedId
++		);
++		if (!isAmongMarked) {
++			return fail('Corresponding author selection does not match the marked author snapshots.');
++		}
++	}
++
++	const correspondingAuthorIds = marked.map((author) => author.userId || '').filter(Boolean);
++	const primaryCorrespondingAuthorId = correspondingAuthorIds[0] ?? '';
++
++	if (input.requireOne && !marked.length) {
++		return fail('Select at least one corresponding author before submitting.');
++	}
++
++	const authorIds = input.authorIds;
++	if (authorIds && authorIds.size > 0) {
++		const outsider = correspondingAuthorIds.find((id) => !authorIds.has(id));
++		if (outsider) return fail('Corresponding authors must be among the paper authors.');
++	}
++
++	return {
++		ok: true,
++		message: '',
++		primaryCorrespondingAuthorId,
++		correspondingAuthorIds,
++		authors
++	};
++}
++
+ export function validateCorrespondingAuthorSelection(
+ 	authors: PaperAuthorSnapshot[],
+ 	options: { requireOne?: boolean } = {}
+ ) {
+ 	const count = countCorrespondingAuthors(authors);
+-	if (count > 1) {
++	if (count > MAX_CORRESPONDING_AUTHORS) {
+ 		return {
+ 			ok: false,
+-			message: 'Only one author can be marked as corresponding author.'
++			message: `A paper can have at most ${MAX_CORRESPONDING_AUTHORS} corresponding authors.`
+ 		};
+ 	}
+ 
+-	if (options.requireOne && count !== 1) {
++	// `requireOne` asks for at least one, not exactly one: two or three are equally valid.
++	if (options.requireOne && count < 1) {
+ 		return {
+ 			ok: false,
+-			message: 'Select exactly one corresponding author before submitting.'
++			message: 'Select at least one corresponding author before submitting.'
+ 		};
+ 	}
+ 
+diff --git a/src/routes/(app)/publish/edit/[slug]/+server.ts b/src/routes/(app)/publish/edit/[slug]/+server.ts
+index 60bd604..d388927 100644
+--- a/src/routes/(app)/publish/edit/[slug]/+server.ts
++++ b/src/routes/(app)/publish/edit/[slug]/+server.ts
+@@ -14,9 +14,7 @@ import {
+     validateSupplementaryFilesTotal
+ } from '$lib/utils/paperFileValidation';
+ import {
+-    countCorrespondingAuthors,
+-    getMarkedCorrespondingAuthor,
+-    markCorrespondingAuthor,
++    reconcileCorrespondingAuthors,
+     normalizeAuthorSnapshots,
+     validateAuthorAffiliationLimits
+ } from '$lib/utils/paperAuthorAffiliations';
+@@ -37,48 +35,24 @@ function reconcileCorrespondingAuthor(
+     authorIds: Set<string>,
+     requireOne: boolean
+ ) {
+-    const markedCount = countCorrespondingAuthors(authorAffiliations);
+-    if (markedCount > 1) {
+-        return {
+-            error: 'Only one author can be marked as corresponding author.',
+-            status: 400
+-        };
+-    }
+-
+-    const markedAuthor = getMarkedCorrespondingAuthor(authorAffiliations);
+-    let correspondingAuthorId = normalizeId(correspondingAuthor);
+-    const markedAuthorId = markedAuthor?.userId || '';
+-
+-    if (markedAuthorId && correspondingAuthorId && markedAuthorId !== correspondingAuthorId) {
+-        return {
+-            error: 'Corresponding author selection does not match the marked author snapshot.',
+-            status: 400
+-        };
+-    }
+-
+-    if (!correspondingAuthorId && markedAuthorId) {
+-        correspondingAuthorId = markedAuthorId;
+-    }
+-
+-    if (requireOne && !correspondingAuthorId) {
+-        return {
+-            error: 'Select exactly one corresponding author before submitting.',
+-            status: 400
+-        };
+-    }
++    // The rule itself lives in $lib/utils/paperAuthorAffiliations so that this endpoint and
++    // the other save endpoint cannot drift apart. Up to MAX_CORRESPONDING_AUTHORS authors may
++    // be marked; the paper's single `correspondingAuthor` reference keeps the primary one.
++    const resolution = reconcileCorrespondingAuthors({
++        authors: authorAffiliations,
++        correspondingAuthor,
++        authorIds,
++        requireOne
++    });
+ 
+-    if (correspondingAuthorId && authorIds.size > 0 && !authorIds.has(correspondingAuthorId)) {
+-        return {
+-            error: 'Corresponding author must be one of the paper authors.',
+-            status: 400
+-        };
++    if (!resolution.ok) {
++        return { error: resolution.message, status: 400 };
+     }
+ 
+     return {
+-        correspondingAuthorId,
+-        authorAffiliations: correspondingAuthorId
+-            ? markCorrespondingAuthor(authorAffiliations, correspondingAuthorId)
+-            : authorAffiliations
++        correspondingAuthorId: resolution.primaryCorrespondingAuthorId,
++        correspondingAuthorIds: resolution.correspondingAuthorIds,
++        authorAffiliations: resolution.authors
+     };
+ }
+ 
+diff --git a/src/routes/(app)/publish/new/+server.ts b/src/routes/(app)/publish/new/+server.ts
+index f1ca0e4..5cc812a 100644
+--- a/src/routes/(app)/publish/new/+server.ts
++++ b/src/routes/(app)/publish/new/+server.ts
+@@ -18,9 +18,7 @@ import {
+ 	validateSupplementaryFilesTotal
+ } from '$lib/utils/paperFileValidation';
+ import {
+-	countCorrespondingAuthors,
+-	getMarkedCorrespondingAuthor,
+-	markCorrespondingAuthor,
++	reconcileCorrespondingAuthors,
+ 	normalizeAuthorSnapshots,
+ 	validateAuthorAffiliationLimits
+ } from '$lib/utils/paperAuthorAffiliations';
+@@ -39,48 +37,24 @@ function reconcileCorrespondingAuthor(
+ 	authorIds: Set<string>,
+ 	requireOne: boolean
+ ) {
+-	const markedCount = countCorrespondingAuthors(authorAffiliations);
+-	if (markedCount > 1) {
+-		return {
+-			error: 'Only one author can be marked as corresponding author.',
+-			status: 400
+-		};
+-	}
+-
+-	const markedAuthor = getMarkedCorrespondingAuthor(authorAffiliations);
+-	let correspondingAuthorId = normalizeUserId(correspondingAuthor);
+-	const markedAuthorId = markedAuthor?.userId || '';
+-
+-	if (markedAuthorId && correspondingAuthorId && markedAuthorId !== correspondingAuthorId) {
+-		return {
+-			error: 'Corresponding author selection does not match the marked author snapshot.',
+-			status: 400
+-		};
+-	}
+-
+-	if (!correspondingAuthorId && markedAuthorId) {
+-		correspondingAuthorId = markedAuthorId;
+-	}
+-
+-	if (requireOne && !correspondingAuthorId) {
+-		return {
+-			error: 'Select exactly one corresponding author before submitting.',
+-			status: 400
+-		};
+-	}
++	// The rule itself lives in $lib/utils/paperAuthorAffiliations so that this endpoint and
++	// the other save endpoint cannot drift apart. Up to MAX_CORRESPONDING_AUTHORS authors may
++	// be marked; the paper's single `correspondingAuthor` reference keeps the primary one.
++	const resolution = reconcileCorrespondingAuthors({
++		authors: authorAffiliations,
++		correspondingAuthor,
++		authorIds,
++		requireOne
++	});
+ 
+-	if (correspondingAuthorId && authorIds.size > 0 && !authorIds.has(correspondingAuthorId)) {
+-		return {
+-			error: 'Corresponding author must be one of the paper authors.',
+-			status: 400
+-		};
++	if (!resolution.ok) {
++		return { error: resolution.message, status: 400 };
+ 	}
+ 
+ 	return {
+-		correspondingAuthorId,
+-		authorAffiliations: correspondingAuthorId
+-			? markCorrespondingAuthor(authorAffiliations, correspondingAuthorId)
+-			: authorAffiliations
++		correspondingAuthorId: resolution.primaryCorrespondingAuthorId,
++		correspondingAuthorIds: resolution.correspondingAuthorIds,
++		authorAffiliations: resolution.authors
+ 	};
+ }
+ 

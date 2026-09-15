@@ -33,8 +33,10 @@
 		normalizeAuthorSnapshot,
 		validateCorrespondingAuthorSelection,
 		collectReusableAffiliations,
+		affiliationDedupeKey,
 		hasAffiliation,
 		MAX_AFFILIATIONS_PER_AUTHOR,
+		MAX_CORRESPONDING_AUTHORS,
 		type PaperAuthorAffiliationSnapshot,
 		type PaperAuthorSnapshot
 	} from '$lib/utils/paperAuthorAffiliations';
@@ -535,19 +537,21 @@
 			);
 
 		if ($store.correspondingAuthor && hasMatchingCorrespondingAuthor) {
-			for (const username of Object.keys(nextAffiliations)) {
-				nextAffiliations[username].isCorresponding = authorSnapshotMatchesReference(
-					nextAffiliations[username],
-					$store.correspondingAuthor
-				);
+			// A paper saved before multiple corresponding authors existed carries the reference but
+			// no per-author flags. Seed the flag from it, without clearing marks already made here.
+			if (!markedAuthors.length) {
+				for (const username of Object.keys(nextAffiliations)) {
+					nextAffiliations[username].isCorresponding = authorSnapshotMatchesReference(
+						nextAffiliations[username],
+						$store.correspondingAuthor
+					);
+				}
 			}
 		} else if ($store.correspondingAuthor && !hasMatchingCorrespondingAuthor) {
 			$store.correspondingAuthor = null;
-		} else if (markedAuthors.length > 1) {
-			for (const username of Object.keys(nextAffiliations)) {
-				nextAffiliations[username].isCorresponding = false;
-			}
-		} else if (markedAuthors.length === 1) {
+		} else if (markedAuthors.length) {
+			// Several authors may correspond. Keep the paper's single reference pointing at the
+			// first of them, which is what readers written before this expect to find.
 			$store.correspondingAuthor = getAuthorReferenceByUsername(markedAuthors[0].username || '');
 		}
 
@@ -650,50 +654,78 @@
 			: snapshots;
 	}
 
-	function setCorrespondingAuthor(username: string) {
-		const reference = getAuthorReferenceByUsername(username);
-		if (!reference) return;
-
-		$store.correspondingAuthor = reference;
-		authorAffiliations = Object.fromEntries(
-			Object.entries(authorAffiliations).map(([key, values]) => [
-				key,
-				{
-					...values,
-					isCorresponding: key === username
-				}
-			])
-		);
+	function correspondingUsernames(): string[] {
+		return Object.entries(authorAffiliations)
+			.filter(([, values]) => values.isCorresponding)
+			.map(([key]) => key);
 	}
 
-	function clearCorrespondingAuthor() {
-		$store.correspondingAuthor = null;
-		authorAffiliations = Object.fromEntries(
-			Object.entries(authorAffiliations).map(([key, values]) => [
-				key,
-				{
-					...values,
-					isCorresponding: false
-				}
-			])
-		);
+	function correspondingCount(): number {
+		return correspondingUsernames().length;
+	}
+
+	/** True when this author cannot be ticked because the paper already names the maximum. */
+	function correspondingLimitReached(username: string): boolean {
+		if (authorAffiliations[username]?.isCorresponding) return false;
+		return correspondingCount() >= MAX_CORRESPONDING_AUTHORS;
+	}
+
+	/**
+	 * Ticks or unticks one author. A fourth tick is refused outright rather than silently
+	 * stealing the mark from someone already selected, and unticking never touches the others.
+	 */
+	function toggleCorrespondingAuthor(username: string) {
+		const turningOn = !authorAffiliations[username]?.isCorresponding;
+		if (turningOn && correspondingCount() >= MAX_CORRESPONDING_AUTHORS) return;
+
+		authorAffiliations = {
+			...authorAffiliations,
+			[username]: { ...authorAffiliations[username], isCorresponding: turningOn }
+		};
+
+		// The paper's single reference follows the first author still ticked.
+		const [primary] = correspondingUsernames();
+		$store.correspondingAuthor = primary ? getAuthorReferenceByUsername(primary) : null;
 	}
 
 	function affiliationsFor(username: string): PaperAuthorAffiliationSnapshot[] {
 		return authorAffiliations[username]?.affiliations || [];
 	}
 
+	/**
+	 * The tags shown under Author details, derived straight from the author's affiliation list
+	 * in the order it is stored. Adding, removing or reordering an affiliation renumbers them
+	 * with no separate bookkeeping, so the user never types a number or an institution twice.
+	 */
+	function affiliationTags(username: string): Array<{ n: number; label: string }> {
+		return affiliationsFor(username).map((affiliation, position) => ({
+			n: position + 1,
+			label:
+				affiliation.displayName ||
+				formatAffiliationDisplayName(affiliation) ||
+				'Untitled affiliation'
+		}));
+	}
+
 	function affiliationLimitReached(username: string): boolean {
 		return affiliationsFor(username).length >= MAX_AFFILIATIONS_PER_AUTHOR;
 	}
 
-	// Everything already known about the people on this paper, offered so the same
-	// institution never has to be typed twice. Sources are the authors' own snapshots,
-	// their earlier papers, their ORCID records and their profiles -- never a global
-	// directory, and never another user's private data.
-	let reusableAffiliations = $derived(
+	// ══ CATALOGUE ════════════════════════════════════════════════════════════════
+	// The affiliations available to THIS submission. Two different things live here and
+	// the code keeps them apart on purpose:
+	//   catalogue   -- which institutions this submission may draw on;
+	//   association -- which of them each author uses, and in what order (see below).
+	// The catalogue is derived, so selecting or removing an author recomputes it. An
+	// affiliation another author is still using stays, because assigned affiliations are
+	// themselves one of the sources.
+	let addedAffiliations = $state<PaperAuthorAffiliationSnapshot[]>([]);
+
+	let affiliationCatalogue = $derived(
 		collectReusableAffiliations([
+			// already assigned on this paper -- keeps in-use entries from disappearing
 			...Object.values(authorAffiliations).flatMap((entry) => entry.affiliations || []),
+			// what the selected authors already carry: ORCID record and profile
 			...inputAuthorList.flatMap((username) => {
 				const selectedAuthor = getAuthorByUsername(username);
 				return [
@@ -701,46 +733,80 @@
 					...buildLegacyAffiliation(selectedAuthor)
 				];
 			}),
-			...knownAffiliations
+			// the same authors' earlier papers
+			...knownAffiliations,
+			// and whatever was typed into the catalogue form on this page
+			...addedAffiliations
 		])
 	);
 
-	function addAffiliation(username: string) {
-		const values = authorAffiliations[username] || getInitialAffiliationForUsername(username);
-		// The server rejects a fourth as well; this only keeps the form honest.
-		if ((values.affiliations || []).length >= MAX_AFFILIATIONS_PER_AUTHOR) return;
-		authorAffiliations = {
-			...authorAffiliations,
-			[username]: {
-				...values,
-				affiliations: [...(values.affiliations || []), createEmptyAffiliation()]
-			}
-		};
+	let newAffiliation = $state<PaperAuthorAffiliationSnapshot>(createEmptyAffiliation());
+
+	function canAddNewAffiliation(): boolean {
+		return Boolean(normalizeAffiliationSnapshot(newAffiliation));
 	}
 
-	function reuseAffiliation(username: string, affiliation: PaperAuthorAffiliationSnapshot) {
-		const values = authorAffiliations[username] || getInitialAffiliationForUsername(username);
-		const existing = values.affiliations || [];
-		if (existing.length >= MAX_AFFILIATIONS_PER_AUTHOR) return;
-		if (hasAffiliation(existing, affiliation)) return;
-		authorAffiliations = {
-			...authorAffiliations,
-			[username]: {
-				...values,
-				// copied into this paper's snapshot; the source record is never mutated
-				affiliations: [...existing, { ...affiliation, id: createAffiliationId() }]
-			}
-		};
+	/** Adds a typed institution to the catalogue. It is not assigned to anyone yet. */
+	function addAffiliationToCatalogue() {
+		// Same normalisation every other source goes through -- no parallel structure.
+		const normalized = normalizeAffiliationSnapshot(newAffiliation, createAffiliationId());
+		if (!normalized) return;
+		if (affiliationCatalogue.some((entry) => entry.key === affiliationDedupeKey(normalized))) {
+			newAffiliation = createEmptyAffiliation();
+			return;
+		}
+		addedAffiliations = [...addedAffiliations, normalized];
+		newAffiliation = createEmptyAffiliation();
 	}
 
-	function removeAffiliation(username: string, index: number) {
+	// ══ ASSOCIATION ══════════════════════════════════════════════════════════════
+	// Which catalogue entries an author uses, in the order the user chose. The order is
+	// the array order, which is what gets persisted in the snapshot and what the PDF
+	// numbers 1..n -- never alphabetical, never the order the catalogue happens to be in.
+
+	/** The catalogue key currently sitting in one of an author's ordered slots. */
+	function slotKey(username: string, slot: number): string {
+		const affiliation = affiliationsFor(username)[slot];
+		return affiliation ? affiliationDedupeKey(affiliation) : '';
+	}
+
+	/** A slot can only be used once the one before it is filled, so 1/2/3 stay contiguous. */
+	function slotEnabled(username: string, slot: number): boolean {
+		return slot <= affiliationsFor(username).length;
+	}
+
+	/** Keys this author already uses elsewhere, so the same institution is not offered twice. */
+	function slotTaken(username: string, slot: number, key: string): boolean {
+		return affiliationsFor(username).some(
+			(affiliation, position) => position !== slot && affiliationDedupeKey(affiliation) === key
+		);
+	}
+
+	/**
+	 * Sets or clears one ordered slot. Clearing compacts the list, so removing the 2nd of
+	 * three promotes the 3rd to 2nd and the tags renumber with it -- never 1 then 3.
+	 */
+	function setAffiliationSlot(username: string, slot: number, key: string) {
 		const values = authorAffiliations[username] || getInitialAffiliationForUsername(username);
+		const next = [...(values.affiliations || [])];
+
+		if (!key) {
+			if (slot >= next.length) return;
+			next.splice(slot, 1);
+		} else {
+			const entry = affiliationCatalogue.find((candidate) => candidate.key === key);
+			if (!entry) return;
+			if (slotTaken(username, slot, key)) return;
+			// copied into this paper's snapshot; the catalogue entry is never mutated
+			const copy = { ...entry.affiliation, id: createAffiliationId() };
+			if (slot < next.length) next[slot] = copy;
+			else next.push(copy);
+		}
+
+		if (next.length > MAX_AFFILIATIONS_PER_AUTHOR) return;
 		authorAffiliations = {
 			...authorAffiliations,
-			[username]: {
-				...values,
-				affiliations: (values.affiliations || []).filter((_, currentIndex) => currentIndex !== index)
-			}
+			[username]: { ...values, affiliations: next }
 		};
 	}
 
@@ -1912,6 +1978,110 @@
 				</div>
 			</section>
 
+			<section id="affiliations" class="mb-4 w-full">
+				<div class="bg-surface-50 dark:bg-surface-800 rounded-lg p-4 border">
+					<h3 class="text-lg font-semibold mb-2 text-surface-900 dark:text-surface-100">Affiliations</h3>
+					<p class="text-xs text-surface-600 dark:text-surface-400 mb-3">
+						The institutions available to this submission, gathered from the authors you selected.
+						Add any that are missing here, then assign them to each author below.
+					</p>
+
+					{#if inputAuthorList.length === 0}
+						<p class="text-sm text-surface-500">
+							Select the authors first — their existing affiliations are gathered here automatically.
+						</p>
+					{:else}
+						{#if affiliationCatalogue.length === 0}
+							<p class="rounded-lg border border-dashed border-surface-300 p-3 text-sm text-surface-500 dark:border-surface-600">
+								No affiliation on file for these authors yet. Add the first one below.
+							</p>
+						{:else}
+							<ul class="mb-3 flex flex-wrap gap-1.5">
+								{#each affiliationCatalogue as entry (entry.key)}
+									<li class="inline-flex items-center gap-2 rounded-full border border-surface-300 bg-white px-3 py-1 text-xs text-surface-700 dark:border-surface-600 dark:bg-surface-900 dark:text-surface-200">
+										{entry.displayName}
+									</li>
+								{/each}
+							</ul>
+						{/if}
+
+						<div class="rounded-lg border border-surface-200 bg-white p-3 dark:border-surface-700 dark:bg-surface-900">
+							<p class="mb-2 text-xs font-semibold uppercase tracking-wide text-surface-500">Add affiliation</p>
+							<div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+							<div>
+								<label for="new-affiliation-organization" class="mb-1 block text-xs font-medium text-surface-600 dark:text-surface-400">
+									Organization / Institution
+								</label>
+								<input
+									id="new-affiliation-organization"
+									type="text"
+									bind:value={newAffiliation.organization}
+									placeholder="Universidade Federal do Rio Grande do Norte"
+									class="w-full rounded-lg border border-surface-300 bg-white p-2 text-sm dark:border-surface-600 dark:bg-surface-900"
+								/>
+							</div>
+							<div>
+								<label for="new-affiliation-department" class="mb-1 block text-xs font-medium text-surface-600 dark:text-surface-400">
+									Department
+								</label>
+								<input
+									id="new-affiliation-department"
+									type="text"
+									bind:value={newAffiliation.department}
+									placeholder="Instituto Metrópole Digital"
+									class="w-full rounded-lg border border-surface-300 bg-white p-2 text-sm dark:border-surface-600 dark:bg-surface-900"
+								/>
+							</div>
+							<div>
+								<label for="new-affiliation-city" class="mb-1 block text-xs font-medium text-surface-600 dark:text-surface-400">
+									City
+								</label>
+								<input
+									id="new-affiliation-city"
+									type="text"
+									bind:value={newAffiliation.city}
+									placeholder="Natal"
+									class="w-full rounded-lg border border-surface-300 bg-white p-2 text-sm dark:border-surface-600 dark:bg-surface-900"
+								/>
+							</div>
+							<div>
+								<label for="new-affiliation-country" class="mb-1 block text-xs font-medium text-surface-600 dark:text-surface-400">
+									Country
+								</label>
+								<input
+									id="new-affiliation-country"
+									type="text"
+									bind:value={newAffiliation.country}
+									placeholder="Brasil"
+									class="w-full rounded-lg border border-surface-300 bg-white p-2 text-sm dark:border-surface-600 dark:bg-surface-900"
+								/>
+							</div>
+							<div>
+								<label for="new-affiliation-rorId" class="mb-1 block text-xs font-medium text-surface-600 dark:text-surface-400">
+									ROR ID
+								</label>
+								<input
+									id="new-affiliation-rorId"
+									type="text"
+									bind:value={newAffiliation.rorId}
+									placeholder="https://ror.org/..."
+									class="w-full rounded-lg border border-surface-300 bg-white p-2 text-sm dark:border-surface-600 dark:bg-surface-900"
+								/>
+							</div>
+							</div>
+							<button
+								type="button"
+								onclick={addAffiliationToCatalogue}
+								disabled={!canAddNewAffiliation()}
+								class="mt-3 rounded-lg border border-primary-200 px-3 py-1.5 text-xs font-medium text-primary-700 hover:bg-primary-50 disabled:cursor-not-allowed disabled:border-surface-200 disabled:text-surface-400 dark:border-primary-700 dark:text-primary-200"
+							>
+								+ Add affiliation
+							</button>
+						</div>
+					{/if}
+				</div>
+			</section>
+
 			<section class="mb-4 w-full">
 				<div class="bg-surface-50 dark:bg-surface-800 rounded-lg p-4 border">
 					<h3 class="text-lg font-semibold mb-2 text-surface-900 dark:text-surface-100">
@@ -1948,199 +2118,94 @@
 											<div class="flex flex-wrap items-center gap-2">
 												<label class="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-surface-300 px-3 py-2 text-xs font-medium text-surface-700 hover:bg-surface-50 dark:border-surface-600 dark:text-surface-200 dark:hover:bg-surface-800">
 													<input
-														type="radio"
-														name="corresponding-author"
+														type="checkbox"
 														checked={authorAffiliations[username].isCorresponding}
-														onchange={() => setCorrespondingAuthor(username)}
-														class="h-4 w-4 text-primary-500"
+														disabled={correspondingLimitReached(username)}
+														onchange={() => toggleCorrespondingAuthor(username)}
+														class="h-4 w-4 rounded text-primary-500 disabled:cursor-not-allowed"
 													/>
 													Corresponding Author
 												</label>
-												{#if authorAffiliations[username].isCorresponding}
-													<button
-														type="button"
-														onclick={clearCorrespondingAuthor}
-														class="rounded-lg border border-surface-300 px-3 py-2 text-xs font-medium text-surface-600 hover:bg-surface-100 dark:border-surface-600 dark:text-surface-300 dark:hover:bg-surface-800"
-													>
-														Clear
-													</button>
+												{#if correspondingLimitReached(username)}
+													<span class="text-xs text-amber-700 dark:text-amber-300">
+														This paper already names {MAX_CORRESPONDING_AUTHORS} corresponding authors. Untick one to choose another.
+													</span>
+												{:else}
+													<span class="text-xs text-surface-500 dark:text-surface-400">
+														{correspondingCount()}/{MAX_CORRESPONDING_AUTHORS} selected
+													</span>
 												{/if}
 											</div>
 										</div>
 
-										<div class="grid grid-cols-1 gap-3">
-											<div>
-												<label for={`author-display-name-${username}`} class="block text-xs font-medium text-surface-600 dark:text-surface-400 mb-1">
-													Display name
-												</label>
-												<input
-													id={`author-display-name-${username}`}
-													type="text"
-													bind:value={authorAffiliations[username].name}
-													placeholder="Full author name"
-													class="w-full p-2 border border-surface-300 dark:border-surface-600 rounded-lg text-sm bg-white dark:bg-surface-800"
-												/>
-											</div>
+										<div class="mt-4">
+											<p class="mb-2 text-xs font-semibold uppercase tracking-wide text-surface-500">Affiliation</p>
+											{#if affiliationCatalogue.length === 0}
+												<p class="rounded-lg border border-dashed border-surface-300 p-3 text-sm text-surface-500 dark:border-surface-600">
+													The submission has no affiliations yet. Add one in <strong>Affiliations</strong> above,
+													then assign it here.
+												</p>
+											{:else}
+												<div class="space-y-2">
+													{#each Array(MAX_AFFILIATIONS_PER_AUTHOR) as _slot, slot (slot)}
+														{#if slotEnabled(username, slot)}
+															<div class="flex items-center gap-2">
+																<span class="w-7 shrink-0 text-xs font-semibold text-surface-500">{slot + 1}<sup>a</sup></span>
+																<select
+																	aria-label={`Affiliation ${slot + 1} for ${username}`}
+																	value={slotKey(username, slot)}
+																	onchange={(event) => setAffiliationSlot(username, slot, event.currentTarget.value)}
+																	class="w-full rounded-lg border border-surface-300 bg-white p-2 text-sm dark:border-surface-600 dark:bg-surface-900"
+																>
+																	<option value="">— not set —</option>
+																	{#each affiliationCatalogue as entry (entry.key)}
+																		<option value={entry.key} disabled={slotTaken(username, slot, entry.key)}>
+																			{entry.displayName}
+																		</option>
+																	{/each}
+																</select>
+															</div>
+														{/if}
+													{/each}
+												</div>
+												{#if affiliationLimitReached(username)}
+													<p class="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-100">
+														Limit reached: an author can use at most {MAX_AFFILIATIONS_PER_AUTHOR} affiliations.
+														Clear one to choose another.
+													</p>
+												{/if}
+											{/if}
 										</div>
 
 										<div class="mt-4">
-											<div class="mb-2 flex items-center justify-between gap-3">
-												<p class="text-xs font-semibold uppercase text-surface-500">
-													Affiliations ({affiliationsFor(username).length}/{MAX_AFFILIATIONS_PER_AUTHOR})
-												</p>
-												<button
-													type="button"
-													onclick={() => addAffiliation(username)}
-													disabled={affiliationLimitReached(username)}
-													title={affiliationLimitReached(username)
-														? `An author can have at most ${MAX_AFFILIATIONS_PER_AUTHOR} affiliations.`
-														: 'Add a blank affiliation'}
-													class="rounded-lg border border-primary-200 px-3 py-1.5 text-xs font-medium text-primary-700 hover:bg-primary-50 disabled:cursor-not-allowed disabled:border-surface-200 disabled:text-surface-400 disabled:hover:bg-transparent dark:border-primary-700 dark:text-primary-200 dark:hover:bg-primary-900/30"
-												>
-													+ Add affiliation
-												</button>
-											</div>
-
-											{#if affiliationLimitReached(username)}
-												<p class="mb-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-100">
-													Limit reached: an author can have at most {MAX_AFFILIATIONS_PER_AUTHOR} affiliations.
-													Remove one to add another.
-												</p>
-											{:else if reusableAffiliations.length > 0}
-												<div class="mb-2 rounded-lg border border-surface-200 bg-surface-50 p-2 dark:border-surface-700 dark:bg-surface-800">
-													<p class="mb-1.5 text-xs text-surface-600 dark:text-surface-400">
-														Reuse an affiliation already on file:
-													</p>
-													<div class="flex flex-wrap gap-1.5">
-														{#each reusableAffiliations as reusable (reusable.key)}
-															<button
-																type="button"
-																onclick={() => reuseAffiliation(username, reusable.affiliation)}
-																disabled={hasAffiliation(affiliationsFor(username), reusable.affiliation)}
-																title={hasAffiliation(affiliationsFor(username), reusable.affiliation)
-																	? 'Already added for this author'
-																	: 'Add this affiliation to the author'}
-																class="rounded-full border border-surface-300 bg-white px-2.5 py-1 text-xs text-surface-700 hover:border-primary-400 hover:text-primary-700 disabled:cursor-not-allowed disabled:border-surface-200 disabled:bg-surface-100 disabled:text-surface-400 dark:border-surface-600 dark:bg-surface-900 dark:text-surface-200"
-															>
-																+ {reusable.displayName}
-															</button>
-														{/each}
-													</div>
+											<p class="mb-2 text-xs font-semibold uppercase tracking-wide text-surface-500">Author details</p>
+											<div class="grid grid-cols-1 gap-3">
+												<div>
+													<label for={`author-display-name-${username}`} class="block text-xs font-medium text-surface-600 dark:text-surface-400 mb-1">
+														Display name
+													</label>
+													<input
+														id={`author-display-name-${username}`}
+														type="text"
+														bind:value={authorAffiliations[username].name}
+														placeholder="Full author name"
+														class="w-full p-2 border border-surface-300 dark:border-surface-600 rounded-lg text-sm bg-white dark:bg-surface-800"
+													/>
 												</div>
-											{/if}
-
-											{#if authorAffiliations[username].affiliations.length === 0}
-												<p class="rounded-lg border border-dashed border-surface-300 p-3 text-sm text-surface-500 dark:border-surface-600">
-													No affiliations added for this paper.
-												</p>
-											{:else}
-												<div class="space-y-3">
-													{#each authorAffiliations[username].affiliations as affiliation, affiliationIndex (affiliation.id || affiliationIndex)}
-														<div class="rounded-lg border border-surface-200 bg-surface-50 p-3 dark:border-surface-700 dark:bg-surface-800">
-															<div class="mb-3 flex items-center justify-between gap-3">
-																<p class="text-xs font-semibold text-surface-600 dark:text-surface-300">
-																	Affiliation {affiliationIndex + 1}
-																</p>
-																<button
-																	type="button"
-																	onclick={() => removeAffiliation(username, affiliationIndex)}
-																	class="rounded p-1 text-surface-500 hover:bg-surface-200 hover:text-error-600 dark:hover:bg-surface-700"
-																	aria-label={`Remove affiliation ${affiliationIndex + 1}`}
-																>
-																	<IconRemove size={16} />
-																</button>
-															</div>
-															<div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-																<div>
-																	<label for={`author-affiliation-organization-${username}-${affiliationIndex}`} class="block text-xs font-medium text-surface-600 dark:text-surface-400 mb-1">
-																		Organization / Institution
-																	</label>
-																	<input
-																		id={`author-affiliation-organization-${username}-${affiliationIndex}`}
-																		type="text"
-																		bind:value={affiliation.organization}
-																		placeholder="Federal University"
-																		class="w-full p-2 border border-surface-300 dark:border-surface-600 rounded-lg text-sm bg-white dark:bg-surface-900"
-																	/>
-																</div>
-																<div>
-																	<label for={`author-affiliation-department-${username}-${affiliationIndex}`} class="block text-xs font-medium text-surface-600 dark:text-surface-400 mb-1">
-																		Department
-																	</label>
-																	<input
-																		id={`author-affiliation-department-${username}-${affiliationIndex}`}
-																		type="text"
-																		bind:value={affiliation.department}
-																		placeholder="Computer Science Department"
-																		class="w-full p-2 border border-surface-300 dark:border-surface-600 rounded-lg text-sm bg-white dark:bg-surface-900"
-																	/>
-																</div>
-																<div>
-																	<label for={`author-affiliation-role-${username}-${affiliationIndex}`} class="block text-xs font-medium text-surface-600 dark:text-surface-400 mb-1">
-																		Role / title
-																	</label>
-																	<input
-																		id={`author-affiliation-role-${username}-${affiliationIndex}`}
-																		type="text"
-																		bind:value={affiliation.roleTitle}
-																		placeholder="Researcher"
-																		class="w-full p-2 border border-surface-300 dark:border-surface-600 rounded-lg text-sm bg-white dark:bg-surface-900"
-																	/>
-																</div>
-																<div>
-																	<label for={`author-affiliation-ror-${username}-${affiliationIndex}`} class="block text-xs font-medium text-surface-600 dark:text-surface-400 mb-1">
-																		ROR ID
-																	</label>
-																	<input
-																		id={`author-affiliation-ror-${username}-${affiliationIndex}`}
-																		type="text"
-																		bind:value={affiliation.rorId}
-																		placeholder="https://ror.org/..."
-																		class="w-full p-2 border border-surface-300 dark:border-surface-600 rounded-lg text-sm bg-white dark:bg-surface-900"
-																	/>
-																</div>
-																<div>
-																	<label for={`author-affiliation-city-${username}-${affiliationIndex}`} class="block text-xs font-medium text-surface-600 dark:text-surface-400 mb-1">
-																		City
-																	</label>
-																	<input
-																		id={`author-affiliation-city-${username}-${affiliationIndex}`}
-																		type="text"
-																		bind:value={affiliation.city}
-																		placeholder="Natal"
-																		class="w-full p-2 border border-surface-300 dark:border-surface-600 rounded-lg text-sm bg-white dark:bg-surface-900"
-																	/>
-																</div>
-																<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-																	<div>
-																		<label for={`author-affiliation-region-${username}-${affiliationIndex}`} class="block text-xs font-medium text-surface-600 dark:text-surface-400 mb-1">
-																			Region
-																		</label>
-																		<input
-																			id={`author-affiliation-region-${username}-${affiliationIndex}`}
-																			type="text"
-																			bind:value={affiliation.region}
-																			placeholder="RN"
-																			class="w-full p-2 border border-surface-300 dark:border-surface-600 rounded-lg text-sm bg-white dark:bg-surface-900"
-																		/>
-																	</div>
-																	<div>
-																		<label for={`author-affiliation-country-${username}-${affiliationIndex}`} class="block text-xs font-medium text-surface-600 dark:text-surface-400 mb-1">
-																			Country
-																		</label>
-																		<input
-																			id={`author-affiliation-country-${username}-${affiliationIndex}`}
-																			type="text"
-																			bind:value={affiliation.country}
-																			placeholder="Brazil"
-																			class="w-full p-2 border border-surface-300 dark:border-surface-600 rounded-lg text-sm bg-white dark:bg-surface-900"
-																		/>
-																	</div>
-																</div>
-															</div>
-														</div>
+											</div>
+											{#if affiliationTags(username).length}
+												<div class="mt-3 flex flex-wrap gap-1.5">
+													{#each affiliationTags(username) as tag (tag.n)}
+														<span class="inline-flex items-center gap-1.5 rounded-full border border-surface-300 bg-surface-50 px-2.5 py-1 text-xs text-surface-700 dark:border-surface-600 dark:bg-surface-800 dark:text-surface-200">
+															<sup class="font-semibold text-primary-700 dark:text-primary-300">{tag.n}</sup>
+															{tag.label}
+														</span>
 													{/each}
 												</div>
+											{:else}
+												<p class="mt-3 text-xs text-surface-500 dark:text-surface-400">
+													Affiliation tags appear here automatically once this author has an affiliation.
+												</p>
 											{/if}
 										</div>
 									</div>

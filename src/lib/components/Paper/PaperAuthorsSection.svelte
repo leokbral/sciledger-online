@@ -98,13 +98,16 @@
 			snapshot: getPaperAuthorSnapshot(paperData, item.author)
 		}));
 		const affiliationIndex = buildPaperAffiliationIndex(items.map((item) => item.snapshot));
-		const hasCorrespondingAuthor = items.some((item) => item.snapshot.isCorresponding);
+		// A paper may name several corresponding authors; each already carries its own `*`
+		// beside the name, so the legend below only has to agree in number.
+		const correspondingCount = items.filter((item) => item.snapshot.isCorresponding).length;
 
 		return {
 			items,
 			affiliationEntries: affiliationIndex.entries,
 			authorAffiliationIndexes: affiliationIndex.authorAffiliationIndexes,
-			hasCorrespondingAuthor
+			hasCorrespondingAuthor: correspondingCount > 0,
+			correspondingCount
 		};
 	}
 
@@ -218,7 +221,7 @@
 
 		{#if authorData.hasCorrespondingAuthor}
 			<p class="paper-export-corresponding-author mt-2 text-xs leading-5 text-slate-500">
-				* Corresponding author
+				* {authorData.correspondingCount > 1 ? 'Corresponding authors' : 'Corresponding author'}
 			</p>
 		{/if}
 	</div>

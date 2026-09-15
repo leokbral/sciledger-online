@@ -13,6 +13,7 @@ import { autolinkHtml } from './autolink';
 import { parseReferenceNumber } from './crossReference';
 import {
 	buildPaperAffiliationIndex,
+	getMarkedCorrespondingAuthors,
 	formatAffiliationDisplayName,
 	type PaperAuthorSnapshot
 } from '$lib/utils/paperAuthorAffiliations';
@@ -102,20 +103,30 @@ function buildAuthorsHtml(authors: PaperAuthorSnapshot[]) {
 		})
 		.join(' &nbsp;·&nbsp; ');
 
-	const corresponding = authors.find((a) => a.isCorresponding);
+	// A paper may name several corresponding authors, and every one of them carries the same
+	// `*` next to their name above. The legend has to list them all, otherwise the PDF would
+	// silently claim a single corresponding author where the record says three.
+	const corresponding = getMarkedCorrespondingAuthors(authors);
+	const reachable = corresponding.filter((author) => author.email);
+	const correspondingLine = reachable.length
+		? `<sup>*</sup> Corresponding author${reachable.length > 1 ? 's' : ''}: ` +
+			reachable
+				.map((author) => `<a href="mailto:${esc(author.email)}">${esc(author.email)}</a>`)
+				.join(', ')
+		: '';
+
 	const affilHtml = [
 		...index.entries.map(
 			(entry) =>
 				`<sup>${entry.index}</sup> ${esc(entry.displayName || formatAffiliationDisplayName(entry.affiliation))}`
 		),
-		corresponding?.email
-			? `<sup>*</sup> Corresponding author: <a href="mailto:${esc(corresponding.email)}">${esc(corresponding.email)}</a>`
-			: ''
+		correspondingLine
 	]
 		.filter(Boolean)
 		.join(' &nbsp;·&nbsp; ');
 
-	return { authorsHtml, affilHtml, correspondingEmail: corresponding?.email ?? '' };
+	// The single token stays the primary author's address, for templates that show just one.
+	return { authorsHtml, affilHtml, correspondingEmail: reachable[0]?.email ?? '' };
 }
 
 /** CRediT (creditAuthorStatements) ➜ parágrafo "Author contributions". */
