@@ -1,0 +1,43 @@
+import { describe, it, vi } from 'vitest';
+
+const mocks = vi.hoisted(() => ({
+	startMongo: vi.fn(),
+	findEmailReviewerInvitationByToken: vi.fn(),
+	isEmailReviewerInvitationActive: vi.fn(),
+	userFindOne: vi.fn()
+}));
+vi.mock('$lib/db/mongooseConnection', () => ({ start_mongo: mocks.startMongo }));
+vi.mock('$lib/server/auth/emailReviewerInvitation', () => ({
+	findEmailReviewerInvitationByToken: mocks.findEmailReviewerInvitationByToken,
+	isEmailReviewerInvitationActive: mocks.isEmailReviewerInvitationActive
+}));
+vi.mock('$lib/db/models/User', () => ({ default: { findOne: mocks.userFindOne } }));
+
+async function t(label: string, fn: () => Promise<unknown>) {
+	const t0 = performance.now();
+	try { await fn(); } catch (e: any) { console.log(`  ${label}: THREW ${e?.message}`); }
+	console.log(`  ${label}: ${Math.round(performance.now() - t0)}ms`);
+}
+
+describe('diag', () => {
+	it('times each top-level dependency, then the route module', async () => {
+		console.log('--- individual deps ---');
+		await t('mongoose', () => import('mongoose'));
+		await t('stripe', () => import('stripe'));
+		await t('@sveltejs/kit', () => import('@sveltejs/kit'));
+		await t('$lib/db/mongo', () => import('$lib/db/mongo'));
+		await t('models/PaperReviewInvitation', () => import('$lib/db/models/PaperReviewInvitation'));
+		await t('models/Paper', () => import('$lib/db/models/Paper'));
+		await t('models/Hub', () => import('$lib/db/models/Hub'));
+		await t('reviewerEligibility', () => import('$lib/helpers/reviewerEligibility'));
+		await t('roleAssignmentService', () => import('$lib/server/authorization/roleAssignmentService'));
+		await t('effectiveHubRoles', () => import('$lib/server/authorization/effectiveHubRoles'));
+		await t('reviewInvitationLifecycle', () => import('$lib/server/reviewInvitationLifecycle'));
+		await t('EventService', () => import('$lib/services/EventService'));
+		await t('reviewInvitations', () => import('$lib/server/reviewInvitations'));
+		await t('editorialTransitionService', () => import('$lib/server/authorization/editorialTransitionService'));
+		await t('paperPaymentService', () => import('$lib/server/payments/paperPaymentService'));
+		console.log('--- route module (everything above already cached) ---');
+		await t('./+server', () => import('./+server'));
+	}, 300000);
+});

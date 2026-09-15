@@ -37,11 +37,11 @@
 <div class="main-container">
 	<form class="main-form" onsubmit={preventDefault(submit)}>
 		<img
-			src="https://t4.ftcdn.net/jpg/05/44/04/47/360_F_544044746_Swth0lqH9CcTci8S5p2FS4Jqpcy6HWoI.jpg"
-			alt="Logo"
-			width="64px"
-			height="105px"
-			style="display: flex; align-self: center; align-self: flex-start;"
+			src="/brand/logo/sciledger-logo-dark.svg"
+			alt="SciLedger"
+			width="160"
+			height="47"
+			style="display: flex; align-self: center; align-self: flex-start; width: 160px; height: auto;"
 		/>
 		<h3 style="font-weight: bold; color: white;align-self: flex-start;">Password Reset</h3>
 		<div class="input-section">

@@ -33,7 +33,13 @@
 
 <section class="min-h-screen flex items-center justify-center bg-surface-100 px-4">
 	<div class="w-full max-w-md rounded-lg bg-white p-8 text-center shadow">
-		<img src="/favicon.png" alt="SciLedger" width="56" height="52" class="mx-auto mb-6" />
+		<img
+			src="/brand/logo/sciledger-logo.svg"
+			alt="SciLedger"
+			width="160"
+			height="47"
+			class="mx-auto mb-6 h-auto w-40"
+		/>
 		<h1 class="text-2xl font-bold text-surface-900">Verify your email</h1>
 		<p class="mt-5 text-surface-700">We've sent a verification email to:</p>
 		<p class="mt-2 break-all font-semibold text-surface-950">{email}</p>

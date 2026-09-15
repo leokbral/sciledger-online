@@ -1,0 +1,145 @@
+{
+  "font": {
+    "family": "Inter Variable",
+    "version": "Version 4.001;git-9221beed3",
+    "sha256": "4989b125924991b90d05b2d16e0e388c48f7d5bb8b30539bbf9c755278d0ccaf"
+  },
+  "assets": [
+    {
+      "svg": "logo/sciledger-logo.svg",
+      "png": "png/sciledger-logo.png",
+      "width": 2400,
+      "height": 698,
+      "xmlValid": true,
+      "outlined": true
+    },
+    {
+      "svg": "logo/sciledger-logo-light.svg",
+      "png": "png/sciledger-logo-light.png",
+      "width": 2400,
+      "height": 698,
+      "xmlValid": true,
+      "outlined": true
+    },
+    {
+      "svg": "logo/sciledger-logo-dark.svg",
+      "png": "png/sciledger-logo-dark.png",
+      "width": 2400,
+      "height": 698,
+      "xmlValid": true,
+      "outlined": true
+    },
+    {
+      "svg": "logo/sciledger-logo-monochrome.svg",
+      "png": "png/sciledger-logo-monochrome.png",
+      "width": 2400,
+      "height": 698,
+      "xmlValid": true,
+      "outlined": true
+    },
+    {
+      "svg": "logo/sciledger-logo-white.svg",
+      "png": "png/sciledger-logo-white.png",
+      "width": 2400,
+      "height": 698,
+      "xmlValid": true,
+      "outlined": true
+    },
+    {
+      "svg": "logo/sciledger-symbol.svg",
+      "png": "png/sciledger-symbol.png",
+      "width": 1024,
+      "height": 1024,
+      "xmlValid": true,
+      "outlined": true
+    },
+    {
+      "svg": "logo/sciledger-symbol-dark.svg",
+      "png": "png/sciledger-symbol-dark.png",
+      "width": 1024,
+      "height": 1024,
+      "xmlValid": true,
+      "outlined": true
+    },
+    {
+      "svg": "logo/sciledger-symbol-monochrome.svg",
+      "png": "png/sciledger-symbol-monochrome.png",
+      "width": 1024,
+      "height": 1024,
+      "xmlValid": true,
+      "outlined": true
+    },
+    {
+      "svg": "logo/sciledger-symbol-white.svg",
+      "png": "png/sciledger-symbol-white.png",
+      "width": 1024,
+      "height": 1024,
+      "xmlValid": true,
+      "outlined": true
+    },
+    {
+      "svg": "logo/sciledger-wordmark.svg",
+      "png": "png/sciledger-wordmark.png",
+      "width": 2000,
+      "height": 599,
+      "xmlValid": true,
+      "outlined": true
+    },
+    {
+      "svg": "logo/sciledger-wordmark-white.svg",
+      "png": "png/sciledger-wordmark-white.png",
+      "width": 2000,
+      "height": 599,
+      "xmlValid": true,
+      "outlined": true
+    },
+    {
+      "svg": "logo/sciledger-compact.svg",
+      "png": "png/sciledger-compact.png",
+      "width": 1200,
+      "height": 950,
+      "xmlValid": true,
+      "outlined": true
+    },
+    {
+      "svg": "logo/sciledger-compact-dark.svg",
+      "png": "png/sciledger-compact-dark.png",
+      "width": 1200,
+      "height": 950,
+      "xmlValid": true,
+      "outlined": true
+    },
+    {
+      "svg": "logo/sciledger-favicon.svg",
+      "png": "png/sciledger-favicon.png",
+      "width": 512,
+      "height": 512,
+      "xmlValid": true,
+      "outlined": true
+    },
+    {
+      "svg": "previews/sciledger-brand-board.svg",
+      "png": "previews/sciledger-brand-board.png",
+      "width": 1600,
+      "height": 1120,
+      "xmlValid": true,
+      "outlined": true
+    },
+    {
+      "svg": "previews/sciledger-application-checks.svg",
+      "png": "previews/sciledger-application-checks.png",
+      "width": 1400,
+      "height": 970,
+      "xmlValid": true,
+      "outlined": true
+    },
+    {
+      "svg": "previews/sciledger-variants.svg",
+      "png": "previews/sciledger-variants.png",
+      "width": 1500,
+      "height": 970,
+      "xmlValid": true,
+      "outlined": true
+    }
+  ]
+}

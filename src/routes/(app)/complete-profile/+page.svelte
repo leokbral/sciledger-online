@@ -56,7 +56,13 @@
 
 <div class="h-screen flex flex-col items-center justify-center bg-gradient-to-br from-surface-100 to-surface-50">
 	<div class="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8">
-		<img src="/favicon.png" alt="Logo" width="64px" height="60px" class="mb-6" />
+		<img
+			src="/brand/logo/sciledger-logo.svg"
+			alt="SciLedger"
+			width="160"
+			height="47"
+			class="mb-6 h-auto w-40"
+		/>
 
 		<h1 class="text-3xl font-bold mb-2 text-surface-900">Complete Your Profile</h1>
 		<p class="text-surface-600 mb-6">

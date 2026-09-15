@@ -42,11 +42,11 @@
 	>
 		<form class="flex flex-col w-4/5 md:w-full md:px-16 md:py-14" onsubmit={preventDefault(submit)}>
 			<img
-				src="/favicon.png"
-				alt="Logo"
-				width="64px"
-				height="60px"
-				class="self-start mb-4"
+				src="/brand/logo/sciledger-logo.svg"
+				alt="SciLedger"
+				width="160"
+				height="47"
+				class="self-start mb-4 h-auto w-40"
 			/>
 
 			<span class="text-2xl font-semibold mb-4 text-center text-surface-900">Sign in</span>

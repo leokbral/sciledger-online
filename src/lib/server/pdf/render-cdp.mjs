@@ -1,24 +1,28 @@
 import { spawn } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 
 const CHROME = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const FILE   = 'file://' + process.cwd() + '/article-template.html';
 const OUT    = 'sciledger-article-sample.pdf';
+const LOGO = `data:image/svg+xml;base64,${Buffer.from(
+  readFileSync(new URL('../../../../brand/logo/sciledger-logo.svg', import.meta.url), 'utf8'),
+  'utf8'
+).toString('base64')}`;
 
 const HEADER = `
 <div style="width:100%;font-family:Inter,Helvetica,Arial,sans-serif;font-size:7pt;color:#6B7280;
      padding:0 17mm 2mm;display:flex;justify-content:space-between;align-items:baseline;
      border-bottom:0.5pt solid #E5E7EB;">
   <span style="font-style:italic;">Ferreira Cabral et al. — Ledger-based provenance for peer review</span>
-  <span style="font-weight:600;color:#172554;">SciLedger&nbsp;<span style="font-weight:400;color:#6B7280;">· 2026 · 4(2) · 118</span></span>
+  <span style="display:inline-flex;align-items:center;gap:5pt;"><img src="${LOGO}" alt="SciLedger" style="height:12pt;width:auto;vertical-align:middle;"><span style="font-weight:400;color:#6B7280;">&middot; 2026 &middot; 4(2) &middot; 118</span></span>
 </div>`;
 
 const FOOTER = `
 <div style="width:100%;font-family:Inter,Helvetica,Arial,sans-serif;font-size:7pt;color:#6B7280;
      padding:2mm 17mm 0;display:flex;justify-content:space-between;align-items:center;
      border-top:0.5pt solid #E5E7EB;">
-  <span>doi.org/10.63000/sciledger.2026.118 &nbsp;·&nbsp; CC BY 4.0</span>
-  <span><span style="color:#172554;font-weight:600;">SciLedger</span> &nbsp;·&nbsp; page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
+  <span>doi.org/10.63000/sciledger.2026.118 &nbsp;&middot;&nbsp; CC BY 4.0</span>
+  <span style="display:inline-flex;align-items:center;gap:4pt;"><img src="${LOGO}" alt="SciLedger" style="height:10pt;width:auto;vertical-align:middle;"> &nbsp;&middot;&nbsp; page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
 </div>`;
 
 const chrome = spawn(CHROME, ['--headless','--disable-gpu','--no-sandbox',

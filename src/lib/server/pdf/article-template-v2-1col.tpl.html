@@ -20,8 +20,8 @@ body{font-family:var(--serif);color:var(--ink);-webkit-font-smoothing:antialiase
 .mast::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1.6mm;
   background:linear-gradient(90deg,var(--accent) 0%,var(--accent-2) 55%,#A5C9FF 100%)}
 .mast-in{display:flex;justify-content:space-between;align-items:flex-start}
-.brand{display:flex;align-items:center;gap:3mm}
-.brand-name{font-family:var(--sans);font-weight:700;font-size:16pt;letter-spacing:-.028em;line-height:1;color:#fff}
+.brand{display:flex;align-items:center}
+.brand-logo{display:block;width:43mm;height:auto}
 .brand-tag{font-family:var(--sans);font-size:6.4pt;font-weight:500;letter-spacing:.18em;
   text-transform:uppercase;color:#93B4F5;margin-top:1.6mm}
 .mast-r{text-align:right;font-family:var(--sans)}
@@ -104,6 +104,7 @@ ol.refs a{color:var(--accent);text-decoration:none}
   font-family:var(--sans);font-size:6.9pt;color:var(--soft)}
 .endband b{color:var(--ink)}
 .endband a{color:var(--accent);text-decoration:none}
+.publisher-logo{display:inline-block;height:7.2pt;width:auto;vertical-align:-1pt;margin:0 .7mm}
 
 .lead-grid{display:grid;grid-template-columns:44mm 1fr;gap:0 9mm;margin-top:8mm;
   padding-top:4.5mm;border-top:.5pt solid var(--rule)}
@@ -163,15 +164,8 @@ ol.refs li{scroll-margin-top:8mm}
   <header class="mast bleed">
     <div class="mast-in">
       <div class="brand">
-        <svg width="30" height="30" viewBox="0 0 32 32" fill="none" aria-hidden="true">
-          <rect x="0" y="0" width="32" height="32" rx="8" fill="#fff" fill-opacity=".10"/>
-          <path d="M8.6 21.8V10.2" stroke="#60A5FA" stroke-width="2.5" stroke-linecap="round"/>
-          <path d="M8.6 21.8H16.2" stroke="#60A5FA" stroke-width="2.5" stroke-linecap="round"/>
-          <path d="M14.4 10.2h4.5a3.7 3.7 0 0 1 0 7.4h-2.2" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-          <circle cx="23.4" cy="20.6" r="2.4" fill="#60A5FA"/>
-        </svg>
         <div>
-          <div class="brand-name">SciLedger</div>
+          <img class="brand-logo" src="{{SCILEDGER_LOGO_DARK}}" alt="SciLedger">
           <div class="brand-tag">Open Science Publishing</div>
         </div>
       </div>
@@ -228,7 +222,7 @@ ol.refs li{scroll-margin-top:8mm}
     </div>
   </section>
   <div class="endband bleed">
-    <span>© {{YEAR}} The Authors. Published by <b>SciLedger</b> under {{LICENSE}}.</span>
+    <span>© {{YEAR}} The Authors. Published by <img class="publisher-logo" src="{{SCILEDGER_WORDMARK}}" alt="SciLedger"> under {{LICENSE}}.</span>
     <a href="https://sciledger.org">sciledger.org</a>
   </div>
 </div></body></html>

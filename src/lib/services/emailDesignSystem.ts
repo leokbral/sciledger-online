@@ -212,12 +212,14 @@ function renderList(items: string[] = []) {
 	return `<ul style="margin: 8px 0 0 18px; padding: 0;">${rows}</ul>`;
 }
 
-export function EmailHeader(options: { showLogo?: boolean } = {}) {
+export function EmailHeader(options: { showLogo?: boolean; siteUrl?: string } = {}) {
 	if (options.showLogo === false) return '';
+	const siteUrl = resolveSiteUrl(options.siteUrl);
+	const logoUrl = `${siteUrl}/brand/png/sciledger-logo-dark.png`;
 
 	return `
 				<div style="background-color: #07326a; color: #ffffff; padding: 28px 20px; text-align: center;">
-					<h1 style="margin: 0; font-size: 28px; font-weight: 700; color: #ffffff; letter-spacing: -0.2px;">SciLedger</h1>
+					<img src="${escapeAttribute(logoUrl)}" alt="SciLedger" width="193" height="56" style="display: block; width: 193px; max-width: 72%; height: auto; margin: 0 auto;">
 					<p style="margin: 8px 0 0 0; font-size: 13px; color: rgba(255,255,255,0.95); opacity: 0.95;">Scientific Platform</p>
 				</div>
 	`;
@@ -510,7 +512,7 @@ export function EmailLayout(input: EmailLayoutInput) {
         <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 20px; background-color: #f8f9fa;">
             <div style="display: none; max-height: 0; overflow: hidden; opacity: 0; color: transparent; font-size: 1px; line-height: 1px;">${escapeHtml(preheader)}</div>
             <div style="max-width: 600px; margin: 0 auto; background-color: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); overflow: hidden;">
-				${EmailHeader({ showLogo: input.showLogo })}
+				${EmailHeader({ showLogo: input.showLogo, siteUrl })}
 
                 <div style="padding: 40px 30px;">
 					${content}

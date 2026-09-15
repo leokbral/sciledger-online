@@ -1,8 +1,12 @@
 import { spawn } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 
 const [,, INPUT, OUTPUT] = process.argv;
 const CHROME = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const LOGO = `data:image/svg+xml;base64,${Buffer.from(
+  readFileSync(new URL('../../../../brand/logo/sciledger-logo.svg', import.meta.url), 'utf8'),
+  'utf8'
+).toString('base64')}`;
 
 const HEADER = `<span style="display:none"></span>`;
 
@@ -11,9 +15,9 @@ const FOOTER = `
      padding:0 18mm;">
   <div style="border-top:.5pt solid #E4E8F0;padding-top:2.4mm;display:flex;
        justify-content:space-between;align-items:center;">
-    <span><i>Ferreira Cabral et al.</i> &nbsp;·&nbsp; doi.org/10.63000/sciledger.2026.118 &nbsp;·&nbsp; CC BY 4.0</span>
-    <span><span style="color:#101A3D;font-weight:700;letter-spacing:-.02em;">SciLedger</span>
-      &nbsp;<span style="color:#2563EB;">·</span>&nbsp;
+    <span><i>Ferreira Cabral et al.</i> &nbsp;&middot;&nbsp; doi.org/10.63000/sciledger.2026.118 &nbsp;&middot;&nbsp; CC BY 4.0</span>
+    <span style="display:inline-flex;align-items:center;gap:4pt;"><img src="${LOGO}" alt="SciLedger" style="height:10pt;width:auto;vertical-align:middle;">
+      &nbsp;<span style="color:#2563EB;">&middot;</span>&nbsp;
       <span class="pageNumber"></span>&thinsp;/&thinsp;<span class="totalPages"></span></span>
   </div>
 </div>`;

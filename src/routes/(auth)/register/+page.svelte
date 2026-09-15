@@ -144,11 +144,11 @@
 	<div class="w-full max-w-lg p-6 bg-white rounded-xl md:shadow-2xl md:shadow-surface-500/50">
 		<form onsubmit={preventDefault(submit)} class="space-y-6">
 			<img
-				src="https://t4.ftcdn.net/jpg/05/44/04/47/360_F_544044746_Swth0lqH9CcTci8S5p2FS4Jqpcy6HWoI.jpg"
-				alt="Logo"
-				width="64px"
-				height="105px"
-				class="mx-auto"
+				src="/brand/logo/sciledger-logo.svg"
+				alt="SciLedger"
+				width="160"
+				height="47"
+				class="mx-auto h-auto w-40"
 			/>
 
 			<h3 class="text-2xl font-bold text-center text-surface-900">

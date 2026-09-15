@@ -29,8 +29,8 @@ body{font-family:var(--serif);color:var(--ink);font-size:10pt;line-height:1.52;
 .hero>*{position:relative}
 .hero-top{display:flex;justify-content:space-between;align-items:center;
   padding-bottom:7mm;border-bottom:.4pt solid rgba(255,255,255,.16)}
-.brand{display:flex;align-items:center;gap:2.8mm}
-.brand-name{font-family:var(--sans);font-weight:700;font-size:12.5pt;letter-spacing:-.03em;line-height:1}
+.brand{display:flex;align-items:center}
+.brand-logo{display:block;width:39mm;height:auto}
 .brand-tag{font-family:var(--sans);font-size:5.8pt;font-weight:500;letter-spacing:.22em;
   text-transform:uppercase;color:var(--sky);margin-top:1.3mm}
 .chips{font-family:var(--sans)}
@@ -161,6 +161,7 @@ ol.refs a{color:var(--accent);text-decoration:none}
   font-family:var(--sans);font-size:6.6pt;color:var(--soft)}
 .endband b{color:var(--ink)}
 .endband a{color:var(--accent);text-decoration:none}
+.publisher-logo{display:inline-block;height:7pt;width:auto;vertical-align:-1pt;margin:0 .7mm}
 
 /* ══ FALLBACK — conteúdo cru vindo do editor / DOCX ══════ */
 /* O corpo do artigo chega do mammoth sem classes. Estas regras garantem que
@@ -203,14 +204,7 @@ ol.refs li{scroll-margin-top:8mm}
   <header class="hero bleed">
     <div class="hero-top">
       <div class="brand">
-        <svg width="26" height="26" viewBox="0 0 32 32" fill="none" aria-hidden="true">
-          <rect width="32" height="32" rx="8" fill="#fff" fill-opacity=".12"/>
-          <path d="M8.6 21.8V10.2" stroke="#7DAAFB" stroke-width="2.5" stroke-linecap="round"/>
-          <path d="M8.6 21.8H16.2" stroke="#7DAAFB" stroke-width="2.5" stroke-linecap="round"/>
-          <path d="M14.4 10.2h4.5a3.7 3.7 0 0 1 0 7.4h-2.2" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-          <circle cx="23.4" cy="20.6" r="2.4" fill="#7DAAFB"/>
-        </svg>
-        <div><div class="brand-name">SciLedger</div><div class="brand-tag">Open Science Publishing</div></div>
+        <div><img class="brand-logo" src="{{SCILEDGER_LOGO_DARK}}" alt="SciLedger"><div class="brand-tag">Open Science Publishing</div></div>
       </div>
       <div class="chips">
         <span class="chip chip-t">{{ARTICLE_TYPE}}</span><span class="chip chip-oa">Open Access</span>
@@ -276,7 +270,7 @@ ol.refs li{scroll-margin-top:8mm}
   </section>
 
   <div class="endband bleed">
-    <span>© {{YEAR}} The Authors. Published by <b>SciLedger</b> under {{LICENSE}}.</span>
+    <span>© {{YEAR}} The Authors. Published by <img class="publisher-logo" src="{{SCILEDGER_WORDMARK}}" alt="SciLedger"> under {{LICENSE}}.</span>
     <a href="https://sciledger.org">sciledger.org</a>
   </div>
 

@@ -53,11 +53,11 @@
         <div class="flex flex-col items-center justify-center w-full max-w-lg p-8">
             <!-- Logo -->
             <img
-                src="https://t4.ftcdn.net/jpg/05/44/04/47/360_F_544044746_Swth0lqH9CcTci8S5p2FS4Jqpcy6HWoI.jpg"
-                alt="Logo"
-                width="64px"
-                height="105px"
-                class="mb-6"
+                src="/brand/logo/sciledger-logo.svg"
+                alt="SciLedger"
+                width="160"
+                height="47"
+                class="mb-6 h-auto w-40"
             />
 
             {#if !submitted}

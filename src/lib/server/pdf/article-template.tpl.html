@@ -53,10 +53,8 @@ body{
   display:flex; justify-content:space-between; align-items:flex-start;
   padding-bottom:3mm; border-bottom:1.6pt solid var(--accent);
 }
-.brand{ display:flex; align-items:center; gap:2.6mm; }
-.brand-mark{ flex:none; }
-.brand-name{ font-family:var(--sans); font-weight:700; font-size:14pt;
-  letter-spacing:-.022em; color:var(--ink); line-height:1; }
+.brand{ display:flex; align-items:center; }
+.brand-logo{ display:block; width:43mm; height:auto; }
 .brand-tag{ font-family:var(--sans); font-size:6.6pt; font-weight:500; color:var(--muted);
   letter-spacing:.10em; text-transform:uppercase; margin-top:1.2mm; }
 .mast-right{ text-align:right; font-family:var(--sans); }
@@ -201,6 +199,7 @@ ol.refs a{ color:var(--accent); text-decoration:none; }
 .pg1-footer .lic{ display:flex; align-items:center; gap:1.6mm; }
 .pg1-footer a{ color:var(--accent); text-decoration:none; }
 .cc{ height:7pt; }
+.publisher-logo{ display:inline-block; height:7.4pt; width:auto; vertical-align:-1.1pt; margin:0 .7mm; }
 
 /* ══ FALLBACK — conteúdo cru vindo do editor / DOCX ══════ */
 /* O corpo do artigo chega do mammoth sem classes. Estas regras garantem que
@@ -249,15 +248,8 @@ ol.refs li{scroll-margin-top:8mm}
   <!-- 1 · MASTHEAD -->
   <header class="masthead">
     <div class="brand">
-      <svg class="brand-mark" width="26" height="26" viewBox="0 0 32 32" fill="none" aria-hidden="true">
-        <rect x="1.2" y="1.2" width="29.6" height="29.6" rx="7" fill="#172554"/>
-        <path d="M8.5 21.5V10.5" stroke="#3B82F6" stroke-width="2.4" stroke-linecap="round"/>
-        <path d="M8.5 21.5H16" stroke="#3B82F6" stroke-width="2.4" stroke-linecap="round"/>
-        <path d="M14.2 10.5h4.6a3.6 3.6 0 0 1 0 7.2h-2.3" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-        <circle cx="23.2" cy="20.4" r="2.3" fill="#3B82F6"/>
-      </svg>
       <div>
-        <div class="brand-name">SciLedger</div>
+        <img class="brand-logo" src="{{SCILEDGER_LOGO}}" alt="SciLedger">
         <div class="brand-tag">Open Science Publishing</div>
       </div>
     </div>
@@ -351,7 +343,7 @@ ol.refs li{scroll-margin-top:8mm}
         <rect x="24.5" y="0.5" width="21" height="21" rx="10.5" fill="none" stroke="#6B7280"/>
         <text x="35" y="15.5" font-family="Inter,Arial" font-size="11" font-weight="700" fill="#6B7280" text-anchor="middle">by</text>
       </svg>
-      <span>© {{YEAR}} The Authors. Published by <b style="color:#172554">SciLedger</b> under
+      <span>© {{YEAR}} The Authors. Published by <img class="publisher-logo" src="{{SCILEDGER_WORDMARK}}" alt="SciLedger"> under
         <a href="https://creativecommons.org/licenses/by/4.0/">{{LICENSE}}</a>.</span>
     </div>
     <div><a href="https://sciledger.org">sciledger.org</a></div>

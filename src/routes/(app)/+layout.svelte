@@ -42,8 +42,18 @@
 					href="/"
 					class="nav-link"
 					class:active={page.url.pathname === '/login'}
+					aria-label="SciLedger home"
 				>
-					SciLedger
+					<img
+						src="/brand/logo/sciledger-logo.svg"
+						alt="SciLedger"
+						class="h-8 w-auto dark:hidden"
+					/>
+					<img
+						src="/brand/logo/sciledger-logo-dark.svg"
+						alt="SciLedger"
+						class="hidden h-8 w-auto dark:block"
+					/>
 				</a>
 			{/snippet}
 
@@ -128,7 +138,11 @@
 		{#if !data.user}
 			<div class="banner bg-primary-900 p-8 text-surface-50">
 				<div class=" flex flex-col items-center gap-4 m-auto w-full">
-					<h1 class="h1">SciLedger</h1>
+					<img
+						src="/brand/logo/sciledger-logo-dark.svg"
+						alt="SciLedger"
+						class="h-16 w-auto"
+					/>
 					<p>Blockchain Based Open Science</p>
 					Consider rethinking your decision to invest substantial amounts
 				</div>
@@ -160,7 +174,11 @@
 	<footer class="mt-8 border-t border-primary-700 bg-primary-500 p-4 text-primary-contrast-500">
 		<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
 			<div class="flex flex-col items-center justify-between gap-2 text-center sm:flex-row sm:text-left">
-				<p class="text-sm font-semibold">SciLedger</p>
+				<img
+					src="/brand/logo/sciledger-logo-dark.svg"
+					alt="SciLedger"
+					class="h-7 w-auto"
+				/>
 				<p class="text-xs opacity-90">© 2026 • All rights reserved.</p>
 			</div>
 		</div>

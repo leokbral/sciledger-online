@@ -83,7 +83,11 @@
 		{#if heroVisible}
 		<div class="max-w-6xl mx-auto text-center" transition:fade={{ duration: 800 }}>
 			<div class="flex justify-center mb-8">
-				<img src="/favicon.png" alt="SciLedger Logo" class="w-48 h-48 sm:w-64 sm:h-64" />
+				<img
+					src="/brand/logo/sciledger-compact.svg"
+					alt="SciLedger"
+					class="h-auto w-48 sm:w-64"
+				/>
 			</div>
 			<h1
 				class="text-6xl sm:text-7xl md:text-8xl font-semibold text-surface-900 mb-6 tracking-tight leading-[1.05]"
@@ -761,6 +765,11 @@
 				</div>
 			</div>
 			<div class="pt-8 border-t border-surface-200 text-center">
+				<img
+					src="/brand/logo/sciledger-wordmark.svg"
+					alt="SciLedger"
+					class="mx-auto mb-4 h-8 w-auto"
+				/>
 				<p class="text-sm text-surface-600">&copy; 2025 SciLedger. All rights reserved.</p>
 			</div>
 		</div>

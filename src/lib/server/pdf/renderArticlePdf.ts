@@ -15,12 +15,16 @@
  * v2/v3 usam faixas full-bleed, então as margens LATERAIS precisam ser 0
  * (a classe .bleed compensa internamente com margin/padding de 18–20mm).
  */
+import { Buffer } from 'node:buffer';
 import { chromium } from 'playwright';
 import { buildArticleTokens, type ArticleTokens, type BuildOptions } from './articleViewModel';
 import { resolveArticleTokens, type ResolveDiagnostics } from './resolveArticleData';
 import { fixPdfDestinations, toPoints } from './fixPdfDestinations';
 import { enhanceReferencesInPage, type ReferenceLinkReport } from './enhanceReferencesInPage';
 
+import logoSvg from '../../../../brand/logo/sciledger-logo.svg?raw';
+import logoDarkSvg from '../../../../brand/logo/sciledger-logo-dark.svg?raw';
+import wordmarkSvg from '../../../../brand/logo/sciledger-wordmark.svg?raw';
 import tplV1 from './article-template.tpl.html?raw';
 import tplV2One from './article-template-v2-1col.tpl.html?raw';
 import tplV2Two from './article-template-v2-2col.tpl.html?raw';
@@ -42,13 +46,23 @@ const VARIANTS: Record<TemplateVariant, VariantCfg> = {
 	'v3-1col': { template: tplV3One, margin: { top: '12mm', bottom: '14.5mm', left: '0mm', right: '0mm' } }
 };
 
+function svgDataUri(svg: string) {
+	return `data:image/svg+xml;base64,${Buffer.from(svg, 'utf8').toString('base64')}`;
+}
+
+const BRAND_TOKENS: Record<string, string> = {
+	SCILEDGER_LOGO: svgDataUri(logoSvg),
+	SCILEDGER_LOGO_DARK: svgDataUri(logoDarkSvg),
+	SCILEDGER_WORDMARK: svgDataUri(wordmarkSvg)
+};
+
 export function isTemplateVariant(value: unknown): value is TemplateVariant {
 	return typeof value === 'string' && (TEMPLATE_VARIANTS as string[]).includes(value);
 }
 
 /** Substitui {{TOKEN}} — tokens ausentes viram string vazia (nunca deixa "{{X}}" vazando). */
 export function fillTemplate(tpl: string, tokens: ArticleTokens): string {
-	return tpl.replace(/\{\{([A-Z_]+)\}\}/g, (_m, k: string) => tokens[k] ?? '');
+	return tpl.replace(/\{\{([A-Z_]+)\}\}/g, (_m, k: string) => tokens[k] ?? BRAND_TOKENS[k] ?? '');
 }
 
 /** HTML final de uma variante, já preenchido. Útil para depurar sem gerar PDF. */
@@ -62,8 +76,8 @@ function furniture(tokens: ArticleTokens, pad: string) {
 	const footer = `
 <div style="width:100%;font-family:Inter,Helvetica,Arial,sans-serif;font-size:6.5pt;color:#7C8AA8;padding:0 ${pad};">
   <div style="border-top:.5pt solid #E4E8F0;padding-top:2.4mm;display:flex;justify-content:space-between;align-items:center;">
-    <span><i>${tokens.RUNNING_TITLE ?? ''}</i> &nbsp;·&nbsp; ${tokens.DOI ?? ''} &nbsp;·&nbsp; ${tokens.LICENSE ?? ''}</span>
-    <span><span style="color:#101A3D;font-weight:700;">SciLedger</span> &nbsp;·&nbsp;
+    <span><i>${tokens.RUNNING_TITLE ?? ''}</i> &nbsp;&middot;&nbsp; ${tokens.DOI ?? ''} &nbsp;&middot;&nbsp; ${tokens.LICENSE ?? ''}</span>
+    <span style="display:inline-flex;align-items:center;gap:4pt;"><img src="${BRAND_TOKENS.SCILEDGER_LOGO}" alt="SciLedger" style="height:10pt;width:auto;vertical-align:middle;"> &nbsp;&middot;&nbsp;
       <span class="pageNumber"></span>&thinsp;/&thinsp;<span class="totalPages"></span></span>
   </div>
 </div>`;

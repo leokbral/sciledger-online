@@ -8,7 +8,7 @@
 
 	<div class="relative flex flex-col items-center gap-5">
 		<div class="logo-shell">
-			<img src="/favicon.png" alt="SciLedger" class="logo-mark" />
+			<img src="/brand/logo/sciledger-symbol.svg" alt="SciLedger" class="logo-mark" />
 		</div>
 		<div class="text-center">
 			<p class="text-2xl font-semibold text-surface-900">SciLedger</p>

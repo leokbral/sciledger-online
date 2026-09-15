@@ -1,0 +1,377 @@
+{
+  "svg_checks": [
+    {
+      "file": "logo/sciledger-compact-dark.svg",
+      "self_contained_paths": true
+    },
+    {
+      "file": "logo/sciledger-compact.svg",
+      "self_contained_paths": true
+    },
+    {
+      "file": "logo/sciledger-favicon.svg",
+      "self_contained_paths": true
+    },
+    {
+      "file": "logo/sciledger-logo-dark.svg",
+      "self_contained_paths": true
+    },
+    {
+      "file": "logo/sciledger-logo-light.svg",
+      "self_contained_paths": true
+    },
+    {
+      "file": "logo/sciledger-logo-monochrome.svg",
+      "self_contained_paths": true
+    },
+    {
+      "file": "logo/sciledger-logo-white.svg",
+      "self_contained_paths": true
+    },
+    {
+      "file": "logo/sciledger-logo.svg",
+      "self_contained_paths": true
+    },
+    {
+      "file": "logo/sciledger-symbol-dark.svg",
+      "self_contained_paths": true
+    },
+    {
+      "file": "logo/sciledger-symbol-monochrome.svg",
+      "self_contained_paths": true
+    },
+    {
+      "file": "logo/sciledger-symbol-white.svg",
+      "self_contained_paths": true
+    },
+    {
+      "file": "logo/sciledger-symbol.svg",
+      "self_contained_paths": true
+    },
+    {
+      "file": "logo/sciledger-wordmark-white.svg",
+      "self_contained_paths": true
+    },
+    {
+      "file": "logo/sciledger-wordmark.svg",
+      "self_contained_paths": true
+    }
+  ],
+  "png_checks": [
+    {
+      "file": "png/sciledger-compact-dark.png",
+      "size": [
+        1200,
+        950
+      ],
+      "mode": "RGBA",
+      "alpha_bbox": [
+        220,
+        90,
+        983,
+        802
+      ],
+      "palette_valid": true,
+      "opaque_color_count": 2
+    },
+    {
+      "file": "png/sciledger-compact.png",
+      "size": [
+        1200,
+        950
+      ],
+      "mode": "RGBA",
+      "alpha_bbox": [
+        220,
+        90,
+        983,
+        802
+      ],
+      "palette_valid": true,
+      "opaque_color_count": 2
+    },
+    {
+      "file": "png/sciledger-favicon-16.png",
+      "size": [
+        16,
+        16
+      ],
+      "mode": "RGBA",
+      "alpha_bbox": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "palette_valid": true,
+      "opaque_color_count": 26
+    },
+    {
+      "file": "png/sciledger-favicon-24.png",
+      "size": [
+        24,
+        24
+      ],
+      "mode": "RGBA",
+      "alpha_bbox": [
+        0,
+        0,
+        24,
+        24
+      ],
+      "palette_valid": true,
+      "opaque_color_count": 45
+    },
+    {
+      "file": "png/sciledger-favicon-32.png",
+      "size": [
+        32,
+        32
+      ],
+      "mode": "RGBA",
+      "alpha_bbox": [
+        0,
+        0,
+        32,
+        32
+      ],
+      "palette_valid": true,
+      "opaque_color_count": 45
+    },
+    {
+      "file": "png/sciledger-favicon-48.png",
+      "size": [
+        48,
+        48
+      ],
+      "mode": "RGBA",
+      "alpha_bbox": [
+        0,
+        0,
+        48,
+        48
+      ],
+      "palette_valid": true,
+      "opaque_color_count": 68
+    },
+    {
+      "file": "png/sciledger-favicon-64.png",
+      "size": [
+        64,
+        64
+      ],
+      "mode": "RGBA",
+      "alpha_bbox": [
+        0,
+        0,
+        64,
+        64
+      ],
+      "palette_valid": true,
+      "opaque_color_count": 80
+    },
+    {
+      "file": "png/sciledger-favicon.png",
+      "size": [
+        512,
+        512
+      ],
+      "mode": "RGBA",
+      "alpha_bbox": [
+        0,
+        0,
+        512,
+        512
+      ],
+      "palette_valid": true,
+      "opaque_color_count": 232
+    },
+    {
+      "file": "png/sciledger-logo-dark.png",
+      "size": [
+        2400,
+        698
+      ],
+      "mode": "RGBA",
+      "alpha_bbox": [
+        131,
+        143,
+        2269,
+        555
+      ],
+      "palette_valid": true,
+      "opaque_color_count": 2
+    },
+    {
+      "file": "png/sciledger-logo-light.png",
+      "size": [
+        2400,
+        698
+      ],
+      "mode": "RGBA",
+      "alpha_bbox": [
+        131,
+        143,
+        2269,
+        555
+      ],
+      "palette_valid": true,
+      "opaque_color_count": 2
+    },
+    {
+      "file": "png/sciledger-logo-monochrome.png",
+      "size": [
+        2400,
+        698
+      ],
+      "mode": "RGBA",
+      "alpha_bbox": [
+        131,
+        143,
+        2269,
+        555
+      ],
+      "palette_valid": true,
+      "opaque_color_count": 1
+    },
+    {
+      "file": "png/sciledger-logo-white.png",
+      "size": [
+        2400,
+        698
+      ],
+      "mode": "RGBA",
+      "alpha_bbox": [
+        131,
+        143,
+        2269,
+        555
+      ],
+      "palette_valid": true,
+      "opaque_color_count": 1
+    },
+    {
+      "file": "png/sciledger-logo.png",
+      "size": [
+        2400,
+        698
+      ],
+      "mode": "RGBA",
+      "alpha_bbox": [
+        131,
+        143,
+        2269,
+        555
+      ],
+      "palette_valid": true,
+      "opaque_color_count": 2
+    },
+    {
+      "file": "png/sciledger-symbol-dark.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGBA",
+      "alpha_bbox": [
+        109,
+        109,
+        915,
+        915
+      ],
+      "palette_valid": true,
+      "opaque_color_count": 1
+    },
+    {
+      "file": "png/sciledger-symbol-monochrome.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGBA",
+      "alpha_bbox": [
+        109,
+        109,
+        915,
+        915
+      ],
+      "palette_valid": true,
+      "opaque_color_count": 1
+    },
+    {
+      "file": "png/sciledger-symbol-white.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGBA",
+      "alpha_bbox": [
+        109,
+        109,
+        915,
+        915
+      ],
+      "palette_valid": true,
+      "opaque_color_count": 1
+    },
+    {
+      "file": "png/sciledger-symbol.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGBA",
+      "alpha_bbox": [
+        109,
+        109,
+        915,
+        915
+      ],
+      "palette_valid": true,
+      "opaque_color_count": 1
+    },
+    {
+      "file": "png/sciledger-wordmark-white.png",
+      "size": [
+        2000,
+        599
+      ],
+      "mode": "RGBA",
+      "alpha_bbox": [
+        91,
+        88,
+        1916,
+        477
+      ],
+      "palette_valid": true,
+      "opaque_color_count": 1
+    },
+    {
+      "file": "png/sciledger-wordmark.png",
+      "size": [
+        2000,
+        599
+      ],
+      "mode": "RGBA",
+      "alpha_bbox": [
+        91,
+        88,
+        1916,
+        477
+      ],
+      "palette_valid": true,
+      "opaque_color_count": 1
+    }
+  ],
+  "contrast_ratios": {
+    "primary_on_white": 5.17,
+    "primary_on_light": 4.95,
+    "dark_on_white": 17.74,
+    "reverse_blue_on_dark": 6.98,
+    "white_on_dark": 17.74
+  },
+  "result": "pass",
+  "monochrome_geometry_equal": true,
+  "monochrome_max_alpha_rounding_difference_255": 1,
+  "light_alias_equal": true
+}

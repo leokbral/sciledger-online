@@ -83,7 +83,7 @@
 							href="{rota}/{paper.id}"
 							class="flex min-w-0 flex-1 items-center space-x-4 hover:text-secondary-500"
 						>
-							<img src="/favicon.png" alt="Paper" class="w-8 h-8" />
+							<img src="/brand/logo/sciledger-symbol.svg" alt="Paper" class="w-8 h-8" />
 							<span class="min-w-0 flex-auto">
 								<dt class="font-bold">{@html paper.title}</dt>
 								<p class="text-sm text-gray-600 capitalize">Status: {paper.status}</p>
