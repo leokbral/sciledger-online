@@ -10,6 +10,17 @@
 
 	<div class="grid gap-4 sm:grid-cols-2">
 		<a
+			href="/help/about"
+			class="block rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:shadow-md hover:border-primary-400"
+		>
+			<h2 class="text-lg font-semibold text-gray-900">About SciLedger</h2>
+			<p class="text-sm text-gray-600 mt-1">
+				What the platform is, why it exists, how the editorial process works, and why publish here.
+			</p>
+			<p class="text-sm text-primary-700 mt-3 font-medium">Read more</p>
+		</a>
+
+		<a
 			href="/help/how-to-submit"
 			class="block rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:shadow-md hover:border-primary-400"
 		>
