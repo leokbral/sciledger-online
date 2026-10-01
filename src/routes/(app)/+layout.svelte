@@ -81,6 +81,16 @@
 							active="bg-transparent border-b-2 border-primary-500 rounded-none"
 							width='w-24'
 						></Navigation.Tile>
+						{#if data.isSuperAdmin}
+							<Navigation.Tile
+								label="Admin"
+								href="/admin"
+								selected={page.url.pathname.startsWith('/admin') &&
+									!page.url.pathname.startsWith('/admin/rbac')}
+								active="bg-transparent border-b-2 border-primary-500 rounded-none"
+								width='w-24'
+							></Navigation.Tile>
+						{/if}
 						{#if data.canManageRbac}
 							<Navigation.Tile
 								label="RBAC"
