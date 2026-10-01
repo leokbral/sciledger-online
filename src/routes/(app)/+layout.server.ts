@@ -4,6 +4,7 @@ import { resolveUserIdentifiers } from '$lib/helpers/userIdentifiers';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import { can } from '$lib/server/authorization/authorizationService';
 import { hasReviewerCapability } from '$lib/server/authorization/reviewerCapability';
+import { isSuperAdmin } from '$lib/server/authorization/superAdmin';
 import type { LayoutServerLoad } from './$types';
 import type { Notification } from '$lib/types/Notification'; // ajuste se necessário
 
@@ -16,7 +17,8 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 		return {
 			user: sessionUser,
 			notifications: [],
-			canManageRbac: false
+			canManageRbac: false,
+			isSuperAdmin: false
 		};
 	}
 
@@ -44,6 +46,9 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 	let isAuthor = false;
 	let isReviewer = false;
 	let isAdmin = false;
+	// Drives only the visibility of the Administration nav entry. Every /admin page
+	// and API re-checks server-side, so a stale or forged value grants nothing.
+	let superAdmin = false;
 
 	try {
 		const { aliases: userAliases } = await resolveUserIdentifiers(user);
@@ -86,6 +91,7 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 		isAdmin = canManageRbac;
 		isAuthor = await can(user, 'paper.submit');
 		isReviewer = await hasReviewerCapability(user);
+		superAdmin = await isSuperAdmin(user);
 	} catch (error) {
 		console.error('Erro ao resolver permissao RBAC:', error);
 	}
@@ -125,6 +131,7 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 			updatedAt: user.updatedAt
 		},
 		notifications,
-		canManageRbac
+		canManageRbac,
+		isSuperAdmin: superAdmin
 	};
 };

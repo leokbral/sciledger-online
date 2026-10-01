@@ -19,7 +19,38 @@ export const PERMISSIONS = [
 
 export type PermissionKey = (typeof PERMISSIONS)[number] | string;
 
+/**
+ * Platform-wide super administrator capability.
+ *
+ * This permission is deliberately NOT part of `PERMISSIONS`. That exclusion is a
+ * security boundary, not an oversight:
+ *
+ *  - `DEFAULT_GLOBAL_ROLES.Admin` grants `[...PERMISSIONS]`, so listing it there
+ *    would silently turn every existing Admin into a super administrator.
+ *  - The RBAC admin screen renders its checkboxes from `PERMISSIONS` and filters
+ *    submitted values against the same array, so a `rbac.manage` holder cannot
+ *    attach this permission to a role through the UI.
+ *
+ * `PermissionKey` is a union with `string`, so `authorize(user, SUPER_ADMIN_PERMISSION)`
+ * type-checks without the permission being a member of the array.
+ */
+export const SUPER_ADMIN_PERMISSION = 'platform.superAdmin';
+
+/** Role key that carries `SUPER_ADMIN_PERMISSION` at global scope. */
+export const SUPER_ADMIN_ROLE_KEY = 'SuperAdmin';
+
 export const DEFAULT_GLOBAL_ROLES = [
+	{
+		key: SUPER_ADMIN_ROLE_KEY,
+		name: 'Super Administrator',
+		description:
+			'Platform-wide administration: read access to every user, hub, paper, review and invitation. Granted only by the bootstrap script, never through the RBAC UI.',
+		priority: 0,
+		inheritsFrom: [],
+		permissions: [SUPER_ADMIN_PERMISSION],
+		isSystem: true,
+		isProtected: true
+	},
 	{
 		key: 'Admin',
 		name: 'Admin',

@@ -8,13 +8,32 @@ import Hubs from '$lib/db/models/Hub';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import { authorize } from '$lib/server/authorization/authorizationService';
 import { ensureDefaultRoles } from '$lib/server/authorization/bootstrapRbac';
-import { PERMISSIONS } from '$lib/server/authorization/permissions';
+import { PERMISSIONS, SUPER_ADMIN_ROLE_KEY } from '$lib/server/authorization/permissions';
 import { emitEvent } from '$lib/services/EventService';
 
 async function assertCanManageRbac(user: any) {
 	const authorization = await authorize(user, 'rbac.manage');
 	return authorization.allowed;
 }
+
+/**
+ * `rbac.manage` must not be a path to platform super administration.
+ *
+ * This screen lets any `rbac.manage` holder edit a global role's permissions,
+ * assign a global role to any account, and revoke an assignment. Left open, that
+ * would mean an Admin could grant themselves `SuperAdmin` (privilege escalation),
+ * strip the permission off the role by saving the form without it (lockout), or
+ * revoke the only super administrator (lockout).
+ *
+ * The SuperAdmin role is therefore hidden from this screen and refused by its
+ * mutations. It is granted exclusively by `scripts/bootstrap-super-admin.js`.
+ */
+function isSuperAdminRoleKey(roleKey: string | null | undefined) {
+	return String(roleKey || '').trim() === SUPER_ADMIN_ROLE_KEY;
+}
+
+const SUPER_ADMIN_REFUSAL =
+	'The SuperAdmin role is managed by the platform bootstrap script and cannot be changed here.';
 
 function getFormPermissions(formData: FormData) {
 	return formData
@@ -66,8 +85,14 @@ export const load: PageServerLoad = async ({ locals }) => {
 	}
 
 	const [roles, assignments, users, hubs, auditLogs] = await Promise.all([
-		Role.find({ scopeType: 'global', scopeId: null }).sort({ isSystem: -1, key: 1 }).lean(),
-		UserRoleAssignment.find({ scopeType: 'global', isActive: true })
+		Role.find({ scopeType: 'global', scopeId: null, key: { $ne: SUPER_ADMIN_ROLE_KEY } })
+			.sort({ isSystem: -1, key: 1 })
+			.lean(),
+		UserRoleAssignment.find({
+			scopeType: 'global',
+			isActive: true,
+			roleKey: { $ne: SUPER_ADMIN_ROLE_KEY }
+		})
 			.sort({ createdAt: -1 })
 			.limit(250)
 			.lean(),
@@ -106,6 +131,10 @@ export const actions: Actions = {
 
 		if (!key || !name) {
 			return fail(400, { message: 'Role key and name are required' });
+		}
+
+		if (isSuperAdminRoleKey(key)) {
+			return fail(403, { message: SUPER_ADMIN_REFUSAL });
 		}
 
 		const roleResult = await Role.updateOne(
@@ -168,6 +197,10 @@ export const actions: Actions = {
 			return fail(400, { message: 'Role key is required' });
 		}
 
+		if (isSuperAdminRoleKey(roleKey)) {
+			return fail(403, { message: SUPER_ADMIN_REFUSAL });
+		}
+
 		const previousRole: any = await Role.findOne({
 			key: roleKey,
 			scopeType: 'global',
@@ -228,6 +261,10 @@ export const actions: Actions = {
 
 		if (!userId || !roleKey) {
 			return fail(400, { message: 'Invalid role assignment' });
+		}
+
+		if (isSuperAdminRoleKey(roleKey)) {
+			return fail(403, { message: SUPER_ADMIN_REFUSAL });
 		}
 
 		const role = await Role.findOne({ key: roleKey, scopeType: 'global', scopeId: null, isActive: true });
@@ -310,6 +347,11 @@ export const actions: Actions = {
 			$or: [{ _id: assignmentId }, { id: assignmentId }],
 			scopeType: 'global'
 		}).lean();
+
+		if (isSuperAdminRoleKey(assignment?.roleKey)) {
+			return fail(403, { message: SUPER_ADMIN_REFUSAL });
+		}
+
 		const role: any = assignment
 			? await Role.findOne({
 					key: assignment.roleKey,

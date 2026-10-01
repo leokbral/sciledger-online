@@ -10,6 +10,7 @@
     "playwright:install": "playwright install chromium",
     "migrate:paper-status-reviewer-assignment": "node scripts/migrate-paper-status-to-reviewer-assignment.js",
     "migrate:rbac-defaults": "node scripts/migrate-rbac-defaults.js",
+    "bootstrap:super-admin": "node scripts/bootstrap-super-admin.js",
     "test": "npm run test:integration && npm run test:unit",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
