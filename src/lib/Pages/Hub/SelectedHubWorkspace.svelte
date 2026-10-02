@@ -3,6 +3,7 @@
 	import Icon from '@iconify/svelte';
 	import type { DashboardUser } from '$lib/components/Dashboard/types';
 	import { getHubMetrics } from './hubMetrics';
+	import { filterPapersForPersona } from './hubPaperVisibility';
 	import { resolveHubWorkspaceForHub } from './hubResolver';
 	import type { HubRoleContext, HubStats, HubSummary, HubWorkspacePersonaKey } from './hubTypes';
 	import type { HubWorkspacePaper, HubWorkspaceReview } from './hubTypes';
@@ -26,7 +27,8 @@
 		details?: Snippet;
 		members?: Snippet;
 		management?: Snippet;
-		workspace?: Snippet;
+		/** Receives the papers visible to the active workspace persona. */
+		workspace?: Snippet<[HubWorkspacePaper[]]>;
 		stats?: HubStats;
 	}
 
@@ -48,7 +50,6 @@
 		currentUserHubMember: currentUserHubMember ?? hub.currentUserHubMember
 	} satisfies HubSummary);
 	let hubs = $derived([contextualHub]);
-	let metrics = $derived(getHubMetrics(hubs, papers, reviews));
 	let currentUserId = $derived(String(user.id ?? user._id ?? ''));
 	let resolution = $derived(
 		resolveHubWorkspaceForHub(contextualHub, currentUserHubMember, {
@@ -61,6 +62,9 @@
 	let activePersona = $derived(
 		availablePersonas.find((persona) => persona.key === selectedPersonaKey) ?? availablePersonas[0]
 	);
+	// Each persona only sees its own papers: reviewers their assignments, authors their manuscripts.
+	let personaPapers = $derived(filterPapersForPersona(papers, activePersona?.key, currentUserId));
+	let metrics = $derived(getHubMetrics(hubs, personaPapers, reviews));
 	const loading = false;
 	const error = null;
 
@@ -78,6 +82,10 @@
 		selectedPersonaKey = (event.currentTarget as HTMLSelectElement).value as HubWorkspacePersonaKey;
 	}
 </script>
+
+{#snippet personaWorkspace()}
+	{@render workspace?.(personaPapers)}
+{/snippet}
 
 <section class="space-y-6">
 	<div
@@ -129,7 +137,7 @@
 				hub={contextualHub}
 				hubRoleLabel={activePersona.label}
 				{hubs}
-				{papers}
+				papers={personaPapers}
 				{reviews}
 				{metrics}
 				{loading}
@@ -137,7 +145,7 @@
 				{details}
 				{members}
 				{management}
-				{workspace}
+				workspace={workspace ? personaWorkspace : undefined}
 				{stats}
 			/>
 		{:else if activePersona?.role === 'editor'}
@@ -146,7 +154,7 @@
 				hub={contextualHub}
 				hubRoleLabel={activePersona.label}
 				{hubs}
-				{papers}
+				papers={personaPapers}
 				{reviews}
 				{metrics}
 				{loading}
@@ -154,7 +162,7 @@
 				{details}
 				{members}
 				{management}
-				{workspace}
+				workspace={workspace ? personaWorkspace : undefined}
 				{stats}
 			/>
 		{:else if activePersona?.role === 'reviewer'}
@@ -163,13 +171,13 @@
 				hub={contextualHub}
 				hubRoleLabel={activePersona.label}
 				{hubs}
-				{papers}
+				papers={personaPapers}
 				{reviews}
 				{metrics}
 				{loading}
 				{error}
 				{details}
-				{workspace}
+				workspace={workspace ? personaWorkspace : undefined}
 				{stats}
 			/>
 		{:else if activePersona?.role === 'author'}
@@ -178,13 +186,13 @@
 				hub={contextualHub}
 				hubRoleLabel={activePersona.label}
 				{hubs}
-				{papers}
+				papers={personaPapers}
 				{reviews}
 				{metrics}
 				{loading}
 				{error}
 				{details}
-				{workspace}
+				workspace={workspace ? personaWorkspace : undefined}
 				{stats}
 			/>
 		{:else}
@@ -193,13 +201,13 @@
 				hub={contextualHub}
 				hubRoleLabel={activePersona?.label ?? resolution.label}
 				{hubs}
-				{papers}
+				papers={personaPapers}
 				{reviews}
 				{metrics}
 				{loading}
 				{error}
 				{details}
-				{workspace}
+				workspace={workspace ? personaWorkspace : undefined}
 				{stats}
 			/>
 		{/if}

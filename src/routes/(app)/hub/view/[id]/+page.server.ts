@@ -77,15 +77,27 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 				status: { $ne: 'draft' }
 			};
 		} else {
-			// Outros usuários: vê papers onde é revisor, autor ou publicados
+			// Reviewers and authors only see papers they are involved in (plus published ones).
+			// Review assignments exclude drafts and papers declined by the Hub.
 			paperQuery = {
 				hubId: params.id,
 				$or: [
 					{ status: 'published' },
 					{
-						reviewers: { $in: [locals.user.id] },
-						status: { $ne: 'draft' }
-					}, // Papers onde é revisor (não draft)
+						status: { $nin: ['draft', 'rejected'] },
+						rejectedByHub: { $ne: true },
+						$or: [
+							{ reviewers: { $in: [locals.user.id] } },
+							{
+								'peer_review.responses': {
+									$elemMatch: {
+										reviewerId: locals.user.id,
+										status: { $in: ['accepted', 'completed'] }
+									}
+								}
+							}
+						]
+					},
 					{
 						status: { $ne: 'published' },
 						$or: [
@@ -229,9 +241,9 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 			hub: hubData
 		});
 		const canManageEditorialFlow = assignmentAuthorization.allowed;
-		const canReviewHub = currentUserHubMember?.canReview === true;
 		const usersData = await fetchUsers();
-		const papersData = await fetchPapers(canManageEditorialFlow || canReviewHub);
+		// Only editorial roles see every Hub paper; a Reviewer role alone does not.
+		const papersData = await fetchPapers(canManageEditorialFlow);
 		const hubId = getIdAliases(hubData)[0] || params.id;
 		const roleManagementAuthorization = await authorize(locals.user, 'hub.manageRoles', {
 			hub: hubData
