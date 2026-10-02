@@ -33,6 +33,17 @@
 	function permissionGroups() {
 		return groupPermissionsForDisplay(data.permissions);
 	}
+
+	function formatLastLogin(value: string | null | undefined) {
+		if (!value) return 'No login recorded';
+		const date = new Date(value);
+		if (Number.isNaN(date.getTime())) return 'No login recorded';
+		return new Intl.DateTimeFormat('en-GB', {
+			dateStyle: 'medium',
+			timeStyle: 'short',
+			timeZone: 'America/Sao_Paulo'
+		}).format(date);
+	}
 </script>
 
 <svelte:head>
@@ -50,6 +61,33 @@
 			<h1 class="text-2xl font-semibold text-slate-950">Platform RBAC</h1>
 			<p class="text-sm text-slate-600">Manage global platform roles. Hub roles are managed inside each hub.</p>
 		</header>
+
+		<section class="space-y-4">
+			<h2 class="text-lg font-semibold text-slate-900">User logins</h2>
+			<p class="text-sm text-slate-600">Last successful login. Times shown in Brasília time (America/Sao_Paulo).</p>
+			<div class="overflow-x-auto rounded border border-slate-200 bg-white">
+				<table class="min-w-full text-left text-sm">
+					<thead class="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
+						<tr>
+							<th scope="col" class="px-3 py-2">User</th>
+							<th scope="col" class="px-3 py-2">Username</th>
+							<th scope="col" class="px-3 py-2">Last login</th>
+						</tr>
+					</thead>
+					<tbody>
+						{#each data.users as user}
+							<tr class="border-b border-slate-100">
+								<td class="px-3 py-2">{userLabel(user.id || user._id)}</td>
+								<td class="px-3 py-2">{user.username || '—'}</td>
+								<td class="whitespace-nowrap px-3 py-2">{formatLastLogin(user.lastLoginAt)}</td>
+							</tr>
+						{:else}
+							<tr><td colspan="3" class="px-3 py-4 text-slate-500">No users found.</td></tr>
+						{/each}
+					</tbody>
+				</table>
+			</div>
+		</section>
 
 		<section class="space-y-4">
 			<h2 class="text-lg font-semibold text-slate-900">Roles</h2>

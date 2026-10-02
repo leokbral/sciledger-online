@@ -14,6 +14,8 @@ export type User = {
     email: string; // User email
     password: string; // User password
     refreshToken?: string; // Token for managing login sessions
+    firstLoginAt?: Date;
+    lastLoginAt?: Date;
     resetPasswordTokenHash: string;
     resetPasswordExpiresAt: Date; // Password reset token expiry
     emailVerified: boolean; // Email verification

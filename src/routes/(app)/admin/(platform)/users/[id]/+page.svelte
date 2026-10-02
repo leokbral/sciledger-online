@@ -1,6 +1,11 @@
 <script lang="ts">
 	import StatusBadge from '$lib/components/Admin/StatusBadge.svelte';
-	import { formatAdminDate, formatAdminDateTime, truncate } from '$lib/helpers/adminFormat';
+	import {
+		formatAdminDate,
+		formatAdminDateTime,
+		formatAdminLoginDate,
+		truncate
+	} from '$lib/helpers/adminFormat';
 	import type { PageData } from './$types';
 
 	interface Props {
@@ -181,7 +186,21 @@
 						<dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Created</dt>
 						<dd class="mt-0.5 text-slate-700">{formatAdminDate(profile.createdAt)}</dd>
 					</div>
+					<div>
+						<dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">
+							First recorded login
+						</dt>
+						<dd class="mt-0.5 text-slate-700">{formatAdminLoginDate(profile.firstLoginAt)}</dd>
+					</div>
+					<div>
+						<dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Last login</dt>
+						<dd class="mt-0.5 text-slate-700">{formatAdminLoginDate(profile.lastLoginAt)}</dd>
+					</div>
 				</dl>
+				<p class="mt-4 text-xs text-slate-500">
+					Login times use Brasília time (America/Sao_Paulo). The first recorded login is the
+					earliest available record; older accounts may have incomplete login history.
+				</p>
 			</section>
 
 			<section class="rounded-xl border border-blue-200 bg-blue-50 p-5">

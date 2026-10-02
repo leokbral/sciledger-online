@@ -34,6 +34,17 @@ export function formatAdminDateTime(value: unknown): string {
 	});
 }
 
+export function formatAdminLoginDate(value: unknown): string {
+	if (!value) return 'No login recorded';
+	const date = value instanceof Date ? value : new Date(String(value));
+	if (Number.isNaN(date.getTime())) return 'No login recorded';
+	return new Intl.DateTimeFormat('en-GB', {
+		dateStyle: 'medium',
+		timeStyle: 'short',
+		timeZone: 'America/Sao_Paulo'
+	}).format(date);
+}
+
 /** Truncates long free text (paper titles) for table cells without breaking words mid-stream. */
 export function truncate(value: unknown, maxLength = 80): string {
 	const text = String(value ?? '').trim();

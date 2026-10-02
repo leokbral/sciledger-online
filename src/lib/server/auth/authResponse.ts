@@ -1,4 +1,6 @@
 import { error, json } from '@sveltejs/kit';
+import Users from '$lib/db/models/User';
+import { getUserLoginHistory } from './loginHistory';
 import { createSession } from './SessionService';
 import { isSecureRequest, serializeSessionCookie } from './sessionCookie';
 
@@ -16,6 +18,7 @@ type CreateSessionForAuth = (input: {
 }) => Promise<{
 	sessionToken: string;
 	session: {
+		createdAt: Date;
 		expiresAt: Date;
 	};
 }>;
@@ -63,6 +66,20 @@ export async function respondWithSession(
 				expires: session.expiresAt
 			})
 		);
+
+		try {
+			const history = await getUserLoginHistory([body.user]);
+			await Users.updateOne(
+				{ $or: [{ id: userId }, { _id: userId }] },
+				{
+					$min: { firstLoginAt: history.get(String(userId))?.firstLoginAt ?? session.createdAt },
+					$max: { lastLoginAt: session.createdAt }
+				}
+			);
+		} catch (error) {
+			// Login remains available if recording its timestamp fails.
+			console.error('Failed to record login dates:', error);
+		}
 	} catch (error) {
 		console.error('Failed to create persistent user session:', error);
 	}

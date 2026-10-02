@@ -13,6 +13,8 @@ export const UserSchema: Schema = new Schema({
     email: { type: String, required: true, unique: true }, // User email
     password: { type: String, required: false }, // User password (optional for ORCID login)
     refreshToken: { type: String }, // Token for managing login sessions
+    firstLoginAt: { type: Date }, // Earliest recorded successful login
+    lastLoginAt: { type: Date }, // Most recent successful login, retained after session expiry
     resetPasswordTokenHash: { type: String, index: true },
     resetPasswordExpiresAt: { type: Date }, // Password reset token expiry
     emailVerified: { type: Boolean, default: false }, // Email verification

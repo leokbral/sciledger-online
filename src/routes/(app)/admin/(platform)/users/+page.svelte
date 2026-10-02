@@ -2,7 +2,7 @@
 	import AdminFilters from '$lib/components/Admin/AdminFilters.svelte';
 	import AdminTable from '$lib/components/Admin/AdminTable.svelte';
 	import StatusBadge from '$lib/components/Admin/StatusBadge.svelte';
-	import { formatAdminDate } from '$lib/helpers/adminFormat';
+	import { formatAdminDate, formatAdminLoginDate } from '$lib/helpers/adminFormat';
 	import type { PageData } from './$types';
 
 	interface Props {
@@ -11,7 +11,16 @@
 
 	let { data }: Props = $props();
 
-	const columns = ['User', 'Email', 'Global roles', 'Hubs', 'Status', 'Joined'] as const;
+	const columns = [
+		'User',
+		'Email',
+		'Global roles',
+		'Hubs',
+		'Status',
+		'Registered',
+		'First recorded login',
+		'Last login'
+	] as const;
 </script>
 
 <svelte:head>
@@ -27,6 +36,10 @@
 	</div>
 
 	<AdminFilters search={data.users.search} placeholder="Name, username, e-mail or ORCID iD" />
+	<p class="text-sm text-slate-500">
+		Login times are shown in Brasília time (America/Sao_Paulo). Older accounts may have incomplete
+		login history; the first recorded login is the earliest available record.
+	</p>
 
 	<AdminTable
 		{columns}
@@ -74,6 +87,12 @@
 			<td class="px-4 py-3 text-slate-600">{user.hubRoleCount}</td>
 			<td class="px-4 py-3"><StatusBadge status={user.billingStatus} /></td>
 			<td class="whitespace-nowrap px-4 py-3 text-slate-500">{formatAdminDate(user.createdAt)}</td>
+			<td class="whitespace-nowrap px-4 py-3 text-slate-500">
+				{formatAdminLoginDate(user.firstLoginAt)}
+			</td>
+			<td class="whitespace-nowrap px-4 py-3 text-slate-500">
+				{formatAdminLoginDate(user.lastLoginAt)}
+			</td>
 		{/snippet}
 	</AdminTable>
 </section>

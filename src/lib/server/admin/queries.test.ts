@@ -83,6 +83,10 @@ const harness = vi.hoisted(() => {
 
 const models = harness.models;
 
+vi.mock('$lib/db/models/UserSession', () => ({
+	default: { aggregate: async () => [] }
+}));
+
 vi.mock('$lib/db/mongooseConnection', () => ({
 	start_mongo: vi.fn().mockResolvedValue(undefined)
 }));
@@ -168,6 +172,29 @@ beforeEach(() => {
 });
 
 describe('listUsers', () => {
+	it('returns login dates separately from the registration date', async () => {
+		models.users.setRows([{
+			...USER_WITH_SECRETS,
+			firstLoginAt: new Date('2026-02-01T12:00:00Z'),
+			lastLoginAt: new Date('2026-10-02T12:00:00Z')
+		}]);
+		const { listUsers } = await import('./queries');
+		const result = await listUsers(pagination);
+		expect(result.items[0]).toMatchObject({
+			createdAt: '2026-01-01T00:00:00.000Z',
+			firstLoginAt: '2026-02-01T12:00:00.000Z',
+			lastLoginAt: '2026-10-02T12:00:00.000Z'
+		});
+		expectNoSecrets(result);
+	});
+
+	it('does not treat registration as a login when no history exists', async () => {
+		models.users.setRows([USER_WITH_SECRETS]);
+		const { listUsers } = await import('./queries');
+		const result = await listUsers(pagination);
+		expect(result.items[0]).toMatchObject({ firstLoginAt: null, lastLoginAt: null });
+	});
+
 	it('never returns credentials, tokens or Stripe identifiers', async () => {
 		models.users.setRows([USER_WITH_SECRETS]);
 		const { listUsers } = await import('./queries');
@@ -236,6 +263,21 @@ describe('listUsers', () => {
 });
 
 describe('getUserDetail', () => {
+	it('includes the same login dates in the user detail', async () => {
+		models.users.setRows([{
+			...USER_WITH_SECRETS,
+			firstLoginAt: new Date('2026-02-01T12:00:00Z'),
+			lastLoginAt: new Date('2026-10-02T12:00:00Z')
+		}]);
+		const { getUserDetail } = await import('./queries');
+		const result = await getUserDetail('user-1');
+		expect(result).toMatchObject({
+			firstLoginAt: '2026-02-01T12:00:00.000Z',
+			lastLoginAt: '2026-10-02T12:00:00.000Z'
+		});
+		expectNoSecrets(result);
+	});
+
 	it('returns null for an unknown id instead of throwing', async () => {
 		const { getUserDetail } = await import('./queries');
 

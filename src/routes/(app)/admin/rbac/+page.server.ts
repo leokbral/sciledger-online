@@ -4,6 +4,7 @@ import Role from '$lib/db/models/Role';
 import UserRoleAssignment from '$lib/db/models/UserRoleAssignment';
 import EditorialAuditLog from '$lib/db/models/EditorialAuditLog';
 import Users from '$lib/db/models/User';
+import UserSession from '$lib/db/models/UserSession';
 import Hubs from '$lib/db/models/Hub';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import { authorize } from '$lib/server/authorization/authorizationService';
@@ -97,7 +98,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 			.limit(250)
 			.lean(),
 		Users.find({})
-			.select('id _id firstName lastName username email roles')
+			.select('id _id firstName lastName username email roles lastLoginAt')
 			.sort({ firstName: 1, lastName: 1 })
 			.limit(500)
 			.lean(),
@@ -105,12 +106,38 @@ export const load: PageServerLoad = async ({ locals }) => {
 		EditorialAuditLog.find({}).sort({ createdAt: -1 }).limit(100).lean()
 	]);
 
+	// Older accounts can use login dates from sessions that are still retained.
+	const usersWithoutLogin = users.filter((user: any) => !user.lastLoginAt);
+	const previousLogins = usersWithoutLogin.length
+		? await UserSession.aggregate<{ _id: string; lastLoginAt: Date }>([
+				{
+					$match: {
+						userId: {
+							$in: usersWithoutLogin.flatMap((user: any) =>
+								[user.id, user._id].filter(Boolean).map(String)
+							)
+						}
+					}
+				},
+				{ $group: { _id: '$userId', lastLoginAt: { $max: '$createdAt' } } }
+			])
+		: [];
+	const loginByUserId = new Map(previousLogins.map((login) => [login._id, login.lastLoginAt]));
+	const usersWithLogin = users.map((user: any) => ({
+		...user,
+		lastLoginAt:
+			user.lastLoginAt ||
+			loginByUserId.get(String(user.id)) ||
+			loginByUserId.get(String(user._id)) ||
+			null
+	}));
+
 	return {
 		authorized,
 		permissions: PERMISSIONS,
 		roles: JSON.parse(JSON.stringify(roles)),
 		assignments: JSON.parse(JSON.stringify(assignments)),
-		users: JSON.parse(JSON.stringify(users)),
+		users: JSON.parse(JSON.stringify(usersWithLogin)),
 		hubs: JSON.parse(JSON.stringify(hubs)),
 		auditLogs: JSON.parse(JSON.stringify(auditLogs))
 	};

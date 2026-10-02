@@ -7,6 +7,7 @@ import ReviewModel from '$lib/db/models/Review';
 import UserRoleAssignment from '$lib/db/models/UserRoleAssignment';
 import Users from '$lib/db/models/User';
 import { start_mongo } from '$lib/db/mongooseConnection';
+import { getUserLoginHistory } from '$lib/server/auth/loginHistory';
 import { buildSearchFilter, paginate, type Paginated, type PaginationInput } from './pagination';
 
 /**
@@ -31,6 +32,8 @@ const USER_FIELDS = [
 	'emailVerified',
 	'billingStatus',
 	'profilePictureUrl',
+	'firstLoginAt',
+	'lastLoginAt',
 	'createdAt',
 	'updatedAt'
 ].join(' ');
@@ -286,13 +289,14 @@ export async function listUsers(input: PaginationInput): Promise<Paginated<Lean>
 
 	const ids = uniqueIds((rows as Lean[]).flatMap((row) => [row.id, row._id]));
 
-	const [globalRoles, hubRoleRows] = await Promise.all([
+	const [globalRoles, hubRoleRows, loginHistory] = await Promise.all([
 		UserRoleAssignment.find({ userId: { $in: ids }, scopeType: 'global', isActive: true })
 			.select('userId roleKey')
 			.lean(),
 		UserRoleAssignment.find({ userId: { $in: ids }, scopeType: 'hub', isActive: true })
 			.select('userId roleKey scopeId')
-			.lean()
+			.lean(),
+		getUserLoginHistory(rows as Lean[])
 	]);
 
 	const rolesByUser = new Map<string, string[]>();
@@ -324,6 +328,8 @@ export async function listUsers(input: PaginationInput): Promise<Paginated<Lean>
 			],
 			hubRoleCount:
 				(hubCountByUser.get(id) ?? 0) + (id === altId ? 0 : (hubCountByUser.get(altId) ?? 0)),
+			firstLoginAt: loginHistory.get(id)?.firstLoginAt ?? null,
+			lastLoginAt: loginHistory.get(id)?.lastLoginAt ?? null,
 			createdAt: user.createdAt ?? null
 		};
 	});
@@ -345,7 +351,7 @@ export async function getUserDetail(userId: string) {
 
 	const aliases = uniqueIds([user.id, user._id]);
 
-	const [assignments, paperCount, reviewAssignments, recentActivity] = await Promise.all([
+	const [assignments, paperCount, reviewAssignments, recentActivity, loginHistory] = await Promise.all([
 		UserRoleAssignment.find({ userId: { $in: aliases }, isActive: true })
 			.select('roleKey scopeType scopeId grantedBy createdAt')
 			.sort({ scopeType: 1, roleKey: 1 })
@@ -361,7 +367,8 @@ export async function getUserDetail(userId: string) {
 		ActivityEvent.find({ $or: [{ actorId: { $in: aliases } }, { targetUserId: { $in: aliases } }] })
 			.sort({ createdAt: -1 })
 			.limit(15)
-			.lean()
+			.lean(),
+		getUserLoginHistory([user])
 	]);
 
 	const hubIds = uniqueIds([
@@ -386,6 +393,8 @@ export async function getUserDetail(userId: string) {
 		billingStatus: user.billingStatus ?? null,
 		createdAt: user.createdAt ?? null,
 		updatedAt: user.updatedAt ?? null,
+		firstLoginAt: loginHistory.get(normalizeId(user.id || user._id))?.firstLoginAt ?? null,
+		lastLoginAt: loginHistory.get(normalizeId(user.id || user._id))?.lastLoginAt ?? null,
 		paperCount,
 		globalRoles: (assignments as Lean[])
 			.filter((assignment) => assignment.scopeType === 'global')
