@@ -4,7 +4,6 @@
 	import { writable } from 'svelte/store';
 	import type { PaperPublishStoreData } from '$lib/types/PaperPublishStoreData';
 	import { page } from '$app/state';
-	import RichTextEditor from '$lib/components/Text/RichTextEditor.svelte';
 	import Autocomplete from '$lib/components/Autocomplete.svelte';
 
 	import IconDropzone from '@lucide/svelte/icons/image-plus';
@@ -413,6 +412,12 @@
 	let inputAuthorList = $state(getInitialAuthorUsernames());
 	let selected = $state({ value: '' });
 	let content = $state(inicialValue.content || '');
+
+	// Title, abstract and keywords are derived from the uploaded document (DTH extraction)
+	// and are shown read-only; they only change when the main document is re-uploaded.
+	let titleDisplayHtml = $derived(($store.title || '').trim());
+	let abstractDisplayHtml = $derived(($store.abstract || '').trim());
+	let keywordDisplayList = $derived($store.keywords ?? []);
 	let authorAffiliations = $state<Record<string, AuthorAffiliationForm>>({});
 	// let inputComponent: TagsInput = $state();
 
@@ -1918,23 +1923,23 @@
 					</div>
 				{/if}
 			</div>
-			<section class="mb-4 w-full">
-				<!-- <input
-					name="title"
-					class="w-full p-2 border border-surface-300 rounded-lg text-lg"
-					placeholder="Article Title"
-					bind:value={$store.title}
-				/> -->
-				<label for="title" class="block mb-1 font-semibold">Title *</label>
+			<section class="mb-4 w-full" aria-labelledby="title-label">
+				<p id="title-label" class="block mb-1 font-semibold">Title *</p>
 				<p class="text-xs text-surface-600 dark:text-surface-400 mb-2">
-					Enter the full title of your paper. Be clear and descriptive.
+					Extracted from the uploaded document. To change it, update the document and upload it
+					again.
 				</p>
-				<RichTextEditor
-					id="title"
-					bind:content={$store.title}
-					placeholder="Article Title..."
-					minHeight="80px"
-				/>
+				<div
+					class="w-full min-h-[80px] p-4 rounded-lg bg-surface-100 dark:bg-surface-900 text-lg font-semibold break-words"
+				>
+					{#if titleDisplayHtml}
+						{@html titleDisplayHtml}
+					{:else}
+						<p class="text-sm font-normal italic text-surface-500">
+							Will be filled from the uploaded document.
+						</p>
+					{/if}
+				</div>
 			</section>
 			<section id="authors" class="w-full flex flex-col gap-2">
 				<p class="block mb-1 font-semibold">Authors *</p>
@@ -2299,16 +2304,23 @@
 				</div>
 			</section>
 
-			<section class="mb-4 w-full">
-				<label for="abstract" class="block mb-1 font-semibold">Abstract *</label>
+			<section class="mb-4 w-full" aria-labelledby="abstract-label">
+				<p id="abstract-label" class="block mb-1 font-semibold">Abstract *</p>
 				<p class="text-xs text-surface-600 dark:text-surface-400 mb-2">
-					Provide a concise summary of your paper, including the main objectives, methods, results, and conclusions (typically 150-300 words).
+					Extracted from the uploaded document. To change it, update the document and upload it
+					again.
 				</p>
-				<RichTextEditor
-					id="abstract"
-					bind:content={$store.abstract}
-					placeholder="Enter the abstract..."
-				/>
+				<div
+					class="w-full max-h-96 overflow-y-auto p-4 rounded-lg bg-surface-100 dark:bg-surface-900 break-words"
+				>
+					{#if abstractDisplayHtml}
+						{@html abstractDisplayHtml}
+					{:else}
+						<p class="text-sm italic text-surface-500">
+							Will be filled from the uploaded document.
+						</p>
+					{/if}
+				</div>
 			</section>
 
 			<!-- Current Author Profile (if no ORCID search) -->
@@ -2327,18 +2339,27 @@
 			</section> -->
 
 			<!-- {$store.content} -->
-			<section class="mb-4 w-full">
-				<p class="block mb-1 font-semibold">Keywords *</p>
+			<section class="mb-4 w-full" aria-labelledby="keywords-label">
+				<p id="keywords-label" class="block mb-1 font-semibold">Keywords *</p>
 				<p class="text-xs text-surface-600 dark:text-surface-400 mb-2">
-					Add 3-6 keywords that describe your paper. Press Enter after each keyword to add it.
+					Extracted from the uploaded document. To change them, update the document and upload it
+					again.
 				</p>
-				<TagsInput
-					value={$store.keywords}
-					name="chips"
-					placeholder="Enter article keywords..."
-					onValueChange={(e) => ($store.keywords = e.value)}
-					classes="bg-[rgb(240,240,240)] dark:bg-surface-900 rounded-lg"
-				/>
+				<div class="w-full p-4 rounded-lg bg-surface-100 dark:bg-surface-900">
+					{#if keywordDisplayList.length > 0}
+						<ul class="flex flex-wrap gap-2">
+							{#each keywordDisplayList as keyword, index (`${index}-${keyword}`)}
+								<li class="preset-filled-primary-500 px-3 py-1 rounded-base break-words">
+									{keyword}
+								</li>
+							{/each}
+						</ul>
+					{:else}
+						<p class="text-sm italic text-surface-500">
+							Will be filled from the uploaded document.
+						</p>
+					{/if}
+				</div>
 			</section>
 
 			<!-- Scopus Classification Section - Multiple Classifications -->
