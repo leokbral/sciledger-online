@@ -200,8 +200,9 @@
 
 	const filteredPapers = data.papers?.filter((paper: any) => {
 		if (paper.status === 'published') return true;
-		if (isCreator) return true;
-		if (isReviewer) return true;
+		// Editorial roles get the full Hub list from the server; everyone else only sees
+		// papers they review or authored (plus published ones).
+		if (isCreator || isHubManager) return true;
 		if (paper.isAcceptedForReview || false) return true;
 
 		const isMainAuthor = paper.mainAuthor?.id === userId;
@@ -663,10 +664,10 @@
 	</section>
 {/snippet}
 
-{#snippet hubWorkspacePanel()}
+{#snippet hubWorkspacePanel(personaPapers: any[])}
 	<section id="papers" class="scroll-mt-28">
 		<PapersSection
-			papers={workspacePapers}
+			papers={personaPapers}
 			{hub}
 			{isCreator}
 			{isHubManager}
