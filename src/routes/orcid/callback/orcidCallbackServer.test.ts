@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => {
 		findOne: vi.fn(),
 		startMongo: vi.fn(),
 		respondWithSession: vi.fn(),
+		claimFindOneAndUpdate: vi.fn(),
 		UserModel
 	};
 });
@@ -43,6 +44,12 @@ vi.mock('$lib/db/models/User', () => {
 
 vi.mock('$lib/server/auth/authResponse', () => ({
 	respondWithSession: mocks.respondWithSession
+}));
+
+vi.mock('$lib/db/models/OrcidSignupClaim', () => ({
+	default: {
+		findOneAndUpdate: (...args: any[]) => mocks.claimFindOneAndUpdate(...args)
+	}
 }));
 
 function createEvent() {
@@ -79,6 +86,7 @@ describe('ORCID callback email verification policy', () => {
 		mocks.instances.length = 0;
 		mocks.startMongo.mockResolvedValue(undefined);
 		mocks.respondWithSession.mockResolvedValue(new Response(null, { headers: { 'set-cookie': 'session=token' } }));
+		mocks.claimFindOneAndUpdate.mockResolvedValue({ id: 'claim-1' });
 	});
 
 	it('creates a verified user when ORCID returns a public email', async () => {
@@ -106,7 +114,15 @@ describe('ORCID callback email verification policy', () => {
 		expect(user.save).toHaveBeenCalled();
 	});
 
-	it('creates an unverified placeholder user when ORCID has no public email', async () => {
+	/**
+	 * O comportamento mudou de proposito. Antes, uma conta era criada aqui com um
+	 * endereco `<orcid>@orcid.placeholder` inventado -- e se a pessoa ja tivesse
+	 * conta no sistema, essa era uma SEGUNDA conta, orfa, que ela nunca
+	 * conseguia unificar ("This email is already in use" ao tentar cadastrar o
+	 * email real). Agora nada e criado: a identidade do ORCID fica parada num
+	 * registro temporario ate a pessoa confirmar um endereco de verdade.
+	 */
+	it('creates no account when ORCID has no public email, parking a claim instead', async () => {
 		mocks.findOne.mockResolvedValue(null);
 		mockFetchPerson({
 			name: {
@@ -120,18 +136,50 @@ describe('ORCID callback email verification policy', () => {
 		const { GET } = await import('./+server');
 
 		const response = await GET(createEvent() as any);
-		const user = mocks.instances[0];
 
 		expect(response.status).toBe(302);
-		// Conta nova: `profileCompletedAt` ainda nao existe, por isso o desvio --
-		// nao por causa do e-mail placeholder.
-		expect(response.headers.get('location')).toBe('/complete-profile');
-		expect(user.profileCompletedAt).toBeUndefined();
-		expect(user.email).toBe('0000-0001-0002-0003@orcid.placeholder');
-		expect(user.emailVerified).toBe(false);
-		expect(user.emailVerifiedAt).toBeUndefined();
-		expect(user.verificationSource).toBe('orcid_placeholder');
-		expect(user.save).toHaveBeenCalled();
+		expect(response.headers.get('location')).toBe('/orcid/email');
+		// Nenhum usuario construido -- nenhum email inventado em lugar algum.
+		expect(mocks.instances).toHaveLength(0);
+
+		const [filter, update] = mocks.claimFindOneAndUpdate.mock.calls[0];
+		expect(filter).toEqual({ orcid: '0000-0001-0002-0003' });
+		expect(update.$set).toMatchObject({ firstName: 'Ada', lastName: 'Lovelace' });
+		// Uma tentativa reiniciada nao herda endereco nem token de uma anterior.
+		expect(update.$unset).toEqual({ pendingEmail: '', tokenHash: '' });
+
+		// O navegador recebe apenas o id do registro, em cookie httpOnly.
+		const setCookie = response.headers.get('set-cookie') ?? '';
+		expect(setCookie).toContain('orcid_signup=claim-1');
+		expect(setCookie).toContain('HttpOnly');
+	});
+
+	it('logs a legacy placeholder account in instead of parking a new claim', async () => {
+		// Contas criadas pelo fluxo antigo (a do Prof Tetsu, por exemplo) seguem
+		// entrando normalmente -- a correcao nao as deixa de fora.
+		const legacy = {
+			email: '0000-0001-0002-0003@orcid.placeholder',
+			firstName: 'Ada',
+			lastName: 'Lovelace',
+			profileCompletedAt: new Date('2026-01-01T00:00:00.000Z'),
+			save: vi.fn().mockResolvedValue(undefined)
+		};
+		// 3.1 (por orcid) nao acha; a busca pelo placeholder deterministico acha.
+		mocks.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce(legacy);
+		mockFetchPerson({
+			name: {
+				'given-names': { value: 'Ada' },
+				'family-name': { value: 'Lovelace' }
+			},
+			emails: { email: [] }
+		});
+		const { GET } = await import('./+server');
+
+		const response = await GET(createEvent() as any);
+
+		expect(response.headers.get('location')).toBe('/');
+		expect(legacy.save).toHaveBeenCalled();
+		expect(mocks.claimFindOneAndUpdate).not.toHaveBeenCalled();
 	});
 });
 

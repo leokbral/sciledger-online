@@ -7,11 +7,17 @@ import Users from '$lib/db/models/User';
 import { respondWithSession } from '$lib/server/auth/authResponse';
 import { normalizeEmail } from '$lib/server/auth/normalizeEmail';
 import { getOrcidRedirectUri } from '$lib/server/orcid/redirectUri';
+import { createOrcidUser } from '$lib/server/orcid/createOrcidUser';
+import OrcidSignupClaim from '$lib/db/models/OrcidSignupClaim';
+import {
+	getOrcidSignupExpiresAt,
+	serializeOrcidSignupCookie
+} from '$lib/server/auth/orcidSignupClaim';
+import { isSecureRequest } from '$lib/server/auth/sessionCookie';
 import {
 	buildOrcidPlaceholderEmail,
 	isOrcidPlaceholderEmail
 } from '$lib/helpers/orcidPlaceholderEmail';
-import * as crypto from 'crypto';
 
 /**
  * Verifica se o perfil do usuário está completo
@@ -48,19 +54,47 @@ function isProfileComplete(user: any): boolean {
 	return completedExplicitly || hasRealEmail;
 }
 
-function getOrcidVerificationFields(hasPublicEmail: boolean) {
-	if (!hasPublicEmail) {
-		return {
-			emailVerified: false,
-			verificationSource: 'orcid_placeholder'
-		};
-	}
+/**
+ * Parks an ORCID identity that arrived without a usable e-mail address and
+ * sends the browser to the form that asks for one.
+ *
+ * No account is created here. Until the person confirms an address we cannot
+ * tell whether they already have one, and guessing is what used to produce a
+ * second, orphan account with an invented `@orcid.placeholder` address.
+ *
+ * The browser carries only the claim's id, in an httpOnly cookie. Holding it
+ * lets someone name an address and have a confirmation link sent THERE, which
+ * is no privilege at all: the link is the proof, and it lands in that mailbox.
+ */
+async function parkClaimAndAskForEmail(
+	claim: { orcid: string; firstName: string; lastName: string },
+	request: Request,
+	url: URL
+): Promise<Response> {
+	const now = new Date();
+	const saved = await OrcidSignupClaim.findOneAndUpdate(
+		{ orcid: claim.orcid },
+		{
+			$set: {
+				firstName: claim.firstName,
+				lastName: claim.lastName,
+				expiresAt: getOrcidSignupExpiresAt(now),
+				updatedAt: now
+			},
+			// A restarted sign-up must not inherit an address or token from an
+			// abandoned attempt.
+			$unset: { pendingEmail: '', tokenHash: '' }
+		},
+		{ new: true, upsert: true, setDefaultsOnInsert: true }
+	);
 
-	return {
-		emailVerified: true,
-		emailVerifiedAt: new Date(),
-		verificationSource: 'orcid'
-	};
+	const headers = new Headers({ Location: '/orcid/email' });
+	headers.append(
+		'set-cookie',
+		serializeOrcidSignupCookie(String(saved.id), { secure: isSecureRequest(url, request) })
+	);
+
+	return new Response(null, { status: 302, headers });
 }
 
 /**
@@ -256,74 +290,47 @@ export const GET: RequestHandler = async ({ url, request }) => {
 		// ETAPA 4: Criar novo usuário
 		// ====================================================================
 
-		// Se não tem email público no ORCID, usa email placeholder determinístico.
-		// Placeholders não comprovam posse de e-mail real e permanecem não verificados.
-		const userEmail = email || buildOrcidPlaceholderEmail(orcid);
-		const orcidVerificationFields = getOrcidVerificationFields(Boolean(email));
+		// O ORCID publicou o e-mail: ele serve como prova de posse, entao a conta
+		// e criada aqui mesmo, ja verificada.
+		if (email) {
+			const newUser = await createOrcidUser({
+				orcid,
+				firstName,
+				lastName,
+				email,
+				verificationSource: 'orcid',
+				accessToken: access_token,
+				refreshToken: refresh_token,
+				tokenExpiry: new Date(Date.now() + expires_in * 1000)
+			});
 
-		// Gera username único baseado no ORCID
-		const baseUsername = `@${firstName.toLowerCase()}_${orcid.split('-').pop()}`;
-		let username = baseUsername;
-		let usernameExists = await Users.findOne({ username });
-		let counter = 1;
-
-		// Garante que username é único
-		while (usernameExists) {
-			username = `${baseUsername}_${counter}`;
-			usernameExists = await Users.findOne({ username });
-			counter++;
+			return loginAndRedirect(newUser, request, url);
 		}
 
-		// Cria senha aleatória (usuário pode definir uma depois se quiser)
-		// Usuário poderá usar "Esqueci minha senha" para definir uma senha
-		const randomPassword = crypto.randomBytes(32).toString('hex');
-
-		const userId = crypto.randomUUID();
-
-		// Evita conflito com conta antiga que por acaso já tenha o placeholder
-		const existingPlaceholderUser = await Users.findOne({ email: userEmail });
-		if (existingPlaceholderUser) {
-			existingPlaceholderUser.orcid = orcid;
-			existingPlaceholderUser.orcidAccessToken = access_token;
-			existingPlaceholderUser.orcidRefreshToken = refresh_token;
-			existingPlaceholderUser.orcidTokenExpiry = new Date(Date.now() + expires_in * 1000);
-			if (email) {
-				existingPlaceholderUser.emailVerified = true;
-				existingPlaceholderUser.emailVerifiedAt = existingPlaceholderUser.emailVerifiedAt || new Date();
-				existingPlaceholderUser.verificationSource = 'orcid';
-			} else if (existingPlaceholderUser.emailVerified !== true) {
-				existingPlaceholderUser.emailVerified = false;
-				existingPlaceholderUser.verificationSource = 'orcid_placeholder';
-			}
-			await existingPlaceholderUser.save();
-
-			return loginAndRedirect(existingPlaceholderUser, request, url);
-		}
-
-		// Cria novo usuário
-		const newUser = new Users({
-			_id: userId,
-			id: userId,
-			firstName,
-			lastName,
-			email: userEmail,
-			username,
-			country: '', // Usuário pode preencher depois
-			dob: '', // Usuário pode preencher depois
-			password: randomPassword, // Senha temporária aleatória
-			...orcidVerificationFields,
-			orcid: orcid,
-			orcidAccessToken: access_token,
-			orcidRefreshToken: refresh_token,
-			orcidTokenExpiry: new Date(Date.now() + expires_in * 1000),
-			createdAt: new Date().toISOString(),
-			updatedAt: new Date().toISOString()
+		// Sem e-mail publico. Contas criadas pelo fluxo antigo carregam o
+		// placeholder deterministico deste ORCID iD; a ETAPA 3.1 normalmente as
+		// encontra pelo proprio iD, e esta busca cobre as que por algum motivo
+		// ficaram sem ele. Elas continuam entrando como sempre -- o aviso em
+		// /settings/account e que as conduz a cadastrar um endereco real.
+		const legacyPlaceholderUser = await Users.findOne({
+			email: buildOrcidPlaceholderEmail(orcid)
 		});
 
-		await newUser.save();
+		if (legacyPlaceholderUser) {
+			legacyPlaceholderUser.orcid = orcid;
+			legacyPlaceholderUser.orcidAccessToken = access_token;
+			legacyPlaceholderUser.orcidRefreshToken = refresh_token;
+			legacyPlaceholderUser.orcidTokenExpiry = new Date(Date.now() + expires_in * 1000);
+			await legacyPlaceholderUser.save();
 
-		// Faz login e redireciona para complete-profile (já que dados podem estar incompletos)
-		return loginAndRedirect(newUser, request, url);
+			return loginAndRedirect(legacyPlaceholderUser, request, url);
+		}
+
+		// Conta nova sem e-mail conhecido: nada e criado ainda. A identidade do
+		// ORCID fica parada num registro temporario e o navegador vai para o
+		// formulario que pede o endereco. Inventar um placeholder aqui era o que
+		// gerava a segunda conta orfa, impossivel de unificar depois.
+		return parkClaimAndAskForEmail({ orcid, firstName, lastName }, request, url);
 
 	} catch (error) {
 		console.error('❌ ORCID callback error:', error);

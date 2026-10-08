@@ -93,6 +93,31 @@ export function buildEmailChangeConfirmationEmailHtml(firstName: string, confirm
 	});
 }
 
+/**
+ * Sent when someone signs in with ORCID whose record exposes no public e-mail.
+ * No account exists yet at this point -- confirming this link is what creates
+ * it, or links the ORCID iD to the account that already holds this address.
+ */
+export function buildOrcidSignupConfirmationEmailHtml(firstName: string, confirmationUrl: string) {
+	return createEmailLayout({
+		title: 'Confirm Your Email',
+		subtitle: 'Finish signing in with ORCID',
+		greeting: `Hello ${firstName},`,
+		message:
+			'You signed in to SciLedger with ORCID. Your ORCID record does not share an email address publicly, so we need you to confirm one before we can finish. If this address already belongs to a SciLedger account, confirming will connect your ORCID iD to it, and you will be able to sign in either way.',
+		ctaIntro: 'Click the button below to confirm this email address:',
+		actionLabel: 'Confirm Email',
+		actionUrl: confirmationUrl,
+		fallbackUrl: confirmationUrl,
+		warning: {
+			title: 'Important',
+			message:
+				'This link will expire in 24 hours. If you did not try to sign in with ORCID, you can safely ignore this email -- no account is created until the link is used.'
+		},
+		closing: 'If you continue having problems, please contact our support team.'
+	});
+}
+
 export function buildEmailChangedNotificationEmailHtml(firstName: string, newEmail: string) {
 	return createEmailLayout({
 		title: 'Your Account Email Has Changed',
