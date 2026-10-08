@@ -123,11 +123,107 @@ describe('ORCID callback email verification policy', () => {
 		const user = mocks.instances[0];
 
 		expect(response.status).toBe(302);
+		// Conta nova: `profileCompletedAt` ainda nao existe, por isso o desvio --
+		// nao por causa do e-mail placeholder.
 		expect(response.headers.get('location')).toBe('/complete-profile');
+		expect(user.profileCompletedAt).toBeUndefined();
 		expect(user.email).toBe('0000-0001-0002-0003@orcid.placeholder');
 		expect(user.emailVerified).toBe(false);
 		expect(user.emailVerifiedAt).toBeUndefined();
 		expect(user.verificationSource).toBe('orcid_placeholder');
 		expect(user.save).toHaveBeenCalled();
+	});
+});
+
+function mockExistingOrcidUser(overrides: Record<string, unknown> = {}) {
+	const user = {
+		orcid: '0000-0001-0002-0003',
+		firstName: 'Ada',
+		lastName: 'Lovelace',
+		email: '0000-0001-0002-0003@orcid.placeholder',
+		profileCompletedAt: undefined as Date | undefined,
+		save: vi.fn().mockResolvedValue(undefined),
+		...overrides
+	};
+	mocks.findOne.mockResolvedValue(user);
+	return user;
+}
+
+function mockAdaPerson() {
+	mockFetchPerson({
+		name: {
+			'given-names': { value: 'Ada' },
+			'family-name': { value: 'Lovelace' }
+		},
+		emails: {
+			email: []
+		}
+	});
+}
+
+/**
+ * O e-mail nao pode mais ser o unico portao de `isProfileComplete`. Contas ORCID
+ * sem e-mail publico ficam com `<orcid>@orcid.placeholder`, e /complete-profile
+ * nao troca e-mail (o POST rejeita o campo com 400), entao exigir um endereco
+ * real prendia essas contas em /complete-profile a cada login.
+ */
+describe('ORCID callback post-login redirect', () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		vi.unstubAllGlobals();
+		mocks.instances.length = 0;
+		mocks.startMongo.mockResolvedValue(undefined);
+		mocks.respondWithSession.mockResolvedValue(
+			new Response(null, { headers: { 'set-cookie': 'session=token' } })
+		);
+	});
+
+	it('sends a placeholder-email user who already completed the profile to the home page', async () => {
+		mockExistingOrcidUser({ profileCompletedAt: new Date('2026-01-01T00:00:00.000Z') });
+		mockAdaPerson();
+		const { GET } = await import('./+server');
+
+		const response = await GET(createEvent() as any);
+
+		// Antes da correcao isto era '/complete-profile' em todo login, para sempre.
+		expect(response.headers.get('location')).toBe('/');
+	});
+
+	it('still sends a placeholder-email user who never completed the profile to /complete-profile', async () => {
+		mockExistingOrcidUser();
+		mockAdaPerson();
+		const { GET } = await import('./+server');
+
+		const response = await GET(createEvent() as any);
+
+		expect(response.headers.get('location')).toBe('/complete-profile');
+	});
+
+	it('sends a legacy account with a real email but no profileCompletedAt to the home page', async () => {
+		// Conta criada por e-mail/senha que agora vincula o ORCID: nunca passou por
+		// /complete-profile, mas o perfil esta completo de fato.
+		mockExistingOrcidUser({ email: 'ada@example.com' });
+		mockAdaPerson();
+		const { GET } = await import('./+server');
+
+		const response = await GET(createEvent() as any);
+
+		expect(response.headers.get('location')).toBe('/');
+	});
+
+	it('requires a real name regardless of profileCompletedAt', async () => {
+		// Fallback do callback quando o ORCID nao expoe nome algum.
+		mockExistingOrcidUser({
+			firstName: 'User',
+			lastName: 'ORCID',
+			email: 'ada@example.com',
+			profileCompletedAt: new Date('2026-01-01T00:00:00.000Z')
+		});
+		mockAdaPerson();
+		const { GET } = await import('./+server');
+
+		const response = await GET(createEvent() as any);
+
+		expect(response.headers.get('location')).toBe('/complete-profile');
 	});
 });

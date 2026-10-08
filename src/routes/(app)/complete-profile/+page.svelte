@@ -3,15 +3,21 @@
 	import { page } from '$app/stores';
 	import { post } from '$lib/utils';
 	import { fade } from 'svelte/transition';
+	import { isOrcidPlaceholderEmail } from '$lib/helpers/orcidPlaceholderEmail';
 
 	let firstName = '';
 	let lastName = '';
-	let email = '';
 	let country = '';
 	let dob = '';
 	let formWarning = '';
 	let formSuccess = '';
 	let isLoading = false;
+
+	// Read-only mirror of the stored address. This screen never submits it:
+	// POST /complete-profile rejects any non-empty `email` field, because
+	// changing an address requires proof of ownership and therefore has to go
+	// through POST /api/account/email-change (exposed by /settings/account).
+	let email = '';
 
 	// Pré-preenche com dados do perfil se existirem
 	$: if ($page.data.user) {
@@ -22,6 +28,12 @@
 		dob = $page.data.user.dob || '';
 	}
 
+	// ORCID accounts without a public e-mail are created with a deterministic
+	// placeholder address (see $lib/helpers/orcidPlaceholderEmail). Those users
+	// have no usable address for recovery or notifications, so point them at
+	// the verified change flow.
+	$: isPlaceholderEmail = isOrcidPlaceholderEmail(email);
+
 	async function handleSubmit(event: SubmitEvent) {
 		event.preventDefault();
 		isLoading = true;
@@ -29,10 +41,10 @@
 		formSuccess = '';
 
 		try {
+			// `email` is deliberately absent from this payload.
 			const response = await post('/complete-profile', {
 				firstName,
 				lastName,
-				email,
 				country,
 				dob
 			});
@@ -54,7 +66,7 @@
 	}
 </script>
 
-<div class="h-screen flex flex-col items-center justify-center bg-gradient-to-br from-surface-100 to-surface-50">
+<div class="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-surface-100 to-surface-50 py-10">
 	<div class="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8">
 		<img
 			src="/brand/logo/sciledger-logo.svg"
@@ -100,22 +112,39 @@
 				/>
 			</div>
 
-			<!-- Email -->
+			<!-- Email (read-only: changing it requires the verified flow) -->
 			<div>
-				<label for="email" class="block text-sm font-medium text-surface-700 mb-1">
-					Email
-				</label>
-				<input
-					type="email"
-					id="email"
-					bind:value={email}
-					required
-					placeholder="joao@example.com"
-					class="w-full px-4 py-2 rounded-lg border border-surface-300 focus:outline-none focus:ring-2 focus:ring-primary-500"
-				/>
-				<p class="text-xs text-surface-500 mt-1">
-					This email will be used for account recovery and notifications
-				</p>
+				<span class="block text-sm font-medium text-surface-700 mb-1">Email</span>
+				{#if isPlaceholderEmail}
+					<p
+						class="w-full px-4 py-2 rounded-lg border border-surface-200 bg-surface-100 text-sm text-surface-500 italic break-all"
+					>
+						No e-mail address on file
+					</p>
+					<p class="text-xs text-amber-700 mt-1">
+						Your ORCID record does not expose a public e-mail address, so we could not import one.
+						<a
+							href="/settings/account"
+							class="font-medium underline hover:text-amber-800"
+						>
+							Add your e-mail in account settings
+						</a>
+						to enable account recovery and notifications.
+					</p>
+				{:else}
+					<p
+						class="w-full px-4 py-2 rounded-lg border border-surface-200 bg-surface-100 text-sm text-surface-700 break-all"
+					>
+						{email || '—'}
+					</p>
+					<p class="text-xs text-surface-500 mt-1">
+						This email is used for account recovery and notifications. To change it, go to
+						<a href="/settings/account" class="font-medium underline hover:text-surface-700">
+							account settings
+						</a>
+						— the new address has to be confirmed before it takes effect.
+					</p>
+				{/if}
 			</div>
 
 			<!-- Country -->

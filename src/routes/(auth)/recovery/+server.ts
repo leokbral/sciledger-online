@@ -8,6 +8,7 @@ import { SITE_URL } from '$env/static/private';
 import { env } from '$env/dynamic/private';
 import { buildPasswordResetEmailHtml } from '$lib/services/platformEmailTemplates';
 import { normalizeAndValidateEmail } from '$lib/server/auth/normalizeEmail';
+import { isOrcidPlaceholderEmail } from '$lib/helpers/orcidPlaceholderEmail';
 import {
 	generatePasswordResetToken,
 	getPasswordResetExpiresAt,
@@ -67,6 +68,27 @@ export const POST: RequestHandler = async ({ request }) => {
 			return json({ message: 'success' });
 		}
 
+		// Contas ORCID sem e-mail publico ficam com um placeholder
+		// `<orcid>@orcid.placeholder`, um dominio que nao existe. Nenhum e-mail
+		// chega nelas, entao gerar um token aqui seria pior que inutil:
+		//
+		//  - o token e persistido ANTES do envio, logo uma falha deixaria um
+		//    token valido no banco que ninguem consegue usar;
+		//  - isso acionaria o bloco de rate-limit abaixo, bloqueando a conta em
+		//    silencio por todo o tempo de vida do token;
+		//  - e o erro do envio distinguiria esta conta de uma inexistente.
+		//
+		// Esse ultimo ponto e o mais serio: ORCID iDs sao publicos, entao
+		// qualquer um pode montar o endereco placeholder de um iD e sondar se a
+		// conta existe aqui. A resposta tem de ser indistinguivel da de uma
+		// conta inexistente -- exatamente o mesmo `success` de cima.
+		//
+		// O caminho real para estas contas e cadastrar um endereco de verdade
+		// em /settings/account, que avisa sobre isso de forma persistente.
+		if (isOrcidPlaceholderEmail(user.email)) {
+			return json({ message: 'success' });
+		}
+
 		// Check if there's already a valid token (not expired)
 		if (user.resetPasswordTokenHash && user.resetPasswordExpiresAt) {
 			const now = new Date();
@@ -116,12 +138,9 @@ export const POST: RequestHandler = async ({ request }) => {
 			console.error('Error stack:', error.stack);
 		}
 
-		return json(
-			{
-				error: 'Internal server error',
-				details: error instanceof Error ? error.message : String(error)
-			},
-			{ status: 500 }
-		);
+		// A mensagem de erro fica apenas nos logs do servidor (console.error
+		// acima). Devolve-la ao cliente vazava detalhe interno e, pior, tornava
+		// a resposta dependente da conta consultada -- um oraculo de enumeracao.
+		return json({ error: 'Internal server error' }, { status: 500 });
 	}
 };

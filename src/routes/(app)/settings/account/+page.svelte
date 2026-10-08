@@ -4,6 +4,7 @@
 	import SettingsCard from '$lib/components/Settings/SettingsCard.svelte';
 	import SettingsField from '$lib/components/Settings/SettingsField.svelte';
 	import StatusBadge from '$lib/components/Settings/StatusBadge.svelte';
+	import { isOrcidPlaceholderEmail } from '$lib/helpers/orcidPlaceholderEmail';
 	import type { PageData } from './$types';
 
 	interface Props {
@@ -16,6 +17,13 @@
 
 	let emailVerified = $state(data.emailVerified);
 	let pendingEmail = $state<string | null>(data.pendingEmail);
+
+	// Contas criadas pelo login ORCID sem e-mail público ficam com um
+	// placeholder não entregável. Elas conseguem entrar pelo ORCID, mas nenhum
+	// e-mail da plataforma as alcança -- inclusive a recuperação de senha, que é
+	// o único caminho para definir a senha que o callback gerou aleatoriamente.
+	// O aviso fica visível até que um endereço real seja confirmado.
+	let hasPlaceholderEmail = $derived(isOrcidPlaceholderEmail(data.user.email));
 
 	let openModal = $state(false);
 	let newEmail = $state('');
@@ -108,14 +116,39 @@
 <SettingsCard title="Email">
 	<SettingsField label="Current Email">
 		<div class="flex items-center gap-2">
-			<p class="text-sm font-medium">{data.user.email}</p>
-			{#if emailVerified}
-				<StatusBadge label="Verified" tone="success" />
+			{#if hasPlaceholderEmail}
+				<p class="text-sm font-medium italic text-surface-600-400">No email address</p>
+				<StatusBadge label="Missing" tone="error" />
 			{:else}
-				<StatusBadge label="Not verified" tone="warning" />
+				<p class="text-sm font-medium">{data.user.email}</p>
+				{#if emailVerified}
+					<StatusBadge label="Verified" tone="success" />
+				{:else}
+					<StatusBadge label="Not verified" tone="warning" />
+				{/if}
 			{/if}
 		</div>
 	</SettingsField>
+
+	{#if hasPlaceholderEmail}
+		<div
+			class="space-y-2 rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-900/20"
+		>
+			<p class="text-sm font-semibold text-amber-900 dark:text-amber-200">
+				This account can only sign in through ORCID
+			</p>
+			<p class="text-sm text-amber-800 dark:text-amber-300">
+				Your ORCID record does not expose a public email address, so we have no address on file for
+				you. Until you add one, no platform email can reach you &mdash; including password recovery,
+				which is the only way to set a password for this account. If you lose access to your ORCID
+				account, we will not be able to help you recover this one.
+			</p>
+			<p class="text-sm text-amber-800 dark:text-amber-300">
+				Add an email address below. We will send a confirmation link to it, and the address only
+				takes effect once you confirm.
+			</p>
+		</div>
+	{/if}
 
 	{#if pendingEmail}
 		<div class="space-y-2 rounded-md border p-3">

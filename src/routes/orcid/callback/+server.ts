@@ -7,21 +7,45 @@ import Users from '$lib/db/models/User';
 import { respondWithSession } from '$lib/server/auth/authResponse';
 import { normalizeEmail } from '$lib/server/auth/normalizeEmail';
 import { getOrcidRedirectUri } from '$lib/server/orcid/redirectUri';
+import {
+	buildOrcidPlaceholderEmail,
+	isOrcidPlaceholderEmail
+} from '$lib/helpers/orcidPlaceholderEmail';
 import * as crypto from 'crypto';
 
 /**
  * Verifica se o perfil do usuário está completo
  * Retorna true se todos os dados essenciais foram preenchidos
+ *
+ * O endereço de e-mail deliberadamente NÃO bloqueia mais este teste. Contas
+ * ORCID sem e-mail público recebem um placeholder (ver
+ * `$lib/helpers/orcidPlaceholderEmail`),
+ * e /complete-profile não pode trocá-lo: POST /complete-profile rejeita o campo
+ * `email` com 400, porque trocar de endereço exige prova de posse e só acontece
+ * via POST /api/account/email-change. Exigir um e-mail real aqui prendia esses
+ * usuários em /complete-profile a cada login, sem nenhuma saída possível.
+ *
+ * O sinal de conclusão passa a ser `profileCompletedAt`, gravado por
+ * /complete-profile justamente para isso. O e-mail real continua valendo como
+ * sinal alternativo para não mandar contas antigas -- criadas por e-mail/senha,
+ * portanto sem `profileCompletedAt` -- para uma tela que elas não precisam.
  */
 function isProfileComplete(user: any): boolean {
-	return !!(
+	const hasRealName = !!(
 		user.firstName &&
 		user.firstName !== 'User' &&
 		user.lastName &&
-		user.lastName !== 'ORCID' &&
-		user.email &&
-		!user.email.includes('@orcid.placeholder')
+		user.lastName !== 'ORCID'
 	);
+
+	if (!hasRealName) {
+		return false;
+	}
+
+	const completedExplicitly = !!user.profileCompletedAt;
+	const hasRealEmail = !!(user.email && !isOrcidPlaceholderEmail(user.email));
+
+	return completedExplicitly || hasRealEmail;
 }
 
 function getOrcidVerificationFields(hasPublicEmail: boolean) {
@@ -234,7 +258,7 @@ export const GET: RequestHandler = async ({ url, request }) => {
 
 		// Se não tem email público no ORCID, usa email placeholder determinístico.
 		// Placeholders não comprovam posse de e-mail real e permanecem não verificados.
-		const userEmail = email || `${orcid}@orcid.placeholder`;
+		const userEmail = email || buildOrcidPlaceholderEmail(orcid);
 		const orcidVerificationFields = getOrcidVerificationFields(Boolean(email));
 
 		// Gera username único baseado no ORCID

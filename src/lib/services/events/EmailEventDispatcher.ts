@@ -7,12 +7,22 @@ import type {
 	EventDispatchResult
 } from '$lib/types/EventService';
 import { getEventEmailTemplate } from './templates';
+import { isOrcidPlaceholderEmail } from '$lib/helpers/orcidPlaceholderEmail';
 
 type UserEmailLookup = {
 	id?: string;
 	_id?: string;
 	email?: string;
 };
+
+/**
+ * Enderecos nao entregaveis sao pulados antes de abrir uma conexao SMTP. Hoje
+ * a unica familia conhecida e o placeholder do ORCID, cujo dominio nao existe:
+ * a resolucao MX falha e o nodemailer lanca de forma sincrona.
+ */
+function isUndeliverableEmail(email: string): boolean {
+	return isOrcidPlaceholderEmail(email);
+}
 
 export class EmailEventDispatcher implements EventDispatcher {
 	readonly channel = 'email' as const;
@@ -93,6 +103,16 @@ export class EmailEventDispatcher implements EventDispatcher {
 				continue;
 			}
 
+			if (isUndeliverableEmail(user.email)) {
+				results.push({
+					channel: this.channel,
+					status: 'skipped',
+					recipientId: recipient.userId,
+					reason: 'recipient_email_undeliverable'
+				});
+				continue;
+			}
+
 			const payload = await template({ event, recipient });
 			if (!payload) {
 				results.push({
@@ -104,13 +124,26 @@ export class EmailEventDispatcher implements EventDispatcher {
 				continue;
 			}
 
-			await transporter.sendMail({
-				from: `"SciLedger Team" <${env.SMTP_USER}>`,
-				to: user.email,
-				subject: payload.subject,
-				text: payload.text,
-				html: payload.html
-			});
+			try {
+				await transporter.sendMail({
+					from: `"SciLedger Team" <${env.SMTP_USER}>`,
+					to: user.email,
+					subject: payload.subject,
+					text: payload.text,
+					html: payload.html
+				});
+			} catch (error) {
+				// Um endereço que falha não pode silenciar os destinatários
+				// seguintes: antes deste try/catch o throw abortava o loop e o
+				// resto do evento ficava sem e-mail, sem nenhum registro.
+				results.push({
+					channel: this.channel,
+					status: 'failed',
+					recipientId: recipient.userId,
+					error: error instanceof Error ? error.message : String(error)
+				});
+				continue;
+			}
 
 			results.push({
 				channel: this.channel,
