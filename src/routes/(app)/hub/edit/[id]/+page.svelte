@@ -40,6 +40,13 @@
 			text: hub.publicationPolicy?.text || '',
 			version: hub.publicationPolicy?.version || 'hub-publication-v1'
 		},
+		publicationWatermark: {
+			// Ausente vale ligada: e assim que o servidor e a renderizacao tratam.
+			enabled: hub.publicationWatermark?.enabled !== false,
+			mode: hub.publicationWatermark?.mode || 'text',
+			text: hub.publicationWatermark?.text || '',
+			opacity: hub.publicationWatermark?.opacity ?? 0.06
+		},
 		tracks: hub.tracks || '',
 		calendar: hub.calendar || '',
 		showCalendar: hub.showCalendar || false,
@@ -474,6 +481,52 @@
 				placeholder="Publication rules for this Hub"
 			></textarea>
 		</div>
+		<div>
+			<label for="watermark-enabled" class="block mb-1">Watermark on the published PDF</label>
+			<select
+				id="watermark-enabled"
+				bind:value={form.publicationWatermark.enabled}
+				class="w-full p-2 border rounded"
+			>
+				<option value={true}>On</option>
+				<option value={false}>Off</option>
+			</select>
+			<p class="mt-1 text-xs text-surface-600 dark:text-surface-400">
+				Stamped on every page of papers published by this Hub.
+			</p>
+		</div>
+		{#if form.publicationWatermark.enabled}
+			<div>
+				<label for="watermark-mode" class="block mb-1">Watermark content</label>
+				<select
+					id="watermark-mode"
+					bind:value={form.publicationWatermark.mode}
+					class="w-full p-2 border rounded"
+				>
+					<option value="text">Text</option>
+					<option value="logo">Hub logo</option>
+				</select>
+				{#if form.publicationWatermark.mode === 'logo' && !form.logoUrl}
+					<p class="mt-1 text-xs text-warning-600">
+						This Hub has no logo yet, so the watermark falls back to the text below.
+					</p>
+				{/if}
+			</div>
+			{#if form.publicationWatermark.mode === 'text'}
+				<div>
+					<label for="watermark-text" class="block mb-1">Watermark text</label>
+					<input
+						id="watermark-text"
+						bind:value={form.publicationWatermark.text}
+						class="w-full p-2 border rounded"
+						placeholder={form.title || 'Hub name'}
+					/>
+					<p class="mt-1 text-xs text-surface-600 dark:text-surface-400">
+						Leave empty to use the Hub name.
+					</p>
+				</div>
+			{/if}
+		{/if}
 	</div>
 
 	<Accordion {value} onValueChange={(e) => (value = e.value)} collapsible>

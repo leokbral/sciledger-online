@@ -1,4 +1,5 @@
-import type { RequestHandler } from './$types';
+import type { RequestHandler } from './$types';
+import { normalizeHubWatermarkConfig } from '$lib/server/pdf/hubWatermark';
 import { json } from '@sveltejs/kit';
 import * as crypto from 'crypto';
 import { start_mongo } from '$lib/db/mongooseConnection';
@@ -37,6 +38,7 @@ export const POST: RequestHandler = async ({ request }) => {
             reviewVisibility,
             billing,
             publicationPolicy,
+            publicationWatermark,
             socialMedia,  // Add this line
             tracks,
             calendar,
@@ -101,6 +103,7 @@ export const POST: RequestHandler = async ({ request }) => {
                 policyVersion: billing?.policyVersion || 'hub-billing-v1',
                 updatedAt: new Date()
             },
+            publicationWatermark: normalizeHubWatermarkConfig(publicationWatermark),
             publicationPolicy: {
                 text: publicationPolicy?.text || '',
                 version: publicationPolicy?.version || 'hub-publication-v1',

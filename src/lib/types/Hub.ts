@@ -25,6 +25,13 @@ export type Hub = {
         policyVersion?: string;
         updatedAt?: Date;
     };
+    /** Marca d'agua do hub no PDF publicado. Ausente vale ligada com o titulo do hub. */
+    publicationWatermark?: {
+        enabled?: boolean;
+        mode?: 'text' | 'logo';
+        text?: string;
+        opacity?: number;
+    };
     publicationPolicy?: {
         text?: string;
         version?: string;

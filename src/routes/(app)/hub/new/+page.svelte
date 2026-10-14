@@ -39,6 +39,13 @@
 			text: '',
 			version: 'hub-publication-v1'
 		},
+		publicationWatermark: {
+			// Hub novo nasce carimbando com o proprio nome; o servidor aplica o mesmo padrao.
+			enabled: true,
+			mode: 'text',
+			text: '',
+			opacity: 0.06
+		},
 		tracks: '',
 		calendar: '',
 		showCalendar: false,
@@ -574,6 +581,29 @@
 			rows="4"
 			placeholder="Publication rules for this Hub"
 		></textarea>
+		Watermark on the published PDF
+		<select bind:value={form.publicationWatermark.enabled} class="w-full p-2 border rounded">
+			<option value={true}>On</option>
+			<option value={false}>Off</option>
+		</select>
+		{#if form.publicationWatermark.enabled}
+			Watermark content
+			<select bind:value={form.publicationWatermark.mode} class="w-full p-2 border rounded">
+				<option value="text">Text</option>
+				<option value="logo">Hub logo</option>
+			</select>
+			{#if form.publicationWatermark.mode === 'text'}
+				Watermark text
+				<input
+					bind:value={form.publicationWatermark.text}
+					class="w-full p-2 border rounded"
+					placeholder={form.title || 'Hub name'}
+				/>
+				<p class="text-xs text-surface-600 dark:text-surface-400">
+					Leave empty to use the Hub name.
+				</p>
+			{/if}
+		{/if}
 	</div>
 
 	<Accordion {value} onValueChange={(e) => (value = e.value)} collapsible>

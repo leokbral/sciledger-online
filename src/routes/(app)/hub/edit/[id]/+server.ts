@@ -1,4 +1,5 @@
-import type { RequestHandler } from './$types';
+import type { RequestHandler } from './$types';
+import { normalizeHubWatermarkConfig } from '$lib/server/pdf/hubWatermark';
 import { json } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import Hubs from '$lib/db/models/Hub';
@@ -33,6 +34,7 @@ export const PUT: RequestHandler = async ({ request, params }) => {
             reviewVisibility,
             billing,
             publicationPolicy,
+            publicationWatermark,
             socialMedia,
             tracks,
             calendar,
@@ -76,6 +78,9 @@ export const PUT: RequestHandler = async ({ request, params }) => {
             updatedAt: new Date(),
             updatedBy: String(hub.createdBy || '')
         };
+        // Normalizado pelo mesmo modulo que a renderizacao usa, para que gravar e
+        // carimbar nao possam discordar sobre o que e um valor valido.
+        hub.publicationWatermark = normalizeHubWatermarkConfig(publicationWatermark);
         hub.socialMedia = {
             twitter: socialMedia?.twitter || '',
             facebook: socialMedia?.facebook || '',

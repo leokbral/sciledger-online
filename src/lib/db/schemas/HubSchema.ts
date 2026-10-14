@@ -20,6 +20,24 @@ export const HubSchema: Schema = new Schema({
 	bannerUrl: { type: String },
 	cardUrl: { type: String },
 
+	/**
+	 * Marca d'agua do hub no PDF publicado.
+	 *
+	 * `enabled` nasce ligado: a decisao e carimbar por padrao com o nome do hub.
+	 * Hubs salvos antes desta mudanca nao tem o campo, e quem le o hub no pipeline
+	 * do PDF usa o driver nativo (sem defaults do Mongoose) -- por isso a ausencia
+	 * tambem vale como ligada, em `resolveHubWatermark`.
+	 *
+	 * `text` vazio significa "use o titulo do hub". `mode: 'logo'` usa o `logoUrl`
+	 * que o hub ja tem, e cai para o texto se a imagem nao estiver disponivel.
+	 */
+	publicationWatermark: {
+		enabled: { type: Boolean, default: true },
+		mode: { type: String, enum: ['text', 'logo'], default: 'text' },
+		text: { type: String, default: '' },
+		opacity: { type: Number, default: 0.06, min: 0, max: 1 }
+	},
+
 	peerReview: { type: String, enum: ['Everyone', 'Only Reviewers'], default: 'Everyone' },
 	authorInvite: { type: String, enum: ['Yes', 'No'], default: 'Yes' },
 	identityVisibility: { type: String, enum: ['Everyone', 'Reviewers Only', 'Hidden'], default: 'Everyone' },
