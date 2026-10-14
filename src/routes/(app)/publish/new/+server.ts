@@ -9,6 +9,8 @@ import type { User } from '$lib/types/User';
 import { can } from '$lib/server/authorization/authorizationService';
 import { getUserIdAliases } from '$lib/server/authorization/roleResolver';
 import { emitPaperLifecycleEvent } from '$lib/server/paperLifecycleEvents';
+import { mergePendingAuthorInvitations } from '$lib/server/papers/pendingAuthorInvitations';
+import { processPendingAuthorInvitations } from '$lib/server/papers/sendPendingAuthorInvitations';
 import {
 	UserBillingStatusError,
 	assertUserCanSubmitPapers
@@ -67,7 +69,7 @@ async function getHubPaperPaymentPolicy(hubId: string | undefined) {
 		: 'publication';
 }
 
-export const POST: RequestHandler = async ({ request, locals }) => {
+export const POST: RequestHandler = async ({ request, locals, url }) => {
 	await start_mongo();
 
 	try {
@@ -97,7 +99,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			scopusSubArea,
 			scopusClassifications,
 			supplementaryMaterials,
-			supplementaryFiles
+			supplementaryFiles,
+			pendingAuthorInvitations
 		} = await request.json();
 
 		const currentStatus = status || 'draft';
@@ -211,11 +214,24 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			...(scopusClassifications?.length > 0 && { scopusClassifications }),
 			...(supplementaryMaterials?.length > 0 && { supplementaryMaterials }),
 			...(supplementaryFiles?.length > 0 && { supplementaryFiles }),
+			// Co-authors with no account yet. Persisted WITH the paper; nobody is
+			// contacted until after this save succeeds -- see below.
+			pendingAuthorInvitations: mergePendingAuthorInvitations([], pendingAuthorInvitations),
 			createdAt: new Date(),
 			updatedAt: new Date()
 		});
 
 		await newPaper.save();
+
+		// Only now, with the paper durably stored, may invitations go out. This
+		// ordering is the requirement: if the save above had failed, nothing
+		// would have been sent. A send failure cannot undo the save, and an
+		// invitation already marked sent is never sent again.
+		await processPendingAuthorInvitations({
+			paper: newPaper,
+			inviterName: `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.username || '',
+			requestOrigin: url.origin
+		});
 
 		const mainAuthorUser = await Users.findById(normalizeUserId(mainAuthor));
 		if (!mainAuthorUser) {

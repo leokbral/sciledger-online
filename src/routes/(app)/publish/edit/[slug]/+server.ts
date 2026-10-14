@@ -18,6 +18,8 @@ import {
     normalizeAuthorSnapshots,
     validateAuthorAffiliationLimits
 } from '$lib/utils/paperAuthorAffiliations';
+import { mergePendingAuthorInvitations } from '$lib/server/papers/pendingAuthorInvitations';
+import { processPendingAuthorInvitations } from '$lib/server/papers/sendPendingAuthorInvitations';
 
 function normalizeId(input: any): string | undefined {
     if (!input) return undefined;
@@ -56,7 +58,7 @@ function reconcileCorrespondingAuthor(
     };
 }
 
-export const POST: RequestHandler = async ({ request, locals }) => {
+export const POST: RequestHandler = async ({ request, locals, url }) => {
     await start_mongo();
 
     try {
@@ -159,6 +161,12 @@ export const POST: RequestHandler = async ({ request, locals }) => {
             ...(data.scopusClassifications && data.scopusClassifications.length > 0 && { scopusClassifications: data.scopusClassifications }),
             supplementaryMaterials: data.supplementaryMaterials || [],
             supplementaryFiles: data.supplementaryFiles || [],
+            // Carrega adiante cada `inviteSentAt` que o servidor ja gravou, para
+            // que salvar o mesmo draft de novo nao reenvie convite.
+            pendingAuthorInvitations: mergePendingAuthorInvitations(
+                (existingPaper as any).pendingAuthorInvitations,
+                data.pendingAuthorInvitations
+            ),
             updatedAt: new Date().toISOString()
         };
 
@@ -175,6 +183,22 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
         if (!paper) {
             return json({ error: 'Paper not found' }, { status: 404 });
+        }
+
+        // So agora, com o paper gravado, os convites podem sair. O documento e
+        // recarregado sem `.lean()` porque o despachante precisa de `.save()`
+        // para registrar o que saiu; uma falha aqui nao desfaz o save acima.
+        const paperDocument = await Papers.findById(data.id).exec();
+        if (paperDocument) {
+            await processPendingAuthorInvitations({
+                paper: paperDocument as any,
+                inviterName:
+                    `${(user as any).firstName ?? ''} ${(user as any).lastName ?? ''}`.trim() ||
+                    (user as any).username ||
+                    '',
+                requestOrigin: url.origin
+            });
+            paper = paperDocument.toObject();
         }
 
         // Disparar comprovante de submissao quando sair de draft para reviewer assignment.

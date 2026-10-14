@@ -100,6 +100,51 @@ export const PaperSchema: Schema = new Schema({
     price: { type: Number, required: true }, // Publication price field
     score: { type: Number, default: 0, min: 0, max: 5 }, // Publication score field, default 0, range 0 to 5
     authors: [{ type: String, ref: 'User' }],
+    /**
+     * Co-authors named during submission who have no SciLedger account yet.
+     *
+     * `authors`, `coAuthors` and `mainAuthor` are all `ref: 'User'`, so an
+     * author without an account cannot live in them. That is precisely why the
+     * submission form used to create an account (and mail the person) the
+     * instant an ORCID result was added -- before the paper was saved, with no
+     * way to undo either. These entries hold such an author on the paper
+     * itself, so nothing is created and nobody is contacted until the draft is
+     * persisted.
+     *
+     * `inviteSentAt` is the idempotency key: the dispatcher only mails entries
+     * where it is unset, so saving the same draft repeatedly, a retried
+     * request or a page reload cannot produce a second invitation.
+     */
+    pendingAuthorInvitations: [{
+        _id: false,
+        id: { type: String, required: true },
+        email: { type: String, required: true },
+        firstName: { type: String, default: '' },
+        lastName: { type: String, default: '' },
+        orcid: { type: String, default: '' },
+        /** Position in the author list, so a pending author keeps its place. */
+        order: { type: Number, default: 0 },
+        isCorresponding: { type: Boolean, default: false },
+        department: { type: String, default: '' },
+        affiliation: { type: String, default: '' },
+        affiliations: [{
+            _id: false,
+            id: { type: String },
+            organization: { type: String, default: '' },
+            department: { type: String, default: '' },
+            roleTitle: { type: String, default: '' },
+            city: { type: String, default: '' },
+            region: { type: String, default: '' },
+            country: { type: String, default: '' },
+            rorId: { type: String, default: '' },
+            displayName: { type: String, default: '' }
+        }],
+        createdAt: { type: Date, default: () => new Date() },
+        /** Set once the invitation has actually gone out. Never reset. */
+        inviteSentAt: { type: Date, default: null },
+        /** Last send failure, kept for diagnosis; does not block a retry. */
+        lastInviteError: { type: String, default: '' }
+    }],
     peer_review: {
         type: {
             reviewType: { type: String, enum: ['open', 'selected'], required: true },

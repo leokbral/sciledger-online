@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PaperSubmissionGuide from '$lib/components/Paper/PaperSubmissionGuide.svelte';
 	import { TagsInput, FileUpload } from '@skeletonlabs/skeleton-svelte';
 	import type { User } from '$lib/types/User';
 	import { writable } from 'svelte/store';
@@ -129,6 +130,20 @@
 		},
 		savePaper
 	}: Props = $props();
+
+	/**
+	 * The author catalogue with a `label` the Autocomplete can show.
+	 *
+	 * Derived, never written back. Reassigning the `$bindable` prop here (and in
+	 * the ORCID handler) mutated a parent's state from a child at init time,
+	 * which Svelte 5 flags as `state_unsafe_mutation` and which, under the Vite
+	 * dev server, can escalate into a full page reload -- taking every unsaved
+	 * author, affiliation and extracted metadata value with it. That is the
+	 * "unexpected refresh" this page was losing data to.
+	 */
+	let authorCatalogue = $derived(
+		(authorsOptions ?? []).map((a: User) => ({ ...a, label: a.username }))
+	);
 
 	export const store = writable<PaperPublishStoreData>(inicialValue);
 
@@ -391,7 +406,7 @@
 		if (typeof value === 'object' && value.username) return String(value.username);
 
 		const id = typeof value === 'string' ? value : value.id || value._id;
-		const matchedAuthor = authorsOptions.find((option: User) => option.id === id || option._id === id);
+		const matchedAuthor = authorCatalogue.find((option: User) => option.id === id || option._id === id);
 		return matchedAuthor?.username || '';
 	}
 
@@ -419,6 +434,122 @@
 	let abstractDisplayHtml = $derived(($store.abstract || '').trim());
 	let keywordDisplayList = $derived($store.keywords ?? []);
 	let authorAffiliations = $state<Record<string, AuthorAffiliationForm>>({});
+
+	/**
+	 * Co-authors named here who have no SciLedger account yet.
+	 *
+	 * They cannot go in `inputAuthorList`, which holds usernames of real
+	 * accounts. Adding one used to CREATE an account and MAIL the person
+	 * immediately, from this unsaved form -- so abandoning the draft still left
+	 * an account behind and a stranger contacted, with no undo. Now they ride
+	 * along with the submission and the server contacts them only after the
+	 * draft is persisted.
+	 */
+	interface PendingAuthorForm {
+		id: string;
+		email: string;
+		firstName: string;
+		lastName: string;
+		orcid: string;
+		inviteSentAt?: string | null;
+	}
+
+	function getInitialPendingAuthors(): PendingAuthorForm[] {
+		const stored = (inicialValue as any).pendingAuthorInvitations;
+		if (!Array.isArray(stored)) return [];
+
+		return stored
+			.filter((entry: any) => typeof entry?.email === 'string' && entry.email.trim())
+			.map((entry: any) => ({
+				id: String(entry.id ?? createAffiliationId()),
+				email: String(entry.email).trim(),
+				firstName: String(entry.firstName ?? ''),
+				lastName: String(entry.lastName ?? ''),
+				orcid: String(entry.orcid ?? ''),
+				inviteSentAt: entry.inviteSentAt ?? null
+			}));
+	}
+
+	let pendingAuthors = $state<PendingAuthorForm[]>(getInitialPendingAuthors());
+
+	function pendingAuthorDisplayName(entry: PendingAuthorForm) {
+		return `${entry.firstName} ${entry.lastName}`.trim() || entry.email;
+	}
+
+	function isEmailAlreadySelected(email: string) {
+		const normalized = email.trim().toLowerCase();
+		if (!normalized) return false;
+
+		if (pendingAuthors.some((entry) => entry.email.toLowerCase() === normalized)) return true;
+
+		return inputAuthorList.some((username) => {
+			const existing = getAuthorByUsername(username);
+			return String(existing?.email ?? '').toLowerCase() === normalized;
+		});
+	}
+
+	function addPendingAuthor(entry: Omit<PendingAuthorForm, 'id'>) {
+		pendingAuthors = [...pendingAuthors, { ...entry, id: createAffiliationId() }];
+	}
+
+
+	/**
+	 * Author order, and how it is reordered.
+	 *
+	 * `inputAuthorList` IS the order: position 0 becomes `mainAuthor` on save and
+	 * the rest become `coAuthors`, which is how the paper, the authors section and
+	 * the generated PDF all read it. There is no separate order field, so moving an
+	 * entry in this array is the whole operation.
+	 *
+	 * Affiliations and the corresponding-author flag live in `authorAffiliations`,
+	 * keyed by username, so they are untouched by a reorder by construction -- the
+	 * record is not indexed by position. The same holds for the uploaded document,
+	 * the extracted metadata and the preview: none of them is derived from author
+	 * order, and nothing here writes to them.
+	 */
+	function moveAuthor(from: number, to: number) {
+		if (from === to) return;
+		if (from < 0 || from >= inputAuthorList.length) return;
+		if (to < 0 || to >= inputAuthorList.length) return;
+
+		const next = [...inputAuthorList];
+		const [moved] = next.splice(from, 1);
+		next.splice(to, 0, moved);
+		inputAuthorList = next;
+	}
+
+	let draggingAuthorIndex = $state<number | null>(null);
+	let dropTargetIndex = $state<number | null>(null);
+
+	function onAuthorDragStart(index: number) {
+		draggingAuthorIndex = index;
+	}
+
+	function onAuthorDrop(index: number) {
+		if (draggingAuthorIndex !== null) {
+			moveAuthor(draggingAuthorIndex, index);
+		}
+		draggingAuthorIndex = null;
+	}
+
+	/**
+	 * Removes an author from the list.
+	 *
+	 * The TagsInput's own chips (which carried its delete button) are hidden,
+	 * so this list is the only place an author can be taken out. Removing by
+	 * username keeps `authorAffiliations` in step: it is keyed by username, and
+	 * `syncAuthorAffiliationsForUsernames` drops whatever is no longer listed.
+	 */
+	function removeAuthor(index: number) {
+		if (index < 0 || index >= inputAuthorList.length) return;
+
+		inputAuthorList = inputAuthorList.filter((_, position) => position !== index);
+		syncAuthorAffiliationsForUsernames(inputAuthorList);
+	}
+
+	function removePendingAuthor(id: string) {
+		pendingAuthors = pendingAuthors.filter((entry) => entry.id !== id);
+	}
 	// let inputComponent: TagsInput = $state();
 
 	function createAffiliationId() {
@@ -571,7 +702,7 @@
 	});
 
 	function getAuthorByUsername(username: string): User | undefined {
-		return authorsOptions.find((option: User) => option.username === username);
+		return authorCatalogue.find((option: User) => option.username === username);
 	}
 
 	function getInitialAffiliationForUsername(username: string): AuthorAffiliationForm {
@@ -826,9 +957,6 @@
 		return true;
 	}
 
-	authorsOptions = authorsOptions.map((a: User) => {
-		return { ...a, label: a.username };
-	});
 
 	// function onInputChipSelect(event: CustomEvent<AutocompleteOption<string>>): void {
 	// 	inputAuthor = event.detail.label;
@@ -856,7 +984,7 @@
 
 
 	function isValidAuthor(value: ValidateArgs): boolean {
-		return authorsOptions.some((option: User) => option.username === value.inputValue);
+		return authorCatalogue.some((option: User) => option.username === value.inputValue);
 	}
 
 
@@ -1570,7 +1698,33 @@
 
 			$store.paperPictures = coverImageIds;
 			$store.content = content;
-			await savePaper($store);
+			// Riding along with the paper. The server sends these only after the
+			// save succeeds, and skips any it has already sent.
+			($store as any).pendingAuthorInvitations = pendingAuthors.map((entry, index) => ({
+				id: entry.id,
+				email: entry.email,
+				firstName: entry.firstName,
+				lastName: entry.lastName,
+				orcid: entry.orcid,
+				order: inputAuthorList.length + index
+			}));
+			const savedPaper = await savePaper($store);
+
+			// Re-seed from what came back, so the UI reflects which invitations
+			// the server actually sent and a second save does not look pending.
+			const savedPending = (savedPaper as any)?.paper?.pendingAuthorInvitations;
+			if (Array.isArray(savedPending)) {
+				pendingAuthors = savedPending
+					.filter((entry: any) => typeof entry?.email === 'string' && entry.email.trim())
+					.map((entry: any) => ({
+						id: String(entry.id ?? createAffiliationId()),
+						email: String(entry.email).trim(),
+						firstName: String(entry.firstName ?? ''),
+						lastName: String(entry.lastName ?? ''),
+						orcid: String(entry.orcid ?? ''),
+						inviteSentAt: entry.inviteSentAt ?? null
+					}));
+			}
 
 			return $store;
 		} finally {
@@ -1753,103 +1907,136 @@
 		selectedOrcidProfile = event.detail.isSelected;
 	}
 
-	// Function to add ORCID profile as co-author
-	async function addOrcidAsCoauthor(event: any) {
+	/**
+	 * Adds a confirmed ORCID profile to the author list.
+	 *
+	 * Deliberately does FOUR fewer things than before. It no longer calls
+	 * `/api/orcid/add-user` (which created a real account), no longer calls
+	 * `/api/email/coauthor` (which mailed the person), no longer receives a
+	 * plaintext temporary password, and no longer shows one in an `alert()`.
+	 *
+	 * All of that used to happen from an unsaved form, so merely picking an
+	 * ORCID result created an account and contacted a stranger -- irreversibly,
+	 * even if the draft was then abandoned. Nothing leaves the browser here
+	 * now: the author is held in submission state and the server invites them
+	 * only after the draft is persisted.
+	 */
+	function addOrcidAsCoauthor(event: any) {
 		const { profile, email } = event.detail;
-		const profileAffiliations = extractOrcidAffiliations(profile);
 
 		if (!selectedOrcidProfile) {
 			orcidError = 'Please select the profile first';
 			return;
 		}
 
-		isAddingOrcidUser = true;
+		const orcidIdentifier = String(
+			profile?.['orcid-identifier']?.path ?? profile?.orcidId ?? orcidId ?? ''
+		).trim();
+		const firstName = String(
+			profile?.person?.name?.['given-names']?.value ?? profile?.firstName ?? ''
+		).trim();
+		const lastName = String(
+			profile?.person?.name?.['family-name']?.value ?? profile?.lastName ?? ''
+		).trim();
 
-		try {
-			const response = await fetch('/api/orcid/add-user', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify({
-					orcidProfile: profile,
-					email: email
-				})
-			});
+		// An existing account is the better match: use it instead of creating a
+		// pending entry that would duplicate the person.
+		const existingAccount = authorCatalogue.find(
+			(candidate: User) =>
+				(orcidIdentifier && String((candidate as any).orcid ?? '') === orcidIdentifier) ||
+				(email && String(candidate.email ?? '').toLowerCase() === String(email).toLowerCase())
+		);
 
-			if (!response.ok) {
-				const errorData = await response.json();
-				if (response.status === 409) {
-					// User already exists, add them anyway
-					const existingUser = {
-						...errorData.user,
-						affiliations: errorData.user?.affiliations?.length
-							? errorData.user.affiliations
-							: profileAffiliations
-					};
-					authorsOptions = [...authorsOptions, { ...existingUser, label: existingUser.username }];
-					inputAuthorList = [...inputAuthorList, existingUser.username];
-					syncAuthorAffiliationsForUsernames(inputAuthorList);
-					clearOrcidSearch();
-					alert(
-						`${existingUser.firstName} ${existingUser.lastName} added as co-author (existing user)!`
-					);
-					return;
-				}
-				throw new Error(errorData.error || 'Failed to add ORCID user');
+		if (existingAccount) {
+			if (inputAuthorList.includes(existingAccount.username)) {
+				orcidError = `${existingAccount.username} is already in the author list.`;
+				return;
 			}
 
-			const data = await response.json();
-			const newUser = {
-				...data.user,
-				affiliations: data.user?.affiliations?.length ? data.user.affiliations : profileAffiliations
-			};
-
-			// Adicionar o novo usuário às opções de autores
-			authorsOptions = [...authorsOptions, { ...newUser, label: newUser.username }];
-
-			// Adicionar o usuário à lista de autores
-			inputAuthorList = [...inputAuthorList, newUser.username];
+			inputAuthorList = [...inputAuthorList, existingAccount.username];
 			syncAuthorAffiliationsForUsernames(inputAuthorList);
-
-			// Limpar a busca ORCID
 			clearOrcidSearch();
-
-			if (newUser.email) {
-				try {
-					await fetch('/api/email/coauthor', {
-						method: 'POST',
-						headers: {
-							'Content-Type': 'application/json'
-						},
-						body: JSON.stringify({
-							coAuthorName: `${newUser.firstName} ${newUser.lastName}`,
-							coAuthorEmail: newUser.email,
-							inviterName: `${author.firstName} ${author.lastName}`,
-							projectTitle: $store.title,
-							loginUrl: `${window.location.origin}/recovery`
-						})
-					});
-				} catch (emailError) {
-					console.warn('Falha ao enviar e-mail ao coautor:', emailError);
-				}
-			}
-
-			// Mostrar mensagem de sucesso
-			const emailInfo = data.hasEmail ? 'with email' : 'as pre-registration (no email)';
-			const passwordInfo = data.tempPassword ? ` Temporary password: ${data.tempPassword}` : '';
-			alert(
-				`${newUser.firstName} ${newUser.lastName} added as co-author successfully ${emailInfo}!${passwordInfo}`
-			);
-		} catch (error) {
-			console.error('Error adding ORCID user:', error);
-			orcidError =
-				error instanceof Error
-					? error.message
-					: 'Failed to add ORCID profile as co-author. Please try again.';
-		} finally {
-			isAddingOrcidUser = false;
+			return;
 		}
+
+		const normalizedEmail = String(email ?? '').trim();
+		if (!normalizedEmail) {
+			orcidError =
+				'This ORCID record does not share an email address. Enter one so we can invite this author after you save the draft.';
+			return;
+		}
+
+		if (isEmailAlreadySelected(normalizedEmail)) {
+			orcidError = 'That author is already in the list.';
+			return;
+		}
+
+		addPendingAuthor({
+			email: normalizedEmail,
+			firstName,
+			lastName,
+			orcid: orcidIdentifier
+		});
+
+		clearOrcidSearch();
+	}
+
+	let pendingAuthorEmail = $state('');
+	let pendingAuthorFirstName = $state('');
+	let pendingAuthorLastName = $state('');
+	let pendingAuthorError = $state('');
+
+	/**
+	 * The third way to add an author: straight by e-mail. Until now this was
+	 * only a sub-field of the ORCID flow, so an author with neither an account
+	 * nor an ORCID record could not be named at all.
+	 */
+	function addPendingAuthorByEmail() {
+		pendingAuthorError = '';
+		const email = pendingAuthorEmail.trim();
+
+		if (!email) {
+			pendingAuthorError = 'Enter an email address.';
+			return;
+		}
+
+		if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+			pendingAuthorError = 'Enter a valid email address.';
+			return;
+		}
+
+		const existingAccount = authorCatalogue.find(
+			(candidate: User) => String(candidate.email ?? '').toLowerCase() === email.toLowerCase()
+		);
+
+		if (existingAccount) {
+			if (inputAuthorList.includes(existingAccount.username)) {
+				pendingAuthorError = `${existingAccount.username} is already in the author list.`;
+				return;
+			}
+			inputAuthorList = [...inputAuthorList, existingAccount.username];
+			syncAuthorAffiliationsForUsernames(inputAuthorList);
+			pendingAuthorEmail = '';
+			pendingAuthorFirstName = '';
+			pendingAuthorLastName = '';
+			return;
+		}
+
+		if (isEmailAlreadySelected(email)) {
+			pendingAuthorError = 'That author is already in the list.';
+			return;
+		}
+
+		addPendingAuthor({
+			email,
+			firstName: pendingAuthorFirstName.trim(),
+			lastName: pendingAuthorLastName.trim(),
+			orcid: ''
+		});
+
+		pendingAuthorEmail = '';
+		pendingAuthorFirstName = '';
+		pendingAuthorLastName = '';
 	}
 
 	// Function to clear ORCID search
@@ -1868,6 +2055,34 @@
 <main class="grid p-5">
 	<fieldset class="py-4 md:py-6">
 		<section id="article-basic-info" class="flex flex-col items-center max-w-[700px] m-auto">
+			<!-- Step 0: prepare the manuscript. Reuses the existing submission guide -->
+			<div class="mb-6 w-full">
+				<p class="text-xs font-semibold uppercase tracking-wide text-primary-700 dark:text-primary-300 mb-2">
+					Step 0 &middot; Prepare your manuscript
+				</p>
+				<div class="mb-3 rounded-lg border border-surface-300 dark:border-surface-700 bg-surface-50 dark:bg-surface-800 p-4">
+					<p class="text-sm text-surface-700 dark:text-surface-300">
+						Prepare your manuscript using the official SciLedger template before you upload it.
+						The <strong>title, abstract and keywords are read from the document itself</strong> &mdash;
+						you do not type them here. Review the document first, and if any of those three come out
+						wrong, correct the original file and upload it again rather than editing them on this page.
+						Check the rendered preview before you continue.
+					</p>
+					<div class="mt-3 flex flex-wrap gap-3 text-sm">
+						<a href="/paper-template.docx" download class="font-medium text-primary-700 underline hover:text-primary-800">
+							Download the template (.docx)
+						</a>
+						<a href="/help/how-to-submit" class="font-medium text-primary-700 underline hover:text-primary-800">
+							How to submit
+						</a>
+						<a href="/help/support" class="font-medium text-primary-700 underline hover:text-primary-800">
+							Contact support
+						</a>
+					</div>
+				</div>
+				<PaperSubmissionGuide />
+			</div>
+
 			<div class="mb-6 w-full bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800 rounded-lg p-4">
 				<h2 class="text-xl font-bold text-primary-900 dark:text-primary-100 mb-2">Submit Your Paper</h2>
 				<p class="text-sm text-primary-800 dark:text-primary-200">
@@ -1877,6 +2092,9 @@
 			</div>
 
 			<div class="mb-6 w-full bg-surface-50 dark:bg-surface-800 border border-surface-300 dark:border-surface-700 rounded-lg p-4">
+				<p class="text-xs font-semibold uppercase tracking-wide text-primary-700 dark:text-primary-300 mb-2">
+					Step 1 &middot; Upload the manuscript
+				</p>
 				<h5 class="text-lg font-semibold mb-1">Upload Paper Document *</h5>
 				<p class="text-xs text-surface-600 dark:text-surface-400 mb-3">
 					Upload your paper in DOCX format first. Title, abstract, and keywords will be auto-filled when available. Maximum size: {MAIN_PAPER_FILE_LIMIT_LABEL}.
@@ -1923,6 +2141,9 @@
 					</div>
 				{/if}
 			</div>
+			<p class="text-xs font-semibold uppercase tracking-wide text-primary-700 dark:text-primary-300 mb-2">
+				Step 2 &middot; Check what was extracted
+			</p>
 			<section class="mb-4 w-full" aria-labelledby="title-label">
 				<p id="title-label" class="block mb-1 font-semibold">Title *</p>
 				<p class="text-xs text-surface-600 dark:text-surface-400 mb-2">
@@ -1941,10 +2162,157 @@
 					{/if}
 				</div>
 			</section>
+
+			<section class="mb-4 w-full" aria-labelledby="abstract-label">
+				<p id="abstract-label" class="block mb-1 font-semibold">Abstract *</p>
+				<p class="text-xs text-surface-600 dark:text-surface-400 mb-2">
+					Extracted from the uploaded document. To change it, update the document and upload it
+					again.
+				</p>
+				<div
+					class="w-full max-h-96 overflow-y-auto p-4 rounded-lg bg-surface-100 dark:bg-surface-900 break-words"
+				>
+					{#if abstractDisplayHtml}
+						{@html abstractDisplayHtml}
+					{:else}
+						<p class="text-sm italic text-surface-500">
+							Will be filled from the uploaded document.
+						</p>
+					{/if}
+				</div>
+			</section>
+
+			<section class="mb-4 w-full" aria-labelledby="keywords-label">
+				<p id="keywords-label" class="block mb-1 font-semibold">Keywords *</p>
+				<p class="text-xs text-surface-600 dark:text-surface-400 mb-2">
+					Extracted from the uploaded document. To change them, update the document and upload it
+					again.
+				</p>
+				<div class="w-full p-4 rounded-lg bg-surface-100 dark:bg-surface-900">
+					{#if keywordDisplayList.length > 0}
+						<ul class="flex flex-wrap gap-2">
+							{#each keywordDisplayList as keyword, index (`${index}-${keyword}`)}
+								<li class="preset-filled-primary-500 px-3 py-1 rounded-base break-words">
+									{keyword}
+								</li>
+							{/each}
+						</ul>
+					{:else}
+						<p class="text-sm italic text-surface-500">
+							Will be filled from the uploaded document.
+						</p>
+					{/if}
+				</div>
+			</section>
+
+			<!-- Rendered preview, immediately below the extracted metadata -->
+			<section class="mb-4 w-full" aria-labelledby="preview-label">
+				<p id="preview-label" class="block mb-1 font-semibold">Paper preview</p>
+				{#if mainDocumentError}
+					<p class="text-xs text-error-700 mb-2">
+						The document could not be rendered. Correct the original file, upload it again and
+						check the preview below. If it still does not render, contact support.
+					</p>
+				{:else if isMainDocumentBusy()}
+					<p class="text-xs text-surface-600 dark:text-surface-400 mb-2">
+						{mainDocumentStatusMessage || 'Processing the document...'}
+					</p>
+				{:else if !content}
+					<p class="text-xs text-surface-600 dark:text-surface-400 mb-2">
+						Upload the manuscript above to see how it will be rendered.
+					</p>
+				{:else}
+					<p class="text-xs text-surface-600 dark:text-surface-400 mb-2">
+						Check this rendering before you continue. If anything is wrong, correct the original
+						document and upload it again.
+					</p>
+				{/if}
+			<div class="mb-8" id="docx">
+				<div class="border border-gray-300 p-4 h-[80vh] w-full overflow-auto">
+					{#if content}
+						<div
+							class="mt-4 text-surface-950 prose prose-m max-w-none [&>p]:text-lg [&>ol>li]:text-base [&>ol>li]:marker:text-primary-500 [&>*:first-child]:mb-7 [&>*:first-child]:border-b [&>*:first-child]:border-surface-200 [&>*:first-child]:pb-4 [&>*:first-child]:text-3xl [&>*:first-child]:font-bold [&>*:first-child]:leading-tight [&>*:first-child]:tracking-normal [&>*:first-child]:text-surface-950 [&>*:first-child]:break-words md:[&>*:first-child]:text-4xl paper-content paper-preview-content"
+						>
+							{@html content}
+						</div>
+					{:else if docxPreview}
+						<div class="mt-4 overflow-auto">
+							<p class="text-center text-green-500">DOCX file selected</p>
+							<!-- Note: Browsers cannot directly preview DOCX files -->
+							<p class="text-center text-gray-500 text-sm">Preview not available for DOCX files</p>
+						</div>
+					{:else}
+						<p class="text-center text-gray-500">No DOCX file selected</p>
+					{/if}
+				</div>
+			</div>
+			</section>
+			<p class="text-xs font-semibold uppercase tracking-wide text-primary-700 dark:text-primary-300 mb-2">
+				Step 3 &middot; Authors Information
+			</p>
 			<section id="authors" class="w-full flex flex-col gap-2">
 				<p class="block mb-1 font-semibold">Authors *</p>
+				<!-- The authoritative author list. The input box below only takes input: its own chips are hidden so the authors are not listed twice. -->
+				{#if inputAuthorList.length > 0}
+					<p class="text-xs text-surface-600 dark:text-surface-400">
+						The order defines the authorship. The first author is the main author.
+					</p>
+					{#if inputAuthorList.length > 1}
+						<p class="text-xs text-surface-500 dark:text-surface-500">
+							Drag an author with the mouse to reorder, or use the arrows.
+						</p>
+					{/if}
+					<ul class="flex flex-wrap gap-2">
+						{#each inputAuthorList as username, authorIndex (username)}
+							<li
+								class="flex items-center gap-2 rounded-base border border-surface-300 dark:border-surface-600 bg-surface-100 dark:bg-surface-800 px-3 py-1"
+								class:opacity-40={draggingAuthorIndex === authorIndex}
+								class:ring-2={dropTargetIndex === authorIndex && draggingAuthorIndex !== authorIndex}
+								class:ring-primary-500={dropTargetIndex === authorIndex && draggingAuthorIndex !== authorIndex}
+								draggable="true"
+								role="listitem"
+								aria-roledescription="Draggable author"
+								aria-label={`${username}, position ${authorIndex + 1} of ${inputAuthorList.length}`}
+								ondragstart={() => onAuthorDragStart(authorIndex)}
+								ondragover={(event) => { event.preventDefault(); dropTargetIndex = authorIndex; }}
+								ondragleave={() => { if (dropTargetIndex === authorIndex) dropTargetIndex = null; }}
+								ondrop={(event) => { event.preventDefault(); onAuthorDrop(authorIndex); }}
+								ondragend={() => { draggingAuthorIndex = null; dropTargetIndex = null; }}
+							>
+								<span class="cursor-grab select-none text-surface-400" aria-hidden="true">&#8942;&#8942;</span>
+								<span class="text-xs font-semibold text-surface-500">{authorIndex + 1}</span>
+								<span class="text-sm">{username}</span>
+								{#if authorIndex === 0}
+									<span class="badge preset-filled-primary-500 text-xs">Main</span>
+								{/if}
+								<!-- Keyboard and screen-reader route to the same reorder: a drag is pointer-only -->
+								<button
+									type="button"
+									class="text-surface-500 hover:text-surface-900 disabled:opacity-30"
+									disabled={authorIndex === 0}
+									aria-label={`Move ${username} earlier`}
+									onclick={() => moveAuthor(authorIndex, authorIndex - 1)}
+								>&larr;</button>
+								<button
+									type="button"
+									class="text-surface-500 hover:text-surface-900 disabled:opacity-30"
+									disabled={authorIndex === inputAuthorList.length - 1}
+									aria-label={`Move ${username} later`}
+									onclick={() => moveAuthor(authorIndex, authorIndex + 1)}
+								>&rarr;</button>
+								<button
+									type="button"
+									class="text-surface-500 hover:text-error-500"
+									aria-label={`Remove ${username}`}
+									onclick={() => removeAuthor(authorIndex)}
+								>&times;</button>
+							</li>
+						{/each}
+					</ul>
+				{/if}
+
 				<p class="text-xs text-surface-600 dark:text-surface-400 mb-2">
-					Add all authors of this paper. Type the username and select from the dropdown, or use the ORCID search below to find and add co-authors.
+					Add all authors of this paper. Type the username and select it from the list below, or use the ORCID search to find and add co-authors.
 				</p>
 				<TagsInput
 					base="grid !h-auto "
@@ -1958,7 +2326,7 @@
 					placeholder="Add author..."
 					tagBackground="preset-filled-primary-500"
 					classes="w-full max-w-[90vw] max-h-48 p-4 overflow-y-auto bg-surface-100 dark:bg-surface-900 rounded-lg"
-					tagListClasses="gap-2 flex-wrap"
+					tagListClasses="hidden"
 					inputClasses="!outline-none bg-transparent border-none"
 					gap="gap-2"
 					tagClasses="px-3 py-1 rounded-base gap-3"
@@ -1969,7 +2337,7 @@
 					<Autocomplete
 						input={inputAuthor}
 						inputList={inputAuthorList}
-						options={authorsOptions}
+						options={authorCatalogue}
 						denylist={inputAuthorList}
 						emptyState="Author not found."
 						regionEmpty="Não sei o que faz!!!!"
@@ -2100,9 +2468,11 @@
 						<p class="text-sm text-surface-500">Add at least one author to fill affiliation details.</p>
 					{:else}
 						<div class="space-y-4">
-							{#each inputAuthorList as username (username)}
+							{#each inputAuthorList as username, authorIndex (username)}
 								{#if authorAffiliations[username]}
-									<div class="rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-900 p-3">
+									<div
+										class="rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-900 p-3"
+									>
 										<div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
 											<div>
 												<p class="text-sm font-semibold text-surface-800 dark:text-surface-100">
@@ -2221,6 +2591,109 @@
 				</div>
 			</section>
 
+			<!-- The two ways to name an author who has no account yet, side by side -->
+			<div class="mb-6 grid w-full gap-4 lg:grid-cols-2 lg:items-start">
+			<!-- Add an author by email, and the list of authors awaiting an invitation -->
+			<section class="mb-6 w-full">
+				<div class="bg-surface-50 dark:bg-surface-800 rounded-lg p-4 border">
+					<h3 class="text-lg font-semibold mb-3 text-surface-900 dark:text-surface-100">
+						Invite an author by email
+					</h3>
+					<p class="text-xs text-surface-600 dark:text-surface-400 mb-3">
+						For an author with no SciLedger account and no ORCID record. They are invited
+						<strong>only after you save the draft</strong>.
+					</p>
+
+					<div class="grid gap-2 sm:grid-cols-[1fr_1fr_1.5fr_auto] sm:items-end">
+						<div>
+							<label for="pending-author-first" class="block mb-1 text-sm font-medium">
+								First name
+							</label>
+							<input
+								id="pending-author-first"
+								type="text"
+								bind:value={pendingAuthorFirstName}
+								class="input w-full"
+								placeholder="Ada"
+							/>
+						</div>
+						<div>
+							<label for="pending-author-last" class="block mb-1 text-sm font-medium">
+								Last name
+							</label>
+							<input
+								id="pending-author-last"
+								type="text"
+								bind:value={pendingAuthorLastName}
+								class="input w-full"
+								placeholder="Lovelace"
+							/>
+						</div>
+						<div>
+							<label for="pending-author-email" class="block mb-1 text-sm font-medium">
+								Email
+							</label>
+							<input
+								id="pending-author-email"
+								type="email"
+								bind:value={pendingAuthorEmail}
+								class="input w-full"
+								placeholder="ada@university.edu"
+							/>
+						</div>
+						<button
+							type="button"
+							class="btn preset-filled-primary-500 whitespace-nowrap"
+							onclick={addPendingAuthorByEmail}
+						>
+							Add author
+						</button>
+					</div>
+
+					{#if pendingAuthorError}
+						<p class="mt-2 text-sm text-red-600 dark:text-red-400">{pendingAuthorError}</p>
+					{/if}
+
+					{#if pendingAuthors.length > 0}
+						<div class="mt-4 space-y-2">
+							<p class="text-sm font-medium text-surface-900 dark:text-surface-100">
+								Authors awaiting an invitation
+							</p>
+							<ul class="space-y-2">
+								{#each pendingAuthors as entry (entry.id)}
+									<li
+										class="flex items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-900/20"
+									>
+										<div class="min-w-0">
+											<p class="truncate text-sm font-medium text-amber-900 dark:text-amber-200">
+												{pendingAuthorDisplayName(entry)}
+											</p>
+											<p class="truncate text-xs text-amber-800 dark:text-amber-300">
+												{entry.email}{entry.orcid ? ` · ORCID ${entry.orcid}` : ''}
+											</p>
+											<p class="text-xs text-amber-800 dark:text-amber-300">
+												{#if entry.inviteSentAt}
+													Invitation sent
+												{:else}
+													Will be invited when you save this draft
+												{/if}
+											</p>
+										</div>
+										<button
+											type="button"
+											class="btn btn-sm preset-tonal whitespace-nowrap"
+											onclick={() => removePendingAuthor(entry.id)}
+										>
+											Remove
+										</button>
+									</li>
+								{/each}
+							</ul>
+						</div>
+					{/if}
+				</div>
+			</section>
+
 			<!-- ORCID Search Section -->
 			<section class="mb-6 w-full">
 				<div class="bg-surface-50 dark:bg-surface-800 rounded-lg p-4 border">
@@ -2228,7 +2701,9 @@
 						ORCID Profile Search & Add Co-authors
 					</h3>
 					<p class="text-xs text-surface-600 dark:text-surface-400 mb-3">
-						Search for co-authors by their ORCID iD (e.g., 0000-0000-0000-0000). If they're not registered in the system, they'll be added automatically.
+						Search for co-authors by their ORCID iD (e.g., 0000-0000-0000-0000). If they do not
+						have a SciLedger account yet, they are added to the list below and invited by email
+						<strong>after you save the draft</strong> &mdash; nothing is sent while you are still editing.
 					</p>
 
 					<div class="flex gap-2 mb-4">
@@ -2303,25 +2778,8 @@
 					{/if}
 				</div>
 			</section>
+			</div>
 
-			<section class="mb-4 w-full" aria-labelledby="abstract-label">
-				<p id="abstract-label" class="block mb-1 font-semibold">Abstract *</p>
-				<p class="text-xs text-surface-600 dark:text-surface-400 mb-2">
-					Extracted from the uploaded document. To change it, update the document and upload it
-					again.
-				</p>
-				<div
-					class="w-full max-h-96 overflow-y-auto p-4 rounded-lg bg-surface-100 dark:bg-surface-900 break-words"
-				>
-					{#if abstractDisplayHtml}
-						{@html abstractDisplayHtml}
-					{:else}
-						<p class="text-sm italic text-surface-500">
-							Will be filled from the uploaded document.
-						</p>
-					{/if}
-				</div>
-			</section>
 
 			<!-- Current Author Profile (if no ORCID search) -->
 			<!-- {#if !orcidProfile}
@@ -2339,28 +2797,6 @@
 			</section> -->
 
 			<!-- {$store.content} -->
-			<section class="mb-4 w-full" aria-labelledby="keywords-label">
-				<p id="keywords-label" class="block mb-1 font-semibold">Keywords *</p>
-				<p class="text-xs text-surface-600 dark:text-surface-400 mb-2">
-					Extracted from the uploaded document. To change them, update the document and upload it
-					again.
-				</p>
-				<div class="w-full p-4 rounded-lg bg-surface-100 dark:bg-surface-900">
-					{#if keywordDisplayList.length > 0}
-						<ul class="flex flex-wrap gap-2">
-							{#each keywordDisplayList as keyword, index (`${index}-${keyword}`)}
-								<li class="preset-filled-primary-500 px-3 py-1 rounded-base break-words">
-									{keyword}
-								</li>
-							{/each}
-						</ul>
-					{:else}
-						<p class="text-sm italic text-surface-500">
-							Will be filled from the uploaded document.
-						</p>
-					{/if}
-				</div>
-			</section>
 
 			<!-- Scopus Classification Section - Multiple Classifications -->
 			<section class="mb-6 w-full">
@@ -2755,25 +3191,6 @@
 			</div>
 		</div> -->
 
-		<div class="mb-8" id="docx">
-			<div class="border border-gray-300 p-4 h-[80vh] w-full overflow-auto">
-				{#if content}
-					<div
-						class="mt-4 text-surface-950 prose prose-m max-w-none [&>p]:text-lg [&>ol>li]:text-base [&>ol>li]:marker:text-primary-500 [&>*:first-child]:mb-7 [&>*:first-child]:border-b [&>*:first-child]:border-surface-200 [&>*:first-child]:pb-4 [&>*:first-child]:text-3xl [&>*:first-child]:font-bold [&>*:first-child]:leading-tight [&>*:first-child]:tracking-normal [&>*:first-child]:text-surface-950 [&>*:first-child]:break-words md:[&>*:first-child]:text-4xl paper-content paper-preview-content"
-					>
-						{@html content}
-					</div>
-				{:else if docxPreview}
-					<div class="mt-4 overflow-auto">
-						<p class="text-center text-green-500">DOCX file selected</p>
-						<!-- Note: Browsers cannot directly preview DOCX files -->
-						<p class="text-center text-gray-500 text-sm">Preview not available for DOCX files</p>
-					</div>
-				{:else}
-					<p class="text-center text-gray-500">No DOCX file selected</p>
-				{/if}
-			</div>
-		</div>
 	</fieldset>
 	
 	<div class="flex justify-end gap-3 mt-6 pr-5">
