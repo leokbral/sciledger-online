@@ -198,21 +198,8 @@
 		};
 	});
 
-	const filteredPapers = data.papers?.filter((paper: any) => {
-		if (paper.status === 'published') return true;
-		// Editorial roles get the full Hub list from the server; everyone else only sees
-		// papers they review or authored (plus published ones).
-		if (isCreator || isHubManager) return true;
-		if (paper.isAcceptedForReview || false) return true;
-
-		const isMainAuthor = paper.mainAuthor?.id === userId;
-		const isCoAuthor = paper.coAuthors?.some((coAuthor: any) => coAuthor.id === userId);
-		const isCorresponding = paper.correspondingAuthor?.id === userId;
-		const isSubmittedBy = paper.submittedBy?.id === userId;
-
-		return isMainAuthor || isCoAuthor || isCorresponding || isSubmittedBy;
-	});
-	const workspacePapers = filteredPapers ?? [];
+	// The server authorizes the list; SelectedHubWorkspace filters it for the active persona.
+	const workspacePapers = Array.isArray(data.papers) ? data.papers : [];
 
 	const isUserInvolved = (paper: any) => {
 		return (
