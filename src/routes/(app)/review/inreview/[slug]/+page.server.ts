@@ -90,17 +90,19 @@ function sanitize(obj: unknown): unknown {
 	return obj;
 }
 
-export async function load({ locals, params }) {
+export async function load({ locals, params, url }) {
 	if (!locals.user) throw redirect(302, `/login`);
 
 	const id = params.slug;
 	const userId = locals.user.id;
+	const isSuperUser = await isSuperAdmin(locals.user);
+	const isReviewerPreview = isSuperUser && url.searchParams.get('preview') === '1';
 
-	// Busca o paper com status "in review"
+	// Normal review routes retain their status filter; super admin previews accept every stage.
 	const paperDoc = await Papers.findOne(
 		{
 			id,
-			status: { $in: ['reviewer assignment', 'in review'] }
+			...(isReviewerPreview ? {} : { status: { $in: ['reviewer assignment', 'in review'] } })
 		},
 		{}
 	)
@@ -157,7 +159,6 @@ export async function load({ locals, params }) {
 	 * -- a permissao dos Admin comuns. O papel SuperAdmin foi criado separado
 	 * justamente para que um Admin nao herdasse administracao de plataforma.
 	 */
-	const isSuperUser = await isSuperAdmin(locals.user);
 	const isPlatformAdmin = await can(locals.user, 'rbac.manage');
 
 	const canViewSubmittedReviews =
@@ -168,6 +169,7 @@ export async function load({ locals, params }) {
 		isViceManager;
 
 	const canSubmitReview =
+		!isReviewerPreview &&
 		!isPaperAuthor(paperDoc as Record<string, unknown>, userId) &&
 		(isReviewerAccepted || Boolean(hasAcceptedViaQueue) || isHubReviewer);
 
@@ -186,7 +188,7 @@ export async function load({ locals, params }) {
 		!isViceManager &&
 		!isHubReviewer;
 
-	if (isSuperUserView) {
+	if (isSuperUserView || isReviewerPreview) {
 		await recordAdminAuditEvent({
 			actor: locals.user,
 			action: 'admin.paper.view',
@@ -262,6 +264,7 @@ export async function load({ locals, params }) {
 		canViewSubmittedReviews,
 		/** O papel de plataforma foi o que abriu a porta: a tela avisa o usuario. */
 		isSuperUserView,
+		reviewerPreview: isReviewerPreview || isSuperUserView,
 		canSubmitReview
 	};
 }

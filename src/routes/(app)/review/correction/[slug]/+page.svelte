@@ -30,5 +30,6 @@
 		isHubAdmin={isHubOwner}
 		canSubmitReview={(data as any).canSubmitReview === true}
 		canViewSubmittedReviews={(data as any).canViewSubmittedReviews === true}
+		reviewerPreview={data.isSuperUserView === true}
 	/>
 {/if}

@@ -139,8 +139,7 @@ export function filterPapersForPersona(
 	const userAliases = toUserAliases(userId);
 
 	switch (personaKey) {
-		// O servidor ja devolveu apenas o que o super admin pode ver (tudo do hub
-		// menos rascunhos). Aqui nao se estreita mais nada.
+		// The server authorizes all Hub papers for the platform admin, including drafts.
 		case 'PlatformAdmin':
 		case 'HubOwner':
 		case 'EditorChief':

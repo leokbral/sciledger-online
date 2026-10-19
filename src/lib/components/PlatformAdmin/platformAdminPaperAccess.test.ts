@@ -178,19 +178,17 @@ describe('o acesso elevado e registrado e somente para leitura', () => {
 describe('atalhos para as outras lentes', () => {
 	const page = read('src/routes/(app)/publish/view/[slug]/+page.svelte');
 
-	it('oferece a visao de revisor e a de editor conforme o status', () => {
+	it('oferece a previa de revisor e a visao de designacao', () => {
 		expect(page).toContain('/review/inreview/');
-		expect(page).toContain('/review/correction/');
+		expect(page).toContain('?preview=1');
 		expect(page).toContain('/review/paperspool/');
 	});
 
-	it('nao oferece uma tela de revisao para um paper que ainda nao chegou nela', () => {
-		// As telas de revisao so existem a partir da etapa correspondente; oferecer
-		// antes levaria a um 404 ou a uma tela vazia.
+	it('oferece a previa de revisor em qualquer etapa e a designacao somente na etapa correspondente', () => {
 		const bloco = page.slice(page.indexOf('let otherViews'), page.indexOf('otherViews = views;'));
 
-		expect(bloco).toContain("status === 'in review'");
+		expect(bloco).toContain('href: `/review/inreview/${id}?preview=1`');
+		expect(bloco).not.toContain("status === 'in review'");
 		expect(bloco).toContain("status === 'reviewer assignment'");
-		expect(bloco).toMatch(/needing corrections/);
 	});
 });

@@ -22,8 +22,7 @@
 	 *
 	 * So existem para o super admin da plataforma: e a forma de ele olhar o paper
 	 * como um revisor ou um editor olharia, sem precisar de papel no hub. Cada
-	 * destino depende do status, porque as telas de revisao so existem a partir do
-	 * momento em que o paper entra naquela etapa.
+	 * preview de revisor aceita qualquer etapa sem habilitar acoes editoriais.
 	 */
 	let otherViews: Array<{ label: string; href: string }> = [];
 	$: {
@@ -31,12 +30,7 @@
 		const status = String(paper?.status ?? '');
 		const views: Array<{ label: string; href: string }> = [];
 		if (id) {
-			if (status === 'in review') {
-				views.push({ label: 'Reviewer', href: `/review/inreview/${id}` });
-			}
-			if (status === 'needing corrections' || status === 'under correction') {
-				views.push({ label: 'Reviewer', href: `/review/correction/${id}` });
-			}
+			views.push({ label: 'Reviewer', href: `/review/inreview/${id}?preview=1` });
 			if (status === 'reviewer assignment') {
 				views.push({ label: 'Editor', href: `/review/paperspool/${id}` });
 			}

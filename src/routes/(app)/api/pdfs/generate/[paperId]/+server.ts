@@ -5,6 +5,8 @@ import { Readable } from 'node:stream';
 import { chromium } from 'playwright';
 import { db } from '$lib/db/mongo';
 import { fsFiles } from '$lib/db/fs';
+import { requireSuperAdmin } from '$lib/server/authorization/superAdmin';
+import { recordAdminAuditEvent } from '$lib/server/authorization/adminAudit';
 import {
 	authorSnapshotMatchesReference,
 	buildPaperAffiliationIndex,
@@ -876,6 +878,35 @@ async function uploadPdfBuffer(paperId: string, filename: string, pdfBuffer: Buf
 
 	return generatedId;
 }
+
+// Render the same manuscript as the reviewer sees without replacing the stored PDF.
+export const GET: RequestHandler = async ({ params, locals, url }) => {
+	await requireSuperAdmin(locals.user);
+	const paperId = String(params.paperId ?? '').trim();
+	if (!paperId) return new Response('paperId is required', { status: 400 });
+
+	const paper = await papers.findOne(normalizePaperQuery(paperId));
+	if (!paper) return new Response('Paper not found', { status: 404 });
+
+	const authors = await resolvePaperAuthors(paper);
+	const hubName = await resolveHubName(paper.hubId);
+	const pdfBuffer = await generatePaperPdfBuffer(paper, url.origin, authors, hubName);
+	await recordAdminAuditEvent({
+		actor: locals.user,
+		action: 'admin.paper.view',
+		resourceType: 'paper',
+		resourceId: paperId,
+		metadata: { surface: 'paper.reviewer-pdf-preview' }
+	});
+
+	return new Response(new Uint8Array(pdfBuffer), {
+		headers: {
+			'Content-Type': 'application/pdf',
+			'Content-Disposition': 'inline; filename="reviewer-preview.pdf"',
+			'Cache-Control': 'private, no-store'
+		}
+	});
+};
 
 export const POST: RequestHandler = async ({ params, request }) => {
 	const paperId = String(params.paperId ?? '').trim();

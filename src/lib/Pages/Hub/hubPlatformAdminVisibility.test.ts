@@ -126,14 +126,20 @@ describe('o que o servidor libera, e o que continua fechado', () => {
 		expect(serverLoad).not.toContain('request.headers.get(');
 	});
 
-	it('nao passa a mostrar rascunhos', () => {
-		// O ramo de quem ve tudo exclui drafts, e e esse ramo que o super admin usa.
+	it('inclui rascunhos para o super admin e preserva o filtro dos editores do hub', () => {
 		const ramo = serverLoad.slice(
 			serverLoad.indexOf('if (canViewAllHubPapers)'),
 			serverLoad.indexOf('} else {')
 		);
 
-		expect(ramo).toContain("status: { $ne: 'draft' }");
+		const queryFor = new Function('isPlatformAdmin', 'params', `
+			let paperQuery;
+			const canViewAllHubPapers = true;
+			${ramo}}
+			return paperQuery;
+		`);
+		expect(queryFor(true, { id: 'hub-1' })).toEqual({ hubId: 'hub-1' });
+		expect(queryFor(false, { id: 'hub-1' })).toEqual({ hubId: 'hub-1', status: { $ne: 'draft' } });
 	});
 
 	it('deixa rastro de auditoria quando e o papel de plataforma que abriu o acesso', () => {

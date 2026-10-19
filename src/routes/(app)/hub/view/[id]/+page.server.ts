@@ -53,6 +53,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 	if (!locals.user) redirect(302, `/login`);
 
 	await start_mongo();
+	const isPlatformAdmin = await isSuperAdmin(locals.user);
 
 	const fetchHub = async () => {
 		const hub = await Hubs.findById(params.id).lean();
@@ -73,10 +74,10 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		let paperQuery;
 
 		if (canViewAllHubPapers) {
-			// Usuários com permissão editorial efetiva no hub veem todos os papers exceto drafts.
+			// Super admins can inspect every stage, including drafts linked to this Hub.
 			paperQuery = {
 				hubId: params.id,
-				status: { $ne: 'draft' }
+				...(isPlatformAdmin ? {} : { status: { $ne: 'draft' } })
 			};
 		} else {
 			// Reviewers and authors only see papers they are involved in (plus published ones).
@@ -245,15 +246,14 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		const canManageEditorialFlow = assignmentAuthorization.allowed;
 
 		/**
-		 * O super admin da plataforma enxerga a mesma lista que a equipe editorial do
-		 * hub -- tudo menos rascunhos -- mesmo sem papel nenhum neste hub.
+		 * O super admin da plataforma enxerga todos os papers do hub, inclusive
+		 * rascunhos, mesmo sem papel neste hub.
 		 *
 		 * Deliberadamente SEPARADO de `canManageEditorialFlow`: aquele continua sendo
 		 * a unica chave das acoes de escrita (designar revisor, decisao editorial,
 		 * gestao de membros e papeis), e nao muda aqui. O super admin e so leitura,
 		 * como o resto da area de administracao da plataforma.
 		 */
-		const isPlatformAdmin = await isSuperAdmin(locals.user);
 		const canViewAllHubPapers = canManageEditorialFlow || isPlatformAdmin;
 
 		const usersData = await fetchUsers();
