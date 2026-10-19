@@ -30,6 +30,11 @@
 		/** Receives the papers visible to the active workspace persona. */
 		workspace?: Snippet<[HubWorkspacePaper[]]>;
 		stats?: HubStats;
+		/**
+		 * Resolvido no servidor. So acrescenta a persona de leitura da plataforma ao
+		 * seletor -- o conjunto de papers ja veio decidido de la.
+		 */
+		isPlatformAdmin?: boolean;
 	}
 
 	let {
@@ -42,7 +47,8 @@
 		members,
 		management,
 		workspace,
-		stats
+		stats,
+		isPlatformAdmin = false
 	}: Props = $props();
 
 	let contextualHub = $derived({
@@ -54,7 +60,8 @@
 	let resolution = $derived(
 		resolveHubWorkspaceForHub(contextualHub, currentUserHubMember, {
 			userId: currentUserId,
-			papers
+			papers,
+			isSuperAdmin: isPlatformAdmin
 		})
 	);
 	let availablePersonas = $derived(resolution.availablePersonas);

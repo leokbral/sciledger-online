@@ -1,4 +1,5 @@
 import Papers from '$lib/db/models/Paper';
+import { isSuperAdmin } from '$lib/server/authorization/superAdmin';
 import Users from '$lib/db/models/User';
 import { error, redirect } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongooseConnection';
@@ -123,8 +124,17 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		redirect(302, `/publish/published/${paperDoc.id}`);
 	}
 
+	/**
+	 * O super admin da plataforma abre o paper em modo leitura.
+	 *
+	 * Sem isto, ele veria o paper na lista do hub e tomaria 403 ao clicar. E so
+	 * leitura: `canViewCorrections` abaixo continua preso aos papeis do hub, e
+	 * nenhuma acao desta rota foi liberada.
+	 */
+	const isPlatformAdmin = await isSuperAdmin(locals.user);
+
 	// Verificar permissões - apenas hub owner, hub reviewer ou revisor designado podem ver
-	if (!isHubOwner && !isHubVice && !isHubReviewer && !isReviewer) {
+	if (!isHubOwner && !isHubVice && !isHubReviewer && !isReviewer && !isPlatformAdmin) {
 		// Autores devem ver suas próprias rotas
 		if (isPaperAuthor) {
 			if (paperStatus === 'draft') {
@@ -147,7 +157,9 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		paper: sanitize(paperDoc),
 		users: sanitize(usersDoc),
 		user: sanitize(locals.user),
-		canViewCorrections: isHubOwner || isHubVice
+		canViewCorrections: isHubOwner || isHubVice,
+		/** Somente leitura: a tela usa isto para nao oferecer acoes editoriais. */
+		isPlatformAdmin
 	};
 }
 

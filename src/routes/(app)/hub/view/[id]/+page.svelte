@@ -692,6 +692,7 @@
 		management={hubManagementPanel}
 		workspace={hubWorkspacePanel}
 		stats={hubMemberStats}
+		isPlatformAdmin={data.isPlatformAdmin === true}
 	/>
 </div>
 

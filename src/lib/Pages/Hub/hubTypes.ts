@@ -107,6 +107,13 @@ export type HubWorkspaceProps = {
 };
 
 export type HubWorkspacePersonaKey =
+	/**
+	 * Super admin da plataforma visitando um hub do qual nao e membro.
+	 * Somente leitura: ve a lista de papers como a equipe editorial ve, e os
+	 * paineis de gestao continuam fechados porque dependem das permissoes de hub,
+	 * que ele nao tem.
+	 */
+	| 'PlatformAdmin'
 	| 'HubOwner'
 	| 'EditorChief'
 	| 'AssociateEditor'

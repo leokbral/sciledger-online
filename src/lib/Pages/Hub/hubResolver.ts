@@ -9,6 +9,19 @@ import type {
 import { isPaperReviewableByUser, paperBelongsToUser, toUserAliases } from './hubPaperVisibility';
 
 const PERSONAS: HubWorkspacePersona[] = [
+	/**
+	 * `role: 'editor'` de proposito, nao 'admin': abre a area editorial, que e
+	 * onde a lista de papers do hub aparece, sem puxar a tela de administracao do
+	 * hub. Os paineis de gestao nao aparecem de todo jeito -- dependem de
+	 * `isHubManager` e `canManageRoles`, que vem das permissoes de hub.
+	 */
+	{
+		key: 'PlatformAdmin',
+		label: 'Platform Admin (read-only)',
+		role: 'editor',
+		roleKey: null,
+		priority: 600
+	},
 	{ key: 'HubOwner', label: 'Hub Owner', role: 'admin', roleKey: 'HubOwner', priority: 500 },
 	{
 		key: 'EditorChief',
@@ -117,6 +130,12 @@ export function resolveHubWorkspaceForHub(
 	options: {
 		userId?: string | null;
 		papers?: HubWorkspacePaper[];
+		/**
+		 * Resolvido no servidor por `isSuperAdmin()`. Nunca vem do cliente: aqui ele
+		 * so escolhe qual persona aparece no seletor; o que o usuario pode ver ja foi
+		 * decidido na consulta do servidor.
+		 */
+		isSuperAdmin?: boolean;
 	} = {}
 ): HubWorkspaceResolution {
 	const context = memberContext ?? getRoleContextFromHub(hub);
@@ -139,6 +158,12 @@ export function resolveHubWorkspaceForHub(
 		!personas.some((persona) => persona.key === 'Author')
 	) {
 		personas.push(PERSONAS_BY_KEY.get('Author') as HubWorkspacePersona);
+	}
+
+	// Aditiva, como o proprio papel SuperAdmin: quem tambem e membro do hub mantem
+	// as personas do hub e ganha esta a mais.
+	if (options.isSuperAdmin && !personas.some((persona) => persona.key === 'PlatformAdmin')) {
+		personas.push(PERSONAS_BY_KEY.get('PlatformAdmin') as HubWorkspacePersona);
 	}
 
 	return buildResolution(

@@ -1,0 +1,277 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<title>SciLedger — Article Template v3 · One Column</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0B1533; --ink-2:#16224A; --soft:#44548A; --muted:#8492B4;
+  --hair:#DFE5F0; --accent:#2563EB; --sky:#7DAAFB; --pale:#F4F8FF; --oa:#F97316;
+  --sans:"Inter","Helvetica Neue",Arial,sans-serif;
+  --serif:"Source Serif 4",Charter,Georgia,"Times New Roman",serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{font-family:var(--serif);color:var(--ink);font-size:10pt;line-height:1.52;
+  print-color-adjust:exact;-webkit-print-color-adjust:exact;
+  font-variant-numeric:oldstyle-nums proportional-nums;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+.page{padding:0 20mm}
+.bleed{margin:0 -20mm;padding:0 20mm}
+
+/* ══ HERO ════════════════════════════════════════════════ */
+.hero{background:var(--ink);color:#fff;padding-top:9mm;padding-bottom:10mm;position:relative;overflow:hidden}
+.hero::before{content:"";position:absolute;inset:0;
+  background-image:radial-gradient(rgba(125,170,251,.16) .6px,transparent .6px);
+  background-size:3.2mm 3.2mm;opacity:.75}
+.hero::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1.4mm;
+  background:linear-gradient(90deg,#2563EB,#7DAAFB 60%,#CFE0FF)}
+.hero>*{position:relative}
+.hero-top{display:flex;justify-content:space-between;align-items:center;
+  padding-bottom:7mm;border-bottom:.4pt solid rgba(255,255,255,.16)}
+.brand{display:flex;align-items:center}
+.brand-logo{display:block;width:39mm;height:auto}
+.brand-tag{font-family:var(--sans);font-size:5.8pt;font-weight:500;letter-spacing:.22em;
+  text-transform:uppercase;color:var(--sky);margin-top:1.3mm}
+.chips{font-family:var(--sans)}
+.chip{display:inline-block;font-size:6pt;font-weight:600;letter-spacing:.14em;text-transform:uppercase;
+  padding:1.3mm 2.6mm;border-radius:99px;margin-left:1.6mm}
+.chip-t{border:.4pt solid rgba(255,255,255,.34);color:#DCE8FF}
+.chip-oa{background:var(--oa);color:#fff}
+.kicker{font-family:var(--sans);font-size:6.2pt;font-weight:600;letter-spacing:.26em;
+  text-transform:uppercase;color:var(--sky);margin:8mm 0 4mm}
+.h-title{font-family:var(--serif);font-weight:700;font-size:29pt;line-height:1.06;
+  letter-spacing:-.018em;color:#fff;margin:0;max-width:150mm}
+.h-sub{font-family:var(--serif);font-size:12.5pt;line-height:1.34;color:#B9CCF4;
+  margin:4mm 0 0;max-width:140mm;font-weight:400}
+.h-authors{font-family:var(--sans);font-size:8.6pt;font-weight:500;color:#E6EEFF;
+  margin:8mm 0 0;line-height:1.6}
+.h-authors sup{color:var(--sky);font-size:6pt}
+.h-doi{font-family:var(--sans);font-size:6.8pt;color:#8FAEE8;margin-top:5mm;letter-spacing:.02em}
+.h-doi a{color:inherit;text-decoration:none}
+
+/* ══ META STRIP ══════════════════════════════════════════ */
+.meta{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));margin-top:8mm;
+  border-top:.4pt solid var(--hair);border-bottom:.4pt solid var(--hair)}
+.meta>div{padding:3.4mm 2mm 3.4mm 3mm;border-left:.4pt solid var(--hair)}
+.meta>div:first-child{padding-left:0;border-left:none}
+.meta .k{font-family:var(--sans);font-size:5.6pt;font-weight:600;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--muted)}
+.meta .v{font-family:var(--sans);font-size:7.6pt;font-weight:600;color:var(--ink);margin-top:1.4mm;
+  font-variant-numeric:tabular-nums}
+
+/* ══ AFFILIATIONS ════════════════════════════════════════ */
+.affil{font-family:var(--sans);font-size:6.9pt;line-height:1.65;color:var(--muted);margin:4mm 0 0}
+.affil sup{color:var(--accent)}
+.affil a{color:var(--accent);text-decoration:none}
+
+/* ══ ABSTRACT ════════════════════════════════════════════ */
+.abs{margin:8mm 0 0;display:grid;grid-template-columns:24mm 1fr;gap:0 6mm}
+.abs .lbl{font-family:var(--sans);font-size:5.9pt;font-weight:700;letter-spacing:.2em;
+  text-transform:uppercase;color:var(--accent);padding-top:1.4mm}
+.abs p{margin:0;font-size:10.4pt;line-height:1.55;color:var(--ink-2);max-width:128mm}
+.kw{font-family:var(--sans);font-size:7.1pt;color:var(--soft);margin:4mm 0 0 30mm;line-height:1.6}
+.kw b{color:var(--ink);font-weight:600;letter-spacing:.02em}
+
+.rule-soft{border:0;border-top:.4pt solid var(--hair);margin:8mm 0 0}
+
+/* ══ BODY + SIDENOTES ════════════════════════════════════ */
+.body{margin-top:7mm;padding-right:54mm;position:relative}
+/* As fichas geradas pela plataforma ficam FORA do fluxo de floats: um float
+   anterior mais alto empurraria a capitular do primeiro parágrafo para baixo
+   (CSS 9.5.1 — o topo de um float não pode subir acima do topo de um float
+   anterior). Posicionadas em absoluto, elas ocupam a calha sem esse efeito. */
+.sn-stack{position:absolute;top:0;right:0;width:46mm}
+.sn-stack .sn{float:none;clear:none;width:100%;margin:0 0 4mm}
+.body p{margin:0 0 3mm;text-align:justify;hyphens:auto}
+.sn{float:right;clear:right;width:46mm;margin-right:-54mm;margin-bottom:4mm;
+  font-family:var(--sans);font-size:6.9pt;line-height:1.55;color:var(--muted);
+  border-top:.4pt solid var(--hair);padding-top:1.8mm}
+.sn b{color:var(--ink);font-weight:600}
+.sn a{color:var(--accent);text-decoration:none}
+
+h2.sec{margin:9mm -54mm 3.4mm 0;padding:2.6mm 54mm 0 0;break-after:avoid;border-top:.8pt solid var(--ink);
+  font-family:var(--sans);font-size:11.5pt;font-weight:700;letter-spacing:-.015em;color:var(--ink);
+  display:flex;align-items:baseline;gap:3mm}
+h2.sec .n{font-family:var(--sans);font-size:6.4pt;font-weight:700;letter-spacing:.16em;
+  color:var(--accent);position:relative;top:-.6mm}
+h3.sub{font-family:var(--sans);font-size:8.8pt;font-weight:600;color:var(--soft);
+  margin:5mm 0 1.6mm;letter-spacing:.01em;break-after:avoid}
+
+.lead::first-letter{float:left;font-family:var(--serif);font-weight:700;font-size:34pt;
+  line-height:.84;padding:.6mm 2.2mm 0 0;color:var(--accent)}
+
+blockquote.pull{margin:6mm -54mm 6mm 0;padding:0;font-family:var(--serif);font-weight:600;
+  font-size:15pt;line-height:1.28;letter-spacing:-.012em;color:var(--ink);
+  border-top:.8pt solid var(--accent);border-bottom:.8pt solid var(--accent);padding:4mm 0;text-align:left}
+
+/* figures extend into the sidenote column */
+figure{margin:6mm -54mm 6mm 0;break-inside:avoid}
+figure .ph{height:44mm;border-radius:3pt;border:.4pt solid #D8E4FA;
+  background:repeating-linear-gradient(135deg,#FAFCFF,#FAFCFF 8px,#F0F6FF 8px,#F0F6FF 16px);
+  display:flex;align-items:center;justify-content:center;font-family:var(--sans);font-size:7pt;color:#A9BDDF}
+figcaption{font-family:var(--sans);font-size:6.9pt;color:var(--muted);line-height:1.55;margin-top:2.2mm}
+figcaption b{color:var(--ink);font-weight:600}
+
+table.data{width:calc(100% + 54mm);margin:6mm -54mm 6mm 0;border-collapse:collapse;
+  font-family:var(--sans);font-size:7.4pt;break-inside:avoid;font-variant-numeric:tabular-nums}
+table.data caption{caption-side:top;text-align:left;font-size:6.9pt;color:var(--muted);margin-bottom:2mm}
+table.data caption b{color:var(--ink);font-weight:600}
+table.data th{text-align:left;font-weight:600;color:var(--ink);padding:2mm 2.4mm;
+  border-top:.8pt solid var(--ink);border-bottom:.4pt solid var(--hair)}
+table.data td{padding:1.9mm 2.4mm;border-bottom:.4pt solid var(--hair);color:var(--soft)}
+table.data tr:last-child td{border-bottom:.8pt solid var(--ink)}
+
+/* ══ BACK MATTER ═════════════════════════════════════════ */
+.back{margin-top:9mm;padding-top:3.6mm;border-top:.8pt solid var(--ink);
+  display:grid;grid-template-columns:1fr 1fr;gap:0 9mm;
+  font-family:var(--sans);font-size:6.9pt;color:var(--muted);line-height:1.62}
+.back h3{font-size:5.9pt;font-weight:700;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--ink);margin:0 0 1.4mm}
+.back .blk{margin-bottom:3.4mm;break-inside:avoid}
+.back a{color:var(--accent);text-decoration:none}
+ol.refs{margin:1.6mm 0 0;padding-left:5mm;font-size:6.9pt;line-height:1.6;color:var(--soft)}
+ol.refs li{margin-bottom:1.6mm;break-inside:avoid}
+ol.refs i{color:var(--ink-2)}
+ol.refs a{color:var(--accent);text-decoration:none}
+
+/* ══ VERIFY ══════════════════════════════════════════════ */
+.verify{margin-top:8mm;background:var(--ink);border-radius:4pt;overflow:hidden;
+  break-inside:avoid;color:#fff;position:relative}
+.verify::before{content:"";position:absolute;inset:0;
+  background-image:radial-gradient(rgba(125,170,251,.14) .6px,transparent .6px);background-size:3.2mm 3.2mm}
+.verify>*{position:relative}
+.verify-hd{padding:3mm 5mm;border-bottom:.4pt solid rgba(255,255,255,.14);
+  display:flex;justify-content:space-between;align-items:center;font-family:var(--sans)}
+.verify-hd .t{font-size:6.1pt;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:var(--sky)}
+.verify-hd .h{font-size:6.2pt;color:#7E90B8;font-variant-numeric:tabular-nums}
+.verify-bd{display:flex;gap:5mm;padding:5mm;align-items:center}
+.verify-qr{flex:none;width:22mm;height:22mm;background:#fff;border-radius:2.5pt;padding:1.4mm}
+.verify-qr img{width:100%;height:100%;display:block}
+.verify-info{flex:1;font-family:var(--sans);font-size:7pt;line-height:1.75}
+.verify-info .r{display:flex;gap:2mm}
+.verify-info .k{min-width:26mm;color:#8095BE;letter-spacing:.04em}
+.verify-info .v{color:#fff;font-weight:600}
+.verify-info a{color:#fff;text-decoration:none}
+.verify-info .note{margin-top:2.4mm;color:#8095BE;font-style:italic;font-size:6.6pt}
+
+/* ══ END BAND ════════════════════════════════════════════ */
+.endband{margin-top:6mm;background:var(--pale);padding-top:3.4mm;padding-bottom:3.4mm;
+  display:flex;justify-content:space-between;align-items:center;
+  font-family:var(--sans);font-size:6.6pt;color:var(--soft)}
+.endband b{color:var(--ink)}
+.endband a{color:var(--accent);text-decoration:none}
+.publisher-logo{display:inline-block;height:7pt;width:auto;vertical-align:-1pt;margin:0 .7mm}
+
+/* ══ FALLBACK — conteúdo cru vindo do editor / DOCX ══════ */
+/* O corpo do artigo chega do mammoth sem classes. Estas regras garantem que
+   qualquer <h1>, lista, imagem ou tabela que o normalizador não tenha marcado
+   ainda saia com a tipografia do template, e não com a do navegador. */
+.body h1,.body h2,.body h3,.body h4,.body h5,.body h6,
+.cols h1,.cols h2,.cols h3,.cols h4,.cols h5,.cols h6{
+  font-family:var(--sans);color:var(--ink);letter-spacing:-.01em;break-after:avoid}
+.body h1,.cols h1{font-size:12pt;font-weight:700;margin:8mm 0 3mm}
+.body h2:not(.sec),.cols h2:not(.sec){font-size:11pt;font-weight:700;margin:7mm 0 2.6mm}
+.body h3:not(.sub),.cols h3:not(.sub){font-size:9pt;font-weight:600;margin:5mm 0 1.6mm}
+.body h4,.body h5,.body h6,.cols h4,.cols h5,.cols h6{font-size:8.4pt;font-weight:600;margin:4mm 0 1.4mm}
+.body ul,.body ol,.cols ul,.cols ol{margin:0 0 3mm;padding-left:5.5mm}
+.body li,.cols li{margin-bottom:1.2mm}
+.body img,.cols img{max-width:100%;height:auto;display:block;border-radius:2pt}
+.body figure img,.cols figure img{width:100%}
+.body sup,.cols sup{font-size:.68em;vertical-align:super;line-height:0}
+.body sub,.cols sub{font-size:.68em;vertical-align:sub;line-height:0}
+.body a,.cols a{color:var(--accent);text-decoration:none}
+.body blockquote:not(.pull),.cols blockquote:not(.pull){margin:4mm 0;padding-left:4mm;
+  border-left:2pt solid var(--accent);color:var(--soft,#44548A)}
+.body table:not(.data),.cols table:not(.data){width:100%;border-collapse:collapse;
+  font-family:var(--sans);font-size:7.6pt;margin:4mm 0;break-inside:avoid}
+.body table:not(.data) th,.cols table:not(.data) th{text-align:left;font-weight:600;padding:1.8mm 2.2mm;
+  border-top:.8pt solid var(--ink);border-bottom:.4pt solid var(--hair,var(--rule,#DFE5F0))}
+.body table:not(.data) td,.cols table:not(.data) td{padding:1.6mm 2.2mm;
+  border-bottom:.4pt solid var(--hair,var(--rule,#DFE5F0))}
+
+/* ══ REFERÊNCIAS CRUZADAS ════════════════════════════════ */
+/* `[3]` no texto ➜ salto para a entrada 3; `↩` na entrada ➜ volta ao texto.
+   O Chromium registra cada id como destino nomeado no PDF, então o salto
+   funciona em qualquer leitor. */
+a.xref{color:var(--accent);text-decoration:none;font-weight:600;
+  font-variant-numeric:lining-nums tabular-nums}
+.backrefs{white-space:nowrap}
+a.backref{color:var(--accent);text-decoration:none;margin-left:1.2mm;font-size:.9em}
+ol.refs li{scroll-margin-top:8mm}
+</style></head><body><div class="page">
+
+  <header class="hero bleed">
+    <div class="hero-top">
+      <div class="brand">
+        <div><img class="brand-logo" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzODUiIGhlaWdodD0iMTEyIiB2aWV3Qm94PSIwIDAgMzg1IDExMiIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsbGVkYnk9InRpdGxlIj48dGl0bGUgaWQ9InRpdGxlIj5TY2lMZWRnZXIg4oCUIGxvZ28tZGFyazwvdGl0bGU+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMTggMjApIHNjYWxlKC43NSkiPjxnIGZpbGw9IiM2MEE1RkEiPjxwYXRoIGQ9Ik03NiA0SDI4QzE0Ljc0NTIgNCA0IDE0Ljc0NTIgNCAyOEM0IDQxLjI1NDggMTQuNzQ1MiA1MiAyOCA1Mkg0NFYzNEgyOEMyNC42ODYzIDM0IDIyIDMxLjMxMzcgMjIgMjhDMjIgMjQuNjg2MyAyNC42ODYzIDIyIDI4IDIySDc2WiIvPjxwYXRoIGQ9Ik03NiA0SDI4QzE0Ljc0NTIgNCA0IDE0Ljc0NTIgNCAyOEM0IDQxLjI1NDggMTQuNzQ1MiA1MiAyOCA1Mkg0NFYzNEgyOEMyNC42ODYzIDM0IDIyIDMxLjMxMzcgMjIgMjhDMjIgMjQuNjg2MyAyNC42ODYzIDIyIDI4IDIySDc2WiIgdHJhbnNmb3JtPSJyb3RhdGUoMTgwIDQ4IDQ4KSIvPjwvZz48L2c+PGcgYXJpYS1sYWJlbD0iU2NpTGVkZ2VyIiBmaWxsPSIjRkZGRkZGIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgxMTIgNzUuMzk4NCkiPjxwYXRoIGQ9Ik02NjMgLTI0UTQ3OCAtMjQgMzQ2LjUgMzdRMjE1IDk4IDE0NCAyMTIuNVE3MyAzMjcgNzMgNDg2TDMzMiA0ODZRMzM0IDM5NiAzNzMuNSAzMzEuNVE0MTMgMjY3IDQ4NyAyMzNRNTYxIDE5OSA2NjUgMTk5UTc1OCAxOTkgODI3LjUgMjI1LjVRODk3IDI1MiA5MzUuNSAzMDBROTc0IDM0OCA5NzQgNDE0UTk3NCA0NjYgOTQ2IDUwNVE5MTggNTQ0IDg1Ny41IDU3NFE3OTcgNjA0IDY5OCA2MjZMNTM4IDY2MlEzMTMgNzEzIDIwOCA4MTIuNVExMDMgOTEyIDEwMyAxMDcwUTEwMyAxMjA0IDE3MSAxMzAzLjVRMjM5IDE0MDMgMzYyLjUgMTQ1OC41UTQ4NiAxNTE0IDY1MCAxNTE0UTgxNiAxNTE0IDkzOCAxNDU2LjVRMTA2MCAxMzk5IDExMjcuNSAxMjkyLjVRMTE5NSAxMTg2IDExOTkgMTAzOUw5NDggMTAzOVE5NDAgMTE1NyA4NjAuNSAxMjIzLjVRNzgxIDEyOTAgNjQ5IDEyOTBRNTY3IDEyOTAgNTAzLjUgMTI2My41UTQ0MCAxMjM3IDQwMy41IDExOTAuNVEzNjcgMTE0NCAzNjcgMTA4M1EzNjcgMTAzMyAzOTQuNSA5OTYuNVE0MjIgOTYwIDQ4MS41IDkzMi41UTU0MSA5MDUgNjM4IDg4Mkw3ODkgODQ3UTkwNSA4MjEgOTg5LjUgNzgzLjVRMTA3NCA3NDYgMTEyOC41IDY5NVExMTgzIDY0NCAxMjEwIDU3OFExMjM3IDUxMiAxMjM3IDQzMFExMjM3IDI5MSAxMTY3IDE4OVExMDk3IDg3IDk2OCAzMS41UTgzOSAtMjQgNjYzIC0yNFoiIHRyYW5zZm9ybT0idHJhbnNsYXRlKDAgMCkgc2NhbGUoMC4wMjczIC0wLjAyNzMpIi8+PHBhdGggZD0iTTU4MCAtMjRRNDI1IC0yNCAzMDguNSA0NlExOTIgMTE2IDEyNy41IDI0MFE2MyAzNjQgNjMgNTI2UTYzIDY4OSAxMjcuNSA4MTQuNVExOTIgOTQwIDMwOC41IDEwMTBRNDI1IDEwODAgNTgwIDEwODBRNjc4IDEwODAgNzYyLjUgMTA1MC41UTg0NyAxMDIxIDkxMCA5NjdROTczIDkxMyAxMDExLjUgODQwUTEwNTAgNzY3IDEwNTggNjc4TDgxMSA2NzhRODA0IDcyMCA3ODYgNzU1LjVRNzY4IDc5MSA3MzguNSA4MTYuNVE3MDkgODQyIDY3MCA4NTZRNjMxIDg3MCA1ODIgODcwUTUwMCA4NzAgNDQwLjUgODI3LjVRMzgxIDc4NSAzNTAgNzA4LjVRMzE5IDYzMiAzMTkgNTI3UTMxOSA0MjMgMzUwIDM0NlEzODEgMjY5IDQ0MCAyMjcuNVE0OTkgMTg2IDU4MiAxODZRNjMyIDE4NiA2NzAgMTk5LjVRNzA4IDIxMyA3MzUuNSAyMzguNVE3NjMgMjY0IDc4MS41IDI5OS41UTgwMCAzMzUgODA5IDM3OUwxMDU5IDM3OVExMDUxIDI5MiAxMDEzLjUgMjE4LjVROTc2IDE0NSA5MTIgOTFRODQ4IDM3IDc2My41IDYuNVE2NzkgLTI0IDU4MCAtMjRaIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgzNS4yMjU2IDApIHNjYWxlKDAuMDI3MyAtMC4wMjczKSIvPjxwYXRoIGQ9Ik0xMTIgMEwxMTIgMTA1NkwzNjUgMTA1NkwzNjUgMFpNMjM3IDEyMTNRMTczIDEyMTMgMTMwIDEyNTQuNVE4NyAxMjk2IDg3IDEzNTZRODcgMTQxNyAxMzAgMTQ1OC41UTE3MyAxNTAwIDIzNyAxNTAwUTMwMiAxNTAwIDM0NSAxNDU4LjVRMzg4IDE0MTcgMzg4IDEzNTdRMzg4IDEyOTYgMzQ1IDEyNTQuNVEzMDIgMTIxMyAyMzcgMTIxM1oiIHRyYW5zZm9ybT0idHJhbnNsYXRlKDY1LjEyMTUgMCkgc2NhbGUoMC4wMjczIC0wLjAyNzMpIi8+PHBhdGggZD0iTTEyNCAwTDEyNCAxNDkwTDM4OSAxNDkwTDM4OSAyMjlMMTA3OSAyMjlMMTA3OSAwWiIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNzcuNTM2OSAwKSBzY2FsZSgwLjAyNzMgLTAuMDI3MykiLz48cGF0aCBkPSJNNTc5IC0yNFE0MTkgLTI0IDMwNCA0N1ExODkgMTE4IDEyNiAyNDIuNVE2MyAzNjcgNjMgNTI3UTYzIDY4OSAxMjcuNSA4MTNRMTkyIDkzNyAzMDYgMTAwOC41UTQyMCAxMDgwIDU2OCAxMDgwUTY4MiAxMDgwIDc3NSAxMDQwLjVRODY4IDEwMDEgOTM1IDkyN1ExMDAyIDg1MyAxMDM4IDc1Mi41UTEwNzQgNjUyIDEwNzQgNTMxTDEwNzQgNDYyTDE2MyA0NjJMMTYzIDYzNkw5NDggNjM2TDgzNCA1OTBRODM0IDY3OCA4MDIuNSA3NDMuNVE3NzEgODA5IDcxMiA4NDQuNVE2NTMgODgwIDU3MiA4ODBRNDkxIDg4MCA0MzIuNSA4NDQuNVEzNzQgODA5IDM0MiA3NDRRMzEwIDY3OSAzMTAgNTg5TDMxMCA0ODBRMzEwIDM4OSAzNDIgMzIwUTM3NCAyNTEgNDM1IDIxMi41UTQ5NiAxNzQgNTg0IDE3NFE2NDcgMTc0IDY5NiAxOTMuNVE3NDUgMjEzIDc3OCAyNDdRODExIDI4MSA4MjQgMzI2TDEwNjEgMzI3UTEwNDEgMjIzIDk3My41IDE0NFE5MDYgNjUgODA0IDIwLjVRNzAyIC0yNCA1NzkgLTI0WiIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMTA3LjcxMjggMCkgc2NhbGUoMC4wMjczIC0wLjAyNzMpIi8+PHBhdGggZD0iTTUyMCAtMjFRMzgyIC0yMSAyNzkgNDcuNVExNzYgMTE2IDExOS41IDI0MFE2MyAzNjQgNjMgNTI5UTYzIDY5MSAxMjAuNSA4MTVRMTc4IDkzOSAyODEgMTAwOFEzODQgMTA3NyA1MTggMTA3N1E1ODggMTA3NyA2NDcuNSAxMDU4UTcwNyAxMDM5IDc1NSAxMDAyUTgwMyA5NjUgODM2IDkwN0w4MzggOTA3TDgzOCAxNDkwTDEwOTEgMTQ5MEwxMDkxIDBMODQyIDBMODQyIDE2MUw4NDAgMTYxUTgwNyAxMDAgNzU4IDU5LjVRNzA5IDE5IDY0OSAtMVE1ODkgLTIxIDUyMCAtMjFaTTU4MCAxOTBRNjYyIDE5MCA3MjMgMjMxLjVRNzg0IDI3MyA4MTggMzQ5LjVRODUyIDQyNiA4NTIgNTI5UTg1MiA2MzIgODE4LjUgNzA3LjVRNzg1IDc4MyA3MjMuNSA4MjUuNVE2NjIgODY4IDU4MCA4NjhRNTAyIDg2OCA0NDMgODI4LjVRMzg0IDc4OSAzNTEgNzEzLjVRMzE4IDYzOCAzMTggNTI5UTMxOCA0MjAgMzUxIDM0NC41UTM4NCAyNjkgNDQzIDIyOS41UTUwMiAxOTAgNTgwIDE5MFoiIHRyYW5zZm9ybT0idHJhbnNsYXRlKDEzOC4wODExIDApIHNjYWxlKDAuMDI3MyAtMC4wMjczKSIvPjxwYXRoIGQ9Ik01OTEgLTQzMlE0NTIgLTQzMiAzNTAuNSAtMzkxLjVRMjQ5IC0zNTEgMTg5IC0yNzZRMTI5IC0yMDEgMTE1IC05OEwzNjIgLTk3UTM3NCAtMTQzIDQwNiAtMTc0UTQzOCAtMjA1IDQ4NSAtMjIxUTUzMiAtMjM3IDU5MSAtMjM3UTcwOSAtMjM3IDc3NC41IC0xNzNRODQwIC0xMDkgODQwIDEyTDg0MCAxNzJMODM5IDE3MlE4MDYgMTEyIDc1Ny41IDcyUTcwOSAzMiA2NDkuNSAxMi41UTU5MCAtNyA1MjAgLTdRMzgzIC03IDI3OS41IDYyUTE3NiAxMzEgMTE5LjUgMjUyLjVRNjMgMzc0IDYzIDUzM1E2MyA2OTQgMTIwLjUgODE2LjVRMTc4IDkzOSAyODAuNSAxMDA4UTM4MyAxMDc3IDUxOCAxMDc3UTU4NyAxMDc3IDY0NyAxMDU4UTcwNyAxMDM5IDc1NiA5OTkuNVE4MDUgOTYwIDgzOSA4OTlMODQxIDg5OUw4NDEgMTA1NkwxMDkwIDEwNTZMMTA5MCAyOFExMDkwIC0xMzYgMTAyNSAtMjM3UTk2MCAtMzM4IDg0NyAtMzg1UTczNCAtNDMyIDU5MSAtNDMyWk01ODAgMjAxUTY2MiAyMDEgNzIzIDI0Mi41UTc4NCAyODQgODE4IDM1OS41UTg1MiA0MzUgODUyIDUzNlE4NTIgNjM3IDgxOCA3MTIuNVE3ODQgNzg4IDcyMyA4MjkuNVE2NjIgODcxIDU4MCA4NzFRNTAyIDg3MSA0NDMgODMyUTM4NCA3OTMgMzUxIDcxOC41UTMxOCA2NDQgMzE4IDUzNlEzMTggNDI4IDM1MSAzNTMuNVEzODQgMjc5IDQ0MyAyNDBRNTAyIDIwMSA1ODAgMjAxWiIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMTcwLjM0NiAwKSBzY2FsZSgwLjAyNzMgLTAuMDI3MykiLz48cGF0aCBkPSJNNTc5IC0yNFE0MTkgLTI0IDMwNCA0N1ExODkgMTE4IDEyNiAyNDIuNVE2MyAzNjcgNjMgNTI3UTYzIDY4OSAxMjcuNSA4MTNRMTkyIDkzNyAzMDYgMTAwOC41UTQyMCAxMDgwIDU2OCAxMDgwUTY4MiAxMDgwIDc3NSAxMDQwLjVRODY4IDEwMDEgOTM1IDkyN1ExMDAyIDg1MyAxMDM4IDc1Mi41UTEwNzQgNjUyIDEwNzQgNTMxTDEwNzQgNDYyTDE2MyA0NjJMMTYzIDYzNkw5NDggNjM2TDgzNCA1OTBRODM0IDY3OCA4MDIuNSA3NDMuNVE3NzEgODA5IDcxMiA4NDQuNVE2NTMgODgwIDU3MiA4ODBRNDkxIDg4MCA0MzIuNSA4NDQuNVEzNzQgODA5IDM0MiA3NDRRMzEwIDY3OSAzMTAgNTg5TDMxMCA0ODBRMzEwIDM4OSAzNDIgMzIwUTM3NCAyNTEgNDM1IDIxMi41UTQ5NiAxNzQgNTg0IDE3NFE2NDcgMTc0IDY5NiAxOTMuNVE3NDUgMjEzIDc3OCAyNDdRODExIDI4MSA4MjQgMzI2TDEwNjEgMzI3UTEwNDEgMjIzIDk3My41IDE0NFE5MDYgNjUgODA0IDIwLjVRNzAyIC0yNCA1NzkgLTI0WiIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMjAyLjYxMDkgMCkgc2NhbGUoMC4wMjczIC0wLjAyNzMpIi8+PHBhdGggZD0iTTExMiAwTDExMiAxMDU2TDM1NSAxMDU2TDM1NSA4ODFMMzU5IDg4MVEzODcgOTcyIDQ0OS41IDEwMTlRNTEyIDEwNjYgNjE0IDEwNjZRNjM5IDEwNjYgNjYwIDEwNjVRNjgxIDEwNjQgNjk3IDEwNjNMNjk3IDgzOVE2ODMgODQwIDY0OSA4NDNRNjE1IDg0NiA1NzcgODQ2UTUxOCA4NDYgNDY5LjUgODE4LjVRNDIxIDc5MSAzOTMgNzM2UTM2NSA2ODEgMzY1IDU5OUwzNjUgMFoiIHRyYW5zZm9ybT0idHJhbnNsYXRlKDIzMi45NzkyIDApIHNjYWxlKDAuMDI3MyAtMC4wMjczKSIvPjwvZz48L3N2Zz4K" alt="SciLedger"><div class="brand-tag">Open Science Publishing</div></div>
+      </div>
+      <div class="chips">
+        <span class="chip chip-t">Research Article</span><span class="chip chip-oa">Open Access</span>
+      </div>
+    </div>
+
+    <div class="kicker">Research</div>
+    <h1 class="h-title">Multiple corresponding authors and ordered affiliations</h1>
+    <p class="h-sub"></p>
+    <p class="h-authors">Ada Lovelace<sup>1,*</sup> &nbsp;·&nbsp; Grace Hopper<sup>1,2,*</sup> &nbsp;·&nbsp; Tetsu Sakamoto de Albuquerque Nascimento Gonçalves<sup>1,2,3,*</sup> &nbsp;·&nbsp; Leonardo Ferreira Cabral<sup>4</sup></p>
+    <div class="h-doi"><a href="https://sciledger.org/verify/fixture-authors-affiliations">https://sciledger.org/verify/fixture-authors-affiliations</a> &nbsp;·&nbsp; SciLedger 2026 &nbsp;·&nbsp; Open Access</div>
+  </header>
+
+  <section class="meta">
+    <div><div class="k">Received</div><div class="v">04 Jan 2026</div></div>
+    <div><div class="k">Accepted</div><div class="v">28 Feb 2026</div></div>
+    <div><div class="k">Published</div><div class="v">28 Feb 2026</div></div>
+    <div><div class="k">Peer review</div><div class="v">1 rounds</div></div>
+    <div><div class="k">License</div><div class="v">CC BY 4.0</div></div>
+  </section>
+
+  <p class="affil"><sup>1</sup> Universidade Federal do Rio Grande do Norte, Natal, Brasil &nbsp;·&nbsp; <sup>2</sup> Instituto Metrópole Digital, Natal, Brasil &nbsp;·&nbsp; <sup>3</sup> Laboratório de Bioinformática Comparativa e Genômica Evolutiva Aplicada à Saúde Pública, Natal &nbsp;·&nbsp; <sup>4</sup> Departamento de Pesquisa, Universidade Nova, Natal, Brasil &nbsp;·&nbsp; <sup>*</sup> Corresponding authors: <a href="mailto:ada@ufrn.br">ada@ufrn.br</a>, <a href="mailto:grace@imd.ufrn.br">grace@imd.ufrn.br</a>, <a href="mailto:tetsu@imd.ufrn.br">tetsu@imd.ufrn.br</a></p>
+
+  <section class="abs">
+    <div class="lbl">Abstract</div>
+    <p>A fixture exercising the author, corresponding-author and affiliation rendering path.</p>
+  </section>
+  <p class="kw"><b>Keywords</b>&nbsp;&nbsp;affiliations · corresponding authors</p>
+
+  <hr class="rule-soft">
+
+  <div class="body paper-content"><div class="sn-stack"><aside class="sn"><b>Cite this article</b><br>Ada Lovelace, Grace Hopper, Tetsu Sakamoto de Albuquerque Nascimento Gonçalves, Leonardo Ferreira Cabral (2026). Multiple corresponding authors and ordered affiliations. <i>SciLedger</i>. <a href="https://sciledger.org/verify/fixture-authors-affiliations">https://sciledger.org/verify/fixture-authors-affiliations</a></aside><aside class="sn"><b>Peer review</b><br>Double-anonymised · 1 round(s) · 0 referee report(s). Editorial record at sciledger.org/verify/fixture-authors-affiliations.</aside></div><h1>Introduction</h1><p>Body text for the fixture paper.</p>
+  </div>
+
+  <div class="back">
+    <div>
+      <div class="blk"><h3>Author contributions</h3>Not declared for this article.</div>
+      <div class="blk"><h3>Funding</h3>No external funding was declared for this article.</div>
+      <div class="blk"><h3>Data availability</h3>No additional data associated with this article.</div>
+      <div class="blk"><h3>Conflicts of interest</h3>The authors declare no conflict of interest.</div>
+    </div>
+    <div>
+      <h3>References</h3>
+      <ol class="refs paper-references"><li style="list-style:none;margin-left:-5mm">No references recorded for this article.</li></ol>
+    </div>
+  </div>
+
+  <section class="verify">
+    <div class="verify-hd">
+      <span class="t">Verified editorial record</span>
+      <span class="h">digest 516d9d65f628fde2</span>
+    </div>
+    <div class="verify-bd">
+      <div class="verify-qr"><img src="" alt="Verify this record"></div>
+      <div class="verify-info">
+        <div class="r"><span class="k">Verify at</span><span class="v"><a href="https://sciledger.org/verify/fixture-authors-affiliations">sciledger.org/verify/fixture-authors-affiliations</a></span></div>
+        <div class="r"><span class="k">Review rounds</span><span class="v">1 · 0 referee reports</span></div>
+        <div class="r"><span class="k">Decision</span><span class="v">Accepted 28 Feb 2026</span></div>
+        <div class="r"><span class="k">Events recorded</span><span class="v">1 transitions · append-only</span></div>
+        <div class="note">Scan to inspect the complete, tamper-evident editorial history of this article.</div>
+      </div>
+    </div>
+  </section>
+
+  <div class="endband bleed">
+    <span>© 2026 The Authors. Published by <img class="publisher-logo" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMTQiIGhlaWdodD0iOTQiIHZpZXdCb3g9IjAgMCAzMTQgOTQiIHJvbGU9ImltZyIgYXJpYS1sYWJlbGxlZGJ5PSJ0aXRsZSI+PHRpdGxlIGlkPSJ0aXRsZSI+U2NpTGVkZ2VyIOKAlCB3b3JkbWFyazwvdGl0bGU+PGcgYXJpYS1sYWJlbD0iU2NpTGVkZ2VyIiBmaWxsPSIjMTExODI3IiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgxMiA2MS4zMTI1KSI+PHBhdGggZD0iTTY2MyAtMjRRNDc4IC0yNCAzNDYuNSAzN1EyMTUgOTggMTQ0IDIxMi41UTczIDMyNyA3MyA0ODZMMzMyIDQ4NlEzMzQgMzk2IDM3My41IDMzMS41UTQxMyAyNjcgNDg3IDIzM1E1NjEgMTk5IDY2NSAxOTlRNzU4IDE5OSA4MjcuNSAyMjUuNVE4OTcgMjUyIDkzNS41IDMwMFE5NzQgMzQ4IDk3NCA0MTRROTc0IDQ2NiA5NDYgNTA1UTkxOCA1NDQgODU3LjUgNTc0UTc5NyA2MDQgNjk4IDYyNkw1MzggNjYyUTMxMyA3MTMgMjA4IDgxMi41UTEwMyA5MTIgMTAzIDEwNzBRMTAzIDEyMDQgMTcxIDEzMDMuNVEyMzkgMTQwMyAzNjIuNSAxNDU4LjVRNDg2IDE1MTQgNjUwIDE1MTRRODE2IDE1MTQgOTM4IDE0NTYuNVExMDYwIDEzOTkgMTEyNy41IDEyOTIuNVExMTk1IDExODYgMTE5OSAxMDM5TDk0OCAxMDM5UTk0MCAxMTU3IDg2MC41IDEyMjMuNVE3ODEgMTI5MCA2NDkgMTI5MFE1NjcgMTI5MCA1MDMuNSAxMjYzLjVRNDQwIDEyMzcgNDAzLjUgMTE5MC41UTM2NyAxMTQ0IDM2NyAxMDgzUTM2NyAxMDMzIDM5NC41IDk5Ni41UTQyMiA5NjAgNDgxLjUgOTMyLjVRNTQxIDkwNSA2MzggODgyTDc4OSA4NDdROTA1IDgyMSA5ODkuNSA3ODMuNVExMDc0IDc0NiAxMTI4LjUgNjk1UTExODMgNjQ0IDEyMTAgNTc4UTEyMzcgNTEyIDEyMzcgNDMwUTEyMzcgMjkxIDExNjcgMTg5UTEwOTcgODcgOTY4IDMxLjVRODM5IC0yNCA2NjMgLTI0WiIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMCAwKSBzY2FsZSgwLjAzMTMgLTAuMDMxMykiLz48cGF0aCBkPSJNNTgwIC0yNFE0MjUgLTI0IDMwOC41IDQ2UTE5MiAxMTYgMTI3LjUgMjQwUTYzIDM2NCA2MyA1MjZRNjMgNjg5IDEyNy41IDgxNC41UTE5MiA5NDAgMzA4LjUgMTAxMFE0MjUgMTA4MCA1ODAgMTA4MFE2NzggMTA4MCA3NjIuNSAxMDUwLjVRODQ3IDEwMjEgOTEwIDk2N1E5NzMgOTEzIDEwMTEuNSA4NDBRMTA1MCA3NjcgMTA1OCA2NzhMODExIDY3OFE4MDQgNzIwIDc4NiA3NTUuNVE3NjggNzkxIDczOC41IDgxNi41UTcwOSA4NDIgNjcwIDg1NlE2MzEgODcwIDU4MiA4NzBRNTAwIDg3MCA0NDAuNSA4MjcuNVEzODEgNzg1IDM1MCA3MDguNVEzMTkgNjMyIDMxOSA1MjdRMzE5IDQyMyAzNTAgMzQ2UTM4MSAyNjkgNDQwIDIyNy41UTQ5OSAxODYgNTgyIDE4NlE2MzIgMTg2IDY3MCAxOTkuNVE3MDggMjEzIDczNS41IDIzOC41UTc2MyAyNjQgNzgxLjUgMjk5LjVRODAwIDMzNSA4MDkgMzc5TDEwNTkgMzc5UTEwNTEgMjkyIDEwMTMuNSAyMTguNVE5NzYgMTQ1IDkxMiA5MVE4NDggMzcgNzYzLjUgNi41UTY3OSAtMjQgNTgwIC0yNFoiIHRyYW5zZm9ybT0idHJhbnNsYXRlKDQwLjM0MzYgMCkgc2NhbGUoMC4wMzEzIC0wLjAzMTMpIi8+PHBhdGggZD0iTTExMiAwTDExMiAxMDU2TDM2NSAxMDU2TDM2NSAwWk0yMzcgMTIxM1ExNzMgMTIxMyAxMzAgMTI1NC41UTg3IDEyOTYgODcgMTM1NlE4NyAxNDE3IDEzMCAxNDU4LjVRMTczIDE1MDAgMjM3IDE1MDBRMzAyIDE1MDAgMzQ1IDE0NTguNVEzODggMTQxNyAzODggMTM1N1EzODggMTI5NiAzNDUgMTI1NC41UTMwMiAxMjEzIDIzNyAxMjEzWiIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNzQuNTk1OSAwKSBzY2FsZSgwLjAzMTMgLTAuMDMxMykiLz48cGF0aCBkPSJNMTI0IDBMMTI0IDE0OTBMMzg5IDE0OTBMMzg5IDIyOUwxMDc5IDIyOUwxMDc5IDBaIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSg4OC44NzA4IDApIHNjYWxlKDAuMDMxMyAtMC4wMzEzKSIvPjxwYXRoIGQ9Ik01NzkgLTI0UTQxOSAtMjQgMzA0IDQ3UTE4OSAxMTggMTI2IDI0Mi41UTYzIDM2NyA2MyA1MjdRNjMgNjg5IDEyNy41IDgxM1ExOTIgOTM3IDMwNiAxMDA4LjVRNDIwIDEwODAgNTY4IDEwODBRNjgyIDEwODAgNzc1IDEwNDAuNVE4NjggMTAwMSA5MzUgOTI3UTEwMDIgODUzIDEwMzggNzUyLjVRMTA3NCA2NTIgMTA3NCA1MzFMMTA3NCA0NjJMMTYzIDQ2MkwxNjMgNjM2TDk0OCA2MzZMODM0IDU5MFE4MzQgNjc4IDgwMi41IDc0My41UTc3MSA4MDkgNzEyIDg0NC41UTY1MyA4ODAgNTcyIDg4MFE0OTEgODgwIDQzMi41IDg0NC41UTM3NCA4MDkgMzQyIDc0NFEzMTAgNjc5IDMxMCA1ODlMMzEwIDQ4MFEzMTAgMzg5IDM0MiAzMjBRMzc0IDI1MSA0MzUgMjEyLjVRNDk2IDE3NCA1ODQgMTc0UTY0NyAxNzQgNjk2IDE5My41UTc0NSAyMTMgNzc4IDI0N1E4MTEgMjgxIDgyNCAzMjZMMTA2MSAzMjdRMTA0MSAyMjMgOTczLjUgMTQ0UTkwNiA2NSA4MDQgMjAuNVE3MDIgLTI0IDU3OSAtMjRaIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgxMjMuNDQzMiAwKSBzY2FsZSgwLjAzMTMgLTAuMDMxMykiLz48cGF0aCBkPSJNNTIwIC0yMVEzODIgLTIxIDI3OSA0Ny41UTE3NiAxMTYgMTE5LjUgMjQwUTYzIDM2NCA2MyA1MjlRNjMgNjkxIDEyMC41IDgxNVExNzggOTM5IDI4MSAxMDA4UTM4NCAxMDc3IDUxOCAxMDc3UTU4OCAxMDc3IDY0Ny41IDEwNThRNzA3IDEwMzkgNzU1IDEwMDJRODAzIDk2NSA4MzYgOTA3TDgzOCA5MDdMODM4IDE0OTBMMTA5MSAxNDkwTDEwOTEgMEw4NDIgMEw4NDIgMTYxTDg0MCAxNjFRODA3IDEwMCA3NTggNTkuNVE3MDkgMTkgNjQ5IC0xUTU4OSAtMjEgNTIwIC0yMVpNNTgwIDE5MFE2NjIgMTkwIDcyMyAyMzEuNVE3ODQgMjczIDgxOCAzNDkuNVE4NTIgNDI2IDg1MiA1MjlRODUyIDYzMiA4MTguNSA3MDcuNVE3ODUgNzgzIDcyMy41IDgyNS41UTY2MiA4NjggNTgwIDg2OFE1MDIgODY4IDQ0MyA4MjguNVEzODQgNzg5IDM1MSA3MTMuNVEzMTggNjM4IDMxOCA1MjlRMzE4IDQyMCAzNTEgMzQ0LjVRMzg0IDI2OSA0NDMgMjI5LjVRNTAyIDE5MCA1ODAgMTkwWiIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMTU4LjIzNTYgMCkgc2NhbGUoMC4wMzEzIC0wLjAzMTMpIi8+PHBhdGggZD0iTTU5MSAtNDMyUTQ1MiAtNDMyIDM1MC41IC0zOTEuNVEyNDkgLTM1MSAxODkgLTI3NlExMjkgLTIwMSAxMTUgLTk4TDM2MiAtOTdRMzc0IC0xNDMgNDA2IC0xNzRRNDM4IC0yMDUgNDg1IC0yMjFRNTMyIC0yMzcgNTkxIC0yMzdRNzA5IC0yMzcgNzc0LjUgLTE3M1E4NDAgLTEwOSA4NDAgMTJMODQwIDE3Mkw4MzkgMTcyUTgwNiAxMTIgNzU3LjUgNzJRNzA5IDMyIDY0OS41IDEyLjVRNTkwIC03IDUyMCAtN1EzODMgLTcgMjc5LjUgNjJRMTc2IDEzMSAxMTkuNSAyNTIuNVE2MyAzNzQgNjMgNTMzUTYzIDY5NCAxMjAuNSA4MTYuNVExNzggOTM5IDI4MC41IDEwMDhRMzgzIDEwNzcgNTE4IDEwNzdRNTg3IDEwNzcgNjQ3IDEwNThRNzA3IDEwMzkgNzU2IDk5OS41UTgwNSA5NjAgODM5IDg5OUw4NDEgODk5TDg0MSAxMDU2TDEwOTAgMTA1NkwxMDkwIDI4UTEwOTAgLTEzNiAxMDI1IC0yMzdROTYwIC0zMzggODQ3IC0zODVRNzM0IC00MzIgNTkxIC00MzJaTTU4MCAyMDFRNjYyIDIwMSA3MjMgMjQyLjVRNzg0IDI4NCA4MTggMzU5LjVRODUyIDQzNSA4NTIgNTM2UTg1MiA2MzcgODE4IDcxMi41UTc4NCA3ODggNzIzIDgyOS41UTY2MiA4NzEgNTgwIDg3MVE1MDIgODcxIDQ0MyA4MzJRMzg0IDc5MyAzNTEgNzE4LjVRMzE4IDY0NCAzMTggNTM2UTMxOCA0MjggMzUxIDM1My41UTM4NCAyNzkgNDQzIDI0MFE1MDIgMjAxIDU4MCAyMDFaIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgxOTUuMTk1NCAwKSBzY2FsZSgwLjAzMTMgLTAuMDMxMykiLz48cGF0aCBkPSJNNTc5IC0yNFE0MTkgLTI0IDMwNCA0N1ExODkgMTE4IDEyNiAyNDIuNVE2MyAzNjcgNjMgNTI3UTYzIDY4OSAxMjcuNSA4MTNRMTkyIDkzNyAzMDYgMTAwOC41UTQyMCAxMDgwIDU2OCAxMDgwUTY4MiAxMDgwIDc3NSAxMDQwLjVRODY4IDEwMDEgOTM1IDkyN1ExMDAyIDg1MyAxMDM4IDc1Mi41UTEwNzQgNjUyIDEwNzQgNTMxTDEwNzQgNDYyTDE2MyA0NjJMMTYzIDYzNkw5NDggNjM2TDgzNCA1OTBRODM0IDY3OCA4MDIuNSA3NDMuNVE3NzEgODA5IDcxMiA4NDQuNVE2NTMgODgwIDU3MiA4ODBRNDkxIDg4MCA0MzIuNSA4NDQuNVEzNzQgODA5IDM0MiA3NDRRMzEwIDY3OSAzMTAgNTg5TDMxMCA0ODBRMzEwIDM4OSAzNDIgMzIwUTM3NCAyNTEgNDM1IDIxMi41UTQ5NiAxNzQgNTg0IDE3NFE2NDcgMTc0IDY5NiAxOTMuNVE3NDUgMjEzIDc3OCAyNDdRODExIDI4MSA4MjQgMzI2TDEwNjEgMzI3UTEwNDEgMjIzIDk3My41IDE0NFE5MDYgNjUgODA0IDIwLjVRNzAyIC0yNCA1NzkgLTI0WiIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMjMyLjE1NTMgMCkgc2NhbGUoMC4wMzEzIC0wLjAzMTMpIi8+PHBhdGggZD0iTTExMiAwTDExMiAxMDU2TDM1NSAxMDU2TDM1NSA4ODFMMzU5IDg4MVEzODcgOTcyIDQ0OS41IDEwMTlRNTEyIDEwNjYgNjE0IDEwNjZRNjM5IDEwNjYgNjYwIDEwNjVRNjgxIDEwNjQgNjk3IDEwNjNMNjk3IDgzOVE2ODMgODQwIDY0OSA4NDNRNjE1IDg0NiA1NzcgODQ2UTUxOCA4NDYgNDY5LjUgODE4LjVRNDIxIDc5MSAzOTMgNzM2UTM2NSA2ODEgMzY1IDU5OUwzNjUgMFoiIHRyYW5zZm9ybT0idHJhbnNsYXRlKDI2Ni45NDc3IDApIHNjYWxlKDAuMDMxMyAtMC4wMzEzKSIvPjwvZz48L3N2Zz4K" alt="SciLedger"> under CC BY 4.0.</span>
+    <a href="https://sciledger.org">sciledger.org</a>
+  </div>
+
+</div></body></html>

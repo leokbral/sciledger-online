@@ -15,6 +15,8 @@ import {
 	resolveEffectiveHubRoles
 } from '$lib/server/authorization/effectiveHubRoles';
 import { serializeReviewInvitations } from '$lib/server/reviewInvitations';
+import { isSuperAdmin } from '$lib/server/authorization/superAdmin';
+import { recordAdminAuditEvent } from '$lib/server/authorization/adminAudit';
 
 function getIdAliases(value: unknown): string[] {
 	if (!value) return [];
@@ -241,9 +243,36 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 			hub: hubData
 		});
 		const canManageEditorialFlow = assignmentAuthorization.allowed;
+
+		/**
+		 * O super admin da plataforma enxerga a mesma lista que a equipe editorial do
+		 * hub -- tudo menos rascunhos -- mesmo sem papel nenhum neste hub.
+		 *
+		 * Deliberadamente SEPARADO de `canManageEditorialFlow`: aquele continua sendo
+		 * a unica chave das acoes de escrita (designar revisor, decisao editorial,
+		 * gestao de membros e papeis), e nao muda aqui. O super admin e so leitura,
+		 * como o resto da area de administracao da plataforma.
+		 */
+		const isPlatformAdmin = await isSuperAdmin(locals.user);
+		const canViewAllHubPapers = canManageEditorialFlow || isPlatformAdmin;
+
 		const usersData = await fetchUsers();
 		// Only editorial roles see every Hub paper; a Reviewer role alone does not.
-		const papersData = await fetchPapers(canManageEditorialFlow);
+		const papersData = await fetchPapers(canViewAllHubPapers);
+
+		// Um super admin lendo os papers de um hub do qual nao e membro deixa rastro,
+		// pelo mesmo caminho das demais leituras administrativas. So registra quando
+		// e o papel de plataforma que abriu o acesso, nao quando a pessoa e da equipe
+		// do hub por direito proprio.
+		if (isPlatformAdmin && !canManageEditorialFlow) {
+			await recordAdminAuditEvent({
+				actor: locals.user,
+				action: 'admin.hub.view',
+				resourceType: 'hub',
+				resourceId: String(params.id),
+				metadata: { surface: 'hub.workspace', papersReturned: papersData.length }
+			});
+		}
 		const hubId = getIdAliases(hubData)[0] || params.id;
 		const roleManagementAuthorization = await authorize(locals.user, 'hub.manageRoles', {
 			hub: hubData
@@ -371,6 +400,8 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 			isCreator,
 			isViceManager,
 			isHubManager,
+			/** So habilita a persona de leitura no seletor; nao libera acao nenhuma. */
+			isPlatformAdmin,
 			isHubReviewer: currentUserHubMember?.canReview === true,
 			canManageRoles: roleManagementAuthorization.allowed,
 			currentUserHubMember,
