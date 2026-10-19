@@ -93,6 +93,11 @@ function paper(status: string, extra: Record<string, unknown> = {}) {
 }
 
 describe('link do paper para o super admin da plataforma', () => {
+	it('opens drafts even when the super admin also manages the hub', () => {
+		expect(linkFor(SUPER_ADMIN)(paper('draft'))).toBe('/publish/view/p1');
+		expect(linkFor({ ...SUPER_ADMIN, isHubManager: true })(paper('draft'))).toBe('/publish/view/p1');
+	});
+
 	it.each([
 		['reviewer assignment'],
 		['in review'],

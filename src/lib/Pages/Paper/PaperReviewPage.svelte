@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 
 	//AKIIIIIIIIIIIIIII
 	import ReviewChat from '$lib/components/review/ReviewChat.svelte';
@@ -130,6 +130,8 @@
 		isHubAdmin?: boolean;
 		canSubmitReview?: boolean;
 		canViewSubmittedReviews?: boolean;
+		/** Inspect the reviewer PDF without enabling review submission or updating the paper. */
+		reviewerPreview?: boolean;
 	}
 
 	let {
@@ -140,13 +142,23 @@
 		reviewAssignments,
 		isHubAdmin = false,
 		canSubmitReview = false,
-		canViewSubmittedReviews = false
+		canViewSubmittedReviews = false,
+		reviewerPreview = false
 	}: Props = $props();
 
 	let isReviewCollapsed = $state(false);
 	let generatedPdfId = $state<string>(paper?.pdfUrl ?? '');
+	let previewPdfUrl = $state('');
+	let pdfUrl = $derived(
+		reviewerPreview
+			? previewPdfUrl
+			: generatedPdfId
+				? `/api/pdfs/${encodeURIComponent(generatedPdfId)}`
+				: ''
+	);
 	let isGeneratingPdf = $state(false);
 	let generatePdfError = $state<string | null>(null);
+	let destroyed = false;
 
 	function getReviewRound(review: any): number {
 		const round = Number(review?.reviewRound ?? review?.round ?? 1);
@@ -234,10 +246,9 @@
 	}
 
 	function handleOpenPdfPreview() {
-		if (!generatedPdfId) return;
+		if (!pdfUrl) return;
 
-		const url = `/api/pdfs/${encodeURIComponent(generatedPdfId)}?download=0`;
-		const win = window.open(url, '_blank');
+		const win = window.open(pdfUrl, '_blank');
 		if (!win) {
 			alert('Allow pop-ups in the browser to open the PDF.');
 		}
@@ -251,6 +262,16 @@
 		generatePdfError = null;
 
 		try {
+			if (reviewerPreview) {
+				const response = await fetch(`/api/pdfs/generate/${encodeURIComponent(paperId)}`);
+				if (!response.ok) throw new Error('Failed to generate PDF preview. Please try again.');
+				const blob = await response.blob();
+				if (destroyed) return;
+				if (previewPdfUrl) URL.revokeObjectURL(previewPdfUrl);
+				previewPdfUrl = URL.createObjectURL(blob);
+				return;
+			}
+
 			const response = await fetch(`/api/pdfs/generate/${encodeURIComponent(paperId)}`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -275,6 +296,11 @@
 
 	onMount(() => {
 		void generateServerPdf(true);
+	});
+
+	onDestroy(() => {
+		destroyed = true;
+		if (previewPdfUrl) URL.revokeObjectURL(previewPdfUrl);
 	});
 </script>
 
@@ -305,11 +331,16 @@
 		{/if}
 
 		<!-- Role-based rendering: reviewers get PDF + review form; authors/editors/admins can observe submitted reviews -->
-		{#if canSubmitReview}
-			<div class="mb-8 {isHubAdmin ? 'w-full' : 'flex flex-col gap-4 w-full xl:flex-row'}">
+		{#if canSubmitReview || reviewerPreview}
+			{#if reviewerPreview}
+				<p class="mb-4 text-sm text-slate-600">
+					Reviewer preview · {paper.status} · Read-only
+				</p>
+			{/if}
+			<div class="mb-8 {isHubAdmin || reviewerPreview ? 'w-full' : 'flex flex-col gap-4 w-full xl:flex-row'}">
 				<!-- PDF à esquerda -->
 				<section
-					class={isHubAdmin
+					class={isHubAdmin || reviewerPreview
 						? 'w-full'
 						: isReviewCollapsed
 							? 'w-full min-w-0 xl:flex-[4_1_0%]'
@@ -321,6 +352,16 @@
 						>
 							<h3 class="text-lg font-semibold text-slate-800">Paper PDF</h3>
 							<div class="flex flex-col gap-2 min-[420px]:flex-row sm:items-center">
+								{#if reviewerPreview}
+									<button
+										type="button"
+										class="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 disabled:opacity-60"
+										onclick={() => generateServerPdf(true)}
+										disabled={isGeneratingPdf}
+									>
+										{isGeneratingPdf ? 'Generating PDF...' : 'Refresh PDF preview'}
+									</button>
+								{/if}
 								<!-- Regenerate PDF button hidden (manual override). -->
 								<!--
 								<button
@@ -336,7 +377,7 @@
 									type="button"
 									class="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 min-[420px]:w-auto"
 									onclick={handleOpenPdfPreview}
-									disabled={!generatedPdfId}
+									disabled={!pdfUrl}
 								>
 									Open in new tab
 								</button>
@@ -347,12 +388,12 @@
 							<p class="mb-2 text-sm text-red-600">{generatePdfError}</p>
 						{/if}
 
-						{#if generatedPdfId}
+						{#if pdfUrl}
 							<div
 								class="h-[125dvh] w-full overflow-hidden border border-gray-300 sm:h-[90dvh] lg:h-[86vh] xl:h-[calc(100vh-10rem)]"
 							>
 								<iframe
-									src={`/api/pdfs/${generatedPdfId}#view=FitH&zoom=page-width`}
+									src={`${pdfUrl}#view=FitH&zoom=page-width`}
 									title="PDF file"
 									frameborder="1"
 									class="h-full w-full border-0"
@@ -371,7 +412,7 @@
 				</section>
 
 				<!-- ReviewForms à direita (apenas para revisores, não para admin do hub) -->
-				{#if !isHubAdmin}
+				{#if canSubmitReview && !isHubAdmin && !reviewerPreview}
 					<section
 						class={isReviewCollapsed
 							? 'w-full xl:w-[300px] flex-none min-w-0'
@@ -393,7 +434,7 @@
 		{/if}
 
 		{#if canViewSubmittedReviews}
-			{#if !canSubmitReview}
+			{#if !canSubmitReview && !reviewerPreview}
 				<div class="mb-8">
 					<PublishedPaperView {paper} showReviewedBadge={false} />
 				</div>
@@ -508,7 +549,7 @@
 				</div>
 			{/if}
 		{:else}
-			{#if !canSubmitReview}
+			{#if !canSubmitReview && !reviewerPreview}
 				<div class="mb-8">
 					<PublishedPaperView {paper} showReviewedBadge={false} />
 				</div>

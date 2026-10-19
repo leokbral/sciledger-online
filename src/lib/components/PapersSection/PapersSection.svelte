@@ -96,6 +96,7 @@
 	function getReadMoreHref(paper: any): string {
 		const slug = getPaperSlug(paper);
 		if (!slug) return '#';
+		if (isPlatformAdmin && paper?.status === 'draft') return `/publish/view/${slug}`;
 
 		/**
 		 * Super admin da plataforma que nao e membro deste hub.
@@ -730,6 +731,15 @@
 
 						<!-- Action buttons -->
 						<div class="flex flex-wrap items-center gap-2 sm:justify-end">
+							{#if isPlatformAdmin}
+								<a
+									href={`/review/inreview/${getPaperSlug(paper)}?preview=1`}
+									class="btn btn-sm flex items-center gap-1 rounded-full border border-surface-200 bg-white text-surface-700 transition hover:bg-surface-50"
+								>
+									<Icon icon="mdi:file-eye-outline" width="20" height="20" />
+									View as reviewer
+								</a>
+							{/if}
 							{#if isHubManager && paper.status !== 'published'}
 								{#if isCreator && paper.status === 'reviewer assignment' && !paper.rejectedByHub}
 									<button

@@ -15,11 +15,11 @@
 
 	let { data }: Props = $props();
 
-	let paper = data.paper as Paper;
-	let currentUser = data.user as User;
-	let messageFeed = data.messageFeed as MessageFeed;
-	let reviewAssignments = data.reviewAssignments;
-	let isHubOwner = data.isHubOwner || false;
+	let paper = $derived(data.paper as Paper);
+	let currentUser = $derived(data.user as User);
+	let messageFeed = $derived(data.messageFeed as MessageFeed);
+	let reviewAssignments = $derived(data.reviewAssignments);
+	let isHubOwner = $derived(data.isHubOwner || false);
 
 	async function handleSavePaper(event: { detail: { store: Paper } }) {
 		const updatedPaper = event.detail.store;
@@ -97,13 +97,16 @@
 	</div>
 {/if}
 
-<PaperReviewPage
-	on:reviewSubmitted={handleReviewSubmitted}
-	{paper}
-	{currentUser}
-	{messageFeed}
-	{reviewAssignments}
-	isHubAdmin={isHubOwner}
-	canSubmitReview={(data as any).canSubmitReview === true}
-	canViewSubmittedReviews={(data as any).canViewSubmittedReviews === true}
-/>
+{#key `${paper.id}:${data.reviewerPreview === true}`}
+	<PaperReviewPage
+		on:reviewSubmitted={handleReviewSubmitted}
+		{paper}
+		{currentUser}
+		{messageFeed}
+		{reviewAssignments}
+		isHubAdmin={isHubOwner}
+		canSubmitReview={(data as any).canSubmitReview === true}
+		canViewSubmittedReviews={(data as any).canViewSubmittedReviews === true}
+		reviewerPreview={data.reviewerPreview === true}
+	/>
+{/key}
