@@ -1,4 +1,6 @@
 import Papers from '$lib/db/models/Paper';
+import { isSuperAdmin } from '$lib/server/authorization/superAdmin';
+import { recordAdminAuditEvent } from '$lib/server/authorization/adminAudit';
 import Users from '$lib/db/models/User';
 import { error, redirect } from '@sveltejs/kit';
 import {
@@ -51,8 +53,27 @@ export async function load({ locals, params }) {
 		const isOpenReviewer = !paperRaw.hubId && (await hasReviewerCapability(locals.user));
 
 
-		if (!isHubReviewer && !isHubOwner && !isOpenReviewer && !hasAcceptedViaQueue) {
+		// Super admin da plataforma: leitura, mesmo sem papel neste hub.
+		const isSuperUser = await isSuperAdmin(locals.user);
+		const isSuperUserView =
+			isSuperUser &&
+			!isHubReviewer &&
+			!isHubOwner &&
+			!isOpenReviewer &&
+			!hasAcceptedViaQueue;
+
+		if (!isHubReviewer && !isHubOwner && !isOpenReviewer && !hasAcceptedViaQueue && !isSuperUser) {
 			throw error(403, 'You do not have permission to view this paper');
+		}
+
+		if (isSuperUserView) {
+			await recordAdminAuditEvent({
+				actor: locals.user,
+				action: 'admin.paper.view',
+				resourceType: 'paper',
+				resourceId: String(paperRaw.id ?? params.slug),
+				metadata: { surface: 'paper.editor-view' }
+			});
 		}
 
 	// 🔧 Normaliza o campo peer_review (se existir)
@@ -92,6 +113,8 @@ export async function load({ locals, params }) {
 
 	return {
 		paper: paperData,
+		/** O papel de plataforma foi o que abriu a porta: a tela avisa o usuario. */
+		isSuperUserView,
 		users
 	};
 	} catch (err: any) {

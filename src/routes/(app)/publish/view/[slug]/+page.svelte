@@ -1,5 +1,6 @@
 <script lang="ts">
 	import PaperAuthorsSection from '$lib/components/Paper/PaperAuthorsSection.svelte';
+	import PlatformAdminNotice from '$lib/components/PlatformAdmin/PlatformAdminNotice.svelte';
 	import DownloadArticlePdf from '$lib/components/Paper/DownloadArticlePdf.svelte';
 	import SupplementaryMaterials from '$lib/components/SupplementaryMaterials.svelte';
 	import SupplementaryFiles from '$lib/components/SupplementaryFiles.svelte';
@@ -15,6 +16,33 @@
 	$: paper = data.paper as any;
 	let currentUser: any = data.user as any;
 	let canViewCorrections = data.canViewCorrections === true;
+
+	/**
+	 * Atalhos para o mesmo paper visto por outro papel.
+	 *
+	 * So existem para o super admin da plataforma: e a forma de ele olhar o paper
+	 * como um revisor ou um editor olharia, sem precisar de papel no hub. Cada
+	 * destino depende do status, porque as telas de revisao so existem a partir do
+	 * momento em que o paper entra naquela etapa.
+	 */
+	let otherViews: Array<{ label: string; href: string }> = [];
+	$: {
+		const id = paper?.id ?? paper?._id ?? '';
+		const status = String(paper?.status ?? '');
+		const views: Array<{ label: string; href: string }> = [];
+		if (id) {
+			if (status === 'in review') {
+				views.push({ label: 'Reviewer', href: `/review/inreview/${id}` });
+			}
+			if (status === 'needing corrections' || status === 'under correction') {
+				views.push({ label: 'Reviewer', href: `/review/correction/${id}` });
+			}
+			if (status === 'reviewer assignment') {
+				views.push({ label: 'Editor', href: `/review/paperspool/${id}` });
+			}
+		}
+		otherViews = views;
+	}
 
 	const quantitativeFields = [
 		{ key: 'originality', label: 'Originality' },
@@ -96,6 +124,12 @@
 		enhancePaperReferenceLinks(document.body);
 	});
 </script>
+
+{#if data.isPlatformAdmin}
+	<div class="max-w-[900px] ml-6 pt-6">
+		<PlatformAdminNotice view="reader" {otherViews} />
+	</div>
+{/if}
 
 <!-- Lista de Papers -->
 <div class="space-y-6 max-w-[900px] ml-6">

@@ -1,5 +1,6 @@
 import Papers from '$lib/db/models/Paper';
 import { isSuperAdmin } from '$lib/server/authorization/superAdmin';
+import { recordAdminAuditEvent } from '$lib/server/authorization/adminAudit';
 import Users from '$lib/db/models/User';
 import { error, redirect } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongooseConnection';
@@ -132,6 +133,13 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 	 * nenhuma acao desta rota foi liberada.
 	 */
 	const isPlatformAdmin = await isSuperAdmin(locals.user);
+	const isPlatformAdminView =
+		isPlatformAdmin &&
+		!isHubOwner &&
+		!isHubVice &&
+		!isHubReviewer &&
+		!isReviewer &&
+		!isPaperAuthor;
 
 	// Verificar permissões - apenas hub owner, hub reviewer ou revisor designado podem ver
 	if (!isHubOwner && !isHubVice && !isHubReviewer && !isReviewer && !isPlatformAdmin) {
@@ -150,6 +158,16 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		throw error(403, 'You do not have permission to view this paper');
 	}
 
+	if (isPlatformAdminView) {
+		await recordAdminAuditEvent({
+			actor: locals.user,
+			action: 'admin.paper.view',
+			resourceType: 'paper',
+			resourceId: String(paperDoc.id ?? params.slug),
+			metadata: { surface: 'paper.read-only-view' }
+		});
+	}
+
 	const usersDoc = await Users.find({}, {}).lean().exec();
 
 	// ✅ Retornar versão sanitizada
@@ -159,7 +177,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		user: sanitize(locals.user),
 		canViewCorrections: isHubOwner || isHubVice,
 		/** Somente leitura: a tela usa isto para nao oferecer acoes editoriais. */
-		isPlatformAdmin
+		isPlatformAdmin: isPlatformAdminView
 	};
 }
 

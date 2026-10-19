@@ -1,4 +1,6 @@
 import MessageFeeds from '$lib/db/models/MessageFeed.js';
+import { isSuperAdmin } from '$lib/server/authorization/superAdmin';
+import { recordAdminAuditEvent } from '$lib/server/authorization/adminAudit';
 import Papers from '$lib/db/models/Paper';
 import Users from '$lib/db/models/User';
 import { error, redirect } from '@sveltejs/kit';
@@ -147,11 +149,21 @@ export async function load({ locals, params }) {
 	const isHubOwner = currentUserHubMember?.primaryRoleKey === 'HubOwner';
 	const isHubReviewer = currentUserHubMember?.canReview === true;
 	const isViceManager = currentUserHubMember?.canAssignReviewers === true;
+
+	/**
+	 * Super admin da plataforma: leitura.
+	 *
+	 * Distinto do `isPlatformAdmin` deste arquivo, que e `can(user, 'rbac.manage')`
+	 * -- a permissao dos Admin comuns. O papel SuperAdmin foi criado separado
+	 * justamente para que um Admin nao herdasse administracao de plataforma.
+	 */
+	const isSuperUser = await isSuperAdmin(locals.user);
 	const isPlatformAdmin = await can(locals.user, 'rbac.manage');
 
 	const canViewSubmittedReviews =
 		isPaperAuthor(paperDoc as Record<string, unknown>, userId) ||
 		isPlatformAdmin ||
+		isSuperUser ||
 		isHubOwner ||
 		isViceManager;
 
@@ -162,6 +174,26 @@ export async function load({ locals, params }) {
 	// Para REVISAR o paper: precisa ter aceitado (via responses OU ReviewQueue) OU ser dono do hub OU ser revisor do hub
 	if (!canViewSubmittedReviews && !canSubmitReview) {
 		throw error(403, 'You need to accept this review request before you can review this paper');
+	}
+
+	const isSuperUserView =
+		isSuperUser &&
+		!isPlatformAdmin &&
+		!isPaperAuthor(paperDoc as Record<string, unknown>, userId) &&
+		!isReviewerAccepted &&
+		!hasAcceptedViaQueue &&
+		!isHubOwner &&
+		!isViceManager &&
+		!isHubReviewer;
+
+	if (isSuperUserView) {
+		await recordAdminAuditEvent({
+			actor: locals.user,
+			action: 'admin.paper.view',
+			resourceType: 'paper',
+			resourceId: String(paperDoc.id ?? id),
+			metadata: { surface: 'paper.reviewer-view' }
+		});
 	}
 
 	// Mesmo se você quiser manter essa estrutura...
@@ -228,6 +260,8 @@ export async function load({ locals, params }) {
 		reviewAssignments: sanitize(serializedAssignments),
 		isHubOwner: isHubOwner,
 		canViewSubmittedReviews,
+		/** O papel de plataforma foi o que abriu a porta: a tela avisa o usuario. */
+		isSuperUserView,
 		canSubmitReview
 	};
 }

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import PlatformAdminNotice from '$lib/components/PlatformAdmin/PlatformAdminNotice.svelte';
 	import { post } from '$lib/utils/index.js';
 	import type { Paper } from '$lib/types/Paper';
 	import type { PaperPublishStoreData } from '$lib/types/PaperPublishStoreData';
@@ -82,6 +83,12 @@
 
 </script>
 
+{#if data.isSuperUserView}
+	<div class="container mx-auto max-w-5xl px-4 pt-6">
+		<PlatformAdminNotice view="editor" />
+	</div>
+{/if}
+
 {#if paper}
     <div class="container max-w-5xl mx-auto px-4 py-8">
         <!-- Header Section -->
@@ -116,30 +123,32 @@
             </div>
         </div>
 
-        <!-- Action Buttons -->
-        <div class="flex flex-col sm:flex-row justify-center gap-4">
-            <button
-                class="group relative px-8 py-4 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-3"
-                onclick={() => goto('/review/')}
-            >
-                <Icon icon="mdi:close-circle" class="w-6 h-6" />
-                <span>Decline Review</span>
-            </button>
-            
-            <button
-                class="group relative px-8 py-4 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-3"
-                onclick={handleAcceptReview}
-            >
-                <Icon icon="mdi:check-circle" class="w-6 h-6" />
-                <span>Accept Review</span>
-            </button>
-        </div>
+        {#if !data.isSuperUserView}
+            <!-- Action Buttons -->
+            <div class="flex flex-col sm:flex-row justify-center gap-4">
+                <button
+                    class="group relative px-8 py-4 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-3"
+                    onclick={() => goto('/review/')}
+                >
+                    <Icon icon="mdi:close-circle" class="w-6 h-6" />
+                    <span>Decline Review</span>
+                </button>
 
-        <!-- Info Footer -->
-        <div class="mt-8 text-center">
-            <p class="text-sm text-gray-500 dark:text-gray-400">
-                By accepting this review, you commit to providing constructive feedback within the specified deadline.
-            </p>
-        </div>
+                <button
+                    class="group relative px-8 py-4 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-3"
+                    onclick={handleAcceptReview}
+                >
+                    <Icon icon="mdi:check-circle" class="w-6 h-6" />
+                    <span>Accept Review</span>
+                </button>
+            </div>
+
+            <!-- Info Footer -->
+            <div class="mt-8 text-center">
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                    By accepting this review, you commit to providing constructive feedback within the specified deadline.
+                </p>
+            </div>
+        {/if}
     </div>
 {/if}

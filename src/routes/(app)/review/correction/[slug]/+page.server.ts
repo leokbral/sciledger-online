@@ -1,4 +1,6 @@
 import Papers from '$lib/db/models/Paper';
+import { isSuperAdmin } from '$lib/server/authorization/superAdmin';
+import { recordAdminAuditEvent } from '$lib/server/authorization/adminAudit';
 import Users from '$lib/db/models/User';
 import { error, redirect } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongo';
@@ -131,6 +133,15 @@ export async function load({ locals, params }) {
 		const isViceManager = currentUserHubMember?.canAssignReviewers === true;
 		const isPlatformAdmin = await can(locals.user, 'rbac.manage');
 
+		/**
+		 * Super admin da plataforma: leitura.
+		 *
+		 * Distinto do `isPlatformAdmin` acima, que e `can(user, 'rbac.manage')` -- a
+		 * permissao dos Admin comuns. O papel SuperAdmin existe separado justamente
+		 * para que um Admin nao herde administracao de plataforma.
+		 */
+		const isSuperUser = await isSuperAdmin(locals.user);
+
 		// Verificar se aceitou via ReviewQueue (novo sistema)
 		const ReviewQueue = (await import('$lib/db/models/ReviewQueue')).default;
 		const hasAcceptedViaQueue = await ReviewQueue.findOne({
@@ -143,10 +154,29 @@ export async function load({ locals, params }) {
 			isReviewerAccepted || Boolean(hasAcceptedViaQueue) || isHubReviewer;
 
 		const canViewSubmittedReviews =
-			!canSubmitReview && (isHubOwner || isViceManager || isPlatformAdmin);
+			!canSubmitReview && (isHubOwner || isViceManager || isPlatformAdmin || isSuperUser);
 
 		if (!canSubmitReview && !canViewSubmittedReviews) {
 			throw error(403, 'You do not have permission to view this paper');
+		}
+
+		const isSuperUserView =
+			isSuperUser &&
+			!isPlatformAdmin &&
+			!isReviewerAccepted &&
+			!hasAcceptedViaQueue &&
+			!isHubOwner &&
+			!isViceManager &&
+			!isHubReviewer;
+
+		if (isSuperUserView) {
+			await recordAdminAuditEvent({
+				actor: locals.user,
+				action: 'admin.paper.view',
+				resourceType: 'paper',
+				resourceId: String(paperRaw.id ?? params.slug),
+				metadata: { surface: 'paper.reviewer-corrections-view' }
+			});
 		}
 
 		// Normalizar peer_review igual ao primeiro código
@@ -184,6 +214,8 @@ export async function load({ locals, params }) {
 			user: sanitize(locals.user),
 			users: sanitize(usersRaw),
 			isHubOwner,
+			/** O papel de plataforma foi o que abriu a porta: a tela avisa o usuario. */
+			isSuperUserView,
 			canSubmitReview,
 			canViewSubmittedReviews
 		};

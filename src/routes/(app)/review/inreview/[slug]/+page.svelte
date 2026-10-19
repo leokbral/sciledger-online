@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import PlatformAdminNotice from '$lib/components/PlatformAdmin/PlatformAdminNotice.svelte';
 	import PaperReviewPage from '$lib/Pages/Paper/PaperReviewPage.svelte';
 	import { post } from '$lib/utils/index.js';
 	import type { Paper } from '$lib/types/Paper';
@@ -89,6 +90,12 @@
 		}
 	}
 </script>
+
+{#if data.isSuperUserView}
+	<div class="mx-auto max-w-5xl px-4 pt-6">
+		<PlatformAdminNotice view="reviewer" />
+	</div>
+{/if}
 
 <PaperReviewPage
 	on:reviewSubmitted={handleReviewSubmitted}
