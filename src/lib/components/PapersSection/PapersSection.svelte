@@ -14,6 +14,11 @@
 		isCreator: boolean;
 		isHubManager: boolean;
 		isHubReviewer?: boolean;
+		/**
+		 * Super admin da plataforma, resolvido no servidor. So muda PARA ONDE o
+		 * link de cada paper aponta; nao habilita acao nenhuma.
+		 */
+		isPlatformAdmin?: boolean;
 		userId: string;
 		shouldHighlight: (paper: any) => boolean;
 		reviewAssignments?: any[];
@@ -30,6 +35,7 @@
 		isCreator,
 		isHubManager,
 		isHubReviewer = false,
+		isPlatformAdmin = false,
 		userId,
 		shouldHighlight,
 		reviewAssignments,
@@ -90,6 +96,29 @@
 	function getReadMoreHref(paper: any): string {
 		const slug = getPaperSlug(paper);
 		if (!slug) return '#';
+
+		/**
+		 * Super admin da plataforma que nao e membro deste hub.
+		 *
+		 * O roteamento abaixo e por status E por papel: sem este desvio, os links
+		 * dele caem em `/publish/inreview`, `/publish/reviewer-assignment` e
+		 * `/publish/corrections`, que sao rotas de autor e de revisor e respondem
+		 * 403. Ele veria a lista completa e nao conseguiria abrir nada.
+		 *
+		 * `/publish/view/` e a rota de leitura, a mesma que o hub manager usa, e a
+		 * unica estendida para o papel de plataforma. Paper publicado continua indo
+		 * para a rota publica, que ja aceita qualquer usuario autenticado.
+		 */
+		if (
+			isPlatformAdmin &&
+			!isHubManager &&
+			!isPaperAuthor(paper) &&
+			!isDesignatedReviewer(paper)
+		) {
+			return paper?.status === 'published'
+				? `/publish/published/${slug}`
+				: `/publish/view/${slug}`;
+		}
 
 		// Hub admin: publication approval requested after round 2
 		if (isCreator && paper?.status === 'reviewer assignment' && paper?.reviewRound === 2) {

@@ -672,6 +672,7 @@
 			{isCreator}
 			{isHubManager}
 			isHubReviewer={isReviewer}
+			isPlatformAdmin={data.isPlatformAdmin === true}
 			{effectiveReviewers}
 			userId={data.user.id ?? data.user._id}
 			{shouldHighlight}
