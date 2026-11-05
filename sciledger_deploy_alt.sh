@@ -17,7 +17,8 @@ npm run build
 
 pm2 delete "$APP_NAME" || true
 
-BODY_SIZE_LIMIT="$BODY_SIZE_LIMIT" PORT="$APP_PORT" HOST="$APP_HOST" \
+NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }-r dotenv/config" \
+  BODY_SIZE_LIMIT="$BODY_SIZE_LIMIT" PORT="$APP_PORT" HOST="$APP_HOST" \
 	pm2 start build/index.js --name "$APP_NAME" --update-env
 
 pm2 save

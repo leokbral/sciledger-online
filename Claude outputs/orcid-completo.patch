@@ -1,0 +1,2651 @@
+From e9c905cf01a19fd23a29245e6b5f57e5b76f6e69 Mon Sep 17 00:00:00 2001
+From: leokbral <cabralleonardoferreira@gmail.com>
+Date: Thu, 8 Oct 2026 09:45:56 -0300
+Subject: [PATCH 1/2] fix: break the ORCID placeholder-email dead end
+
+ORCID accounts without a public e-mail are created with a deterministic
+`<orcid>@orcid.placeholder` address. That address is undeliverable, and five
+separate defects grew out of it.
+
+- complete-profile: the form pre-filled the e-mail and posted it back, but the
+  server rejects any non-empty `email` there (changing an address requires the
+  verified flow). Every submit returned 400, and `required` blocked the only
+  workaround of clearing the field, so the screen could not be submitted at
+  all. The e-mail is now read-only and is not sent.
+
+- orcid/callback: `isProfileComplete()` required a non-placeholder e-mail, so
+  these accounts were redirected to /complete-profile on every login forever --
+  a page that by design cannot change the e-mail. Completion is now signalled
+  by `profileCompletedAt`, which complete-profile already wrote and nothing
+  read. A real e-mail still counts, so legacy accounts that never visited the
+  screen are unaffected.
+
+- EmailEventDispatcher: `sendMail` had no try/catch inside the recipient loop,
+  so one failing address aborted the loop and every later recipient of the same
+  event silently got no e-mail. Failures are now recorded per recipient, and
+  undeliverable addresses are skipped before SMTP is dialled.
+
+- recovery: the endpoint generated and persisted a reset token before sending,
+  leaving an unusable token behind and tripping the existing rate-limit in
+  silence. Worse, the failure made the response differ from that of a
+  non-existent account -- an enumeration oracle, and ORCID iDs are public.
+  Placeholder accounts now get the same `success` response, with no token and
+  no mail. The `catch` no longer returns `details` to the client; the full
+  error stays in the server log.
+
+- settings/account: the unusable placeholder was displayed as if it were a
+  contact address. It is now hidden behind a persistent warning explaining that
+  the account can only sign in through ORCID and that password recovery cannot
+  reach it, pointing at the existing change-email flow.
+
+The domain string lived in four places with three different semantics; it is
+now a single helper, `$lib/helpers/orcidPlaceholderEmail`, which compares the
+domain with `endsWith` rather than `includes` so a real address on a subdomain
+is not misread as a placeholder.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01YN8AGt68oA7M8GqaNskuwL
+---
+ src/lib/helpers/orcidPlaceholderEmail.test.ts |  51 +++++
+ src/lib/helpers/orcidPlaceholderEmail.ts      |  43 +++++
+ .../events/EmailEventDispatcher.test.ts       | 174 ++++++++++++++++++
+ .../services/events/EmailEventDispatcher.ts   |  47 ++++-
+ .../(app)/complete-profile/+page.svelte       |  65 +++++--
+ .../completeProfilePage.test.ts               |  49 +++++
+ .../(app)/settings/account/+page.svelte       |  41 ++++-
+ .../accountPagePlaceholderEmail.test.ts       |  47 +++++
+ src/routes/(auth)/recovery/+server.ts         |  33 +++-
+ .../(auth)/recovery/recoveryServer.test.ts    | 132 +++++++++++++
+ src/routes/orcid/callback/+server.ts          |  34 +++-
+ .../callback/orcidCallbackServer.test.ts      |  96 ++++++++++
+ 12 files changed, 771 insertions(+), 41 deletions(-)
+ create mode 100644 src/lib/helpers/orcidPlaceholderEmail.test.ts
+ create mode 100644 src/lib/helpers/orcidPlaceholderEmail.ts
+ create mode 100644 src/lib/services/events/EmailEventDispatcher.test.ts
+ create mode 100644 src/routes/(app)/complete-profile/completeProfilePage.test.ts
+ create mode 100644 src/routes/(app)/settings/account/accountPagePlaceholderEmail.test.ts
+
+diff --git a/src/lib/helpers/orcidPlaceholderEmail.test.ts b/src/lib/helpers/orcidPlaceholderEmail.test.ts
+new file mode 100644
+index 0000000..4b93916
+--- /dev/null
++++ b/src/lib/helpers/orcidPlaceholderEmail.test.ts
+@@ -0,0 +1,51 @@
++import { describe, expect, it } from 'vitest';
++import {
++	buildOrcidPlaceholderEmail,
++	isOrcidPlaceholderEmail
++} from './orcidPlaceholderEmail';
++
++describe('buildOrcidPlaceholderEmail', () => {
++	it('builds the deterministic address the ORCID callback stores', () => {
++		expect(buildOrcidPlaceholderEmail('0000-0001-0002-0003')).toBe(
++			'0000-0001-0002-0003@orcid.placeholder'
++		);
++	});
++
++	it('round-trips with the recognizer', () => {
++		expect(isOrcidPlaceholderEmail(buildOrcidPlaceholderEmail('0000-0001-0002-0003'))).toBe(true);
++	});
++});
++
++describe('isOrcidPlaceholderEmail', () => {
++	it('recognizes a placeholder address', () => {
++		expect(isOrcidPlaceholderEmail('0000-0001-0002-0003@orcid.placeholder')).toBe(true);
++	});
++
++	it('normalizes casing and surrounding whitespace before comparing', () => {
++		// Linhas gravadas antes da normalizacao de e-mail entrar no callback.
++		expect(isOrcidPlaceholderEmail('  0000-0001-0002-0003@ORCID.Placeholder  ')).toBe(true);
++	});
++
++	it('rejects a real address', () => {
++		expect(isOrcidPlaceholderEmail('ada@example.com')).toBe(false);
++	});
++
++	it('does not match a real address hosted on a subdomain of the placeholder name', () => {
++		// Este e o caso que `includes('@orcid.placeholder')` errava: o dominio
++		// real termina em .com, nao no dominio inexistente.
++		expect(isOrcidPlaceholderEmail('bob@orcid.placeholder.com')).toBe(false);
++	});
++
++	it('does not match the domain appearing in the local part', () => {
++		expect(isOrcidPlaceholderEmail('orcid.placeholder@example.com')).toBe(false);
++	});
++
++	it('treats a missing or non-string email as not a placeholder', () => {
++		// Ausencia nao e placeholder -- quem precisa da distincao testa a
++		// presenca do campo separadamente.
++		expect(isOrcidPlaceholderEmail(undefined)).toBe(false);
++		expect(isOrcidPlaceholderEmail(null)).toBe(false);
++		expect(isOrcidPlaceholderEmail('')).toBe(false);
++		expect(isOrcidPlaceholderEmail(42)).toBe(false);
++	});
++});
+diff --git a/src/lib/helpers/orcidPlaceholderEmail.ts b/src/lib/helpers/orcidPlaceholderEmail.ts
+new file mode 100644
+index 0000000..a9c47c9
+--- /dev/null
++++ b/src/lib/helpers/orcidPlaceholderEmail.ts
+@@ -0,0 +1,43 @@
++/**
++ * Fonte unica de verdade para o endereco de e-mail placeholder do ORCID.
++ *
++ * Contas criadas pelo login ORCID sem e-mail publico nao tem endereco algum
++ * para armazenar, e o schema exige um. O callback grava um placeholder
++ * deterministico `<orcid>@orcid.placeholder`. Esse dominio nao existe: a
++ * resolucao MX falha, entao qualquer envio para ele lanca de forma sincrona.
++ *
++ * Todo ponto que precise construir ou reconhecer esses enderecos deve usar
++ * este modulo em vez de repetir a string -- antes desta extracao havia quatro
++ * copias com tres semanticas diferentes (`includes`, `endsWith` e concatenacao
++ * literal), e `includes` classificava um endereco real em um subdominio como
++ * `bob@orcid.placeholder.com` como se fosse um placeholder.
++ *
++ * Mantido em `$lib/helpers` (nao em `$lib/server`) porque
++ * /complete-profile o usa no cliente, e SvelteKit proibe importar modulos
++ * server-only de um componente.
++ */
++
++const ORCID_PLACEHOLDER_EMAIL_DOMAIN = 'orcid.placeholder';
++
++/**
++ * Monta o placeholder deterministico de um ORCID iD.
++ */
++export function buildOrcidPlaceholderEmail(orcid: string): string {
++	return `${orcid}@${ORCID_PLACEHOLDER_EMAIL_DOMAIN}`;
++}
++
++/**
++ * Responde se o endereco e um placeholder do ORCID, portanto nao entregavel.
++ *
++ * Compara o dominio com `endsWith` (nao `includes`) para nao capturar um
++ * endereco real hospedado em um subdominio, e normaliza antes de comparar
++ * porque linhas antigas podem ter sido gravadas sem trim/lowercase.
++ *
++ * Retorna false para qualquer coisa que nao seja string: um usuario SEM
++ * e-mail nao tem um placeholder. Quem precisa distinguir "ausente" de "real"
++ * deve testar a presenca do campo separadamente.
++ */
++export function isOrcidPlaceholderEmail(email: unknown): boolean {
++	if (typeof email !== 'string') return false;
++	return email.trim().toLowerCase().endsWith(`@${ORCID_PLACEHOLDER_EMAIL_DOMAIN}`);
++}
+diff --git a/src/lib/services/events/EmailEventDispatcher.test.ts b/src/lib/services/events/EmailEventDispatcher.test.ts
+new file mode 100644
+index 0000000..1d122de
+--- /dev/null
++++ b/src/lib/services/events/EmailEventDispatcher.test.ts
+@@ -0,0 +1,174 @@
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++
++const mocks = vi.hoisted(() => ({
++	sendMail: vi.fn(),
++	findOne: vi.fn(),
++	getEventEmailTemplate: vi.fn()
++}));
++
++vi.mock('nodemailer', () => ({
++	default: {
++		createTransport: vi.fn(() => ({ sendMail: mocks.sendMail }))
++	}
++}));
++
++vi.mock('$env/dynamic/private', () => ({
++	env: {
++		SMTP_USER: 'noreply@sciledger.online',
++		SMTP_PASS: 'smtp-password'
++	}
++}));
++
++vi.mock('$lib/db/models/User', () => ({
++	default: {
++		findOne: mocks.findOne
++	}
++}));
++
++vi.mock('./templates', () => ({
++	getEventEmailTemplate: mocks.getEventEmailTemplate
++}));
++
++/**
++ * `Users.findOne(...).select(...).lean()` resolvido por id do destinatario.
++ */
++function mockUsersByEmail(emailsByUserId: Record<string, string | undefined>) {
++	mocks.findOne.mockImplementation((query: any) => {
++		const id = query?.$or?.[0]?.id;
++		const email = emailsByUserId[id];
++		return {
++			select: vi.fn().mockReturnValue({
++				lean: vi.fn().mockResolvedValue(email === undefined ? null : { id, email })
++			})
++		};
++	});
++}
++
++function eventWith(userIds: string[]) {
++	return {
++		type: 'review.invitation.created',
++		recipients: userIds.map((userId) => ({ userId, channels: ['email'] }))
++	} as any;
++}
++
++async function dispatch(event: any) {
++	const { EmailEventDispatcher } = await import('./EmailEventDispatcher');
++	return new EmailEventDispatcher().dispatch({ event });
++}
++
++describe('EmailEventDispatcher per-recipient isolation', () => {
++	beforeEach(() => {
++		vi.clearAllMocks();
++		// `clearAllMocks` NAO drena a fila de `mockXOnce`. Sem este reset, um
++		// `mockRejectedValueOnce` que o teste anterior nao consumiu (porque o
++		// dispatch lancou antes de chegar nele) vaza para o teste seguinte e
++		// torna a suite dependente de ordem.
++		mocks.sendMail.mockReset();
++		mocks.sendMail.mockResolvedValue(undefined);
++		mocks.getEventEmailTemplate.mockReturnValue(
++			vi.fn().mockResolvedValue({ subject: 'Subject', text: 'Text', html: '<p>Html</p>' })
++		);
++	});
++
++	it('skips an ORCID placeholder address without blocking the remaining recipients', async () => {
++		mockUsersByEmail({
++			'user-placeholder': '0000-0001-0002-0003@orcid.placeholder',
++			'user-real': 'ada@example.com'
++		});
++
++		const results = await dispatch(eventWith(['user-placeholder', 'user-real']));
++
++		// O destinatario real recebe, apesar de vir DEPOIS do placeholder.
++		expect(results).toEqual([
++			{
++				channel: 'email',
++				status: 'skipped',
++				recipientId: 'user-placeholder',
++				reason: 'recipient_email_undeliverable'
++			},
++			{ channel: 'email', status: 'sent', recipientId: 'user-real' }
++		]);
++		expect(mocks.sendMail).toHaveBeenCalledTimes(1);
++		expect(mocks.sendMail).toHaveBeenCalledWith(
++			expect.objectContaining({ to: 'ada@example.com' })
++		);
++	});
++
++	it('records the skip reason and never attempts SMTP for an undeliverable address', async () => {
++		mockUsersByEmail({ 'user-placeholder': '0000-0001-0002-0003@orcid.placeholder' });
++
++		const results = await dispatch(eventWith(['user-placeholder']));
++
++		expect(results).toEqual([
++			{
++				channel: 'email',
++				status: 'skipped',
++				recipientId: 'user-placeholder',
++				reason: 'recipient_email_undeliverable'
++			}
++		]);
++		expect(mocks.sendMail).not.toHaveBeenCalled();
++	});
++
++	it('matches the placeholder domain regardless of casing or surrounding whitespace', async () => {
++		mockUsersByEmail({ 'user-legacy': '  0000-0001-0002-0003@ORCID.Placeholder  ' });
++
++		const results = await dispatch(eventWith(['user-legacy']));
++
++		expect(results[0].reason).toBe('recipient_email_undeliverable');
++		expect(mocks.sendMail).not.toHaveBeenCalled();
++	});
++
++	it('records a failed send and keeps going instead of aborting the event', async () => {
++		mockUsersByEmail({
++			'user-bad': 'bounces@example.invalid',
++			'user-good': 'ada@example.com'
++		});
++		mocks.sendMail
++			.mockRejectedValueOnce(new Error('getaddrinfo ENOTFOUND example.invalid'))
++			.mockResolvedValueOnce(undefined);
++
++		const results = await dispatch(eventWith(['user-bad', 'user-good']));
++
++		// Antes do try/catch, o throw abortava o loop e 'user-good' ficava sem
++		// e-mail e sem nenhum registro.
++		expect(results).toEqual([
++			{
++				channel: 'email',
++				status: 'failed',
++				recipientId: 'user-bad',
++				error: 'getaddrinfo ENOTFOUND example.invalid'
++			},
++			{ channel: 'email', status: 'sent', recipientId: 'user-good' }
++		]);
++		expect(mocks.sendMail).toHaveBeenCalledTimes(2);
++	});
++
++	it('stringifies a non-Error rejection rather than losing the reason', async () => {
++		mockUsersByEmail({ 'user-bad': 'bounces@example.invalid' });
++		mocks.sendMail.mockRejectedValueOnce('smtp exploded');
++
++		const results = await dispatch(eventWith(['user-bad']));
++
++		expect(results[0]).toEqual({
++			channel: 'email',
++			status: 'failed',
++			recipientId: 'user-bad',
++			error: 'smtp exploded'
++		});
++	});
++
++	it('still reports a real address with no user record as not found', async () => {
++		mockUsersByEmail({ 'user-missing': undefined, 'user-real': 'ada@example.com' });
++
++		const results = await dispatch(eventWith(['user-missing', 'user-real']));
++
++		expect(results[0]).toEqual({
++			channel: 'email',
++			status: 'skipped',
++			recipientId: 'user-missing',
++			reason: 'recipient_email_not_found'
++		});
++		expect(results[1].status).toBe('sent');
++	});
++});
+diff --git a/src/lib/services/events/EmailEventDispatcher.ts b/src/lib/services/events/EmailEventDispatcher.ts
+index d706235..61ece4c 100644
+--- a/src/lib/services/events/EmailEventDispatcher.ts
++++ b/src/lib/services/events/EmailEventDispatcher.ts
+@@ -7,6 +7,7 @@ import type {
+ 	EventDispatchResult
+ } from '$lib/types/EventService';
+ import { getEventEmailTemplate } from './templates';
++import { isOrcidPlaceholderEmail } from '$lib/helpers/orcidPlaceholderEmail';
+ 
+ type UserEmailLookup = {
+ 	id?: string;
+@@ -14,6 +15,15 @@ type UserEmailLookup = {
+ 	email?: string;
+ };
+ 
++/**
++ * Enderecos nao entregaveis sao pulados antes de abrir uma conexao SMTP. Hoje
++ * a unica familia conhecida e o placeholder do ORCID, cujo dominio nao existe:
++ * a resolucao MX falha e o nodemailer lanca de forma sincrona.
++ */
++function isUndeliverableEmail(email: string): boolean {
++	return isOrcidPlaceholderEmail(email);
++}
++
+ export class EmailEventDispatcher implements EventDispatcher {
+ 	readonly channel = 'email' as const;
+ 	private transporter: nodemailer.Transporter | null = null;
+@@ -93,6 +103,16 @@ export class EmailEventDispatcher implements EventDispatcher {
+ 				continue;
+ 			}
+ 
++			if (isUndeliverableEmail(user.email)) {
++				results.push({
++					channel: this.channel,
++					status: 'skipped',
++					recipientId: recipient.userId,
++					reason: 'recipient_email_undeliverable'
++				});
++				continue;
++			}
++
+ 			const payload = await template({ event, recipient });
+ 			if (!payload) {
+ 				results.push({
+@@ -104,13 +124,26 @@ export class EmailEventDispatcher implements EventDispatcher {
+ 				continue;
+ 			}
+ 
+-			await transporter.sendMail({
+-				from: `"SciLedger Team" <${env.SMTP_USER}>`,
+-				to: user.email,
+-				subject: payload.subject,
+-				text: payload.text,
+-				html: payload.html
+-			});
++			try {
++				await transporter.sendMail({
++					from: `"SciLedger Team" <${env.SMTP_USER}>`,
++					to: user.email,
++					subject: payload.subject,
++					text: payload.text,
++					html: payload.html
++				});
++			} catch (error) {
++				// Um endereço que falha não pode silenciar os destinatários
++				// seguintes: antes deste try/catch o throw abortava o loop e o
++				// resto do evento ficava sem e-mail, sem nenhum registro.
++				results.push({
++					channel: this.channel,
++					status: 'failed',
++					recipientId: recipient.userId,
++					error: error instanceof Error ? error.message : String(error)
++				});
++				continue;
++			}
+ 
+ 			results.push({
+ 				channel: this.channel,
+diff --git a/src/routes/(app)/complete-profile/+page.svelte b/src/routes/(app)/complete-profile/+page.svelte
+index cd7dffa..0a080cb 100644
+--- a/src/routes/(app)/complete-profile/+page.svelte
++++ b/src/routes/(app)/complete-profile/+page.svelte
+@@ -3,16 +3,22 @@
+ 	import { page } from '$app/stores';
+ 	import { post } from '$lib/utils';
+ 	import { fade } from 'svelte/transition';
++	import { isOrcidPlaceholderEmail } from '$lib/helpers/orcidPlaceholderEmail';
+ 
+ 	let firstName = '';
+ 	let lastName = '';
+-	let email = '';
+ 	let country = '';
+ 	let dob = '';
+ 	let formWarning = '';
+ 	let formSuccess = '';
+ 	let isLoading = false;
+ 
++	// Read-only mirror of the stored address. This screen never submits it:
++	// POST /complete-profile rejects any non-empty `email` field, because
++	// changing an address requires proof of ownership and therefore has to go
++	// through POST /api/account/email-change (exposed by /settings/account).
++	let email = '';
++
+ 	// Pré-preenche com dados do perfil se existirem
+ 	$: if ($page.data.user) {
+ 		firstName = $page.data.user.firstName || '';
+@@ -22,6 +28,12 @@
+ 		dob = $page.data.user.dob || '';
+ 	}
+ 
++	// ORCID accounts without a public e-mail are created with a deterministic
++	// placeholder address (see $lib/helpers/orcidPlaceholderEmail). Those users
++	// have no usable address for recovery or notifications, so point them at
++	// the verified change flow.
++	$: isPlaceholderEmail = isOrcidPlaceholderEmail(email);
++
+ 	async function handleSubmit(event: SubmitEvent) {
+ 		event.preventDefault();
+ 		isLoading = true;
+@@ -29,10 +41,10 @@
+ 		formSuccess = '';
+ 
+ 		try {
++			// `email` is deliberately absent from this payload.
+ 			const response = await post('/complete-profile', {
+ 				firstName,
+ 				lastName,
+-				email,
+ 				country,
+ 				dob
+ 			});
+@@ -54,7 +66,7 @@
+ 	}
+ </script>
+ 
+-<div class="h-screen flex flex-col items-center justify-center bg-gradient-to-br from-surface-100 to-surface-50">
++<div class="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-surface-100 to-surface-50 py-10">
+ 	<div class="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8">
+ 		<img
+ 			src="/brand/logo/sciledger-logo.svg"
+@@ -100,22 +112,39 @@
+ 				/>
+ 			</div>
+ 
+-			<!-- Email -->
++			<!-- Email (read-only: changing it requires the verified flow) -->
+ 			<div>
+-				<label for="email" class="block text-sm font-medium text-surface-700 mb-1">
+-					Email
+-				</label>
+-				<input
+-					type="email"
+-					id="email"
+-					bind:value={email}
+-					required
+-					placeholder="joao@example.com"
+-					class="w-full px-4 py-2 rounded-lg border border-surface-300 focus:outline-none focus:ring-2 focus:ring-primary-500"
+-				/>
+-				<p class="text-xs text-surface-500 mt-1">
+-					This email will be used for account recovery and notifications
+-				</p>
++				<span class="block text-sm font-medium text-surface-700 mb-1">Email</span>
++				{#if isPlaceholderEmail}
++					<p
++						class="w-full px-4 py-2 rounded-lg border border-surface-200 bg-surface-100 text-sm text-surface-500 italic break-all"
++					>
++						No e-mail address on file
++					</p>
++					<p class="text-xs text-amber-700 mt-1">
++						Your ORCID record does not expose a public e-mail address, so we could not import one.
++						<a
++							href="/settings/account"
++							class="font-medium underline hover:text-amber-800"
++						>
++							Add your e-mail in account settings
++						</a>
++						to enable account recovery and notifications.
++					</p>
++				{:else}
++					<p
++						class="w-full px-4 py-2 rounded-lg border border-surface-200 bg-surface-100 text-sm text-surface-700 break-all"
++					>
++						{email || '—'}
++					</p>
++					<p class="text-xs text-surface-500 mt-1">
++						This email is used for account recovery and notifications. To change it, go to
++						<a href="/settings/account" class="font-medium underline hover:text-surface-700">
++							account settings
++						</a>
++						— the new address has to be confirmed before it takes effect.
++					</p>
++				{/if}
+ 			</div>
+ 
+ 			<!-- Country -->
+diff --git a/src/routes/(app)/complete-profile/completeProfilePage.test.ts b/src/routes/(app)/complete-profile/completeProfilePage.test.ts
+new file mode 100644
+index 0000000..5a8b083
+--- /dev/null
++++ b/src/routes/(app)/complete-profile/completeProfilePage.test.ts
+@@ -0,0 +1,49 @@
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++import { dirname, resolve } from 'node:path';
++import { fileURLToPath } from 'node:url';
++
++const here = dirname(fileURLToPath(import.meta.url));
++const pageSource = readFileSync(resolve(here, '+page.svelte'), 'utf8');
++
++/**
++ * The server rejects any non-empty `email` field with a 400 ("Email changes
++ * are not supported here"). A form that pre-fills the address and then posts
++ * it back therefore makes the screen impossible to submit, while `required`
++ * on the input blocks the only workaround of clearing it. These assertions
++ * lock the form to the server's contract.
++ */
++describe('complete-profile +page.svelte', () => {
++	it('does not submit an email field', () => {
++		const payload = pageSource.slice(
++			pageSource.indexOf("post('/complete-profile'"),
++			pageSource.indexOf('if (response.success)')
++		);
++
++		expect(payload).not.toBe('');
++		expect(payload).toContain('firstName');
++		expect(payload).toContain('lastName');
++		expect(payload).not.toMatch(/\bemail\b/);
++	});
++
++	it('renders the email as read-only rather than as an editable input', () => {
++		expect(pageSource).not.toContain('bind:value={email}');
++		expect(pageSource).not.toContain('type="email"');
++	});
++
++	it('routes email changes to the verified flow in account settings', () => {
++		expect(pageSource).toContain('/settings/account');
++	});
++
++	it('offers placeholder-email accounts a way to set a real address', () => {
++		expect(pageSource).toContain('isPlaceholderEmail');
++	});
++
++	it('recognizes placeholder addresses through the shared helper, not its own copy', () => {
++		// A string do dominio mora apenas em $lib/helpers/orcidPlaceholderEmail.
++		// Uma copia local aqui voltaria a divergir da semantica usada no servidor.
++		expect(pageSource).toContain("from '$lib/helpers/orcidPlaceholderEmail'");
++		expect(pageSource).toContain('isOrcidPlaceholderEmail(email)');
++		expect(pageSource).not.toContain("'@orcid.placeholder'");
++	});
++});
+diff --git a/src/routes/(app)/settings/account/+page.svelte b/src/routes/(app)/settings/account/+page.svelte
+index eb61544..e6607f2 100644
+--- a/src/routes/(app)/settings/account/+page.svelte
++++ b/src/routes/(app)/settings/account/+page.svelte
+@@ -4,6 +4,7 @@
+ 	import SettingsCard from '$lib/components/Settings/SettingsCard.svelte';
+ 	import SettingsField from '$lib/components/Settings/SettingsField.svelte';
+ 	import StatusBadge from '$lib/components/Settings/StatusBadge.svelte';
++	import { isOrcidPlaceholderEmail } from '$lib/helpers/orcidPlaceholderEmail';
+ 	import type { PageData } from './$types';
+ 
+ 	interface Props {
+@@ -17,6 +18,13 @@
+ 	let emailVerified = $state(data.emailVerified);
+ 	let pendingEmail = $state<string | null>(data.pendingEmail);
+ 
++	// Contas criadas pelo login ORCID sem e-mail público ficam com um
++	// placeholder não entregável. Elas conseguem entrar pelo ORCID, mas nenhum
++	// e-mail da plataforma as alcança -- inclusive a recuperação de senha, que é
++	// o único caminho para definir a senha que o callback gerou aleatoriamente.
++	// O aviso fica visível até que um endereço real seja confirmado.
++	let hasPlaceholderEmail = $derived(isOrcidPlaceholderEmail(data.user.email));
++
+ 	let openModal = $state(false);
+ 	let newEmail = $state('');
+ 	let isSubmitting = $state(false);
+@@ -108,15 +116,40 @@
+ <SettingsCard title="Email">
+ 	<SettingsField label="Current Email">
+ 		<div class="flex items-center gap-2">
+-			<p class="text-sm font-medium">{data.user.email}</p>
+-			{#if emailVerified}
+-				<StatusBadge label="Verified" tone="success" />
++			{#if hasPlaceholderEmail}
++				<p class="text-sm font-medium italic text-surface-600-400">No email address</p>
++				<StatusBadge label="Missing" tone="error" />
+ 			{:else}
+-				<StatusBadge label="Not verified" tone="warning" />
++				<p class="text-sm font-medium">{data.user.email}</p>
++				{#if emailVerified}
++					<StatusBadge label="Verified" tone="success" />
++				{:else}
++					<StatusBadge label="Not verified" tone="warning" />
++				{/if}
+ 			{/if}
+ 		</div>
+ 	</SettingsField>
+ 
++	{#if hasPlaceholderEmail}
++		<div
++			class="space-y-2 rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-900/20"
++		>
++			<p class="text-sm font-semibold text-amber-900 dark:text-amber-200">
++				This account can only sign in through ORCID
++			</p>
++			<p class="text-sm text-amber-800 dark:text-amber-300">
++				Your ORCID record does not expose a public email address, so we have no address on file for
++				you. Until you add one, no platform email can reach you &mdash; including password recovery,
++				which is the only way to set a password for this account. If you lose access to your ORCID
++				account, we will not be able to help you recover this one.
++			</p>
++			<p class="text-sm text-amber-800 dark:text-amber-300">
++				Add an email address below. We will send a confirmation link to it, and the address only
++				takes effect once you confirm.
++			</p>
++		</div>
++	{/if}
++
+ 	{#if pendingEmail}
+ 		<div class="space-y-2 rounded-md border p-3">
+ 			<SettingsField label="Pending Email" value={pendingEmail} />
+diff --git a/src/routes/(app)/settings/account/accountPagePlaceholderEmail.test.ts b/src/routes/(app)/settings/account/accountPagePlaceholderEmail.test.ts
+new file mode 100644
+index 0000000..30b2e1b
+--- /dev/null
++++ b/src/routes/(app)/settings/account/accountPagePlaceholderEmail.test.ts
+@@ -0,0 +1,47 @@
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++import { dirname, resolve } from 'node:path';
++import { fileURLToPath } from 'node:url';
++
++const here = dirname(fileURLToPath(import.meta.url));
++const pageSource = readFileSync(resolve(here, '+page.svelte'), 'utf8');
++
++/**
++ * Contas ORCID sem e-mail publico ficam com um placeholder nao entregavel.
++ * Elas entram pelo ORCID, mas nenhum e-mail da plataforma as alcanca --
++ * inclusive /recovery, que e o unico caminho para definir a senha aleatoria
++ * que o callback gerou. Sem um aviso, o usuario nao tem como saber que a
++ * conta depende exclusivamente do ORCID. Estes asserts travam o aviso.
++ */
++describe('settings/account placeholder-email warning', () => {
++	it('derives the placeholder state from the shared helper, not its own copy', () => {
++		expect(pageSource).toContain("from '$lib/helpers/orcidPlaceholderEmail'");
++		expect(pageSource).toContain('isOrcidPlaceholderEmail(data.user.email)');
++		expect(pageSource).not.toContain("'@orcid.placeholder'");
++	});
++
++	it('warns that the account depends on ORCID and that recovery cannot reach it', () => {
++		expect(pageSource).toContain('hasPlaceholderEmail');
++		expect(pageSource).toMatch(/only sign in through ORCID/i);
++		expect(pageSource).toMatch(/password recovery/i);
++	});
++
++	it('hides the unusable placeholder address instead of displaying it as contact', () => {
++		expect(pageSource).toMatch(/No email address/i);
++	});
++
++	it('still offers the change-email flow as the remedy', () => {
++		// O aviso so e acionavel porque o botao continua alcancavel para estas
++		// contas -- /api/account/email-change nao as bloqueia.
++		expect(pageSource).toContain('openChangeEmailModal');
++		expect(pageSource).toContain('Change Email');
++	});
++
++	it('uses the warning palette the rest of the codebase uses', () => {
++		// Tokens `warning-*` do Skeleton nao estao gerados neste projeto; o
++		// padrao real para blocos de aviso e amber do Tailwind. Uma classe
++		// inexistente nao renderiza nada e falharia em silencio.
++		expect(pageSource).toContain('bg-amber-50');
++		expect(pageSource).not.toMatch(/bg-warning-\d/);
++	});
++});
+diff --git a/src/routes/(auth)/recovery/+server.ts b/src/routes/(auth)/recovery/+server.ts
+index a0fb22a..1971e8c 100644
+--- a/src/routes/(auth)/recovery/+server.ts
++++ b/src/routes/(auth)/recovery/+server.ts
+@@ -8,6 +8,7 @@ import { SITE_URL } from '$env/static/private';
+ import { env } from '$env/dynamic/private';
+ import { buildPasswordResetEmailHtml } from '$lib/services/platformEmailTemplates';
+ import { normalizeAndValidateEmail } from '$lib/server/auth/normalizeEmail';
++import { isOrcidPlaceholderEmail } from '$lib/helpers/orcidPlaceholderEmail';
+ import {
+ 	generatePasswordResetToken,
+ 	getPasswordResetExpiresAt,
+@@ -67,6 +68,27 @@ export const POST: RequestHandler = async ({ request }) => {
+ 			return json({ message: 'success' });
+ 		}
+ 
++		// Contas ORCID sem e-mail publico ficam com um placeholder
++		// `<orcid>@orcid.placeholder`, um dominio que nao existe. Nenhum e-mail
++		// chega nelas, entao gerar um token aqui seria pior que inutil:
++		//
++		//  - o token e persistido ANTES do envio, logo uma falha deixaria um
++		//    token valido no banco que ninguem consegue usar;
++		//  - isso acionaria o bloco de rate-limit abaixo, bloqueando a conta em
++		//    silencio por todo o tempo de vida do token;
++		//  - e o erro do envio distinguiria esta conta de uma inexistente.
++		//
++		// Esse ultimo ponto e o mais serio: ORCID iDs sao publicos, entao
++		// qualquer um pode montar o endereco placeholder de um iD e sondar se a
++		// conta existe aqui. A resposta tem de ser indistinguivel da de uma
++		// conta inexistente -- exatamente o mesmo `success` de cima.
++		//
++		// O caminho real para estas contas e cadastrar um endereco de verdade
++		// em /settings/account, que avisa sobre isso de forma persistente.
++		if (isOrcidPlaceholderEmail(user.email)) {
++			return json({ message: 'success' });
++		}
++
+ 		// Check if there's already a valid token (not expired)
+ 		if (user.resetPasswordTokenHash && user.resetPasswordExpiresAt) {
+ 			const now = new Date();
+@@ -116,12 +138,9 @@ export const POST: RequestHandler = async ({ request }) => {
+ 			console.error('Error stack:', error.stack);
+ 		}
+ 
+-		return json(
+-			{
+-				error: 'Internal server error',
+-				details: error instanceof Error ? error.message : String(error)
+-			},
+-			{ status: 500 }
+-		);
++		// A mensagem de erro fica apenas nos logs do servidor (console.error
++		// acima). Devolve-la ao cliente vazava detalhe interno e, pior, tornava
++		// a resposta dependente da conta consultada -- um oraculo de enumeracao.
++		return json({ error: 'Internal server error' }, { status: 500 });
+ 	}
+ };
+diff --git a/src/routes/(auth)/recovery/recoveryServer.test.ts b/src/routes/(auth)/recovery/recoveryServer.test.ts
+index 2ec932a..22bb565 100644
+--- a/src/routes/(auth)/recovery/recoveryServer.test.ts
++++ b/src/routes/(auth)/recovery/recoveryServer.test.ts
+@@ -130,3 +130,135 @@ describe('password recovery token hashing and email normalization', () => {
+ 		expect(mocks.findOne).toHaveBeenCalledWith({ email: 'user@example.com' });
+ 	});
+ });
++
++function createUser(overrides: Record<string, unknown> = {}) {
++	return {
++		email: 'user@example.com',
++		firstName: 'Ada',
++		resetPasswordTokenHash: undefined as string | undefined,
++		resetPasswordExpiresAt: undefined as Date | undefined,
++		updatedAt: '',
++		save: mocks.save,
++		...overrides
++	};
++}
++
++/**
++ * ORCID iDs sao publicos, entao qualquer um pode montar
++ * `<orcid>@orcid.placeholder` e submeter em /recovery. Se a resposta para esse
++ * endereco diferir da de uma conta inexistente, isso vira um oraculo de
++ * enumeracao alimentado por dado publico. A resposta tem de ser identica.
++ */
++describe('password recovery for ORCID placeholder accounts', () => {
++	beforeEach(() => {
++		vi.resetModules();
++		vi.clearAllMocks();
++		mocks.startMongo.mockResolvedValue(undefined);
++		mocks.model.mockReturnValue({ findOne: mocks.findOne });
++		mocks.generatePasswordResetToken.mockReturnValue('plain-reset-token');
++		mocks.getPasswordResetExpiresAt.mockReturnValue(new Date('2026-07-10T13:00:00.000Z'));
++		mocks.buildPasswordResetEmailHtml.mockReturnValue('<html></html>');
++		mocks.verify.mockResolvedValue(undefined);
++		mocks.sendMail.mockResolvedValue(undefined);
++		mocks.createTransport.mockReturnValue({
++			verify: mocks.verify,
++			sendMail: mocks.sendMail
++		});
++	});
++
++	it('returns the uniform success response without sending mail or saving a token', async () => {
++		const user = createUser({ email: '0000-0001-0002-0003@orcid.placeholder' });
++		mocks.findOne.mockResolvedValue(user);
++		const { POST } = await import('./+server');
++
++		const response = await POST({
++			request: createRecoveryRequest('0000-0001-0002-0003@orcid.placeholder')
++		} as any);
++
++		expect(response.status).toBe(200);
++		expect(await response.json()).toEqual({ message: 'success' });
++		expect(mocks.sendMail).not.toHaveBeenCalled();
++		// Nenhum token gravado: antes, o save acontecia ANTES do envio, deixando
++		// um token valido e inutilizavel e acionando o rate-limit em silencio.
++		expect(mocks.save).not.toHaveBeenCalled();
++		expect(user.resetPasswordTokenHash).toBeUndefined();
++		expect(user.resetPasswordExpiresAt).toBeUndefined();
++		expect(mocks.generatePasswordResetToken).not.toHaveBeenCalled();
++	});
++
++	it('is byte-for-byte indistinguishable from the response for an account that does not exist', async () => {
++		// O relay recusa um destinatario cujo dominio nao existe. Sem o desvio,
++		// o envio estoura, cai no catch e devolve 500 -- enquanto uma conta
++		// inexistente devolve 200. Essa diferenca e o oraculo de enumeracao, e
++		// ORCID iDs sao publicos, entao qualquer um pode consultar.
++		mocks.sendMail.mockRejectedValue(new Error('550 recipient domain not found'));
++
++		const { POST: PostForPlaceholder } = await import('./+server');
++		mocks.findOne.mockResolvedValue(createUser({ email: '0000-0001-0002-0003@orcid.placeholder' }));
++		const placeholderResponse = await PostForPlaceholder({
++			request: createRecoveryRequest('0000-0001-0002-0003@orcid.placeholder')
++		} as any);
++		const placeholderBody = await placeholderResponse.text();
++
++		vi.resetModules();
++		mocks.findOne.mockResolvedValue(null);
++		const { POST: PostForMissing } = await import('./+server');
++		const missingResponse = await PostForMissing({
++			request: createRecoveryRequest('nobody@example.com')
++		} as any);
++		const missingBody = await missingResponse.text();
++
++		expect(placeholderResponse.status).toBe(missingResponse.status);
++		expect(placeholderBody).toBe(missingBody);
++	});
++
++	it('still issues a token and sends mail for an account with a real address', async () => {
++		const user = createUser();
++		mocks.findOne.mockResolvedValue(user);
++		const { POST } = await import('./+server');
++
++		const response = await POST({
++			request: createRecoveryRequest('user@example.com')
++		} as any);
++
++		expect(response.status).toBe(200);
++		expect(mocks.save).toHaveBeenCalled();
++		expect(user.resetPasswordTokenHash).toBe(hashPasswordResetToken('plain-reset-token'));
++		expect(mocks.sendMail).toHaveBeenCalledWith(
++			expect.objectContaining({ to: 'user@example.com' })
++		);
++	});
++});
++
++describe('password recovery error responses', () => {
++	beforeEach(() => {
++		vi.resetModules();
++		vi.clearAllMocks();
++		mocks.startMongo.mockResolvedValue(undefined);
++		mocks.model.mockReturnValue({ findOne: mocks.findOne });
++		mocks.generatePasswordResetToken.mockReturnValue('plain-reset-token');
++		mocks.getPasswordResetExpiresAt.mockReturnValue(new Date('2026-07-10T13:00:00.000Z'));
++		mocks.buildPasswordResetEmailHtml.mockReturnValue('<html></html>');
++		mocks.verify.mockResolvedValue(undefined);
++		mocks.createTransport.mockReturnValue({
++			verify: mocks.verify,
++			sendMail: mocks.sendMail
++		});
++	});
++
++	it('never leaks the internal error message to the client', async () => {
++		mocks.findOne.mockResolvedValue(createUser());
++		mocks.sendMail.mockRejectedValue(new Error('getaddrinfo ENOTFOUND smtp.example.com'));
++		const { POST } = await import('./+server');
++
++		const response = await POST({
++			request: createRecoveryRequest('user@example.com')
++		} as any);
++		const body = await response.json();
++
++		expect(response.status).toBe(500);
++		expect(body).toEqual({ error: 'Internal server error' });
++		expect(body).not.toHaveProperty('details');
++		expect(JSON.stringify(body)).not.toMatch(/ENOTFOUND|smtp\.example\.com/);
++	});
++});
+diff --git a/src/routes/orcid/callback/+server.ts b/src/routes/orcid/callback/+server.ts
+index aa36951..6c1a34a 100644
+--- a/src/routes/orcid/callback/+server.ts
++++ b/src/routes/orcid/callback/+server.ts
+@@ -7,21 +7,45 @@ import Users from '$lib/db/models/User';
+ import { respondWithSession } from '$lib/server/auth/authResponse';
+ import { normalizeEmail } from '$lib/server/auth/normalizeEmail';
+ import { getOrcidRedirectUri } from '$lib/server/orcid/redirectUri';
++import {
++	buildOrcidPlaceholderEmail,
++	isOrcidPlaceholderEmail
++} from '$lib/helpers/orcidPlaceholderEmail';
+ import * as crypto from 'crypto';
+ 
+ /**
+  * Verifica se o perfil do usuário está completo
+  * Retorna true se todos os dados essenciais foram preenchidos
++ *
++ * O endereço de e-mail deliberadamente NÃO bloqueia mais este teste. Contas
++ * ORCID sem e-mail público recebem um placeholder (ver
++ * `$lib/helpers/orcidPlaceholderEmail`),
++ * e /complete-profile não pode trocá-lo: POST /complete-profile rejeita o campo
++ * `email` com 400, porque trocar de endereço exige prova de posse e só acontece
++ * via POST /api/account/email-change. Exigir um e-mail real aqui prendia esses
++ * usuários em /complete-profile a cada login, sem nenhuma saída possível.
++ *
++ * O sinal de conclusão passa a ser `profileCompletedAt`, gravado por
++ * /complete-profile justamente para isso. O e-mail real continua valendo como
++ * sinal alternativo para não mandar contas antigas -- criadas por e-mail/senha,
++ * portanto sem `profileCompletedAt` -- para uma tela que elas não precisam.
+  */
+ function isProfileComplete(user: any): boolean {
+-	return !!(
++	const hasRealName = !!(
+ 		user.firstName &&
+ 		user.firstName !== 'User' &&
+ 		user.lastName &&
+-		user.lastName !== 'ORCID' &&
+-		user.email &&
+-		!user.email.includes('@orcid.placeholder')
++		user.lastName !== 'ORCID'
+ 	);
++
++	if (!hasRealName) {
++		return false;
++	}
++
++	const completedExplicitly = !!user.profileCompletedAt;
++	const hasRealEmail = !!(user.email && !isOrcidPlaceholderEmail(user.email));
++
++	return completedExplicitly || hasRealEmail;
+ }
+ 
+ function getOrcidVerificationFields(hasPublicEmail: boolean) {
+@@ -234,7 +258,7 @@ export const GET: RequestHandler = async ({ url, request }) => {
+ 
+ 		// Se não tem email público no ORCID, usa email placeholder determinístico.
+ 		// Placeholders não comprovam posse de e-mail real e permanecem não verificados.
+-		const userEmail = email || `${orcid}@orcid.placeholder`;
++		const userEmail = email || buildOrcidPlaceholderEmail(orcid);
+ 		const orcidVerificationFields = getOrcidVerificationFields(Boolean(email));
+ 
+ 		// Gera username único baseado no ORCID
+diff --git a/src/routes/orcid/callback/orcidCallbackServer.test.ts b/src/routes/orcid/callback/orcidCallbackServer.test.ts
+index e033ad8..f461deb 100644
+--- a/src/routes/orcid/callback/orcidCallbackServer.test.ts
++++ b/src/routes/orcid/callback/orcidCallbackServer.test.ts
+@@ -123,7 +123,10 @@ describe('ORCID callback email verification policy', () => {
+ 		const user = mocks.instances[0];
+ 
+ 		expect(response.status).toBe(302);
++		// Conta nova: `profileCompletedAt` ainda nao existe, por isso o desvio --
++		// nao por causa do e-mail placeholder.
+ 		expect(response.headers.get('location')).toBe('/complete-profile');
++		expect(user.profileCompletedAt).toBeUndefined();
+ 		expect(user.email).toBe('0000-0001-0002-0003@orcid.placeholder');
+ 		expect(user.emailVerified).toBe(false);
+ 		expect(user.emailVerifiedAt).toBeUndefined();
+@@ -131,3 +134,96 @@ describe('ORCID callback email verification policy', () => {
+ 		expect(user.save).toHaveBeenCalled();
+ 	});
+ });
++
++function mockExistingOrcidUser(overrides: Record<string, unknown> = {}) {
++	const user = {
++		orcid: '0000-0001-0002-0003',
++		firstName: 'Ada',
++		lastName: 'Lovelace',
++		email: '0000-0001-0002-0003@orcid.placeholder',
++		profileCompletedAt: undefined as Date | undefined,
++		save: vi.fn().mockResolvedValue(undefined),
++		...overrides
++	};
++	mocks.findOne.mockResolvedValue(user);
++	return user;
++}
++
++function mockAdaPerson() {
++	mockFetchPerson({
++		name: {
++			'given-names': { value: 'Ada' },
++			'family-name': { value: 'Lovelace' }
++		},
++		emails: {
++			email: []
++		}
++	});
++}
++
++/**
++ * O e-mail nao pode mais ser o unico portao de `isProfileComplete`. Contas ORCID
++ * sem e-mail publico ficam com `<orcid>@orcid.placeholder`, e /complete-profile
++ * nao troca e-mail (o POST rejeita o campo com 400), entao exigir um endereco
++ * real prendia essas contas em /complete-profile a cada login.
++ */
++describe('ORCID callback post-login redirect', () => {
++	beforeEach(() => {
++		vi.clearAllMocks();
++		vi.unstubAllGlobals();
++		mocks.instances.length = 0;
++		mocks.startMongo.mockResolvedValue(undefined);
++		mocks.respondWithSession.mockResolvedValue(
++			new Response(null, { headers: { 'set-cookie': 'session=token' } })
++		);
++	});
++
++	it('sends a placeholder-email user who already completed the profile to the home page', async () => {
++		mockExistingOrcidUser({ profileCompletedAt: new Date('2026-01-01T00:00:00.000Z') });
++		mockAdaPerson();
++		const { GET } = await import('./+server');
++
++		const response = await GET(createEvent() as any);
++
++		// Antes da correcao isto era '/complete-profile' em todo login, para sempre.
++		expect(response.headers.get('location')).toBe('/');
++	});
++
++	it('still sends a placeholder-email user who never completed the profile to /complete-profile', async () => {
++		mockExistingOrcidUser();
++		mockAdaPerson();
++		const { GET } = await import('./+server');
++
++		const response = await GET(createEvent() as any);
++
++		expect(response.headers.get('location')).toBe('/complete-profile');
++	});
++
++	it('sends a legacy account with a real email but no profileCompletedAt to the home page', async () => {
++		// Conta criada por e-mail/senha que agora vincula o ORCID: nunca passou por
++		// /complete-profile, mas o perfil esta completo de fato.
++		mockExistingOrcidUser({ email: 'ada@example.com' });
++		mockAdaPerson();
++		const { GET } = await import('./+server');
++
++		const response = await GET(createEvent() as any);
++
++		expect(response.headers.get('location')).toBe('/');
++	});
++
++	it('requires a real name regardless of profileCompletedAt', async () => {
++		// Fallback do callback quando o ORCID nao expoe nome algum.
++		mockExistingOrcidUser({
++			firstName: 'User',
++			lastName: 'ORCID',
++			email: 'ada@example.com',
++			profileCompletedAt: new Date('2026-01-01T00:00:00.000Z')
++		});
++		mockAdaPerson();
++		const { GET } = await import('./+server');
++
++		const response = await GET(createEvent() as any);
++
++		expect(response.headers.get('location')).toBe('/complete-profile');
++	});
++});
+-- 
+2.43.0
+
+
+From 8c2aac1e876d383079b58d6c9b54c42dc14d3a2d Mon Sep 17 00:00:00 2001
+From: leokbral <cabralleonardoferreira@gmail.com>
+Date: Thu, 8 Oct 2026 14:52:55 -0300
+Subject: [PATCH 2/2] feat: ask for an email instead of inventing one on ORCID
+ sign-up
+
+ORCID accounts whose record publishes no email address were created with an
+invented `<orcid>@orcid.placeholder` address. That guess was the root of the
+duplicate-account problem: the callback could not match the person to the
+account they already had, so it made a second, orphan one -- and they could
+never unify the two, because setting their real address on the new account was
+refused with "This email is already in use" (the address belonged to their
+first account).
+
+Nothing is invented and nothing is created any more until the person proves an
+address:
+
+- The callback parks the ORCID identity in `orcidSignupClaims` and sends the
+  browser to a form asking for an email. The browser carries only the claim id,
+  in an httpOnly cookie; holding it is no privilege, since the confirmation
+  link lands in the mailbox that was named.
+- `POST /orcid/email` stores the address and mails a confirmation link. It
+  deliberately never queries the user collection, so it cannot become a
+  membership oracle for any address an attacker tries; the response is the same
+  shape whoever owns it.
+- `GET /orcid/confirm` is the proof of ownership ORCID could not give. If an
+  account already holds the address, the ORCID iD is attached to THAT account
+  -- nothing merged, nothing overwritten, the person simply gains a second way
+  to sign in. Otherwise the account is created now, with that address, already
+  verified. Either way the claim is consumed, so the link cannot be replayed.
+
+Claims expire by themselves through a TTL index, so an abandoned sign-up leaves
+nothing behind. The ORCID access and refresh tokens are deliberately NOT parked
+in a claim: nothing in the codebase reads them (every projection excludes them),
+so storing them there would be risk without purpose.
+
+Accounts created by the old flow keep working. The callback still recognises a
+legacy placeholder address for the ORCID iD and signs those accounts in; the
+warning on /settings/account is what leads them to register a real address.
+
+Account creation is now shared by both paths through
+`$lib/server/orcid/createOrcidUser`, so username generation, the random
+password and the verification fields cannot drift apart.
+
+Consequence worth stating: because the schema requires a unique email on every
+account, finishing an ORCID sign-up now requires giving an address. There is no
+"continue without one" -- that option only existed because an address was being
+invented.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01YN8AGt68oA7M8GqaNskuwL
+---
+ src/lib/db/models/OrcidSignupClaim.ts         |  20 ++
+ src/lib/db/schemas/OrcidSignupClaimSchema.ts  |  59 +++++
+ src/lib/server/auth/orcidSignupClaim.ts       | 134 ++++++++++++
+ src/lib/server/orcid/createOrcidUser.ts       |  97 +++++++++
+ src/lib/services/platformEmailTemplates.ts    |  25 +++
+ src/routes/orcid/callback/+server.ts          | 159 +++++++-------
+ .../callback/orcidCallbackServer.test.ts      |  70 +++++-
+ src/routes/orcid/confirm/+server.ts           | 113 ++++++++++
+ .../orcid/confirm/orcidConfirmServer.test.ts  | 206 ++++++++++++++++++
+ src/routes/orcid/email/+page.server.ts        |  42 ++++
+ src/routes/orcid/email/+page.svelte           | 137 ++++++++++++
+ src/routes/orcid/email/+server.ts             |  87 ++++++++
+ .../orcid/email/orcidEmailServer.test.ts      | 171 +++++++++++++++
+ 13 files changed, 1233 insertions(+), 87 deletions(-)
+ create mode 100644 src/lib/db/models/OrcidSignupClaim.ts
+ create mode 100644 src/lib/db/schemas/OrcidSignupClaimSchema.ts
+ create mode 100644 src/lib/server/auth/orcidSignupClaim.ts
+ create mode 100644 src/lib/server/orcid/createOrcidUser.ts
+ create mode 100644 src/routes/orcid/confirm/+server.ts
+ create mode 100644 src/routes/orcid/confirm/orcidConfirmServer.test.ts
+ create mode 100644 src/routes/orcid/email/+page.server.ts
+ create mode 100644 src/routes/orcid/email/+page.svelte
+ create mode 100644 src/routes/orcid/email/+server.ts
+ create mode 100644 src/routes/orcid/email/orcidEmailServer.test.ts
+
+diff --git a/src/lib/db/models/OrcidSignupClaim.ts b/src/lib/db/models/OrcidSignupClaim.ts
+new file mode 100644
+index 0000000..b33925b
+--- /dev/null
++++ b/src/lib/db/models/OrcidSignupClaim.ts
+@@ -0,0 +1,20 @@
++import mongoose from 'mongoose';
++import { OrcidSignupClaimSchema } from '../schemas/OrcidSignupClaimSchema';
++
++export interface IOrcidSignupClaim extends mongoose.Document {
++	id: string;
++	orcid: string;
++	firstName: string;
++	lastName: string;
++	pendingEmail?: string;
++	tokenHash?: string;
++	expiresAt: Date;
++	createdAt: Date;
++	updatedAt: Date;
++}
++
++const OrcidSignupClaim =
++	mongoose.models.OrcidSignupClaim ||
++	mongoose.model<IOrcidSignupClaim>('OrcidSignupClaim', OrcidSignupClaimSchema);
++
++export default OrcidSignupClaim;
+diff --git a/src/lib/db/schemas/OrcidSignupClaimSchema.ts b/src/lib/db/schemas/OrcidSignupClaimSchema.ts
+new file mode 100644
+index 0000000..a99d8ab
+--- /dev/null
++++ b/src/lib/db/schemas/OrcidSignupClaimSchema.ts
+@@ -0,0 +1,59 @@
++import { Schema } from 'mongoose';
++import * as crypto from 'crypto';
++
++/**
++ * A half-finished ORCID sign-up.
++ *
++ * When ORCID authenticates someone whose record exposes no public e-mail, the
++ * platform cannot tell whether that person already has an account here. It
++ * used to invent a `<orcid>@orcid.placeholder` address and create a second,
++ * orphan account on the spot. This collection replaces that: the ORCID
++ * identity is parked here until the person proves control of a real address,
++ * and only then is an account created or an existing one linked.
++ *
++ * Deliberately NOT stored: the ORCID access and refresh tokens. Nothing in the
++ * codebase reads them (every projection excludes them), so parking secrets
++ * here would be risk without purpose. The ordinary login paths refresh them on
++ * the next ORCID sign-in.
++ *
++ * Documents expire by themselves -- see the TTL index at the bottom. An
++ * abandoned claim leaves nothing behind.
++ */
++export const OrcidSignupClaimSchema: Schema = new Schema(
++	{
++		_id: { type: String, default: () => crypto.randomUUID() },
++		id: { type: String, default: () => crypto.randomUUID(), unique: true },
++
++		/** The ORCID iD being claimed. One live claim per iD: a restart replaces it. */
++		orcid: { type: String, required: true, unique: true },
++
++		/** Names as ORCID reported them, used to seed the account on confirmation. */
++		firstName: { type: String, default: '' },
++		lastName: { type: String, default: '' },
++
++		/**
++		 * The address the person typed, still unproven. Absent until they
++		 * submit one. Never written onto a user document from here -- only the
++		 * confirmation endpoint promotes it, after the token matches.
++		 */
++		pendingEmail: { type: String },
++
++		/** SHA-256 of the confirmation token. The raw token only ever leaves in the e-mail. */
++		tokenHash: { type: String },
++
++		expiresAt: { type: Date, required: true },
++		createdAt: { type: Date, default: () => new Date() },
++		updatedAt: { type: Date, default: () => new Date() }
++	},
++	{ collection: 'orcidSignupClaims', timestamps: true }
++);
++
++OrcidSignupClaimSchema.index({ orcid: 1 }, { unique: true });
++
++// Sparse: `tokenHash` is absent until the confirmation e-mail is sent, and
++// several claims may sit in that state at once.
++OrcidSignupClaimSchema.index({ tokenHash: 1 }, { unique: true, sparse: true });
++
++// TTL index: MongoDB deletes the document once expiresAt is in the past.
++// expireAfterSeconds: 0 means "expire exactly at expiresAt" -- no cron job.
++OrcidSignupClaimSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+diff --git a/src/lib/server/auth/orcidSignupClaim.ts b/src/lib/server/auth/orcidSignupClaim.ts
+new file mode 100644
+index 0000000..febc2a8
+--- /dev/null
++++ b/src/lib/server/auth/orcidSignupClaim.ts
+@@ -0,0 +1,134 @@
++import crypto from 'crypto';
++import nodemailer from 'nodemailer';
++import * as cookie from 'cookie';
++import { env } from '$env/dynamic/private';
++import { buildOrcidSignupConfirmationEmailHtml } from '$lib/services/platformEmailTemplates';
++
++export const ORCID_SIGNUP_TOKEN_BYTES = 32;
++export const ORCID_SIGNUP_CLAIM_TTL_MS = 24 * 60 * 60 * 1000;
++
++/**
++ * How long the browser keeps the pointer to its half-finished sign-up. Shorter
++ * than the claim's own TTL on purpose: the cookie only has to survive the walk
++ * from the ORCID redirect to the e-mail form, while the confirmation link in
++ * the e-mail stays valid for a day and works from any browser.
++ */
++export const ORCID_SIGNUP_COOKIE_NAME = 'orcid_signup';
++export const ORCID_SIGNUP_COOKIE_TTL_MS = 60 * 60 * 1000;
++
++export function generateOrcidSignupToken() {
++	return crypto.randomBytes(ORCID_SIGNUP_TOKEN_BYTES).toString('hex');
++}
++
++export function hashOrcidSignupToken(token: string) {
++	return crypto.createHash('sha256').update(token).digest('hex');
++}
++
++export function getOrcidSignupExpiresAt(now = new Date()) {
++	return new Date(now.getTime() + ORCID_SIGNUP_CLAIM_TTL_MS);
++}
++
++export function isOrcidSignupExpired(expiresAt: Date | string, now = new Date()) {
++	return new Date(expiresAt).getTime() <= now.getTime();
++}
++
++export function getOrcidSignupConfirmationUrl(siteUrl: string, token: string) {
++	const baseUrl = siteUrl.replace(/\/+$/, '');
++	return `${baseUrl}/orcid/confirm?token=${encodeURIComponent(token)}`;
++}
++
++export function serializeOrcidSignupCookie(
++	claimId: string,
++	options: { secure?: boolean; expires?: Date } = {}
++) {
++	return cookie.serialize(ORCID_SIGNUP_COOKIE_NAME, claimId, {
++		path: '/',
++		httpOnly: true,
++		secure: Boolean(options.secure),
++		sameSite: 'lax',
++		expires: options.expires ?? new Date(Date.now() + ORCID_SIGNUP_COOKIE_TTL_MS)
++	});
++}
++
++export function serializeExpiredOrcidSignupCookie(options: { secure?: boolean } = {}) {
++	return serializeOrcidSignupCookie('deleted', {
++		secure: options.secure,
++		expires: new Date(0)
++	});
++}
++
++export type PreparedOrcidSignupEmail = {
++	pendingEmail: string;
++	tokenHash: string;
++	expiresAt: Date;
++	token: string;
++};
++
++/**
++ * Pure computation of the fields a claim should carry once the person has
++ * supplied an address. Mirrors `prepareEmailChange` so the two confirmation
++ * flows cannot drift apart: only the hash is ever persisted, and the raw token
++ * is handed back for the e-mail and nowhere else.
++ */
++export function prepareOrcidSignupEmail(
++	normalizedEmail: string,
++	now = new Date()
++): PreparedOrcidSignupEmail {
++	const token = generateOrcidSignupToken();
++
++	return {
++		pendingEmail: normalizedEmail,
++		tokenHash: hashOrcidSignupToken(token),
++		expiresAt: getOrcidSignupExpiresAt(now),
++		token
++	};
++}
++
++let transporter: nodemailer.Transporter | null = null;
++
++function getTransporter(): nodemailer.Transporter | null {
++	if (transporter) return transporter;
++
++	const smtpUser = env.SMTP_USER;
++	const smtpPass = env.SMTP_PASS;
++
++	if (!smtpUser || !smtpPass) {
++		return null;
++	}
++
++	const smtpPort = Number(env.SMTP_PORT || 587);
++	transporter = nodemailer.createTransport({
++		host: env.SMTP_HOST || 'smtp.gmail.com',
++		port: smtpPort,
++		secure: env.SMTP_SECURE === 'true' || smtpPort === 465,
++		auth: {
++			user: smtpUser,
++			pass: smtpPass
++		},
++		debug: env.SMTP_DEBUG === 'true',
++		logger: env.SMTP_DEBUG === 'true'
++	});
++
++	return transporter;
++}
++
++export type SendOrcidSignupConfirmationInput = {
++	to: string;
++	firstName: string;
++	confirmationUrl: string;
++};
++
++export async function sendOrcidSignupConfirmation(input: SendOrcidSignupConfirmationInput) {
++	const smtpTransporter = getTransporter();
++	if (!smtpTransporter) {
++		throw new Error('Email service is not configured');
++	}
++
++	await smtpTransporter.verify();
++	await smtpTransporter.sendMail({
++		from: `"SciLedger Team" <${env.SMTP_USER}>`,
++		to: input.to,
++		subject: 'Confirm your email to finish signing in with ORCID - SciLedger',
++		html: buildOrcidSignupConfirmationEmailHtml(input.firstName, input.confirmationUrl)
++	});
++}
+diff --git a/src/lib/server/orcid/createOrcidUser.ts b/src/lib/server/orcid/createOrcidUser.ts
+new file mode 100644
+index 0000000..e44cc1e
+--- /dev/null
++++ b/src/lib/server/orcid/createOrcidUser.ts
+@@ -0,0 +1,97 @@
++import * as crypto from 'crypto';
++import Users from '$lib/db/models/User';
++
++/**
++ * Verification fields for an account that arrived through ORCID.
++ *
++ * A public ORCID e-mail is treated as verified: ORCID itself confirmed it. An
++ * address the person typed into the sign-up form is verified too, but by a
++ * different proof -- they clicked a link we sent to it -- so the caller says
++ * which applies.
++ */
++export function getOrcidVerificationFields(emailIsVerified: boolean, source: string) {
++	if (!emailIsVerified) {
++		return {
++			emailVerified: false,
++			verificationSource: source
++		};
++	}
++
++	return {
++		emailVerified: true,
++		emailVerifiedAt: new Date(),
++		verificationSource: source
++	};
++}
++
++/**
++ * The `@handle_1234` form the platform gives ORCID accounts, made unique by
++ * appending a counter when the base is taken.
++ */
++export async function generateUniqueOrcidUsername(firstName: string, orcid: string) {
++	const baseUsername = `@${String(firstName || 'user').toLowerCase()}_${orcid.split('-').pop()}`;
++	let username = baseUsername;
++	let usernameExists = await Users.findOne({ username });
++	let counter = 1;
++
++	while (usernameExists) {
++		username = `${baseUsername}_${counter}`;
++		usernameExists = await Users.findOne({ username });
++		counter++;
++	}
++
++	return username;
++}
++
++export type CreateOrcidUserInput = {
++	orcid: string;
++	firstName: string;
++	lastName: string;
++	/** A real address, always. The platform no longer invents placeholders. */
++	email: string;
++	/** `'orcid'` when ORCID published the address, `'orcid_email_confirmed'` when the person confirmed it. */
++	verificationSource: string;
++	accessToken?: string;
++	refreshToken?: string;
++	tokenExpiry?: Date;
++};
++
++/**
++ * Creates an account for an ORCID identity.
++ *
++ * Shared by the callback (when ORCID publishes the e-mail) and by the sign-up
++ * confirmation (when the person proved an address themselves) so the two paths
++ * cannot drift apart on username generation, the random password, or the
++ * verification fields.
++ *
++ * The password is random and never shown: these accounts sign in through ORCID
++ * or, once they hold a real address, through password recovery.
++ */
++export async function createOrcidUser(input: CreateOrcidUserInput) {
++	const username = await generateUniqueOrcidUsername(input.firstName, input.orcid);
++	const userId = crypto.randomUUID();
++	const now = new Date().toISOString();
++
++	const user = new Users({
++		_id: userId,
++		id: userId,
++		firstName: input.firstName,
++		lastName: input.lastName,
++		email: input.email,
++		username,
++		country: '',
++		dob: '',
++		password: crypto.randomBytes(32).toString('hex'),
++		...getOrcidVerificationFields(true, input.verificationSource),
++		orcid: input.orcid,
++		orcidAccessToken: input.accessToken,
++		orcidRefreshToken: input.refreshToken,
++		orcidTokenExpiry: input.tokenExpiry,
++		createdAt: now,
++		updatedAt: now
++	});
++
++	await user.save();
++
++	return user;
++}
+diff --git a/src/lib/services/platformEmailTemplates.ts b/src/lib/services/platformEmailTemplates.ts
+index f2a872f..95417c1 100644
+--- a/src/lib/services/platformEmailTemplates.ts
++++ b/src/lib/services/platformEmailTemplates.ts
+@@ -93,6 +93,31 @@ export function buildEmailChangeConfirmationEmailHtml(firstName: string, confirm
+ 	});
+ }
+ 
++/**
++ * Sent when someone signs in with ORCID whose record exposes no public e-mail.
++ * No account exists yet at this point -- confirming this link is what creates
++ * it, or links the ORCID iD to the account that already holds this address.
++ */
++export function buildOrcidSignupConfirmationEmailHtml(firstName: string, confirmationUrl: string) {
++	return createEmailLayout({
++		title: 'Confirm Your Email',
++		subtitle: 'Finish signing in with ORCID',
++		greeting: `Hello ${firstName},`,
++		message:
++			'You signed in to SciLedger with ORCID. Your ORCID record does not share an email address publicly, so we need you to confirm one before we can finish. If this address already belongs to a SciLedger account, confirming will connect your ORCID iD to it, and you will be able to sign in either way.',
++		ctaIntro: 'Click the button below to confirm this email address:',
++		actionLabel: 'Confirm Email',
++		actionUrl: confirmationUrl,
++		fallbackUrl: confirmationUrl,
++		warning: {
++			title: 'Important',
++			message:
++				'This link will expire in 24 hours. If you did not try to sign in with ORCID, you can safely ignore this email -- no account is created until the link is used.'
++		},
++		closing: 'If you continue having problems, please contact our support team.'
++	});
++}
++
+ export function buildEmailChangedNotificationEmailHtml(firstName: string, newEmail: string) {
+ 	return createEmailLayout({
+ 		title: 'Your Account Email Has Changed',
+diff --git a/src/routes/orcid/callback/+server.ts b/src/routes/orcid/callback/+server.ts
+index 6c1a34a..357b15e 100644
+--- a/src/routes/orcid/callback/+server.ts
++++ b/src/routes/orcid/callback/+server.ts
+@@ -7,11 +7,17 @@ import Users from '$lib/db/models/User';
+ import { respondWithSession } from '$lib/server/auth/authResponse';
+ import { normalizeEmail } from '$lib/server/auth/normalizeEmail';
+ import { getOrcidRedirectUri } from '$lib/server/orcid/redirectUri';
++import { createOrcidUser } from '$lib/server/orcid/createOrcidUser';
++import OrcidSignupClaim from '$lib/db/models/OrcidSignupClaim';
++import {
++	getOrcidSignupExpiresAt,
++	serializeOrcidSignupCookie
++} from '$lib/server/auth/orcidSignupClaim';
++import { isSecureRequest } from '$lib/server/auth/sessionCookie';
+ import {
+ 	buildOrcidPlaceholderEmail,
+ 	isOrcidPlaceholderEmail
+ } from '$lib/helpers/orcidPlaceholderEmail';
+-import * as crypto from 'crypto';
+ 
+ /**
+  * Verifica se o perfil do usuário está completo
+@@ -48,19 +54,47 @@ function isProfileComplete(user: any): boolean {
+ 	return completedExplicitly || hasRealEmail;
+ }
+ 
+-function getOrcidVerificationFields(hasPublicEmail: boolean) {
+-	if (!hasPublicEmail) {
+-		return {
+-			emailVerified: false,
+-			verificationSource: 'orcid_placeholder'
+-		};
+-	}
++/**
++ * Parks an ORCID identity that arrived without a usable e-mail address and
++ * sends the browser to the form that asks for one.
++ *
++ * No account is created here. Until the person confirms an address we cannot
++ * tell whether they already have one, and guessing is what used to produce a
++ * second, orphan account with an invented `@orcid.placeholder` address.
++ *
++ * The browser carries only the claim's id, in an httpOnly cookie. Holding it
++ * lets someone name an address and have a confirmation link sent THERE, which
++ * is no privilege at all: the link is the proof, and it lands in that mailbox.
++ */
++async function parkClaimAndAskForEmail(
++	claim: { orcid: string; firstName: string; lastName: string },
++	request: Request,
++	url: URL
++): Promise<Response> {
++	const now = new Date();
++	const saved = await OrcidSignupClaim.findOneAndUpdate(
++		{ orcid: claim.orcid },
++		{
++			$set: {
++				firstName: claim.firstName,
++				lastName: claim.lastName,
++				expiresAt: getOrcidSignupExpiresAt(now),
++				updatedAt: now
++			},
++			// A restarted sign-up must not inherit an address or token from an
++			// abandoned attempt.
++			$unset: { pendingEmail: '', tokenHash: '' }
++		},
++		{ new: true, upsert: true, setDefaultsOnInsert: true }
++	);
+ 
+-	return {
+-		emailVerified: true,
+-		emailVerifiedAt: new Date(),
+-		verificationSource: 'orcid'
+-	};
++	const headers = new Headers({ Location: '/orcid/email' });
++	headers.append(
++		'set-cookie',
++		serializeOrcidSignupCookie(String(saved.id), { secure: isSecureRequest(url, request) })
++	);
++
++	return new Response(null, { status: 302, headers });
+ }
+ 
+ /**
+@@ -256,74 +290,47 @@ export const GET: RequestHandler = async ({ url, request }) => {
+ 		// ETAPA 4: Criar novo usuário
+ 		// ====================================================================
+ 
+-		// Se não tem email público no ORCID, usa email placeholder determinístico.
+-		// Placeholders não comprovam posse de e-mail real e permanecem não verificados.
+-		const userEmail = email || buildOrcidPlaceholderEmail(orcid);
+-		const orcidVerificationFields = getOrcidVerificationFields(Boolean(email));
+-
+-		// Gera username único baseado no ORCID
+-		const baseUsername = `@${firstName.toLowerCase()}_${orcid.split('-').pop()}`;
+-		let username = baseUsername;
+-		let usernameExists = await Users.findOne({ username });
+-		let counter = 1;
+-
+-		// Garante que username é único
+-		while (usernameExists) {
+-			username = `${baseUsername}_${counter}`;
+-			usernameExists = await Users.findOne({ username });
+-			counter++;
+-		}
+-
+-		// Cria senha aleatória (usuário pode definir uma depois se quiser)
+-		// Usuário poderá usar "Esqueci minha senha" para definir uma senha
+-		const randomPassword = crypto.randomBytes(32).toString('hex');
+-
+-		const userId = crypto.randomUUID();
+-
+-		// Evita conflito com conta antiga que por acaso já tenha o placeholder
+-		const existingPlaceholderUser = await Users.findOne({ email: userEmail });
+-		if (existingPlaceholderUser) {
+-			existingPlaceholderUser.orcid = orcid;
+-			existingPlaceholderUser.orcidAccessToken = access_token;
+-			existingPlaceholderUser.orcidRefreshToken = refresh_token;
+-			existingPlaceholderUser.orcidTokenExpiry = new Date(Date.now() + expires_in * 1000);
+-			if (email) {
+-				existingPlaceholderUser.emailVerified = true;
+-				existingPlaceholderUser.emailVerifiedAt = existingPlaceholderUser.emailVerifiedAt || new Date();
+-				existingPlaceholderUser.verificationSource = 'orcid';
+-			} else if (existingPlaceholderUser.emailVerified !== true) {
+-				existingPlaceholderUser.emailVerified = false;
+-				existingPlaceholderUser.verificationSource = 'orcid_placeholder';
+-			}
+-			await existingPlaceholderUser.save();
+-
+-			return loginAndRedirect(existingPlaceholderUser, request, url);
++		// O ORCID publicou o e-mail: ele serve como prova de posse, entao a conta
++		// e criada aqui mesmo, ja verificada.
++		if (email) {
++			const newUser = await createOrcidUser({
++				orcid,
++				firstName,
++				lastName,
++				email,
++				verificationSource: 'orcid',
++				accessToken: access_token,
++				refreshToken: refresh_token,
++				tokenExpiry: new Date(Date.now() + expires_in * 1000)
++			});
++
++			return loginAndRedirect(newUser, request, url);
+ 		}
+ 
+-		// Cria novo usuário
+-		const newUser = new Users({
+-			_id: userId,
+-			id: userId,
+-			firstName,
+-			lastName,
+-			email: userEmail,
+-			username,
+-			country: '', // Usuário pode preencher depois
+-			dob: '', // Usuário pode preencher depois
+-			password: randomPassword, // Senha temporária aleatória
+-			...orcidVerificationFields,
+-			orcid: orcid,
+-			orcidAccessToken: access_token,
+-			orcidRefreshToken: refresh_token,
+-			orcidTokenExpiry: new Date(Date.now() + expires_in * 1000),
+-			createdAt: new Date().toISOString(),
+-			updatedAt: new Date().toISOString()
++		// Sem e-mail publico. Contas criadas pelo fluxo antigo carregam o
++		// placeholder deterministico deste ORCID iD; a ETAPA 3.1 normalmente as
++		// encontra pelo proprio iD, e esta busca cobre as que por algum motivo
++		// ficaram sem ele. Elas continuam entrando como sempre -- o aviso em
++		// /settings/account e que as conduz a cadastrar um endereco real.
++		const legacyPlaceholderUser = await Users.findOne({
++			email: buildOrcidPlaceholderEmail(orcid)
+ 		});
+ 
+-		await newUser.save();
++		if (legacyPlaceholderUser) {
++			legacyPlaceholderUser.orcid = orcid;
++			legacyPlaceholderUser.orcidAccessToken = access_token;
++			legacyPlaceholderUser.orcidRefreshToken = refresh_token;
++			legacyPlaceholderUser.orcidTokenExpiry = new Date(Date.now() + expires_in * 1000);
++			await legacyPlaceholderUser.save();
++
++			return loginAndRedirect(legacyPlaceholderUser, request, url);
++		}
+ 
+-		// Faz login e redireciona para complete-profile (já que dados podem estar incompletos)
+-		return loginAndRedirect(newUser, request, url);
++		// Conta nova sem e-mail conhecido: nada e criado ainda. A identidade do
++		// ORCID fica parada num registro temporario e o navegador vai para o
++		// formulario que pede o endereco. Inventar um placeholder aqui era o que
++		// gerava a segunda conta orfa, impossivel de unificar depois.
++		return parkClaimAndAskForEmail({ orcid, firstName, lastName }, request, url);
+ 
+ 	} catch (error) {
+ 		console.error('❌ ORCID callback error:', error);
+diff --git a/src/routes/orcid/callback/orcidCallbackServer.test.ts b/src/routes/orcid/callback/orcidCallbackServer.test.ts
+index f461deb..9aa65ef 100644
+--- a/src/routes/orcid/callback/orcidCallbackServer.test.ts
++++ b/src/routes/orcid/callback/orcidCallbackServer.test.ts
+@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => {
+ 		findOne: vi.fn(),
+ 		startMongo: vi.fn(),
+ 		respondWithSession: vi.fn(),
++		claimFindOneAndUpdate: vi.fn(),
+ 		UserModel
+ 	};
+ });
+@@ -45,6 +46,12 @@ vi.mock('$lib/server/auth/authResponse', () => ({
+ 	respondWithSession: mocks.respondWithSession
+ }));
+ 
++vi.mock('$lib/db/models/OrcidSignupClaim', () => ({
++	default: {
++		findOneAndUpdate: (...args: any[]) => mocks.claimFindOneAndUpdate(...args)
++	}
++}));
++
+ function createEvent() {
+ 	const url = new URL('https://sciledger.online/orcid/callback?code=authorization-code');
+ 	const request = new Request(url);
+@@ -79,6 +86,7 @@ describe('ORCID callback email verification policy', () => {
+ 		mocks.instances.length = 0;
+ 		mocks.startMongo.mockResolvedValue(undefined);
+ 		mocks.respondWithSession.mockResolvedValue(new Response(null, { headers: { 'set-cookie': 'session=token' } }));
++		mocks.claimFindOneAndUpdate.mockResolvedValue({ id: 'claim-1' });
+ 	});
+ 
+ 	it('creates a verified user when ORCID returns a public email', async () => {
+@@ -106,7 +114,15 @@ describe('ORCID callback email verification policy', () => {
+ 		expect(user.save).toHaveBeenCalled();
+ 	});
+ 
+-	it('creates an unverified placeholder user when ORCID has no public email', async () => {
++	/**
++	 * O comportamento mudou de proposito. Antes, uma conta era criada aqui com um
++	 * endereco `<orcid>@orcid.placeholder` inventado -- e se a pessoa ja tivesse
++	 * conta no sistema, essa era uma SEGUNDA conta, orfa, que ela nunca
++	 * conseguia unificar ("This email is already in use" ao tentar cadastrar o
++	 * email real). Agora nada e criado: a identidade do ORCID fica parada num
++	 * registro temporario ate a pessoa confirmar um endereco de verdade.
++	 */
++	it('creates no account when ORCID has no public email, parking a claim instead', async () => {
+ 		mocks.findOne.mockResolvedValue(null);
+ 		mockFetchPerson({
+ 			name: {
+@@ -120,18 +136,50 @@ describe('ORCID callback email verification policy', () => {
+ 		const { GET } = await import('./+server');
+ 
+ 		const response = await GET(createEvent() as any);
+-		const user = mocks.instances[0];
+ 
+ 		expect(response.status).toBe(302);
+-		// Conta nova: `profileCompletedAt` ainda nao existe, por isso o desvio --
+-		// nao por causa do e-mail placeholder.
+-		expect(response.headers.get('location')).toBe('/complete-profile');
+-		expect(user.profileCompletedAt).toBeUndefined();
+-		expect(user.email).toBe('0000-0001-0002-0003@orcid.placeholder');
+-		expect(user.emailVerified).toBe(false);
+-		expect(user.emailVerifiedAt).toBeUndefined();
+-		expect(user.verificationSource).toBe('orcid_placeholder');
+-		expect(user.save).toHaveBeenCalled();
++		expect(response.headers.get('location')).toBe('/orcid/email');
++		// Nenhum usuario construido -- nenhum email inventado em lugar algum.
++		expect(mocks.instances).toHaveLength(0);
++
++		const [filter, update] = mocks.claimFindOneAndUpdate.mock.calls[0];
++		expect(filter).toEqual({ orcid: '0000-0001-0002-0003' });
++		expect(update.$set).toMatchObject({ firstName: 'Ada', lastName: 'Lovelace' });
++		// Uma tentativa reiniciada nao herda endereco nem token de uma anterior.
++		expect(update.$unset).toEqual({ pendingEmail: '', tokenHash: '' });
++
++		// O navegador recebe apenas o id do registro, em cookie httpOnly.
++		const setCookie = response.headers.get('set-cookie') ?? '';
++		expect(setCookie).toContain('orcid_signup=claim-1');
++		expect(setCookie).toContain('HttpOnly');
++	});
++
++	it('logs a legacy placeholder account in instead of parking a new claim', async () => {
++		// Contas criadas pelo fluxo antigo (a do Prof Tetsu, por exemplo) seguem
++		// entrando normalmente -- a correcao nao as deixa de fora.
++		const legacy = {
++			email: '0000-0001-0002-0003@orcid.placeholder',
++			firstName: 'Ada',
++			lastName: 'Lovelace',
++			profileCompletedAt: new Date('2026-01-01T00:00:00.000Z'),
++			save: vi.fn().mockResolvedValue(undefined)
++		};
++		// 3.1 (por orcid) nao acha; a busca pelo placeholder deterministico acha.
++		mocks.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce(legacy);
++		mockFetchPerson({
++			name: {
++				'given-names': { value: 'Ada' },
++				'family-name': { value: 'Lovelace' }
++			},
++			emails: { email: [] }
++		});
++		const { GET } = await import('./+server');
++
++		const response = await GET(createEvent() as any);
++
++		expect(response.headers.get('location')).toBe('/');
++		expect(legacy.save).toHaveBeenCalled();
++		expect(mocks.claimFindOneAndUpdate).not.toHaveBeenCalled();
+ 	});
+ });
+ 
+diff --git a/src/routes/orcid/confirm/+server.ts b/src/routes/orcid/confirm/+server.ts
+new file mode 100644
+index 0000000..6cef9e3
+--- /dev/null
++++ b/src/routes/orcid/confirm/+server.ts
+@@ -0,0 +1,113 @@
++import { isRedirect, redirect } from '@sveltejs/kit';
++import type { RequestHandler } from './$types';
++import { start_mongo } from '$lib/db/mongooseConnection';
++import Users from '$lib/db/models/User';
++import OrcidSignupClaim from '$lib/db/models/OrcidSignupClaim';
++import { respondWithSession } from '$lib/server/auth/authResponse';
++import { createOrcidUser } from '$lib/server/orcid/createOrcidUser';
++import { isSecureRequest } from '$lib/server/auth/sessionCookie';
++import {
++	hashOrcidSignupToken,
++	isOrcidSignupExpired,
++	serializeExpiredOrcidSignupCookie
++} from '$lib/server/auth/orcidSignupClaim';
++
++/**
++ * Finishes an ORCID sign-up whose e-mail had to be confirmed.
++ *
++ * Opening this link is the proof of ownership that the ORCID record could not
++ * give us. Two outcomes, decided by whether the confirmed address is already
++ * on an account:
++ *
++ *  - it is: the ORCID iD is attached to THAT account. Nothing is merged and
++ *    nothing is overwritten -- the person simply gains a second way to sign in
++ *    to the account they already had. This is the case that used to end in a
++ *    duplicate account and "This email is already in use".
++ *  - it is not: the account is created now, with that address, already
++ *    verified.
++ *
++ * Either way the claim is consumed, so a link cannot be replayed.
++ */
++async function finishSignup(request: Request, url: URL): Promise<Response> {
++	const token = url.searchParams.get('token');
++	if (!token) {
++		throw redirect(302, '/login?error=orcid_confirm_invalid');
++	}
++
++	await start_mongo();
++
++	const claim = await OrcidSignupClaim.findOne({ tokenHash: hashOrcidSignupToken(token) });
++
++	if (!claim || !claim.pendingEmail || isOrcidSignupExpired(claim.expiresAt)) {
++		throw redirect(302, '/login?error=orcid_confirm_expired');
++	}
++
++	const email = String(claim.pendingEmail);
++	const orcid = String(claim.orcid);
++
++	// Someone may have signed in with this ORCID iD through another route while
++	// the link sat unopened. Then there is nothing left to do but log them in.
++	const alreadyLinked = await Users.findOne({ orcid });
++	if (alreadyLinked) {
++		await OrcidSignupClaim.deleteOne({ id: claim.id });
++		return respondWithRedirect(alreadyLinked, request, url, '/');
++	}
++
++	const existingUser = await Users.findOne({ email });
++
++	if (existingUser) {
++		existingUser.orcid = orcid;
++		// The address was already theirs; confirming it here proves they still
++		// control it, so it counts as verified from now on.
++		existingUser.emailVerified = true;
++		existingUser.emailVerifiedAt = existingUser.emailVerifiedAt || new Date();
++		existingUser.verificationSource = 'orcid_email_confirmed';
++		existingUser.updatedAt = new Date().toISOString();
++		await existingUser.save();
++		await OrcidSignupClaim.deleteOne({ id: claim.id });
++
++		return respondWithRedirect(existingUser, request, url, '/');
++	}
++
++	const newUser = await createOrcidUser({
++		orcid,
++		firstName: claim.firstName || 'User',
++		lastName: claim.lastName || 'ORCID',
++		email,
++		verificationSource: 'orcid_email_confirmed'
++	});
++
++	await OrcidSignupClaim.deleteOne({ id: claim.id });
++
++	// A brand-new account still has no country or birthday, so it goes through
++	// the profile screen once.
++	return respondWithRedirect(newUser, request, url, '/complete-profile');
++}
++
++async function respondWithRedirect(
++	user: any,
++	request: Request,
++	url: URL,
++	location: string
++): Promise<Response> {
++	const response = await respondWithSession({ user }, { request, url });
++	const headers = new Headers(response.headers);
++	headers.set('Location', location);
++	// The claim is consumed; drop the browser's pointer to it.
++	headers.append('set-cookie', serializeExpiredOrcidSignupCookie({ secure: isSecureRequest(url, request) }));
++
++	return new Response(null, { status: 302, headers });
++}
++
++export const GET: RequestHandler = async ({ request, url }) => {
++	try {
++		return await finishSignup(request, url);
++	} catch (error) {
++		if (isRedirect(error)) {
++			throw error;
++		}
++
++		console.error('❌ ORCID sign-up confirmation error:', error);
++		throw redirect(302, '/login?error=orcid_confirm_failed');
++	}
++};
+diff --git a/src/routes/orcid/confirm/orcidConfirmServer.test.ts b/src/routes/orcid/confirm/orcidConfirmServer.test.ts
+new file mode 100644
+index 0000000..7b6e076
+--- /dev/null
++++ b/src/routes/orcid/confirm/orcidConfirmServer.test.ts
+@@ -0,0 +1,206 @@
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++import { hashOrcidSignupToken } from '$lib/server/auth/orcidSignupClaim';
++
++const mocks = vi.hoisted(() => {
++	const instances: any[] = [];
++
++	function UserModel(this: any, data: Record<string, unknown>) {
++		Object.assign(this, data);
++		this.save = vi.fn().mockResolvedValue(undefined);
++		instances.push(this);
++	}
++
++	return {
++		instances,
++		userFindOne: vi.fn(),
++		startMongo: vi.fn(),
++		respondWithSession: vi.fn(),
++		claimFindOne: vi.fn(),
++		claimDeleteOne: vi.fn(),
++		UserModel
++	};
++});
++
++vi.mock('$lib/db/mongooseConnection', () => ({
++	start_mongo: mocks.startMongo
++}));
++
++vi.mock('$lib/db/models/User', () => {
++	(mocks.UserModel as unknown as { findOne: typeof mocks.userFindOne }).findOne = mocks.userFindOne;
++	return { default: mocks.UserModel };
++});
++
++vi.mock('$lib/db/models/OrcidSignupClaim', () => ({
++	default: {
++		findOne: (...args: any[]) => mocks.claimFindOne(...args),
++		deleteOne: (...args: any[]) => mocks.claimDeleteOne(...args)
++	}
++}));
++
++vi.mock('$lib/server/auth/authResponse', () => ({
++	respondWithSession: mocks.respondWithSession
++}));
++
++const TOKEN = 'plain-signup-token';
++const ORCID = '0000-0001-0002-0003';
++
++function createEvent(token: string | null = TOKEN) {
++	const url = new URL(
++		token === null
++			? 'https://sciledger.online/orcid/confirm'
++			: `https://sciledger.online/orcid/confirm?token=${encodeURIComponent(token)}`
++	);
++	return { url, request: new Request(url) };
++}
++
++function makeClaim(overrides: Record<string, unknown> = {}) {
++	return {
++		id: 'claim-1',
++		orcid: ORCID,
++		firstName: 'Ada',
++		lastName: 'Lovelace',
++		pendingEmail: 'ada@example.com',
++		tokenHash: hashOrcidSignupToken(TOKEN),
++		expiresAt: new Date(Date.now() + 60_000),
++		...overrides
++	};
++}
++
++async function callGet(event: any) {
++	const { GET } = await import('./+server');
++	try {
++		return { response: await GET(event), redirect: null as any };
++	} catch (thrown: any) {
++		// SvelteKit `redirect()` throws; surface it instead of failing the test.
++		return { response: null as any, redirect: thrown };
++	}
++}
++
++/**
++ * Opening the confirmation link is the proof of ownership that an ORCID record
++ * without a public e-mail could not give. These tests pin the two outcomes it
++ * decides between -- link to the account that already holds the address, or
++ * create one -- plus the refusals.
++ */
++describe('GET /orcid/confirm', () => {
++	beforeEach(() => {
++		vi.resetModules();
++		vi.clearAllMocks();
++		mocks.instances.length = 0;
++		mocks.startMongo.mockResolvedValue(undefined);
++		mocks.claimDeleteOne.mockResolvedValue({ deletedCount: 1 });
++		mocks.respondWithSession.mockResolvedValue(
++			new Response(null, { headers: { 'set-cookie': 'session=token' } })
++		);
++	});
++
++	it('attaches the ORCID iD to the account that already holds the address', async () => {
++		const existing = {
++			id: 'user-1',
++			email: 'ada@example.com',
++			firstName: 'Ada',
++			orcid: undefined as string | undefined,
++			emailVerified: false,
++			emailVerifiedAt: undefined as Date | undefined,
++			verificationSource: 'register',
++			updatedAt: '',
++			save: vi.fn().mockResolvedValue(undefined)
++		};
++		mocks.claimFindOne.mockResolvedValue(makeClaim());
++		// 1st: no account carries this ORCID yet. 2nd: the address is taken.
++		mocks.userFindOne.mockResolvedValueOnce(null).mockResolvedValueOnce(existing);
++
++		const { response } = await callGet(createEvent());
++
++		expect(response.status).toBe(302);
++		expect(response.headers.get('location')).toBe('/');
++		// Linked, not merged: no new account, nothing else overwritten.
++		expect(mocks.instances).toHaveLength(0);
++		expect(existing.orcid).toBe(ORCID);
++		expect(existing.emailVerified).toBe(true);
++		expect(existing.emailVerifiedAt).toBeInstanceOf(Date);
++		expect(existing.verificationSource).toBe('orcid_email_confirmed');
++		expect(existing.save).toHaveBeenCalled();
++		// The claim is consumed, so the link cannot be replayed.
++		expect(mocks.claimDeleteOne).toHaveBeenCalledWith({ id: 'claim-1' });
++	});
++
++	it('creates the account with the confirmed address when nothing holds it', async () => {
++		mocks.claimFindOne.mockResolvedValue(makeClaim());
++		// No ORCID match, no email match, and the username is free.
++		mocks.userFindOne.mockResolvedValue(null);
++
++		const { response } = await callGet(createEvent());
++
++		const created = mocks.instances[0];
++		expect(response.headers.get('location')).toBe('/complete-profile');
++		expect(created.email).toBe('ada@example.com');
++		expect(created.orcid).toBe(ORCID);
++		expect(created.emailVerified).toBe(true);
++		expect(created.verificationSource).toBe('orcid_email_confirmed');
++		// No invented address anywhere in the record.
++		expect(created.email).not.toContain('orcid.placeholder');
++		// And no ORCID secrets parked in the claim ever reach the account.
++		expect(created.orcidAccessToken).toBeUndefined();
++		expect(created.orcidRefreshToken).toBeUndefined();
++		expect(created.save).toHaveBeenCalled();
++		expect(mocks.claimDeleteOne).toHaveBeenCalledWith({ id: 'claim-1' });
++	});
++
++	it('finds the claim by the hash of the token, never by the token itself', async () => {
++		mocks.claimFindOne.mockResolvedValue(makeClaim());
++		mocks.userFindOne.mockResolvedValue(null);
++
++		await callGet(createEvent());
++
++		expect(mocks.claimFindOne).toHaveBeenCalledWith({
++			tokenHash: hashOrcidSignupToken(TOKEN)
++		});
++		expect(JSON.stringify(mocks.claimFindOne.mock.calls)).not.toContain(TOKEN);
++	});
++
++	it('refuses an expired claim without creating anything', async () => {
++		mocks.claimFindOne.mockResolvedValue(
++			makeClaim({ expiresAt: new Date(Date.now() - 1000) })
++		);
++
++		const { redirect } = await callGet(createEvent());
++
++		expect(redirect?.status).toBe(302);
++		expect(redirect?.location).toBe('/login?error=orcid_confirm_expired');
++		expect(mocks.instances).toHaveLength(0);
++	});
++
++	it('refuses an unknown token', async () => {
++		mocks.claimFindOne.mockResolvedValue(null);
++
++		const { redirect } = await callGet(createEvent('wrong-token'));
++
++		expect(redirect?.location).toBe('/login?error=orcid_confirm_expired');
++		expect(mocks.instances).toHaveLength(0);
++	});
++
++	it('refuses a request with no token at all', async () => {
++		const { redirect } = await callGet(createEvent(null));
++
++		expect(redirect?.location).toBe('/login?error=orcid_confirm_invalid');
++		expect(mocks.claimFindOne).not.toHaveBeenCalled();
++	});
++
++	it('just signs the person in when the ORCID iD was linked meanwhile', async () => {
++		const alreadyLinked = {
++			id: 'user-9',
++			email: 'ada@example.com',
++			orcid: ORCID,
++			save: vi.fn().mockResolvedValue(undefined)
++		};
++		mocks.claimFindOne.mockResolvedValue(makeClaim());
++		mocks.userFindOne.mockResolvedValueOnce(alreadyLinked);
++
++		const { response } = await callGet(createEvent());
++
++		expect(response.headers.get('location')).toBe('/');
++		expect(mocks.instances).toHaveLength(0);
++		expect(mocks.claimDeleteOne).toHaveBeenCalledWith({ id: 'claim-1' });
++	});
++});
+diff --git a/src/routes/orcid/email/+page.server.ts b/src/routes/orcid/email/+page.server.ts
+new file mode 100644
+index 0000000..5f83715
+--- /dev/null
++++ b/src/routes/orcid/email/+page.server.ts
+@@ -0,0 +1,42 @@
++import { redirect } from '@sveltejs/kit';
++import type { PageServerLoad } from './$types';
++import { start_mongo } from '$lib/db/mongooseConnection';
++import OrcidSignupClaim from '$lib/db/models/OrcidSignupClaim';
++import {
++	ORCID_SIGNUP_COOKIE_NAME,
++	isOrcidSignupExpired
++} from '$lib/server/auth/orcidSignupClaim';
++
++/**
++ * The form shown after ORCID authenticates someone whose record publishes no
++ * e-mail address. The half-finished sign-up lives in `orcidSignupClaims`; the
++ * browser holds only its id, in an httpOnly cookie.
++ *
++ * Only the first name and whether a link was already sent reach the client --
++ * never the claim id, the token hash, or the ORCID iD.
++ */
++export const load: PageServerLoad = async ({ cookies }) => {
++	const claimId = cookies.get(ORCID_SIGNUP_COOKIE_NAME);
++	if (!claimId) {
++		throw redirect(302, '/login?error=orcid_signup_expired');
++	}
++
++	await start_mongo();
++
++	const claim = await OrcidSignupClaim.findOne({ id: claimId })
++		.select('firstName pendingEmail tokenHash expiresAt')
++		.lean();
++
++	// A claim expires by itself (TTL index), so an absent document and a stale
++	// one mean the same thing to the person: start the ORCID sign-in again.
++	if (!claim || isOrcidSignupExpired(claim.expiresAt)) {
++		throw redirect(302, '/login?error=orcid_signup_expired');
++	}
++
++	return {
++		firstName: claim.firstName || '',
++		// Lets the page show "we sent a link to X" after a reload, without
++		// revealing anything the person did not type themselves.
++		sentTo: claim.tokenHash ? (claim.pendingEmail ?? null) : null
++	};
++};
+diff --git a/src/routes/orcid/email/+page.svelte b/src/routes/orcid/email/+page.svelte
+new file mode 100644
+index 0000000..230d70e
+--- /dev/null
++++ b/src/routes/orcid/email/+page.svelte
+@@ -0,0 +1,137 @@
++<script lang="ts">
++	import { fade } from 'svelte/transition';
++	import { post } from '$lib/utils';
++	import type { PageData } from './$types';
++
++	interface Props {
++		data: PageData;
++	}
++
++	let { data }: Props = $props();
++
++	let email = $state('');
++	let isLoading = $state(false);
++	let formWarning = $state('');
++	let sentTo = $state<string | null>(data.sentTo);
++
++	async function handleSubmit(event: SubmitEvent) {
++		event.preventDefault();
++		isLoading = true;
++		formWarning = '';
++
++		try {
++			const response = await post('/orcid/email', { email });
++
++			if (response.success) {
++				sentTo = response.email ?? email;
++			} else {
++				formWarning = response.message || 'Could not send the confirmation email.';
++			}
++		} catch (error) {
++			formWarning = 'Error submitting form. Please try again.';
++			console.error(error);
++		} finally {
++			isLoading = false;
++		}
++	}
++
++	function startOver() {
++		sentTo = null;
++		email = '';
++	}
++</script>
++
++<svelte:head>
++	<title>Confirm your email | SciLedger</title>
++</svelte:head>
++
++<div
++	class="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-surface-100 to-surface-50 py-10"
++>
++	<div class="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8">
++		<img
++			src="/brand/logo/sciledger-logo.svg"
++			alt="SciLedger"
++			width="160"
++			height="47"
++			class="mb-6 h-auto w-40"
++		/>
++
++		{#if sentTo}
++			<h1 class="text-3xl font-bold mb-2 text-surface-900">Check your inbox</h1>
++			<p class="text-surface-600 mb-4">
++				We sent a confirmation link to <span class="font-medium break-all">{sentTo}</span>. Open it
++				to finish signing in.
++			</p>
++			<p class="text-sm text-surface-600 mb-6">
++				The link is valid for 24 hours. Until you confirm, no account is created and nothing is
++				changed.
++			</p>
++			<button
++				type="button"
++				onclick={startOver}
++				class="text-sm font-medium text-primary-700 underline hover:text-primary-800"
++			>
++				Use a different email address
++			</button>
++		{:else}
++			<h1 class="text-3xl font-bold mb-2 text-surface-900">Confirm your email</h1>
++			<p class="text-surface-600 mb-6">
++				{#if data.firstName}
++					Welcome, {data.firstName}.
++				{/if}
++				Your ORCID record does not share an email address publicly, so we need one before we can
++				finish.
++			</p>
++
++			<form onsubmit={handleSubmit} class="space-y-4">
++				<div>
++					<label for="email" class="block text-sm font-medium text-surface-700 mb-1">
++						Email address
++					</label>
++					<input
++						type="email"
++						id="email"
++						bind:value={email}
++						required
++						autocomplete="email"
++						placeholder="you@university.edu"
++						class="w-full px-4 py-2 rounded-lg border border-surface-300 focus:outline-none focus:ring-2 focus:ring-primary-500"
++					/>
++					<p class="text-xs text-surface-500 mt-1">
++						We will send a confirmation link to this address. It only takes effect once you open
++						the link. If the address already belongs to a SciLedger account, confirming connects
++						your ORCID iD to it &mdash; you will then be able to sign in with ORCID
++						<strong>or</strong> with your email and password.
++					</p>
++				</div>
++
++				{#if formWarning}
++					<div
++						transition:fade={{ duration: 300 }}
++						class="p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg text-sm"
++					>
++						{formWarning}
++					</div>
++				{/if}
++
++				<button
++					type="submit"
++					disabled={isLoading}
++					class="w-full mt-6 bg-primary-500 hover:bg-primary-600 disabled:bg-surface-400 text-white font-semibold py-3 rounded-lg transition-colors"
++				>
++					{#if isLoading}
++						Sending...
++					{:else}
++						Send confirmation link
++					{/if}
++				</button>
++
++				<p class="text-center text-xs text-surface-500 mt-4">
++					An email address is required so we can reach you about your submissions and reviews, and
++					so you can recover your account if you lose access to ORCID.
++				</p>
++			</form>
++		{/if}
++	</div>
++</div>
+diff --git a/src/routes/orcid/email/+server.ts b/src/routes/orcid/email/+server.ts
+new file mode 100644
+index 0000000..02cb0eb
+--- /dev/null
++++ b/src/routes/orcid/email/+server.ts
+@@ -0,0 +1,87 @@
++import { json } from '@sveltejs/kit';
++import type { RequestHandler } from './$types';
++import { SITE_URL } from '$env/static/private';
++import { start_mongo } from '$lib/db/mongooseConnection';
++import OrcidSignupClaim from '$lib/db/models/OrcidSignupClaim';
++import { normalizeAndValidateEmail } from '$lib/server/auth/normalizeEmail';
++import { isOrcidPlaceholderEmail } from '$lib/helpers/orcidPlaceholderEmail';
++import {
++	ORCID_SIGNUP_COOKIE_NAME,
++	getOrcidSignupConfirmationUrl,
++	isOrcidSignupExpired,
++	prepareOrcidSignupEmail,
++	sendOrcidSignupConfirmation
++} from '$lib/server/auth/orcidSignupClaim';
++
++/**
++ * Accepts the address for a half-finished ORCID sign-up and sends the
++ * confirmation link to it.
++ *
++ * This endpoint deliberately does NOT say whether the address already belongs
++ * to an account. Doing so would turn the form into a membership oracle for any
++ * address an attacker cares to try. The response is the same either way, and
++ * what differs is only what the confirmation does once the link is used:
++ * create an account, or link the ORCID iD to the one that is already there.
++ */
++export const POST: RequestHandler = async ({ request, cookies }) => {
++	const claimId = cookies.get(ORCID_SIGNUP_COOKIE_NAME);
++	if (!claimId) {
++		return json(
++			{ success: false, message: 'Your ORCID sign-in expired. Please sign in with ORCID again.' },
++			{ status: 440 }
++		);
++	}
++
++	let body: { email?: unknown };
++	try {
++		body = await request.json();
++	} catch {
++		return json({ success: false, message: 'Invalid request.' }, { status: 400 });
++	}
++
++	const normalizedEmail = normalizeAndValidateEmail(body.email);
++	if (!normalizedEmail) {
++		return json({ success: false, message: 'Please enter a valid email address.' }, { status: 400 });
++	}
++
++	// The placeholder domain is not a real mailbox; accepting it here would
++	// recreate exactly the dead end this flow exists to remove.
++	if (isOrcidPlaceholderEmail(normalizedEmail)) {
++		return json({ success: false, message: 'Please enter a real email address.' }, { status: 400 });
++	}
++
++	await start_mongo();
++
++	const claim = await OrcidSignupClaim.findOne({ id: claimId });
++	if (!claim || isOrcidSignupExpired(claim.expiresAt)) {
++		return json(
++			{ success: false, message: 'Your ORCID sign-in expired. Please sign in with ORCID again.' },
++			{ status: 440 }
++		);
++	}
++
++	const prepared = prepareOrcidSignupEmail(normalizedEmail);
++	claim.pendingEmail = prepared.pendingEmail;
++	claim.tokenHash = prepared.tokenHash;
++	claim.expiresAt = prepared.expiresAt;
++	claim.updatedAt = new Date();
++	await claim.save();
++
++	try {
++		await sendOrcidSignupConfirmation({
++			to: prepared.pendingEmail,
++			firstName: claim.firstName || 'there',
++			confirmationUrl: getOrcidSignupConfirmationUrl(SITE_URL, prepared.token)
++		});
++	} catch (error) {
++		// Full detail stays in the server log; the client is told only that the
++		// send failed, with no internals and nothing account-specific.
++		console.error('❌ Failed to send ORCID sign-up confirmation:', error);
++		return json(
++			{ success: false, message: 'We could not send the confirmation email. Please try again.' },
++			{ status: 502 }
++		);
++	}
++
++	return json({ success: true, email: prepared.pendingEmail });
++};
+diff --git a/src/routes/orcid/email/orcidEmailServer.test.ts b/src/routes/orcid/email/orcidEmailServer.test.ts
+new file mode 100644
+index 0000000..aa80fa1
+--- /dev/null
++++ b/src/routes/orcid/email/orcidEmailServer.test.ts
+@@ -0,0 +1,171 @@
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++import { hashOrcidSignupToken } from '$lib/server/auth/orcidSignupClaim';
++import { readFileSync } from 'node:fs';
++import { dirname, resolve } from 'node:path';
++import { fileURLToPath } from 'node:url';
++
++const mocks = vi.hoisted(() => ({
++	startMongo: vi.fn(),
++	claimFindOne: vi.fn(),
++	sendConfirmation: vi.fn()
++}));
++
++vi.mock('$env/static/private', () => ({
++	SITE_URL: 'https://sciledger.online'
++}));
++
++vi.mock('$lib/db/mongooseConnection', () => ({
++	start_mongo: mocks.startMongo
++}));
++
++vi.mock('$lib/db/models/OrcidSignupClaim', () => ({
++	default: { findOne: (...args: any[]) => mocks.claimFindOne(...args) }
++}));
++
++vi.mock('$lib/server/auth/orcidSignupClaim', async () => {
++	const actual = await vi.importActual<typeof import('$lib/server/auth/orcidSignupClaim')>(
++		'$lib/server/auth/orcidSignupClaim'
++	);
++
++	return {
++		...actual,
++		sendOrcidSignupConfirmation: mocks.sendConfirmation
++	};
++});
++
++// `null` is the no-cookie sentinel on purpose: passing `undefined` to a
++// defaulted parameter triggers the default, which would silently keep the
++// cookie present and make the refusal test pass for the wrong reason.
++function createEvent(body: unknown, claimId: string | null = 'claim-1') {
++	return {
++		request: { json: async () => body },
++		cookies: { get: () => claimId ?? undefined }
++	} as any;
++}
++
++function makeClaim(overrides: Record<string, unknown> = {}) {
++	return {
++		id: 'claim-1',
++		orcid: '0000-0001-0002-0003',
++		firstName: 'Ada',
++		lastName: 'Lovelace',
++		pendingEmail: undefined as string | undefined,
++		tokenHash: undefined as string | undefined,
++		expiresAt: new Date(Date.now() + 60_000),
++		updatedAt: new Date(0),
++		save: vi.fn().mockResolvedValue(undefined),
++		...overrides
++	};
++}
++
++describe('POST /orcid/email', () => {
++	beforeEach(() => {
++		vi.clearAllMocks();
++		mocks.startMongo.mockResolvedValue(undefined);
++		mocks.sendConfirmation.mockResolvedValue(undefined);
++	});
++
++	it('stores only the hash and mails the raw token in the confirmation link', async () => {
++		const claim = makeClaim();
++		mocks.claimFindOne.mockResolvedValue(claim);
++		const { POST } = await import('./+server');
++
++		const response = await POST(createEvent({ email: '  Ada@Example.COM  ' }));
++		const body = await response.json();
++
++		expect(response.status).toBe(200);
++		expect(body).toEqual({ success: true, email: 'ada@example.com' });
++		// Normalized before anything is written.
++		expect(claim.pendingEmail).toBe('ada@example.com');
++		expect(claim.save).toHaveBeenCalled();
++
++		const [{ to, confirmationUrl }] = mocks.sendConfirmation.mock.calls[0];
++		expect(to).toBe('ada@example.com');
++
++		// The link carries the raw token; the stored hash matches it, and the
++		// raw token itself is never persisted.
++		const token = new URL(confirmationUrl).searchParams.get('token') ?? '';
++		expect(token).not.toBe('');
++		expect(claim.tokenHash).toBe(hashOrcidSignupToken(token));
++		expect(claim.tokenHash).not.toBe(token);
++	});
++
++	it('cannot leak whether the address already has an account', async () => {
++		// The guarantee is structural: this endpoint never queries the user
++		// collection, so there is nothing for it to leak. Which outcome applies
++		// -- link an existing account or create one -- is decided later, by
++		// /orcid/confirm, behind the e-mailed link.
++		const source = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '+server.ts'), 'utf8');
++		expect(source).not.toContain('models/User');
++
++		const claim = makeClaim();
++		mocks.claimFindOne.mockResolvedValue(claim);
++		const { POST } = await import('./+server');
++
++		const response = await POST(createEvent({ email: 'someone@example.com' }));
++
++		// The body carries the address back and nothing else -- the same shape
++		// whoever owns it.
++		expect(await response.json()).toEqual({ success: true, email: 'someone@example.com' });
++	});
++
++	it('rejects an invalid address without touching the claim', async () => {
++		const claim = makeClaim();
++		mocks.claimFindOne.mockResolvedValue(claim);
++		const { POST } = await import('./+server');
++
++		const response = await POST(createEvent({ email: 'not-an-email' }));
++
++		expect(response.status).toBe(400);
++		expect(claim.save).not.toHaveBeenCalled();
++		expect(mocks.sendConfirmation).not.toHaveBeenCalled();
++	});
++
++	it('refuses the placeholder domain, which has no mailbox', async () => {
++		const claim = makeClaim();
++		mocks.claimFindOne.mockResolvedValue(claim);
++		const { POST } = await import('./+server');
++
++		const response = await POST(
++			createEvent({ email: '0000-0001-0002-0003@orcid.placeholder' })
++		);
++
++		expect(response.status).toBe(400);
++		expect(mocks.sendConfirmation).not.toHaveBeenCalled();
++	});
++
++	it('refuses when the browser carries no claim cookie', async () => {
++		const { POST } = await import('./+server');
++
++		const response = await POST(createEvent({ email: 'ada@example.com' }, null));
++
++		expect(response.status).toBe(440);
++		expect(mocks.claimFindOne).not.toHaveBeenCalled();
++	});
++
++	it('refuses an expired claim', async () => {
++		mocks.claimFindOne.mockResolvedValue(
++			makeClaim({ expiresAt: new Date(Date.now() - 1000) })
++		);
++		const { POST } = await import('./+server');
++
++		const response = await POST(createEvent({ email: 'ada@example.com' }));
++
++		expect(response.status).toBe(440);
++		expect(mocks.sendConfirmation).not.toHaveBeenCalled();
++	});
++
++	it('reports a send failure without leaking the internal error', async () => {
++		mocks.claimFindOne.mockResolvedValue(makeClaim());
++		mocks.sendConfirmation.mockRejectedValue(
++			new Error('getaddrinfo ENOTFOUND smtp.example.com')
++		);
++		const { POST } = await import('./+server');
++
++		const response = await POST(createEvent({ email: 'ada@example.com' }));
++		const body = await response.json();
++
++		expect(response.status).toBe(502);
++		expect(JSON.stringify(body)).not.toMatch(/ENOTFOUND|smtp\.example\.com/);
++	});
++});
+-- 
+2.43.0
+

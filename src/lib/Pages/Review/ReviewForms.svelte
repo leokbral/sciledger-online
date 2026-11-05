@@ -1114,7 +1114,6 @@
 														disabled={hasSubmittedInCurrentRound}
 														class="text-blue-600 focus:ring-blue-500 mt-1"
 													/>
-													class="text-blue-600 focus:ring-blue-500 mt-1" />
 													<span
 														>The manuscript properly cites the ethics committee approval
 														documentation.</span
@@ -1132,7 +1131,6 @@
 														disabled={hasSubmittedInCurrentRound}
 														class="text-blue-600 focus:ring-blue-500 mt-1"
 													/>
-													class="text-blue-600 focus:ring-blue-500 mt-1" />
 													<span
 														>The work lacks ethics approval, but adequately justifies its absence or
 														mentions the approval process status.</span
@@ -1150,7 +1148,6 @@
 														disabled={hasSubmittedInCurrentRound}
 														class="text-blue-600 focus:ring-blue-500 mt-1"
 													/>
-													class="text-blue-600 focus:ring-blue-500 mt-1" />
 													<span>The manuscript does not mention ethics committee approval.</span>
 												</label>
 											</div>

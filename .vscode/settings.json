@@ -116,5 +116,6 @@
 		"transition",
 		"width",
 		"zIndex"
-	]
+	],
+	"python.terminal.useEnvFile": true
 }
