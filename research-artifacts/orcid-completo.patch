@@ -43,8 +43,6 @@ now a single helper, `$lib/helpers/orcidPlaceholderEmail`, which compares the
 domain with `endsWith` rather than `includes` so a real address on a subdomain
 is not misread as a placeholder.
 
-Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
-Claude-Session: https://claude.ai/code/session_01YN8AGt68oA7M8GqaNskuwL
 ---
  src/lib/helpers/orcidPlaceholderEmail.test.ts |  51 +++++
  src/lib/helpers/orcidPlaceholderEmail.ts      |  43 +++++
@@ -1151,8 +1149,6 @@ account, finishing an ORCID sign-up now requires giving an address. There is no
 "continue without one" -- that option only existed because an address was being
 invented.
 
-Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
-Claude-Session: https://claude.ai/code/session_01YN8AGt68oA7M8GqaNskuwL
 ---
  src/lib/db/models/OrcidSignupClaim.ts         |  20 ++
  src/lib/db/schemas/OrcidSignupClaimSchema.ts  |  59 +++++

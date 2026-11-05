@@ -21,7 +21,7 @@ Esta tarefa adicionou exclusivamente a pasta `brand/`: assets SVG e PNG, prancha
 | Tema, componentes e layouts | Nenhuma edição |
 | package.json e lockfile | Nenhuma edição ou instalação de dependência |
 
-O `git status --short` inicial já mostrava trabalho em Settings, componentes novos associados, arquivos de formatação/teste de pagamentos, `.claude/` e `_to_delete_settings_sprint/`. Esses itens foram preservados. Na conferência final, a única nova entrada atribuída à tarefa é `?? brand/`; os demais caminhos do status correspondem aos itens já existentes. A árvore não estava limpa antes da tarefa, portanto “nenhuma alteração” aqui se refere estritamente ao trabalho de branding.
+O `git status --short` inicial já mostrava trabalho em Settings, componentes novos associados, arquivos de formatação/teste de pagamentos, `configurações locais de ferramentas` e `_to_delete_settings_sprint/`. Esses itens foram preservados. Na conferência final, a única nova entrada atribuída à tarefa é `?? brand/`; os demais caminhos do status correspondem aos itens já existentes. A árvore não estava limpa antes da tarefa, portanto “nenhuma alteração” aqui se refere estritamente ao trabalho de branding.
 
 ## Verificações de assets
 

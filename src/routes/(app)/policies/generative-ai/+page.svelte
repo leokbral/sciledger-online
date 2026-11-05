@@ -22,7 +22,7 @@
 		<section class="mb-8">
 			<h2 class="text-2xl font-semibold text-gray-900 mb-4">General Principles</h2>
 			<p class="text-gray-700 mb-4">
-				The use of generative AI tools (e.g., ChatGPT, Claude, GPT-4, etc.) in research and manuscript preparation 
+				The use of generative AI tools in research and manuscript preparation
 				must be transparent, appropriate, and in compliance with these guidelines:
 			</p>
 			<ul class="list-disc list-inside space-y-2 text-gray-700 ml-4">
