@@ -1,8 +1,5 @@
 <script lang="ts">
-	import { FileUpload } from '@skeletonlabs/skeleton-svelte';
-
 	let file: File | null = null;
-	let files: FileList = $state();
 
 	const handleFileChange = (event: Event) => {
 		const target = event.target as HTMLInputElement;
@@ -11,9 +8,6 @@
 			// Você pode agora fazer o upload do arquivo
 		}
 	};
-
-	function onChangeHandler(e: Event): void {
-	}
 
 	const uploadFile = async () => {
 		if (file) {
@@ -41,5 +35,4 @@
 <input type="file" accept=".pdf" onchange={handleFileChange} />
 
 
-<FileUpload name="files" bind:files on:change={onChangeHandler}>Upload</FileUpload>
 <button class="btn preset-filled-primary-500" onclick={uploadFile}>Upload</button>

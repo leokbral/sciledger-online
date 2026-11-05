@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { FileUpload } from '@skeletonlabs/skeleton-svelte';
 	import type { PageData } from './$types';
 
 	interface Props {
@@ -9,10 +8,13 @@
 	let { data }: Props = $props();
 	const pdfs = data.pdfs;
 
-	let files: FileList = $state();
+	let files: FileList | undefined = $state();
 
-	async function onChangeHandler(event: any): Promise<void> {
-		const file = event.target?.files[0];
+	async function onChangeHandler(event: Event): Promise<void> {
+		const target = event.currentTarget;
+		if (!(target instanceof HTMLInputElement)) return;
+		files = target.files ?? undefined;
+		const file = files?.[0];
 
 		if (file && file.type.startsWith('image/')) {
 			const reader = new FileReader();
@@ -21,7 +23,7 @@
 	}
 
 	async function uploadFile() {
-		if (!files) {
+		if (!files?.length) {
 			return;
 		}
 		const file = files[0];
@@ -49,16 +51,11 @@
 	<header>
 		<!-- <img src={imageUrl || ''} class="bg-black/50 w-full aspect-21/9" alt="Post" /> -->
 		<div>
-			<FileUpload name="files" bind:files on:change={onChangeHandler}>
-				{#snippet message()}
-								<span class="font-bold text-surface-900-100">Selecione um pdf</span
-						>
-							{/snippet}
-				{#snippet meta()}
-								<span class="text-surface-900-100">Ou solte os arquivos aqui</span
-						>
-							{/snippet}
-			</FileUpload>
+			<label class="block">
+				<span class="font-bold text-surface-900-100">Selecione um pdf</span>
+				<span class="block text-surface-900-100">Ou selecione os arquivos aqui</span>
+				<input type="file" name="files" accept="application/pdf" multiple onchange={onChangeHandler} />
+			</label>
 		</div>
 	</header>
 </div>

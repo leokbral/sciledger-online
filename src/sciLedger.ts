@@ -1,6 +1,4 @@
-import type { CustomThemeConfig } from '@skeletonlabs/tw-plugin';
-
-export const sciLedger: CustomThemeConfig = {
+export const sciLedger = {
 	name: 'sciLedger',
 	properties: {
 		'--theme-font-family-heading': 'Inter, system-ui, sans-serif',

@@ -1,73 +1,46 @@
 <script lang="ts">
-	
 	import { AppBar } from '@skeletonlabs/skeleton-svelte';
 
-	// Highlight JS
-	import hljs from 'highlight.js/lib/core';
-	import 'highlight.js/styles/github-dark.css';
-	import xml from 'highlight.js/lib/languages/xml'; // for HTML
-	import css from 'highlight.js/lib/languages/css';
-	import javascript from 'highlight.js/lib/languages/javascript';
-	import typescript from 'highlight.js/lib/languages/typescript';
-
-	hljs.registerLanguage('xml', xml); // for HTML
-	hljs.registerLanguage('css', css);
-	hljs.registerLanguage('javascript', javascript);
-	hljs.registerLanguage('typescript', typescript);
-	storeHighlightJs.set(hljs);
-
-	// Floating UI for Popups
-	import { computePosition, autoUpdate, flip, shift, offset, arrow } from '@floating-ui/dom';
 	interface Props {
 		children?: import('svelte').Snippet;
 	}
 
 	let { children }: Props = $props();
-	storePopup.set({ computePosition, autoUpdate, flip, shift, offset, arrow });
 </script>
 
-<!-- App Shell -->
-<AppShell>
-	{#snippet header()}
-	
-			<!-- App Bar -->
-			<AppBar>
-				{#snippet lead()}
-					
-						<strong class="text-xl uppercase">Skeleton</strong>
-					
-					{/snippet}
-				{#snippet trail()}
-					
-						<a
-							class="btn btn-sm preset-tonal-surface border border-surface-500"
-							href="https://discord.gg/EXqV7W8MtY"
-							target="_blank"
-							rel="noreferrer"
-						>
-							Discord
-						</a>
-						<a
-							class="btn btn-sm preset-tonal-surface border border-surface-500"
-							href="https://twitter.com/SkeletonUI"
-							target="_blank"
-							rel="noreferrer"
-						>
-							Twitter
-						</a>
-						<a
-							class="btn btn-sm preset-tonal-surface border border-surface-500"
-							href="https://github.com/skeletonlabs/skeleton"
-							target="_blank"
-							rel="noreferrer"
-						>
-							GitHub
-						</a>
-					
-					{/snippet}
-			</AppBar>
-		
-	{/snippet}
-	<!-- Page Route Content -->
+<div>
+	<header>
+		<AppBar>
+			{#snippet lead()}
+				<strong class="text-xl uppercase">Skeleton</strong>
+			{/snippet}
+			{#snippet trail()}
+				<a
+					class="btn btn-sm preset-tonal-surface border border-surface-500"
+					href="https://discord.gg/EXqV7W8MtY"
+					target="_blank"
+					rel="noreferrer"
+				>
+					Discord
+				</a>
+				<a
+					class="btn btn-sm preset-tonal-surface border border-surface-500"
+					href="https://twitter.com/SkeletonUI"
+					target="_blank"
+					rel="noreferrer"
+				>
+					Twitter
+				</a>
+				<a
+					class="btn btn-sm preset-tonal-surface border border-surface-500"
+					href="https://github.com/skeletonlabs/skeleton"
+					target="_blank"
+					rel="noreferrer"
+				>
+					GitHub
+				</a>
+			{/snippet}
+		</AppBar>
+	</header>
 	{@render children?.()}
-</AppShell>
+</div>

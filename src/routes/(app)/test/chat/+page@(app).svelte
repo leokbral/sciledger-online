@@ -15,7 +15,7 @@
 		color: string;
 	}
 
-	let elemChat: HTMLElement = $state();
+	let elemChat: HTMLElement | undefined = $state();
 	const lorem = faker.lorem.paragraph();
 
 	// Messages
@@ -63,6 +63,7 @@
 	// For some reason, eslint thinks ScrollBehavior is undefined...
 	// eslint-disable-next-line no-undef
 	function scrollChatBottom(behavior?: ScrollBehavior): void {
+		if (!elemChat) return;
 		elemChat.scrollTo({ top: elemChat.scrollHeight, behavior });
 	}
 
@@ -109,7 +110,7 @@
 				{#each messageFeed as bubble}
 					{#if bubble.host === true}
 						<div class="grid grid-cols-[auto_1fr] gap-2">
-							<Avatar src="https://i.pravatar.cc/?img={bubble.avatar}" width="w-12" />
+							<Avatar src="https://i.pravatar.cc/?img={bubble.avatar}" name={bubble.name} size="w-12" />
 							<div class="card p-4 preset-tonal rounded-tl-none space-y-2">
 								<header class="flex justify-between items-center">
 									<p class="font-bold">{bubble.name}</p>
@@ -127,7 +128,7 @@
 								</header>
 								<p>{bubble.message}</p>
 							</div>
-							<Avatar src="https://i.pravatar.cc/?img={bubble.avatar}" width="w-12" />
+							<Avatar src="https://i.pravatar.cc/?img={bubble.avatar}" name={bubble.name} size="w-12" />
 						</div>
 					{/if}
 				{/each}

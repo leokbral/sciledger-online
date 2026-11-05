@@ -1,5 +1,7 @@
 <script lang="ts">
-	let { data, form } = $props();
+	import type { ActionData, PageData } from './$types';
+
+	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	const categoryLabels: Record<string, string> = {
 		lack_of_time: 'I do not have enough time right now',
@@ -42,7 +44,7 @@
 					<label for="category" class="label">Reason</label>
 					<select id="category" name="category" class="input mt-1" required>
 						<option value="" disabled selected>Select a reason</option>
-						{#each data.categories as category}
+						{#each data.categories ?? [] as category}
 							<option value={category}>{categoryLabels[category] || category}</option>
 						{/each}
 					</select>

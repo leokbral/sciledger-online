@@ -8,7 +8,7 @@
 	}
 
 	let { videoSource, items }: Props = $props();
-	let innerWidth: number = $state();
+	let innerWidth: number | undefined = $state();
 
 	const dispatch = createEventDispatcher();
 

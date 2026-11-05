@@ -60,7 +60,7 @@ export type Paper = {
         assignedReviewers: Array<User | string>;
         responses: Array<{
 			_id: string;
-            reviewerId: User;
+            reviewerId: User | string;
             status: 'pending' | 'accepted' | 'declined' | 'completed';
             responseDate?: Date;
             assignedAt?: Date;
@@ -86,6 +86,7 @@ export type Paper = {
      }; */
     createdAt: Date;
     updatedAt: Date;
+    statusChangedToCorrectionsAt?: Date | string;
     statusHistory?: Array<{
         action: string;
         permissionKey?: string;

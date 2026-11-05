@@ -33,7 +33,7 @@
 		}
 	});
 
-	let elemChat: HTMLElement = $state();
+	let elemChat: HTMLElement | undefined = $state();
 
 	interface Props {
 		data: any;
@@ -52,6 +52,7 @@
 	let currentMessage: string = $state(messageFeed?.currentMessage ?? '');
 
 	function scrollChatBottom(behavior?: ScrollBehavior): void {
+		if (!elemChat) return;
 		elemChat.scrollTo({ top: elemChat.scrollHeight, behavior });
 	}
 
@@ -100,7 +101,7 @@
 			{#each messageFeed.messages as bubble}
 				{#if bubble.sender.id === currentUser.id}
 					<div class="grid grid-cols-[auto_1fr] gap-2">
-						<Avatar src={bubble.sender.profilePictureUrl} width="w-12" />
+						<Avatar src={bubble.sender.profilePictureUrl} name={bubble.sender.username} size="w-12" />
 						<div class="card p-4 preset-tonal rounded-tl-none space-y-2">
 							<header class="flex justify-between items-center">
 								<p class="font-bold">{bubble.sender.username}</p>
@@ -118,7 +119,7 @@
 							</header>
 							<p>{bubble.message}</p>
 						</div>
-						<Avatar src={bubble.sender.profilePictureUrl} width="w-12" />
+						<Avatar src={bubble.sender.profilePictureUrl} name={bubble.sender.username} size="w-12" />
 					</div>
 				{/if}
 			{/each}

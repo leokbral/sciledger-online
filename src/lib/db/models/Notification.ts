@@ -22,7 +22,8 @@ if (cachedNotificationModel) {
 		!cachedNotificationModel.schema.path('idempotencyKey') ||
 		!enumValues.includes('hub_invitation') ||
 		!enumValues.includes('review_request') ||
-		!enumValues.includes('hub_reviewer_accepted');
+		!enumValues.includes('hub_reviewer_accepted') ||
+		!enumValues.includes('paper_needs_corrections');
 
 	if (isOutdatedSchema) {
 		mongoose.deleteModel('Notification');

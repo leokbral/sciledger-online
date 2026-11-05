@@ -1,10 +1,7 @@
 <script lang="ts">
 	import { preventDefault } from 'svelte/legacy';
 
-	import { FileUpload } from '@skeletonlabs/skeleton-svelte';
-
 	let file: File | null = null;
-	let files: FileList = $state();
 
 	// Campos do formulário
 	let title = $state('');
@@ -21,9 +18,6 @@
 			file = target.files[0];
 		}
 	};
-
-	function onChangeHandler(e: Event): void {
-	}
 
 	const uploadFile = async () => {
 		if (file) {
@@ -96,8 +90,6 @@
 		<label for="file">PDF File:</label>
 		<input type="file" id="file" accept=".pdf" onchange={handleFileChange} />
 	</div>
-
-	<FileUpload name="files" bind:files on:change={onChangeHandler}>Upload</FileUpload>
 
 	<button type="submit" class="btn preset-filled-primary-500">Submit Article</button>
 </form>

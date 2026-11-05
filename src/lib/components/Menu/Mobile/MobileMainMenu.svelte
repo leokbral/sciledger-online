@@ -7,8 +7,7 @@
 	import type { Menuitem } from '../types';
 	import MobileMenuItemCard from './MobileMenuItemCard.svelte';
 
-	let innerWidth: number = $state();
-	let w: number;
+	let w = 0;
 
 
 	interface Props {
@@ -23,11 +22,11 @@
 	let touchstartX = 0;
 	let touchendX = 0;
 
-	let menuContainer: HTMLDivElement = $state();
+	let menuContainer: HTMLDivElement | undefined = $state();
 
 	const btnHdl = (i: number) => {
 		selected = i;
-		menuContainer.scroll(selected * w, 0);
+		menuContainer?.scroll(selected * w, 0);
 	};
 
 	function checkDirection() {
@@ -52,6 +51,7 @@
 	}
 
 	function multiColumnLeft(): void {
+		if (!menuContainer) return;
 		let x = menuContainer.scrollLeft;
 		if (isOk2Sub()) {
 			// x = menuContainer.scrollLeft - 88;
@@ -61,6 +61,7 @@
 	}
 
 	function multiColumnRight(): void {
+		if (!menuContainer) return;
 		let x = menuContainer.scrollLeft; //0;
 		// -1 is used because different browsers use different methods to round scrollWidth pixels.
 		if (isOk2Add()) {
@@ -71,10 +72,11 @@
 	}
 
 	function setScrollX(selected: number): void {
-		menuContainer.scroll(267 * selected, 0);
+		menuContainer?.scroll(267 * selected, 0);
 	}
 
 	function isOk2Add() {
+		if (!menuContainer || w <= 0) return false;
 		return (
 			// menuContainer.scrollLeft / 80 <= selected &&
 			menuContainer.scrollLeft / w <= selected &&
@@ -86,6 +88,7 @@
 	}
 
 	function isOk2Sub() {
+		if (!menuContainer || w <= 0) return false;
 		return (
 			0 < selected &&
 			selected <= len - 1 &&
@@ -103,12 +106,11 @@
 	} */
 
 	onMount(() => {
+		w = window.innerWidth * 0.83;
 		setScrollX(selected);
-		w = innerWidth * 0.83;
 	});
 </script>
 
-<svelte:window bind:innerWidth />
 <div
 	ontouchstart={handleTouchStart}
 	ontouchend={handleTouchEnd}

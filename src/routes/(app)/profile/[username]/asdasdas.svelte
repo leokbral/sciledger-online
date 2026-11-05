@@ -130,7 +130,7 @@ profilePictureUrl}
 					class="rounded-full absolute"
 					style="width: {imageSize}%; height: {imageSize}%; object-fit: cover; left: {imagePositionX}%; top: {imagePositionY}%;"
 				/> -->
-				<Avatar src={profilePictureUrl} width="w-32" />
+				<Avatar src={profilePictureUrl} name={user?.firstName ?? ''} size="w-32" />
 			</div>
 
 			<div>

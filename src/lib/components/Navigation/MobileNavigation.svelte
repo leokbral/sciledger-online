@@ -1,15 +1,13 @@
 <script lang="ts">
-	import { Tabs } from '@skeletonlabs/skeleton-svelte';
-
-	const items = data.items;
 	interface Props {
 		data: any;
 		pathname: string;
 	}
 
 	let { data, pathname }: Props = $props();
+	const items = data.items;
 
-	let tabContainer: HTMLDivElement = $state();
+	let tabContainer: HTMLDivElement | undefined = $state();
 
 	let isInEnd: boolean = $state(false);
 	const scrollToEnd = () => {
@@ -37,20 +35,20 @@
 
 <!-- <button on:click={scrollToNextTab}>Rolar para Próxima Tab</button> -->
 <div class="grid grid-cols-[1fr_auto]">
-	<Tabs class="grid grid-cols-1 gap-0 items-center p-0">
-		<div bind:this={tabContainer} class="tab-container flex">
-			{#each items as item, i}
-				<Tabs.Control
-					href="./{item.name}"
-					selected={lastPathitem === item.name}
-					class="text-3xl tab-anchor px-3.5!"
-					id={`tabAnchor-${i}`}
-				>
-					{item.icon}
-				</Tabs.Control>
-			{/each}
-		</div>
-	</Tabs>
+	<div bind:this={tabContainer} class="tab-container flex">
+		{#each items as item, i}
+			<a
+				href="./{item.name}"
+				aria-current={lastPathitem === item.name ? 'page' : undefined}
+				class="text-3xl tab-anchor px-3.5! {lastPathitem === item.name
+					? 'text-primary-500 font-semibold'
+					: ''}"
+				id={`tabAnchor-${i}`}
+			>
+				{item.icon}
+			</a>
+		{/each}
+	</div>
 	{#if isInEnd}
 		<button
 			type="button"

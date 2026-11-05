@@ -1,4 +1,4 @@
-import type { RequestHandler } from '../$types';
+import type { RequestHandler } from './$types';
 import { json } from '@sveltejs/kit';
 //import * as crypto from 'crypto';
 //import Users from '$lib/db/models/User';

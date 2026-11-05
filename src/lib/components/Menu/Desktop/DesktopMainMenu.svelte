@@ -11,11 +11,11 @@
 
 	let { selected = $bindable(), items, children }: Props = $props();
 
-	let menuContainer: HTMLDivElement = $state();
+	let menuContainer: HTMLDivElement | undefined = $state();
 
 	const btnHdl = (i: number) => {
 		selected = i;
-		menuContainer.scroll(0, (selected - 1) * 124);
+		menuContainer?.scroll(0, (selected - 1) * 124);
 	};
 </script>
 

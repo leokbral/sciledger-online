@@ -10,12 +10,12 @@
 
 	let { items, selected }: Props = $props();
 
-	let innerWidth: number = $state();
+	let innerWidth: number | undefined = $state();
 </script>
 
 <svelte:window bind:innerWidth />
 
-{#if innerWidth > 768}
+{#if (innerWidth ?? 0) > 768}
 	<DesktopMainMenu {items} {selected} />
 {:else}
 	<MobileMainMenu {items} {selected} />

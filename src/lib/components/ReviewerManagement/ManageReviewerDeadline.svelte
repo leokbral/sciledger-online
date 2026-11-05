@@ -18,7 +18,7 @@
 	let loading = $state(false);
 
 	// Calcular dias restantes se houver deadline atual
-	let daysRemaining = $derived(() => {
+	let daysRemaining = $derived.by(() => {
 		if (!currentDeadline) return null;
 		const now = new Date();
 		const deadline = new Date(currentDeadline);
@@ -107,11 +107,11 @@
 				   <div class="mb-5 p-4 rounded-xl bg-gradient-to-r from-blue-100/80 to-blue-200/60 dark:from-blue-900/40 dark:to-blue-800/30 border border-blue-200 dark:border-blue-800 flex flex-col gap-1">
 					   <div class="text-xs font-semibold text-blue-700 dark:text-blue-200 uppercase tracking-wide">Current Deadline</div>
 					   <div class="text-lg font-bold text-blue-900 dark:text-blue-100">{new Date(currentDeadline).toLocaleDateString()}</div>
-					   {#if daysRemaining() !== null}
+					   {#if daysRemaining !== null}
 						   <div class="text-xs text-blue-700 dark:text-blue-200">
-							   {daysRemaining() > 0 
-								   ? `${daysRemaining()} days remaining` 
-								   : `${Math.abs(daysRemaining())} days overdue`}
+							   {daysRemaining > 0
+								   ? `${daysRemaining} days remaining`
+								   : `${Math.abs(daysRemaining)} days overdue`}
 						   </div>
 					   {/if}
 				   </div>

@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 import { InvitationSchema } from '../schemas/Invitation';
 
 
-export interface IInvitation extends Invitation, mongoose.Document {}
+export interface IInvitation extends Invitation {}
 
 const cachedInvitationModel = mongoose.models.Invitation as mongoose.Model<IInvitation> | undefined;
 

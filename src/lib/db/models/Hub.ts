@@ -2,8 +2,8 @@ import mongoose from "mongoose";
 import { HubSchema } from "../schemas/HubSchema";
 import type { Hub } from "$lib/types/Hub";
 
-export interface IHub extends Hub, Document {
-    pdfId: ObjectId | undefined;
+export interface IHub extends Hub {
+    pdfId?: mongoose.Types.ObjectId;
 }
 
 const cachedHubModel = mongoose.models.Hub as mongoose.Model<IHub> | undefined;

@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { Tab, Tabs } from '@skeletonlabs/skeleton-svelte';
 	import MyPapers from '$lib/MyPapers.svelte';
 	import AuthorDashboard from '$lib/AuthorDashboard.svelte';
 	import ReviewerDashboard from '$lib/ReviewDashboard.svelte';

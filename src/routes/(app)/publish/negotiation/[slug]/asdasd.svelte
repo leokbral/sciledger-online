@@ -4,14 +4,16 @@
 	import { post } from '$lib/utils/index.js';
 	import type { Paper } from '$lib/types/Paper';
 	import type { PaperPublishStoreData } from '$lib/types/PaperPublishStoreData';
-	import type { PageData } from './$types';
 	import PaperPreview from '$lib/PaperList/PaperPreview.svelte';
 	import { page } from '$app/stores';
 	import AvailableReviewers from '$lib/AvailableReviewers.svelte';
 	import type { User } from '$lib/types/User';
 
 	interface Props {
-		data: PageData;
+		data: {
+			paper: Paper;
+			users: User[];
+		};
 	}
 
 	let { data }: Props = $props();

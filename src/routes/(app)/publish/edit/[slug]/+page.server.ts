@@ -11,24 +11,34 @@ interface ObjectId {
 }
 
 // Função de sanitização
-function sanitize(obj: unknown): unknown {
+type Sanitized<T> = T extends Date
+	? string
+	: T extends { toHexString(): string }
+		? string
+		: T extends readonly (infer U)[]
+			? Sanitized<U>[]
+			: T extends object
+				? { [K in keyof T]: Sanitized<T[K]> }
+				: T;
+
+function sanitize<T>(obj: T): Sanitized<T> {
 	if (obj === null || obj === undefined) {
-		return obj;
+		return obj as Sanitized<T>;
 	}
 	
 	if (Array.isArray(obj)) {
-		return obj.map(sanitize);
+		return obj.map((item) => sanitize(item)) as Sanitized<T>;
 	}
 	
 	if (obj && typeof obj === 'object') {
 		// Handle MongoDB ObjectId
 		if (obj.constructor?.name === 'ObjectId' && typeof (obj as ObjectId).toString === 'function') {
-			return (obj as ObjectId).toString();
+			return (obj as ObjectId).toString() as Sanitized<T>;
 		}
 		
 		// Handle Date objects
 		if (obj instanceof Date) {
-			return obj.toISOString();
+			return obj.toISOString() as Sanitized<T>;
 		}
 		
 		// Handle regular objects
@@ -39,10 +49,10 @@ function sanitize(obj: unknown): unknown {
 				clean[key] = sanitize(value);
 			}
 		}
-		return clean;
+		return clean as Sanitized<T>;
 	}
 	
-	return obj;
+	return obj as Sanitized<T>;
 }
 
 /**
@@ -91,7 +101,7 @@ export async function load({ locals, params }) {
 	return {
 		paper: sanitize(paperDoc),
 		users: sanitize(usersDoc),
-		knownAffiliations: sanitize(knownAffiliations)
+		knownAffiliations
 	};
 }
 

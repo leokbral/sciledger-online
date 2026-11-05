@@ -273,7 +273,7 @@
 	<div class="my-4">
 		<CorrectionProgressBar 
 			{paper} 
-			currentUser={user} 
+			currentUser={user ?? undefined}
 			showDetails={false} 
 			size="sm" 
 		/>

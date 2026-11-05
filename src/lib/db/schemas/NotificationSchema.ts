@@ -35,7 +35,13 @@ export const NotificationSchema: Schema = new Schema(
 				'paper_final_rejection',
 				'hub_reviewer_accepted',
 				'hub_reviewer_declined',
-				'invitation_cancelled'
+				'invitation_cancelled',
+				'reviewer_accepted_assignment',
+				'reviewer_declined_assignment',
+				'paper_status_changed',
+				'paper_phase_changed',
+				'all_reviews_completed',
+				'paper_needs_corrections'
 			],
 			required: true
 		},

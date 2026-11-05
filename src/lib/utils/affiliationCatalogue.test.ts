@@ -15,17 +15,18 @@ import {
 	normalizeAffiliationSnapshot,
 	normalizeAuthorSnapshots
 } from './paperAuthorAffiliations';
+import type { PaperAuthorAffiliationSnapshot } from './paperAuthorAffiliations';
 
 const UFRN = { organization: 'Universidade Federal do Rio Grande do Norte' };
 const IMD = { organization: 'Instituto Metrópole Digital' };
 const LAB = { organization: 'Laboratório X' };
 
-const author = (id: string, affiliations: unknown[] = []) => ({
+const author = (id: string, affiliations: PaperAuthorAffiliationSnapshot[] = []) => ({
 	userId: id, username: `@${id}`, name: id, affiliations
 });
 
 /** What the editor derives: the catalogue is assembled from the selected authors. */
-const catalogue = (authors: any[], extra: unknown[] = []) =>
+const catalogue = (authors: any[], extra: PaperAuthorAffiliationSnapshot[] = []) =>
 	collectReusableAffiliations([
 		...normalizeAuthorSnapshots(authors).flatMap((a) => a.affiliations ?? []),
 		...extra
@@ -64,7 +65,7 @@ describe('catalogue: the institutions this submission may draw on', () => {
 			organization: 'Universidade Nova', department: 'Departamento de Pesquisa',
 			city: 'Natal', country: 'Brasil'
 		});
-		const entries = catalogue([author('ada', [UFRN])], [typed]);
+		const entries = catalogue([author('ada', [UFRN])], typed ? [typed] : []);
 		expect(entries.map((e) => e.affiliation.organization)).toContain('Universidade Nova');
 		expect(entries.find((e) => e.affiliation.organization === 'Universidade Nova')!.displayName)
 			.toContain('Departamento de Pesquisa');
@@ -112,7 +113,8 @@ describe('catalogue: the institutions this submission may draw on', () => {
 });
 
 describe('association: which catalogue entries an author uses, in order', () => {
-	const assign = (affiliations: unknown[]) => normalizeAuthorSnapshots([author('ada', affiliations)])[0];
+	const assign = (affiliations: PaperAuthorAffiliationSnapshot[]) =>
+		normalizeAuthorSnapshots([author('ada', affiliations)])[0];
 
 	it('records one, two or three affiliations for an author', () => {
 		for (const list of [[UFRN], [UFRN, IMD], [UFRN, IMD, LAB]]) {

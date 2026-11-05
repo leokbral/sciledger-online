@@ -27,7 +27,13 @@ export type NotificationType =
 	| 'review_submitted'
 	| 'corrections_submitted'
 	| 'paper_final_acceptance'
-	| 'paper_final_rejection';
+	| 'paper_final_rejection'
+	| 'reviewer_accepted_assignment'
+	| 'reviewer_declined_assignment'
+	| 'paper_status_changed'
+	| 'paper_phase_changed'
+	| 'all_reviews_completed'
+	| 'paper_needs_corrections';
 
 export type NotificationPriority = 'low' | 'medium' | 'high' | 'urgent';
 

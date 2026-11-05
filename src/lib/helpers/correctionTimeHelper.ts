@@ -1,6 +1,26 @@
 import type { Paper } from '$lib/types/Paper';
 import type { User } from '$lib/types/User';
-import { getCurrentPhase, getPhaseInfo, type ReviewPhase } from '$lib/types/ReviewPhases';
+import { getCurrentPhase, getPhaseInfo, ReviewPhase } from '$lib/types/ReviewPhases';
+
+export interface CorrectionTimeInfo {
+    hasDeadline: boolean;
+    daysRemaining: number | null;
+    hoursRemaining: number | null;
+    isOverdue: boolean;
+    deadlineDate: Date | null;
+    correctionStartDate?: Date | null;
+    totalDays?: number | null;
+    correctionType?: 'author' | 'reviewer' | null;
+    phase?: ReviewPhase | null;
+    phaseStartDate?: Date | null;
+    phaseName?: string | null;
+    phaseDescription?: string | null;
+    isCustomDeadline?: boolean;
+}
+
+function getReviewerId(reviewer: User | string): string {
+    return typeof reviewer === 'string' ? reviewer : reviewer._id || reviewer.id;
+}
 
 /**
  * Calculates the remaining time for correction process (15 days from the appropriate start point)
@@ -15,7 +35,7 @@ export function getCorrectionTimeRemaining(
     userRole?: 'author' | 'reviewer', 
     userId?: string,
     reviewAssignments?: any[]
-) {
+): CorrectionTimeInfo {
     const CORRECTION_DEADLINE_DAYS = 15;
     
     // If we have a custom ReviewAssignment for this reviewer/paper, use its deadline
@@ -68,7 +88,7 @@ export function getCorrectionTimeRemaining(
         // For reviewers: INDIVIDUAL 15 days from when THEY accepted the correction task
         correctionType = 'reviewer';
         const reviewerResponse = paper.peer_review.responses.find(
-            response => response.reviewerId._id === userId || response.reviewerId.id === userId
+            response => getReviewerId(response.reviewerId) === userId
         );
         
         // Use the reviewer's individual acceptance date (responseDate when they accepted)
@@ -95,7 +115,7 @@ export function getCorrectionTimeRemaining(
         if (userRole === 'reviewer' && userId) {
             correctionType = 'reviewer';
             const reviewerResponse = paper.peer_review.responses.find(
-                response => response.reviewerId._id === userId || response.reviewerId.id === userId
+                response => getReviewerId(response.reviewerId) === userId
             );
             
             if (reviewerResponse && reviewerResponse.status === 'accepted' && reviewerResponse.responseDate) {
@@ -186,9 +206,9 @@ export function getCorrectionTimeRemainingAuto(paper: Paper, currentUser?: User,
         const isMainAuthor = paper.mainAuthor && (paper.mainAuthor._id === userId || paper.mainAuthor.id === userId);
         const isCoAuthor = paper.coAuthors?.some(author => author._id === userId || author.id === userId);
         const isAuthor = isMainAuthor || isCoAuthor;
-        const isReviewerInReviewers = paper.reviewers?.some(reviewer => reviewer._id === userId || reviewer.id === userId);
+        const isReviewerInReviewers = paper.reviewers?.some(reviewer => getReviewerId(reviewer) === userId);
         const isReviewerInResponses = paper.peer_review?.responses?.some(response => 
-            response.reviewerId._id === userId || response.reviewerId.id === userId
+            getReviewerId(response.reviewerId) === userId
         );
         const isReviewer = isReviewerInReviewers || isReviewerInResponses;
         let userRole: 'author' | 'reviewer' | undefined;
@@ -214,7 +234,7 @@ export function getCorrectionTimeRemainingAuto(paper: Paper, currentUser?: User,
  * @param timeInfo - Time information returned by getCorrectionTimeRemaining
  * @returns Formatted string for display
  */
-export function formatCorrectionTimeRemaining(timeInfo: ReturnType<typeof getCorrectionTimeRemaining>): string {
+export function formatCorrectionTimeRemaining(timeInfo: CorrectionTimeInfo): string {
     if (!timeInfo.hasDeadline || timeInfo.daysRemaining === null || timeInfo.hoursRemaining === null) {
         return '';
     }
@@ -243,7 +263,7 @@ export function formatCorrectionTimeRemaining(timeInfo: ReturnType<typeof getCor
  * @param timeInfo - Time information returned by getCorrectionTimeRemaining
  * @returns String with CSS classes
  */
-export function getCorrectionTimeClass(timeInfo: ReturnType<typeof getCorrectionTimeRemaining>): string {
+export function getCorrectionTimeClass(timeInfo: CorrectionTimeInfo): string {
     if (!timeInfo.hasDeadline || timeInfo.daysRemaining === null) {
         return '';
     }
@@ -266,7 +286,7 @@ export function getCorrectionTimeClass(timeInfo: ReturnType<typeof getCorrection
  * @param timeInfo - Time information returned by getCorrectionTimeRemaining
  * @returns Progress percentage (0-100)
  */
-export function getCorrectionProgressPercentage(timeInfo: ReturnType<typeof getCorrectionTimeRemaining>): number {
+export function getCorrectionProgressPercentage(timeInfo: CorrectionTimeInfo): number {
     if (!timeInfo.hasDeadline || !timeInfo.correctionStartDate || !timeInfo.deadlineDate) {
         return 0;
     }
@@ -286,7 +306,7 @@ export function getCorrectionProgressPercentage(timeInfo: ReturnType<typeof getC
  * @param reviewAssignments - Optional array of ReviewAssignment objects to use custom deadlines
  * @returns Informações sobre o prazo da fase atual
  */
-export function getPhaseBasedTimeRemaining(paper: Paper, currentUser?: User, reviewAssignments?: any[]) {
+export function getPhaseBasedTimeRemaining(paper: Paper, currentUser?: User, reviewAssignments?: any[]): CorrectionTimeInfo {
     const currentPhase = getCurrentPhase(paper.status);
     
     if (!currentPhase) {
@@ -298,6 +318,9 @@ export function getPhaseBasedTimeRemaining(paper: Paper, currentUser?: User, rev
             isOverdue: false,
             deadlineDate: null,
             phaseStartDate: null,
+            correctionStartDate: null,
+            correctionType: null,
+            totalDays: null,
             phaseName: null,
             phaseDescription: null
         };
@@ -334,6 +357,8 @@ export function getPhaseBasedTimeRemaining(paper: Paper, currentUser?: User, rev
         isOverdue,
         deadlineDate,
         phaseStartDate: startDate,
+        correctionStartDate: startDate,
+        correctionType: currentPhase === ReviewPhase.PHASE_2_AUTHOR_CORRECTIONS ? 'author' : 'reviewer',
         phaseName: phaseInfo.name,
         phaseDescription: phaseInfo.description,
         totalDays: phaseInfo.duration
@@ -408,7 +433,7 @@ export function getReviewerSpecificDeadline(paper: Paper, reviewerId: string) {
     }
     
     const reviewerResponse = paper.peer_review.responses.find(
-        response => response.reviewerId._id === reviewerId || response.reviewerId.id === reviewerId
+        response => getReviewerId(response.reviewerId) === reviewerId
     );
     
     if (!reviewerResponse || reviewerResponse.status !== 'accepted' || !reviewerResponse.responseDate) {
@@ -439,7 +464,7 @@ export function getReviewerSpecificDeadline(paper: Paper, reviewerId: string) {
  * @param timeInfo - Time information returned by getCorrectionTimeRemaining
  * @returns Enhanced time description object
  */
-export function getEnhancedTimeDescription(timeInfo: ReturnType<typeof getCorrectionTimeRemaining>) {
+export function getEnhancedTimeDescription(timeInfo: CorrectionTimeInfo) {
     if (!timeInfo.hasDeadline || timeInfo.daysRemaining === null || timeInfo.hoursRemaining === null) {
         return null;
     }

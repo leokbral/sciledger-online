@@ -1,6 +1,4 @@
-import type { UserProfile } from "$lib/types/UserProfile";
-
-const userProfiles: UserProfile[] = [
+const userProfiles = [
     {
         id: "AliceJohnson",
         name: "Alice Johnson",

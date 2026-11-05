@@ -1,11 +1,40 @@
 import { MongoClient } from 'mongodb';
 import { MONGO_URL } from '$env/static/private';
+import { error } from '@sveltejs/kit';
 import Papers from '$lib/db/models/Paper';
 import Users from '$lib/db/models/User';
+import type { Paper } from '$lib/types/Paper';
+import type { User } from '$lib/types/User';
 // import { fsFiles } from '$lib/db/fs';
 
 
 const client = new MongoClient(MONGO_URL);
+
+type ViewUser = Pick<User, 'id' | 'firstName' | 'lastName' | 'username'> & {
+    profilePictureUrl?: string;
+};
+
+type ViewPaper = Omit<
+    Paper,
+    '_id' | 'mainAuthor' | 'correspondingAuthor' | 'coAuthors' | 'reviewers'
+> & {
+    mainAuthor: ViewUser | null;
+    correspondingAuthor: ViewUser | null;
+    coAuthors: ViewUser[];
+    reviewers: ViewUser[];
+};
+
+function toViewUser(user: Partial<User> | null): ViewUser | null {
+    if (!user) return null;
+
+    return {
+        id: String(user.id ?? user._id ?? ''),
+        firstName: user.firstName ?? '',
+        lastName: user.lastName ?? '',
+        username: user.username ?? '',
+        profilePictureUrl: user.profilePictureUrl
+    };
+}
 
 export async function load() {
 
@@ -15,23 +44,29 @@ export async function load() {
     // const publicationCollection = db.collection('papers');
     //; const Users = db.collection('users'); // Coleção de usuários
 
-    const fetchPaper = async () => {
-        const papers = await Papers.find({}, { _id: 0 }).lean().exec();
+    const fetchPaper = async (): Promise<ViewPaper> => {
+        const papers = (await Papers.find({}, { _id: 0 }).lean().exec()) as Array<Omit<Paper, '_id'>>;
+        const paper = papers[0];
+        if (!paper) throw error(404, 'Paper not found');
         // Buscando o artigo na coleção de publicações
 
         // Buscando informações dos autores, coautores e revisores
-        const mainAuthor = await Users.findOne({ id: papers[0].mainAuthor });
-        const correspondingAuthor = await Users.findOne({ id: papers[0].correspondingAuthor });
-        const coAuthors = await Users.find({ id: { $in: papers[0].coAuthors } }).lean().exec();
-        const reviewers = await Users.find({ id: { $in: papers[0].reviewers } }).lean().exec();
+        const mainAuthor = toViewUser(await Users.findOne({ id: paper.mainAuthor }));
+        const correspondingAuthor = toViewUser(await Users.findOne({ id: paper.correspondingAuthor }));
+        const coAuthors = (await Users.find({ id: { $in: paper.coAuthors } }).lean().exec())
+            .map((user) => toViewUser(user))
+            .filter((user): user is ViewUser => user !== null);
+        const reviewers = (await Users.find({ id: { $in: paper.reviewers } }).lean().exec())
+            .map((user) => toViewUser(user))
+            .filter((user): user is ViewUser => user !== null);
 
         // Incluindo as informações dos autores no artigo
-        const paperWithAuthors = {
-            ...papers[0],
-            mainAuthor: mainAuthor || null,
-            correspondingAuthor: correspondingAuthor || null,
-            coAuthors: coAuthors || [],
-            reviewers: reviewers || []
+        const paperWithAuthors: ViewPaper = {
+            ...paper,
+            mainAuthor,
+            correspondingAuthor,
+            coAuthors,
+            reviewers
         };
         return paperWithAuthors;
     }
@@ -59,5 +94,3 @@ export async function load() {
         pdf: await fecthPDF() */
     };
 };
-
-

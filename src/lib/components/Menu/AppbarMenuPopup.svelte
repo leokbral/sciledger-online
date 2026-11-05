@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { getCurrentDate, getDifference } from '$lib/utils/streak';
 	import Profile from '../Profile/Profile.svelte';
 	import MenuHighlights from './MenuHighlights.svelte';
 	// import MenuEmphasis from './MenuHighlights.svelte';
@@ -10,9 +9,9 @@
 
 	let { data }: Props = $props();
 
-	let lastStreakCheckpointDate: string = data.profile.lastStreakCheckpointDate;
-	let currentDate: string = getCurrentDate();
-	let isInactive: boolean = getDifference(currentDate, lastStreakCheckpointDate) !== 0;
+	const currentDate = new Date().toISOString().slice(0, 10);
+	const lastStreakCheckpointDate = String(data.profile.lastStreakCheckpointDate ?? '');
+	const isInactive = currentDate !== lastStreakCheckpointDate.slice(0, 10);
 	const highlights = [
 		{ icon: '🔥', value: data.profile.streakCount, isInactive },
 		{ icon: '💎', value: data.profile.points },

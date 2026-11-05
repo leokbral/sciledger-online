@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 
-	let message = 'This invitation is no longer valid.';
+	let message = $state('This invitation is no longer valid.');
 
 	$effect(() => {
 		const reason = $page.url.searchParams.get('reason');

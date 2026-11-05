@@ -1,12 +1,10 @@
 import { db } from '$lib/db/mongo';
 import crypto from 'crypto';
+import type { NotificationType } from '$lib/types/Notification';
 
 export interface CreateNotificationParams {
     userId: string;
-    type: 'invitation' | 'comment' | 'connection_request' | 'paper_accepted' | 'paper_rejected' | 
-          'paper_pending_review' | 'paper_submitted' | 'hub_invitation' | 'review_request' | 
-          'review_completed' | 'system' | 'follow' | 'mention' | 'paper_published' | 
-          'hub_paper_pending' | 'standalone_paper_pending';
+    type: NotificationType;
     title: string;
     content: string;
     relatedUser?: string;
@@ -157,5 +155,41 @@ export const NotificationTemplates = {
         title: 'Paper Accepted for Review',
         content: `Your paper "${paperTitle}" has been accepted for review by ${acceptedBy}. The review process will begin soon.`,
         priority: 'medium' as const
+    }),
+
+    reviewerAcceptedAssignment: (paperTitle: string, reviewerName: string) => ({
+        title: 'Reviewer Accepted Assignment',
+        content: `${reviewerName} accepted the review assignment for "${paperTitle}".`,
+        priority: 'medium' as const
+    }),
+
+    reviewerDeclinedAssignment: (paperTitle: string, reviewerName: string) => ({
+        title: 'Reviewer Declined Assignment',
+        content: `${reviewerName} declined the review assignment for "${paperTitle}".`,
+        priority: 'medium' as const
+    }),
+
+    paperStatusChanged: (paperTitle: string, oldStatus: string, newStatus: string) => ({
+        title: 'Paper Status Changed',
+        content: `The status of "${paperTitle}" changed from ${oldStatus} to ${newStatus}.`,
+        priority: 'medium' as const
+    }),
+
+    paperPhaseChanged: (paperTitle: string, phase: string) => ({
+        title: 'Paper Phase Changed',
+        content: `"${paperTitle}" moved to the ${phase} phase.`,
+        priority: 'medium' as const
+    }),
+
+    allReviewsCompleted: (paperTitle: string, reviewCount: number) => ({
+        title: 'All Reviews Completed',
+        content: `All ${reviewCount} review${reviewCount === 1 ? '' : 's'} for "${paperTitle}" have been completed.`,
+        priority: 'high' as const
+    }),
+
+    paperNeedsCorrections: (paperTitle: string, correctionCount: number) => ({
+        title: 'Paper Needs Corrections',
+        content: `"${paperTitle}" requires ${correctionCount} correction${correctionCount === 1 ? '' : 's'}.`,
+        priority: 'high' as const
     })
 };

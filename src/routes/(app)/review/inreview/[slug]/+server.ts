@@ -4,6 +4,7 @@ import { start_mongo } from '$lib/db/mongooseConnection';
 import '$lib/db/models/User';
 import '$lib/db/models/MessageFeed';
 import Papers from '$lib/db/models/Paper';
+import type { Paper } from '$lib/types/Paper';
 
 import MessageFeeds from '$lib/db/models/MessageFeed';
 import { authorize } from '$lib/server/authorization/authorizationService';
@@ -85,16 +86,21 @@ export const PATCH: RequestHandler = async ({ request, params, locals }) => {
         }
 
         // Atualiza a resposta do revisor para 'completed'
-        const responses = paper.peer_review?.responses?.map((resp) => {
-            if (resp.reviewerId === reviewerId) {
+        type ReviewerResponse = NonNullable<Paper['peer_review']>['responses'][number];
+        const responses = paper.peer_review?.responses?.map((resp: ReviewerResponse) => {
+            const responseReviewerId =
+                typeof resp.reviewerId === 'string'
+                    ? resp.reviewerId
+                    : resp.reviewerId._id || resp.reviewerId.id;
+            if (responseReviewerId === reviewerId) {
                 return { ...resp, status: 'completed', completedAt: new Date() };
             }
             return resp;
         }) ?? [];
 
         // Verifica se todos os revisores que ACEITARAM completaram
-        const acceptedReviewers = responses.filter(r => r.status === 'accepted' || r.status === 'completed');
-        const completedReviewers = responses.filter(r => r.status === 'completed');
+        const acceptedReviewers = responses.filter((r: ReviewerResponse) => r.status === 'accepted' || r.status === 'completed');
+        const completedReviewers = responses.filter((r: ReviewerResponse) => r.status === 'completed');
         const allAcceptedCompleted = acceptedReviewers.length > 0 && acceptedReviewers.length === completedReviewers.length;
 
         const updatedPaper = await Papers.findOneAndUpdate(
