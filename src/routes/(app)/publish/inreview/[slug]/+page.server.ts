@@ -124,6 +124,10 @@ export async function load({ locals, params }) {
 		throw redirect(302, `/review/inreview/${params.slug}`);
 	}
 
+	if (paperDoc.status === 'needing corrections' || paperDoc.status === 'under correction') {
+		throw redirect(302, `/publish/corrections/${params.slug}`);
+	}
+
 	// Normalizar peer_review
 	const peer_review = paperDoc.peer_review
 		? {

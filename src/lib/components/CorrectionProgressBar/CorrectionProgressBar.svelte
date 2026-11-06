@@ -10,9 +10,10 @@
         showDetails?: boolean;
         size?: 'sm' | 'md' | 'lg';
         reviewAssignments?: any[];
+        tone?: 'default' | 'neutral';
     }
     
-    let { paper, currentUser, showDetails = true, size = 'md', reviewAssignments }: Props = $props();
+    let { paper, currentUser, showDetails = true, size = 'md', reviewAssignments, tone = 'default' }: Props = $props();
     
     // Calcular informações de tempo usando o novo sistema de fases
     const phaseTimeInfo = getPhaseBasedTimeRemaining(paper, currentUser, reviewAssignments);
@@ -44,6 +45,8 @@
             md: 'p-3',
             lg: 'p-4'
         };
+
+        if (tone === 'neutral') return `${sizeClasses[size]} rounded-2xl border border-surface-200 bg-surface-50 dark:border-surface-700 dark:bg-surface-900/60`;
         
         if (!enhancedTimeDescription) return `${sizeClasses[size]} bg-gray-50 rounded-lg`;
         
@@ -62,6 +65,7 @@
     }
     
     function getTextClass() {
+        if (tone === 'neutral') return 'text-surface-700 dark:text-surface-200';
         if (!enhancedTimeDescription) return 'text-gray-600';
         
         switch (enhancedTimeDescription.status) {
@@ -144,8 +148,8 @@
     </div>
 {:else if paper.status === 'in review' || paper.status === 'needing corrections'}
     <!-- Fallback para quando não há deadline específico -->
-    <div class="p-2 bg-blue-50 border-l-4 border-blue-500 rounded-lg">
-        <div class="flex items-center text-xs text-blue-800">
+    <div class={tone === 'neutral' ? 'rounded-2xl border border-surface-200 bg-surface-50 p-4 dark:border-surface-700 dark:bg-surface-900/60' : 'rounded-lg border-l-4 border-blue-500 bg-blue-50 p-2'}>
+        <div class={tone === 'neutral' ? 'flex items-center text-xs text-surface-700 dark:text-surface-200' : 'flex items-center text-xs text-blue-800'}>
             <span class="mr-2">⏳</span>
             <span>
                 {paper.status === 'in review' ? 'Under review by peers' : 'Awaiting author corrections'}
