@@ -77,11 +77,18 @@
 	onMount(async () => {
 		const Quill = (await import('quill')).default;
 
-		const toolbarConfig = id === 'title' 
+		const toolbarConfig = id === 'title'
 			? [
 				['bold', 'italic', 'underline'],
 				['clean']
 			]
+			: id === 'response-to-reviewers'
+				? [
+					['bold', 'italic', 'underline'],
+					[{ list: 'ordered' }, { list: 'bullet' }],
+					['link', 'blockquote'],
+					['clean']
+				]
 			: [
 				[{ header: [1, 2, 3, false] }],
 				['bold', 'italic', 'underline'],
@@ -108,7 +115,7 @@
 			}
 		});
 
-		if (id !== 'abstract' && id !== 'title') {
+		if (id !== 'abstract' && id !== 'title' && id !== 'response-to-reviewers') {
 			const templateBtn = document.querySelector('.ql-template') as HTMLElement;
 			const addRefButton = document.querySelector('.ql-addRef') as HTMLElement;
 

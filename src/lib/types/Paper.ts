@@ -101,6 +101,8 @@ export type Paper = {
     hubId?: string | Hub| null;
     isLinkedToHub?: boolean;
     correctionProgress?: Record<string, boolean>; // Corrections progress (checklist)
+    responseToReviewers?: string;
+    responseToReviewersVersion?: number;
     
     // Review Slot System (max 3 reviewers)
     reviewSlots?: Array<{

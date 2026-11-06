@@ -319,6 +319,16 @@
 			</div>
 		{/if}
 
+		{#if (paper.reviewRound || 1) >= 2 && paper.responseToReviewers}
+			<section class="mb-6 rounded-xl border border-primary-200 bg-primary-50/60 p-4 dark:border-primary-800 dark:bg-primary-950/20 sm:p-5" aria-labelledby="response-to-reviewers-heading">
+				<h2 id="response-to-reviewers-heading" class="text-base font-semibold text-primary-900 dark:text-primary-200">Response to Reviewers</h2>
+				<p class="mt-1 mb-3 text-xs text-surface-600 dark:text-surface-300">The author's response to feedback from the previous round.</p>
+				<div class="text-sm leading-relaxed text-surface-800 dark:text-surface-100 [&_p]:mb-2 [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-5 [&_ol]:pl-5">
+					{@html paper.responseToReviewers}
+				</div>
+			</section>
+		{/if}
+
 		{#if editable}
 			<div class="flex justify-end gap-3 mb-4">
 				<button class="bg-primary-500 text-white rounded-lg px-4 py-2" onclick={hdlSaveDraft}

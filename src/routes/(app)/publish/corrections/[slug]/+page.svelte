@@ -10,6 +10,8 @@
 	import type { PaperPublishStoreData } from '$lib/types/PaperPublishStoreData';
 	import { Avatar } from '@skeletonlabs/skeleton-svelte';
 	import CorrectionProgressBar from '$lib/components/CorrectionProgressBar/CorrectionProgressBar.svelte';
+	import RichTextEditor from '$lib/components/Text/RichTextEditor.svelte';
+	import { onMount } from 'svelte';
 
 	interface Props {
 		data: PageData;
@@ -18,6 +20,16 @@
 	let { data }: Props = $props();
 
 	let paper = $state(data.paper as Paper);
+	let responseToReviewers = $state((data.paper as Paper).responseToReviewers || '');
+	let savedResponseToReviewers = $state((data.paper as Paper).responseToReviewers || '');
+	let responseVersion = $state((data.paper as Paper).responseToReviewersVersion ?? 0);
+	let isSavingResponse = $state(false);
+	let responseSaveError = $state('');
+	let responseSavedAt = $state<Date | null>(null);
+	let responseConflict = $state(false);
+	let latestResponseFromOtherTab = $state<{ content: string; version: number } | null>(null);
+	let responseChannel: BroadcastChannel | null = null;
+	let responseSavePromise: Promise<boolean> | null = null;
 	let currentUser = $state(data.user as User);
 	let messageFeed = $state(data.messageFeed);
 	let users: Array<{ id: string; firstName: string; lastName: string }> = data.users as Array<{
@@ -175,12 +187,96 @@
 		}
 	});
 
+	$effect(() => {
+		if (responseToReviewers === savedResponseToReviewers || responseConflict || isSubmittingFinal) return;
+		const timer = setTimeout(() => void saveResponseToReviewers(), 1500);
+		return () => clearTimeout(timer);
+	});
+
+	function applyResponseFromOtherTab(content: string, version: number) {
+		if (version <= (latestResponseFromOtherTab?.version ?? responseVersion)) return;
+		if ((responseToReviewers === savedResponseToReviewers && !isSavingResponse) || responseToReviewers === content) {
+			responseToReviewers = content;
+			savedResponseToReviewers = content;
+			responseVersion = version;
+			responseConflict = false;
+			latestResponseFromOtherTab = null;
+			responseSaveError = '';
+			responseSavedAt = new Date();
+			return;
+		}
+		latestResponseFromOtherTab = { content, version };
+		responseConflict = true;
+	}
+
+	function useLatestResponse() {
+		if (!latestResponseFromOtherTab) return;
+		responseToReviewers = latestResponseFromOtherTab.content;
+		savedResponseToReviewers = latestResponseFromOtherTab.content;
+		responseVersion = latestResponseFromOtherTab.version;
+		latestResponseFromOtherTab = null;
+		responseConflict = false;
+		responseSaveError = '';
+		responseSavedAt = new Date();
+	}
+
+	function keepLocalResponse() {
+		if (!latestResponseFromOtherTab) return;
+		savedResponseToReviewers = latestResponseFromOtherTab.content;
+		responseVersion = latestResponseFromOtherTab.version;
+		latestResponseFromOtherTab = null;
+		responseConflict = false;
+		responseSaveError = '';
+	}
+
+	async function refreshResponseFromServer() {
+		try {
+			const response = await fetch(`/publish/corrections/${paper.id}`);
+			if (!response.ok) return;
+			const result = await response.json();
+			if (typeof result.responseToReviewers === 'string' && Number.isSafeInteger(result.version)) {
+				applyResponseFromOtherTab(result.responseToReviewers, result.version);
+			}
+		} catch (error) {
+			console.error('Error refreshing Response to Reviewers', error);
+		}
+	}
+
+	onMount(() => {
+		if (typeof BroadcastChannel !== 'undefined') {
+			responseChannel = new BroadcastChannel(`paper-response-to-reviewers:${paper.id}`);
+			responseChannel.onmessage = (event: MessageEvent) => {
+				const update = event.data;
+				if (update?.type === 'saved' && typeof update.content === 'string' && Number.isSafeInteger(update.version)) {
+					applyResponseFromOtherTab(update.content, update.version);
+				}
+			};
+		}
+		const handleVisibilityChange = () => {
+			if (document.visibilityState === 'visible') {
+				void refreshResponseFromServer();
+			} else if (responseToReviewers !== savedResponseToReviewers && !responseConflict) {
+				void saveResponseToReviewers();
+			}
+		};
+		document.addEventListener('visibilitychange', handleVisibilityChange);
+		void refreshResponseFromServer();
+		return () => {
+			document.removeEventListener('visibilitychange', handleVisibilityChange);
+			responseChannel?.close();
+		};
+	});
+
 	async function submitForFinalReview() {
 		if (!paper?.id) return;
 		showFinalReviewConfirm = false;
 		isSubmittingFinal = true;
 		submitFinalError = '';
 		try {
+			if (!(await flushResponseToReviewers())) {
+				submitFinalError = responseSaveError || 'Failed to save Response to Reviewers.';
+				return;
+			}
 			const resp = await fetch(`/api/papers/${paper.id}/submit-final-review`, {
 				method: 'POST'
 			});
@@ -197,6 +293,69 @@
 			submitFinalError = 'Network error. Please try again.';
 		} finally {
 			isSubmittingFinal = false;
+		}
+	}
+
+	async function flushResponseToReviewers(): Promise<boolean> {
+		for (let attempt = 0; attempt < 3 && responseToReviewers !== savedResponseToReviewers; attempt++) {
+			if (!(await saveResponseToReviewers())) return false;
+		}
+		return !responseConflict && responseToReviewers === savedResponseToReviewers;
+	}
+
+	async function saveResponseToReviewers(): Promise<boolean> {
+		if (responseSavePromise && !(await responseSavePromise)) return false;
+		if (responseConflict) {
+			responseSaveError = 'Resolve the changes from the other tab before submitting.';
+			return false;
+		}
+		if (responseToReviewers === savedResponseToReviewers) return true;
+		const pending = performResponseSave();
+		responseSavePromise = pending;
+		try {
+			return await pending;
+		} finally {
+			if (responseSavePromise === pending) responseSavePromise = null;
+		}
+	}
+
+	async function performResponseSave(): Promise<boolean> {
+		isSavingResponse = true;
+		responseSaveError = '';
+		const submittedResponse = responseToReviewers;
+		const expectedVersion = responseVersion;
+		try {
+			const requestBody = JSON.stringify({ action: 'saveResponseToReviewers', responseToReviewers: submittedResponse, expectedVersion });
+			const response = await fetch(`/publish/corrections/${paper.id}`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				keepalive: new TextEncoder().encode(requestBody).byteLength < 60_000,
+				body: requestBody
+			});
+			const result = await response.json();
+			if (!response.ok) {
+				if (response.status === 409 && typeof result.responseToReviewers === 'string' && Number.isSafeInteger(result.version)) {
+					applyResponseFromOtherTab(result.responseToReviewers, result.version);
+				}
+				responseSaveError = result.error || 'Failed to save Response to Reviewers.';
+				return false;
+			}
+			savedResponseToReviewers = result.responseToReviewers;
+			responseVersion = result.version;
+			if (responseToReviewers === submittedResponse) responseToReviewers = result.responseToReviewers;
+			if (latestResponseFromOtherTab && result.version >= latestResponseFromOtherTab.version) {
+				latestResponseFromOtherTab = null;
+				responseConflict = false;
+			}
+			responseSavedAt = new Date();
+			responseChannel?.postMessage({ type: 'saved', content: result.responseToReviewers, version: result.version });
+			return true;
+		} catch (error) {
+			console.error('Error saving Response to Reviewers', error);
+			responseSaveError = 'Network error. Please try again.';
+			return false;
+		} finally {
+			isSavingResponse = false;
 		}
 	}
 
@@ -523,7 +682,7 @@
 					<div class="mt-4 flex items-center gap-3">
 						<button
 							class="btn preset-filled-primary-500"
-							disabled={isSubmittingFinal}
+							disabled={isSubmittingFinal || isSavingResponse}
 							onclick={() => (showFinalReviewConfirm = true)}
 						>
 							{#if isSubmittingFinal}
@@ -559,10 +718,19 @@
 					{#if getCompletionPercentage() === 0}
 						<p class="mt-2 text-amber-700 dark:text-amber-300">No checklist items are marked complete. Please review your changes before submitting.</p>
 					{/if}
+					{#if responseToReviewers !== savedResponseToReviewers}
+						<p class="mt-2 text-surface-600 dark:text-surface-300">Your Response to Reviewers will be saved before submission.</p>
+					{/if}
+					{#if responseConflict}
+						<p class="mt-2 text-amber-700 dark:text-amber-300">Resolve the Response to Reviewers changes from the other tab before submitting.</p>
+					{/if}
+					{#if !responseToReviewers.replace(/<[^>]*>/g, '').trim()}
+						<p class="mt-2 text-amber-700 dark:text-amber-300">No Response to Reviewers has been written yet.</p>
+					{/if}
 				</div>
 				<div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
 					<button class="btn preset-tonal" onclick={() => (showFinalReviewConfirm = false)}>Keep editing</button>
-					<button class="btn preset-filled-primary-500" disabled={isSubmittingFinal} onclick={submitForFinalReview}>Confirm submission</button>
+					<button class="btn preset-filled-primary-500" disabled={isSubmittingFinal || isSavingResponse || responseConflict} onclick={submitForFinalReview}>Confirm submission</button>
 				</div>
 			</div>
 		</div>
@@ -983,6 +1151,43 @@
 			</div>
 		{:else}
 			<p class="text-gray-600">No specific actions required at this time.</p>
+		{/if}
+	</div>
+
+	<!-- Author response to reviewer feedback -->
+	<div class="rounded-2xl border border-surface-200 bg-surface-50 p-5 shadow-sm dark:border-surface-700 dark:bg-surface-900/60 sm:p-7">
+		<div class="mb-4 flex flex-wrap items-start justify-between gap-3">
+			<div>
+				<h2 class="text-2xl font-semibold tracking-tight text-surface-900 dark:text-surface-100">Response to Reviewers</h2>
+				<p class="mt-1 text-sm text-surface-600 dark:text-surface-300">Explain the changes you made and address the reviewers' comments. Reviewers will see this response in the next round.</p>
+			</div>
+			{#if responseConflict}
+				<span class="text-xs font-medium text-amber-700 dark:text-amber-300">Changes in another tab</span>
+			{:else if isSavingResponse}
+				<span class="text-xs text-surface-500 dark:text-surface-400" role="status">Saving...</span>
+			{:else if responseSaveError}
+				<span class="text-xs font-medium text-red-600" role="status">Could not save</span>
+			{:else if responseToReviewers !== savedResponseToReviewers}
+				<span class="text-xs text-surface-500 dark:text-surface-400" role="status">Changes pending</span>
+			{:else}
+				<span class="text-xs text-surface-500 dark:text-surface-400" role="status">{responseSavedAt ? `Saved ${responseSavedAt.toLocaleTimeString()}` : 'All changes saved'}</span>
+			{/if}
+		</div>
+		<RichTextEditor id="response-to-reviewers" bind:content={responseToReviewers} placeholder="Describe how you addressed each reviewer comment..." minHeight="180px" />
+		{#if responseConflict && latestResponseFromOtherTab}
+			<div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm dark:border-amber-900 dark:bg-amber-950/30" role="alert">
+				<p class="font-medium text-amber-900 dark:text-amber-200">This response changed in another tab.</p>
+				<p class="mt-1 text-surface-700 dark:text-surface-300">Choose which version to keep. Latest saved text: {latestResponseFromOtherTab.content.replace(/<[^>]*>/g, '').slice(0, 160) || '(empty)'}</p>
+				<div class="mt-3 flex flex-wrap gap-2">
+					<button class="btn preset-tonal" disabled={isSavingResponse} onclick={useLatestResponse}>Use latest saved version</button>
+					<button class="btn preset-filled-primary-500" disabled={isSavingResponse} onclick={keepLocalResponse}>Keep my edits and overwrite</button>
+				</div>
+			</div>
+		{:else if responseSaveError}
+			<div class="flex flex-wrap items-center gap-3" role="alert">
+				<p class="text-sm text-red-600">{responseSaveError}</p>
+				<button class="btn preset-tonal" disabled={isSavingResponse} onclick={() => saveResponseToReviewers()}>Retry save</button>
+			</div>
 		{/if}
 	</div>
 

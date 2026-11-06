@@ -215,6 +215,8 @@ export const PaperSchema: Schema = new Schema({
         of: Boolean,
         default: new Map()
     },
+    responseToReviewers: { type: String, default: '' },
+    responseToReviewersVersion: { type: Number, default: 0 },
     
     // Review Slot System (max 3 reviewers)
     reviewSlots: [{
