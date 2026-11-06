@@ -2,7 +2,6 @@
 // import mongoose, { Schema, Document } from 'mongoose';
 // import * as crypto from 'crypto';
 
-
 // interface IMessage extends Document {
 //     // sender: mongoose.Types.ObjectId;
 //     // receiver: mongoose.Types.ObjectId;
@@ -25,10 +24,9 @@
 
 // const Message = mongoose.model<IMessage>('Message', MessageSchema);
 // export default Message;
-import mongoose, { Document } from "mongoose";
-import type { MessageFeed } from "$lib/types/MessageFeed"; // The interface must be correct
-import  "$lib/db/models/MessageFeed"; // Make sure this is correct
-import { messageFeedSchema } from "../schemas/MessageFeedSchema";
+import mongoose, { Document } from 'mongoose';
+import type { MessageFeed } from '$lib/types/MessageFeed'; // The interface must be correct
+import { messageFeedSchema } from '../schemas/MessageFeedSchema';
 
 export interface IMessageFeed extends Omit<MessageFeed, 'id'>, Document {} // Omit to avoid conflict
 

@@ -2,7 +2,6 @@ import type { RequestHandler } from './$types';
 import { json } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import '$lib/db/models/User';
-import '$lib/db/models/MessageFeed';
 import Papers from '$lib/db/models/Paper';
 import type { Paper } from '$lib/types/Paper';
 

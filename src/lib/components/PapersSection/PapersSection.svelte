@@ -351,13 +351,18 @@
 
 	async function removeReviewer(reviewerId: string) {
 		if (!selectedPaper) return;
+		const paperId = getPaperSlug(selectedPaper);
+		if (!paperId || !reviewerId) {
+			toaster.error({ title: 'Error', description: 'Paper or reviewer ID is missing' });
+			return;
+		}
 
 		const confirmRemove = confirm('Are you sure you want to remove this reviewer from the paper?');
 		if (!confirmRemove) return;
 
 		loading = true;
 		try {
-			const response = await fetch(`/api/papers/${selectedPaper.id}/remove-reviewer`, {
+			const response = await fetch(`/api/papers/${encodeURIComponent(paperId)}/remove-reviewer`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
@@ -365,16 +370,20 @@
 				})
 			});
 
+			const result = await response.json().catch(() => null);
 			if (response.ok) {
 				toaster.success({ title: 'Success', description: 'Reviewer removed successfully' });
 				// Recarregar a página para atualizar a lista
 				window.location.reload();
 			} else {
-				throw new Error('Failed to remove reviewer');
+				throw new Error(result?.error || `Failed to remove reviewer (HTTP ${response.status})`);
 			}
 		} catch (error) {
 			console.error(error);
-			toaster.error({ title: 'Error', description: 'Failed to remove reviewer' });
+			toaster.error({
+				title: 'Error',
+				description: error instanceof Error ? error.message : 'Failed to remove reviewer'
+			});
 		} finally {
 			loading = false;
 		}
