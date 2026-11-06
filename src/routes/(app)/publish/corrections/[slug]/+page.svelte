@@ -894,9 +894,9 @@
 	{/if}
 
 	<!-- Action Items Section -->
-	<div class="rounded-2xl border border-surface-200 bg-surface-50 p-5 shadow-sm dark:border-surface-700 dark:bg-surface-900/60 sm:p-7">
-		<div class="mb-5 flex flex-wrap items-center justify-between gap-4">
-			<h2 class="text-2xl font-semibold text-gray-900 dark:text-slate-100">Correction Checklist</h2>
+	<div class="rounded-2xl border border-surface-200 bg-surface-50 p-4 shadow-sm dark:border-surface-700 dark:bg-surface-900/60 sm:p-5">
+		<div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+			<h2 class="text-xl font-semibold text-surface-900 dark:text-surface-100">Correction Checklist</h2>
 			<div class="flex flex-wrap items-center gap-3">
 				<div class="text-sm text-gray-600">
 					Progress: {getCompletionPercentage()}% complete
@@ -936,25 +936,26 @@
 		</div>
 
 		{#if paper && (paper as Paper)?.peer_review?.reviews?.length}
-			<div class="space-y-6">
+			<div class="space-y-3">
 				{#each (paper as Paper).peer_review?.reviews || [] as review, reviewIndex}
-					<div class="rounded-xl border border-surface-200 bg-surface-100 p-4 dark:border-surface-700 dark:bg-surface-800">
-						<h3 class="font-semibold text-gray-800 mb-3">Review #{reviewIndex + 1} Corrections</h3>
+					<div class="rounded-xl border border-surface-200 bg-surface-100 p-3 dark:border-surface-700 dark:bg-surface-800">
+						<h3 class="mb-2 text-sm font-semibold text-surface-800 dark:text-surface-100">Review #{reviewIndex + 1} Corrections</h3>
+						<div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
 
 						<!-- Low-scoring criteria to address -->
 						{#if review.quantitativeEvaluation}
 							{#each Object.entries(review.quantitativeEvaluation) as [criterion, score]}
 								{#if (score as number) < 3.5}
-									<div class="mb-2 flex items-center gap-3 rounded-lg border border-surface-200 bg-surface-50 p-3 dark:border-surface-700 dark:bg-surface-900">
+									<div class="flex min-w-0 items-center gap-2 rounded-lg border border-surface-200 bg-surface-50 px-2.5 py-2 dark:border-surface-700 dark:bg-surface-900">
 										<input
 											type="checkbox"
 											id="criterion-{reviewIndex}-{criterion}"
 											bind:checked={correctionProgress[`${reviewIndex}-criterion-${criterion}`]}
 											class="h-4 w-4 accent-primary-600"
 										/>
-										<label for="criterion-{reviewIndex}-{criterion}" class="flex-1 text-sm">
-											<span class="font-medium">Improve {formatCriteriaName(criterion)}</span>
-											<span class="text-surface-500 dark:text-surface-400">(scored {score}/5)</span>
+										<label for="criterion-{reviewIndex}-{criterion}" class="flex min-w-0 flex-1 items-center justify-between gap-2 text-sm">
+											<span class="truncate font-medium" title={formatCriteriaName(criterion)}>Improve {formatCriteriaName(criterion)}</span>
+											<span class="shrink-0 text-xs tabular-nums text-surface-500 dark:text-surface-400">{score}/5</span>
 										</label>
 									</div>
 								{/if}
@@ -963,21 +964,20 @@
 
 						<!-- Critical comments to address -->
 						{#if review.qualitativeEvaluation?.weaknesses}
-							<div class="mb-2 flex items-start gap-3 rounded-lg border border-surface-200 bg-surface-50 p-3 dark:border-surface-700 dark:bg-surface-900">
+							<div class="flex min-w-0 items-center gap-2 rounded-lg border border-amber-200/80 bg-amber-50/60 px-2.5 py-2 dark:border-amber-900/60 dark:bg-amber-950/20">
 								<input
 									type="checkbox"
 									id="weakness-{reviewIndex}"
 									bind:checked={correctionProgress[`${reviewIndex}-weaknesses-main`]}
-									class="mt-1 h-4 w-4 accent-primary-600"
+									class="h-4 w-4 accent-primary-600"
 								/>
-								<label for="weakness-{reviewIndex}" class="flex-1 text-sm">
-									<span class="font-medium text-surface-800 dark:text-surface-100">Address critical feedback:</span>
-									<div class="mt-1 text-xs text-surface-600 dark:text-surface-300">
-										{review.qualitativeEvaluation.weaknesses.substring(0, 150)}...
-									</div>
+								<label for="weakness-{reviewIndex}" class="flex min-w-0 flex-1 items-center gap-1 text-sm" title={review.qualitativeEvaluation.weaknesses}>
+									<span class="shrink-0 font-medium text-amber-800 dark:text-amber-300">Critical feedback:</span>
+									<span class="truncate text-xs text-surface-600 dark:text-surface-300">{review.qualitativeEvaluation.weaknesses}</span>
 								</label>
 							</div>
 						{/if}
+						</div>
 					</div>
 				{/each}
 			</div>
