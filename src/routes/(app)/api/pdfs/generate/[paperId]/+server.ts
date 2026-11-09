@@ -624,7 +624,7 @@ async function generatePaperPdfBuffer(
 							return NodeFilter.FILTER_REJECT;
 						}
 
-						if (parent.closest(`.${EXEMPT_CLASS}`)) {
+						if (parent.closest('math') || parent.closest(`.${EXEMPT_CLASS}`)) {
 							return NodeFilter.FILTER_REJECT;
 						}
 

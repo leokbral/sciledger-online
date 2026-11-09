@@ -501,6 +501,7 @@ export function enhancePaperReferenceLinks(root: HTMLElement) {
 				if (!node.textContent?.includes('[')) return NodeFilter.FILTER_REJECT;
 				if (!node.textContent.match(/\[\d+\]/)) return NodeFilter.FILTER_REJECT;
 				if (!node.parentElement) return NodeFilter.FILTER_REJECT;
+				if (node.parentElement.closest('math')) return NodeFilter.FILTER_REJECT;
 				if (isInsideReferenceEntry(node) || isInsideLink(node)) return NodeFilter.FILTER_REJECT;
 				if (SKIP_TAGS.has(node.parentElement.tagName)) return NodeFilter.FILTER_REJECT;
 				return NodeFilter.FILTER_ACCEPT;
@@ -591,6 +592,7 @@ function wrapTextNodes(root: HTMLElement) {
 			if (!parent) {
 				return NodeFilter.FILTER_REJECT;
 			}
+			if (parent.closest('math')) return NodeFilter.FILTER_REJECT;
 
 			if (parent.closest(`.${LINE_NUMBER_EXEMPT_CLASS}`)) {
 				return NodeFilter.FILTER_REJECT;
