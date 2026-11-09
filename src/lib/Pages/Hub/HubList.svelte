@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { HubSummary } from './hubTypes';
-	import { hubHref, hubImageUrl } from './hubMetrics';
+	import { hubHref, hubImageUrl, hubId } from './hubMetrics';
+	import { hubSubmissionHref } from '$lib/helpers/authReturnTo';
 
 	type Variant = 'cards' | 'compact' | 'table';
 
@@ -11,6 +12,8 @@
 		emptyTitle: string;
 		emptyDescription: string;
 		variant?: Variant;
+		showSubmit?: boolean;
+		loggedIn?: boolean;
 	}
 
 	let {
@@ -19,7 +22,9 @@
 		error = null,
 		emptyTitle,
 		emptyDescription,
-		variant = 'cards'
+		variant = 'cards',
+		showSubmit = false,
+		loggedIn = false
 	}: Props = $props();
 </script>
 
@@ -90,47 +95,58 @@
 {:else}
 	<div class="grid gap-4 md:grid-cols-2">
 		{#each hubs as hub}
-			<a
-				href={hubHref(hub)}
+			<div
 				class="group grid min-h-48 overflow-hidden rounded-lg border border-surface-200 bg-white shadow-sm transition hover:border-primary-300 hover:shadow-md"
-				data-sveltekit-preload-data="hover"
 			>
-				<div class="relative h-28 overflow-hidden bg-surface-100">
-					{#if hub.cardUrl}
-						<img
-							src={hubImageUrl(hub.cardUrl)}
-							alt={`${hub.title ?? 'Hub'} card`}
-							class="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
-						/>
-					{:else}
-						<div
-							class="flex h-full w-full items-center justify-center bg-surface-100 text-sm font-medium text-surface-500"
-						>
-							Cover image unavailable
-						</div>
-					{/if}
-				</div>
-				<div class="space-y-3 p-4">
-					<div class="flex items-start justify-between gap-3">
-						<div class="min-w-0">
-							<p class="text-xs font-semibold uppercase text-primary-700">{hub.type ?? 'Hub'}</p>
-							<h3 class="mt-1 truncate text-base font-semibold text-surface-950">
-								{hub.title ?? 'Untitled hub'}
-							</h3>
-						</div>
-						{#if hub.logoUrl}
+				<a href={hubHref(hub)} class="grid" data-sveltekit-preload-data="hover">
+					<div class="relative h-28 overflow-hidden bg-surface-100">
+						{#if hub.cardUrl}
 							<img
-								src={hubImageUrl(hub.logoUrl)}
-								alt={`${hub.title ?? 'Hub'} logo`}
-								class="h-10 w-10 rounded-full border border-surface-200 object-cover"
+								src={hubImageUrl(hub.cardUrl)}
+								alt={`${hub.title ?? 'Hub'} card`}
+								class="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
 							/>
+						{:else}
+							<div
+								class="flex h-full w-full items-center justify-center bg-surface-100 text-sm font-medium text-surface-500"
+							>
+								Cover image unavailable
+							</div>
 						{/if}
 					</div>
-					<p class="line-clamp-2 text-sm leading-relaxed text-surface-600">
-						{hub.description ?? 'No description yet.'}
-					</p>
-				</div>
-			</a>
+					<div class="space-y-3 p-4">
+						<div class="flex items-start justify-between gap-3">
+							<div class="min-w-0">
+								<p class="text-xs font-semibold uppercase text-primary-700">{hub.type ?? 'Hub'}</p>
+								<h3 class="mt-1 truncate text-base font-semibold text-surface-950">
+									{hub.title ?? 'Untitled hub'}
+								</h3>
+							</div>
+							{#if hub.logoUrl}
+								<img
+									src={hubImageUrl(hub.logoUrl)}
+									alt={`${hub.title ?? 'Hub'} logo`}
+									class="h-10 w-10 rounded-full border border-surface-200 object-cover"
+								/>
+							{/if}
+						</div>
+						<p class="line-clamp-2 text-sm leading-relaxed text-surface-600">
+							{hub.description ?? 'No description yet.'}
+						</p>
+					</div>
+				</a>
+				{#if showSubmit}
+					<div class="flex justify-end border-t border-surface-100 px-4 py-3">
+						<a
+							href={loggedIn
+								? hubSubmissionHref(hubId(hub))
+								: '/login'}
+							class="btn preset-filled-primary-500 rounded-full px-4 py-2 text-sm font-medium text-white"
+							>Submit a paper</a
+						>
+					</div>
+				{/if}
+			</div>
 		{/each}
 	</div>
 {/if}

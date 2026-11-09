@@ -1,6 +1,7 @@
 import Users from '$lib/db/models/User';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import { error, redirect } from '@sveltejs/kit';
+import { loadSubmissionHub } from '$lib/server/submissionHub';
 
 // Type for MongoDB ObjectId
 interface ObjectId {
@@ -43,15 +44,19 @@ function sanitize(obj: unknown): unknown {
 	return obj;
 }
 
-export async function load({ locals }) {
-	if (!locals.user) redirect(302, `/login`);
+export async function load({ locals, url }) {
+	if (!locals.user) redirect(302, '/login');
 	
 	await start_mongo();
 
-	const usersDoc = await Users.find({}, {}).lean().exec();
+	const [usersDoc, submissionHub] = await Promise.all([
+		Users.find({}, {}).lean().exec(),
+		loadSubmissionHub(url.searchParams.get('hubId'))
+	]);
 
 	return {
-		users: sanitize(usersDoc)
+		users: sanitize(usersDoc),
+		submissionHub
 	};
 }
 

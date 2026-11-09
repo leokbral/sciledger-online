@@ -1,11 +1,12 @@
 import { MongoClient, GridFSBucket } from 'mongodb';
-import type { RequestHandler } from '@sveltejs/kit';
+import type { RequestHandler } from './$types';
 import { MONGO_URL } from '$env/static/private';
 import * as crypto from 'crypto';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import Papers from '$lib/db/models/Paper';  
 import Hubs from '$lib/db/models/Hub';
 import { json } from '@sveltejs/kit';
+import { loadPublicHub } from '$lib/server/publicHubs';
 
 const client = new MongoClient(MONGO_URL);
 
@@ -102,7 +103,11 @@ export const POST: RequestHandler = async ({ request, locals, params }) => {
     }
 };
 
-export const GET: RequestHandler = async ({ params }) => {
+export const GET: RequestHandler = async ({ params, locals }) => {
+    if (!locals.user) {
+        const { hub, publishedPapers } = await loadPublicHub(params.id);
+        return json({ hub, papers: publishedPapers });
+    }
     await start_mongo();
     try {
         const hubId = params.id;

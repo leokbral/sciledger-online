@@ -5,6 +5,8 @@
 	import { post } from '$lib/utils';
 	import { fade } from 'svelte/transition';
 	import Splash from '$lib/components/Splash.svelte';
+	let { data } = $props();
+	let orcidHref = $derived(data.returnTo === '/' ? '/orcid/redirect' : `/orcid/redirect?${new URLSearchParams({ returnTo: data.returnTo, from: 'hub-submission' })}`);
 
 
 	let login = $state('');
@@ -23,7 +25,7 @@
 		const response = await post(`/login`, { login, password, rememberMe });
 
 		if (response.user) {
-			goto('/');
+			goto(data.returnTo, { invalidateAll: true });
 		} else if (response.emailVerificationRequired && response.redirectTo) {
 			goto(response.redirectTo);
 		} else {
@@ -102,7 +104,7 @@
 					/>
 				</button>
 				<a
-					href="/orcid/redirect"
+					href={orcidHref}
 					class="mt-4 inline-flex items-center justify-center gap-2 rounded-md border border-emerald-600 px-4 py-2 font-semibold text-emerald-700 hover:bg-emerald-50 transition-colors"
 				>
 					<svg class="w-5 h-5" viewBox="0 0 256 256" fill="currentColor">

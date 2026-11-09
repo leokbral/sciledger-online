@@ -114,6 +114,8 @@
 						active="bg-transparent border-b-2 border-primary-500 rounded-none"
 						width='w-24'
 					></Navigation.Tile>					</Navigation.Bar>
+				{:else}
+					<a href="/hub" class="btn preset-tonal-primary rounded-full px-4 text-sm">Explore Hubs</a>
 				{/if}
 				<span class="z-10!">
 					<button
@@ -145,7 +147,7 @@
 				<Nav pathname={page.url.pathname} user={data.user} notifications={data.notifications}></Nav>
 			{/snippet}
 		</AppBar>
-		{#if !data.user}
+		{#if !data.user && !page.url.pathname.startsWith('/hub')}
 			<div class="banner bg-primary-900 p-8 text-surface-50">
 				<div class=" flex flex-col items-center gap-4 m-auto w-full">
 					<img

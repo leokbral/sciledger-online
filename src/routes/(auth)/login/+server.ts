@@ -6,6 +6,8 @@ import { start_mongo } from '$lib/db/mongooseConnection';
 import Users from '$lib/db/models/User';
 import { respondWithSession } from '$lib/server/auth/authResponse';
 import { normalizeEmail } from '$lib/server/auth/normalizeEmail';
+import { clearAuthReturnTo } from '$lib/server/auth/returnTo';
+import { isSecureRequest } from '$lib/server/auth/sessionCookie';
 
 export const POST: RequestHandler = async ({ request, url }) => {
 	try {
@@ -50,7 +52,9 @@ export const POST: RequestHandler = async ({ request, url }) => {
 			);
 		}
 
-		return respondWithSession({ user }, { request, url, rememberMe: Boolean(rememberMe) });
+		const response = await respondWithSession({ user }, { request, url, rememberMe: Boolean(rememberMe) });
+		clearAuthReturnTo(response, isSecureRequest(url, request));
+		return response;
 	} catch (err) {
 		console.error('Login error:', err);
 		return json({ errors: 'Internal server error.', status: 500 }, { status: 500 });

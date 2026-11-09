@@ -1,5 +1,5 @@
 import { start_mongo } from '$lib/db/mongooseConnection';
-import { redirect, error } from '@sveltejs/kit';
+import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import Users from '$lib/db/models/User';
 import Papers from '$lib/db/models/Paper';
@@ -17,6 +17,7 @@ import {
 import { serializeReviewInvitations } from '$lib/server/reviewInvitations';
 import { isSuperAdmin } from '$lib/server/authorization/superAdmin';
 import { recordAdminAuditEvent } from '$lib/server/authorization/adminAudit';
+import { loadPublicHub } from '$lib/server/publicHubs';
 
 function getIdAliases(value: unknown): string[] {
 	if (!value) return [];
@@ -49,8 +50,10 @@ function matchesUser(value: unknown, userId: string): boolean {
 	return getIdAliases(value).includes(String(userId));
 }
 
-export const load: PageServerLoad = async ({ params, locals }) => {
-	if (!locals.user) redirect(302, `/login`);
+export const load: PageServerLoad = async ({ params, locals, url }) => {
+	if (!locals.user || url.searchParams.get('public') === '1') {
+		return loadPublicHub(params.id);
+	}
 
 	await start_mongo();
 	const isPlatformAdmin = await isSuperAdmin(locals.user);

@@ -237,6 +237,30 @@ describe('ORCID callback post-login redirect', () => {
 		expect(response.headers.get('location')).toBe('/');
 	});
 
+	it('returns an authenticated visitor to the selected Hub submission', async () => {
+		mockExistingOrcidUser({ email: 'ada@example.com' });
+		mockAdaPerson();
+		const { GET } = await import('./+server');
+		const event = createEvent();
+		event.request.headers.set('cookie', 'auth_return_to=%2Fpublish%2Fnew%3FhubId%3Dhub-1');
+		const response = await GET(event as any);
+		expect(response.headers.get('location')).toBe('/publish/new?hubId=hub-1');
+		expect(response.headers.get('set-cookie')).toContain('auth_return_to=; Max-Age=0');
+		expect(response.headers.get('set-cookie')).toContain('session=token');
+	});
+
+	it('retains the Hub destination when ORCID requires profile completion', async () => {
+		mockExistingOrcidUser();
+		mockAdaPerson();
+		const { GET } = await import('./+server');
+		const event = createEvent();
+		event.request.headers.set('cookie', 'auth_return_to=%2Fpublish%2Fnew%3FhubId%3Dhub-1');
+		const response = await GET(event as any);
+		const location = new URL(response.headers.get('location')!, event.url);
+		expect(location.pathname).toBe('/complete-profile');
+		expect(location.searchParams.get('returnTo')).toBe('/publish/new?hubId=hub-1');
+	});
+
 	it('still sends a placeholder-email user who never completed the profile to /complete-profile', async () => {
 		mockExistingOrcidUser();
 		mockAdaPerson();

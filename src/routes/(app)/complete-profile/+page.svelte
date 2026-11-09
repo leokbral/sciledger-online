@@ -4,6 +4,7 @@
 	import { post } from '$lib/utils';
 	import { fade } from 'svelte/transition';
 	import { isOrcidPlaceholderEmail } from '$lib/helpers/orcidPlaceholderEmail';
+	import { safeReturnTo } from '$lib/helpers/authReturnTo';
 
 	let firstName = '';
 	let lastName = '';
@@ -52,7 +53,7 @@
 			if (response.success) {
 				formSuccess = 'Profile updated successfully!';
 				setTimeout(() => {
-					goto('/');
+					goto(safeReturnTo($page.url.searchParams.get('returnTo')), { invalidateAll: true });
 				}, 1000);
 			} else {
 				formWarning = response.message || 'Error updating profile';
