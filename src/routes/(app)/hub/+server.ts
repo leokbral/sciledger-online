@@ -5,6 +5,8 @@ import * as crypto from 'crypto';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import Papers from '$lib/db/models/Paper';
 import Hubs from '$lib/db/models/Hub';
+import { json } from '@sveltejs/kit';
+import { loadPublicHubs } from '$lib/server/publicHubs';
 
 const client = new MongoClient(MONGO_URL);
 
@@ -100,7 +102,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     }
 };
 
-export const GET: RequestHandler = async () => {
+export const GET: RequestHandler = async ({ locals }) => {
+    if (!locals.user) return json({ hubs: await loadPublicHubs() });
     await start_mongo();
     try {
         const hubs = await Hubs.find()

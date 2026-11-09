@@ -1,5 +1,7 @@
 <script lang="ts">
 	import PaperSubmissionGuide from '$lib/components/Paper/PaperSubmissionGuide.svelte';
+	import SubmissionDestination from '$lib/components/Paper/SubmissionDestination.svelte';
+	import type { SubmissionHub } from '$lib/types/SubmissionHub';
 	import { TagsInput, FileUpload } from '@skeletonlabs/skeleton-svelte';
 	import type { User } from '$lib/types/User';
 	import { writable } from 'svelte/store';
@@ -80,6 +82,7 @@
 		savePaper: (paper: PaperPublishStoreData) => void | Promise<void>;
 		/** Affiliations this user already used on their other papers, offered for reuse. */
 		knownAffiliations?: PaperAuthorAffiliationSnapshot[];
+		submissionHub?: SubmissionHub | null;
 	}
 
 	interface AuthorAffiliationForm extends PaperAuthorSnapshot {
@@ -93,6 +96,7 @@
 		authorsOptions = $bindable(),
 		author,
 		knownAffiliations = [],
+		submissionHub,
 		inicialValue = {
 			title: '',
 			authors: [],
@@ -2055,6 +2059,9 @@
 <main class="grid p-5">
 	<fieldset class="py-4 md:py-6">
 		<section id="article-basic-info" class="flex flex-col items-center max-w-[700px] m-auto">
+			{#if submissionHub !== undefined}
+				<div class="mb-6 w-full"><SubmissionDestination hub={submissionHub} /></div>
+			{/if}
 			<!-- Step 0: prepare the manuscript. Reuses the existing submission guide -->
 			<div class="mb-6 w-full">
 				<p class="text-xs font-semibold uppercase tracking-wide text-primary-700 dark:text-primary-300 mb-2">
@@ -3225,6 +3232,9 @@
 				<div class="flex max-h-[calc(100dvh-4rem)] w-full max-w-md flex-col overflow-hidden rounded-lg bg-white shadow-xl" role="dialog" aria-modal="true" aria-labelledby="submit-confirmation-title">
 				<div class="overflow-y-auto p-6">
 				<h2 id="submit-confirmation-title" class="text-2xl font-bold text-gray-900 mb-4">Confirm Submission</h2>
+				{#if submissionHub !== undefined}
+					<div class="mb-4"><SubmissionDestination hub={submissionHub} compact /></div>
+				{/if}
 
 				<div class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
 					<p class="text-yellow-800 font-semibold mb-2">Important: This action cannot be undone!</p>

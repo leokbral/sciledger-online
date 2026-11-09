@@ -3,6 +3,9 @@ import { redirect } from '@sveltejs/kit';
 import { ORCID_CLIENT_ID } from '$env/static/private';
 import { env } from '$env/dynamic/private';
 import { getOrcidRedirectUri } from '$lib/server/orcid/redirectUri';
+import { hubLoginReturnTo } from '$lib/helpers/authReturnTo';
+import { AUTH_RETURN_TO_COOKIE } from '$lib/server/auth/returnTo';
+import { isSecureRequest } from '$lib/server/auth/sessionCookie';
 
 /**
  * Rota para iniciar o fluxo OAuth 2.0 com ORCID
@@ -17,11 +20,18 @@ import { getOrcidRedirectUri } from '$lib/server/orcid/redirectUri';
  * 4. Usuário autoriza no ORCID
  * 5. ORCID redireciona para /orcid/callback com authorization_code
  */
-export const GET: RequestHandler = async ({ url }) => {
+export const GET: RequestHandler = async ({ url, request, cookies, locals }) => {
+	cookies.delete(AUTH_RETURN_TO_COOKIE, { path: '/' });
 	// Valida que as variáveis de ambiente estão configuradas
 	if (!ORCID_CLIENT_ID) {
 		console.error('❌ ORCID credentials not configured');
 		throw redirect(302, '/login?error=orcid_config_error');
+	}
+	const returnTo = locals.user ? '/' : hubLoginReturnTo(url.searchParams);
+	if (returnTo !== '/') {
+		cookies.set(AUTH_RETURN_TO_COOKIE, returnTo, {
+			path: '/', httpOnly: true, sameSite: 'lax', secure: isSecureRequest(url, request), maxAge: 3600
+		});
 	}
 
 	const useSandbox = env.ORCID_SANDBOX === 'true';

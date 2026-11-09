@@ -3,6 +3,7 @@ import Users from '$lib/db/models/User';
 import { error, redirect } from '@sveltejs/kit';
 import { start_mongo } from '$lib/db/mongooseConnection';
 import { collectReusableAffiliations } from '$lib/utils/paperAuthorAffiliations';
+import { loadSubmissionHub } from '$lib/server/submissionHub';
 
 // Type for MongoDB ObjectId
 interface ObjectId {
@@ -97,11 +98,17 @@ export async function load({ locals, params }) {
 	const usersDoc = await Users.find({}, {}).lean().exec();
 
 	const knownAffiliations = await loadKnownAffiliations(String(locals.user.id ?? ''));
+	const submissionHub = await loadSubmissionHub(
+		typeof paperDoc.hubId === 'object' && paperDoc.hubId
+			? String(paperDoc.hubId._id || paperDoc.hubId.id)
+			: paperDoc.hubId
+	);
 
 	return {
 		paper: sanitize(paperDoc),
 		users: sanitize(usersDoc),
-		knownAffiliations
+		knownAffiliations,
+		submissionHub
 	};
 }
 

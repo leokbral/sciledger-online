@@ -158,4 +158,5 @@
 	author={data.user}
 	authorsOptions={userProfiles}
 	knownAffiliations={data.knownAffiliations ?? []}
+	submissionHub={data.submissionHub}
 />

@@ -7,6 +7,7 @@
 	import type { Hub } from '$lib/types/Hub';
 	import type { User } from '$lib/types/User';
 	import ManageReviewerDeadline from '$lib/components/ReviewerManagement/ManageReviewerDeadline.svelte';
+	import { hubSubmissionHref, hubSubmissionLoginHref } from '$lib/helpers/authReturnTo';
 
 	interface Props {
 		papers: Paper[];
@@ -14,6 +15,7 @@
 		isCreator: boolean;
 		isHubManager: boolean;
 		isHubReviewer?: boolean;
+		publicView?: boolean;
 		/**
 		 * Super admin da plataforma, resolvido no servidor. So muda PARA ONDE o
 		 * link de cada paper aponta; nao habilita acao nenhuma.
@@ -35,6 +37,7 @@
 		isCreator,
 		isHubManager,
 		isHubReviewer = false,
+		publicView = false,
 		isPlatformAdmin = false,
 		userId,
 		shouldHighlight,
@@ -44,6 +47,7 @@
 	}: Props = $props();
 
 	let hubId = $derived(hub._id);
+	let visiblePapers = $derived(publicView ? papers.filter(paper => paper.status === 'published') : papers);
 	let reviewerDirectory = $derived(effectiveReviewers);
 
 	function getPaperSlug(paper: any): string {
@@ -96,6 +100,7 @@
 	function getReadMoreHref(paper: any): string {
 		const slug = getPaperSlug(paper);
 		if (!slug) return '#';
+		if (publicView) return `/articles/${encodeURIComponent(slug)}`;
 		if (isPlatformAdmin && paper?.status === 'draft') return `/publish/view/${slug}`;
 
 		/**
@@ -586,12 +591,12 @@
 		class="flex flex-col gap-4 border-b border-surface-200 pb-5 sm:flex-row sm:items-end sm:justify-between"
 	>
 		<div class="max-w-3xl">
-			<p class="text-xs font-medium uppercase tracking-wide text-surface-500">
+			{#if !publicView}<p class="text-xs font-medium uppercase tracking-wide text-surface-500">
 				Manuscript workspace
-			</p>
+			</p>{/if}
 			<h2 class="mt-2 text-2xl font-semibold tracking-tight text-surface-950">Manuscripts</h2>
 			<p class="mt-1 text-sm leading-6 text-surface-600">
-				Submissions, reviews, and publication decisions connected to this Hub.
+				{publicView ? 'Published research connected to this Hub.' : 'Submissions, reviews, and publication decisions connected to this Hub.'}
 			</p>
 		</div>
 		<div class="flex flex-wrap items-center gap-2">
@@ -605,7 +610,7 @@
 			</a>
 			<a
 				data-sveltekit-reload
-				href="/publish/new?hubId={hubId}"
+				href={publicView ? hubSubmissionLoginHref(hubId) : hubSubmissionHref(hubId)}
 				class="btn preset-filled-primary-500 inline-flex items-center justify-center gap-2 rounded-full px-3.5 py-2 text-sm font-medium text-white"
 				data-sveltekit-preload-data="hover"
 			>
@@ -615,9 +620,9 @@
 		</div>
 	</div>
 
-	{#if papers && papers.length > 0}
+	{#if visiblePapers && visiblePapers.length > 0}
 		<div class="overflow-hidden rounded-xl border border-surface-200 bg-white">
-			{#each papers as paper}
+			{#each visiblePapers as paper}
 				<article
 					class="border-b border-l-2 border-b-surface-100 border-l-transparent p-5 transition duration-150 last:border-b-0 hover:bg-surface-50/80 sm:p-6"
 					class:border-l-red-300={paper.status === 'rejected' || paper.rejectedByHub}
@@ -704,7 +709,7 @@
 										{paper.mainAuthor.firstName + ' ' + paper.mainAuthor.lastName}
 									</a>
 								{/if}
-								<span>{new Date(paper.createdAt).toLocaleDateString()}</span>
+								{#if paper.createdAt}<span>{new Date(paper.createdAt).toLocaleDateString()}</span>{/if}
 								<button
 									class="btn btn-xs rounded-full border border-surface-200 bg-white text-surface-600 transition hover:border-surface-300 hover:bg-surface-50 hover:text-surface-950"
 									onclick={() => openAuthorsDialog(paper)}
@@ -818,8 +823,8 @@
 	{:else}
 		<div class="rounded-xl border border-dashed border-surface-300 bg-white px-6 py-14 text-center">
 			<Icon icon="mdi:file-document-outline" class="mx-auto size-10 text-surface-300" />
-			<p class="mt-3 text-sm font-semibold text-surface-700">No manuscripts submitted yet.</p>
-			<p class="mt-1 text-sm text-surface-500">New submissions for this Hub will appear here.</p>
+			<p class="mt-3 text-sm font-semibold text-surface-700">{publicView ? 'No papers published yet.' : 'No manuscripts submitted yet.'}</p>
+			<p class="mt-1 text-sm text-surface-500">{publicView ? 'Published papers from this Hub will appear here.' : 'New submissions for this Hub will appear here.'}</p>
 		</div>
 	{/if}
 </section>

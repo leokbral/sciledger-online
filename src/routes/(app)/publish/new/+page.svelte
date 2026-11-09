@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { page } from '$app/stores';
 	import PaperPublishPage from '$lib/Pages/Paper/PaperPublishPage.svelte';
 	import { post } from '$lib/utils/index.js';
 	//import { userProfiles } from '../../UserProfile';
@@ -14,7 +13,7 @@
 	let userProfiles = data.users;
 	//let articleComponent: PaperPublishPage;
 
-	let hubId = $derived($page.url.searchParams.get('hubId'));
+	let hubId = $derived(data.submissionHub?.id);
 
 	async function savePaper( store: any) {
 		const paper = {
@@ -102,5 +101,5 @@
 	</p>
 </div>
 
-<PaperPublishPage  author={data.user} authorsOptions={userProfiles} {savePaper}/>
+<PaperPublishPage author={data.user} authorsOptions={userProfiles} {savePaper} submissionHub={data.submissionHub} />
 <!-- <PaperPublishPage on:savePaper={hdlSavePaper} author={data.user} authorsOptions={userProfiles} /> -->

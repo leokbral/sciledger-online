@@ -14,6 +14,7 @@ import {
 	serializeOrcidSignupCookie
 } from '$lib/server/auth/orcidSignupClaim';
 import { isSecureRequest } from '$lib/server/auth/sessionCookie';
+import { getAuthReturnTo, clearAuthReturnTo, profileReturnTo } from '$lib/server/auth/returnTo';
 import {
 	buildOrcidPlaceholderEmail,
 	isOrcidPlaceholderEmail
@@ -102,7 +103,9 @@ async function parkClaimAndAskForEmail(
  */
 async function loginAndRedirect(user: any, request: Request, url: URL): Promise<Response> {
 	const response = await respondWithSession({ user }, { request, url });
-	const redirectPath = isProfileComplete(user) ? '/' : '/complete-profile';
+	const returnTo = getAuthReturnTo(request);
+	const redirectPath = isProfileComplete(user) ? returnTo : profileReturnTo(returnTo);
+	clearAuthReturnTo(response, isSecureRequest(url, request));
 	response.headers.set('Location', redirectPath);
 
 	return new Response(null, {

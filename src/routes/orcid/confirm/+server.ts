@@ -6,6 +6,7 @@ import OrcidSignupClaim from '$lib/db/models/OrcidSignupClaim';
 import { respondWithSession } from '$lib/server/auth/authResponse';
 import { createOrcidUser } from '$lib/server/orcid/createOrcidUser';
 import { isSecureRequest } from '$lib/server/auth/sessionCookie';
+import { getAuthReturnTo, clearAuthReturnTo, profileReturnTo } from '$lib/server/auth/returnTo';
 import {
 	hashOrcidSignupToken,
 	isOrcidSignupExpired,
@@ -91,8 +92,10 @@ async function respondWithRedirect(
 	location: string
 ): Promise<Response> {
 	const response = await respondWithSession({ user }, { request, url });
+	const returnTo = getAuthReturnTo(request);
+	clearAuthReturnTo(response, isSecureRequest(url, request));
 	const headers = new Headers(response.headers);
-	headers.set('Location', location);
+	headers.set('Location', location === '/complete-profile' ? profileReturnTo(returnTo) : returnTo);
 	// The claim is consumed; drop the browser's pointer to it.
 	headers.append('set-cookie', serializeExpiredOrcidSignupCookie({ secure: isSecureRequest(url, request) }));
 
