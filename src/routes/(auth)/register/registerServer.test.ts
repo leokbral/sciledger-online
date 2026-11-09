@@ -208,4 +208,23 @@ describe('traditional registration email verification', () => {
 		expect(mocks.instances.length).toBe(0);
 		expect(mocks.sendEmailVerification).not.toHaveBeenCalled();
 	});
+
+	it('reports email delivery failures separately after storing the account', async () => {
+		mocks.sendEmailVerification.mockRejectedValue(new Error('SMTP unavailable'));
+		const { POST } = await import('./+server');
+
+		const response = await POST({
+			request: createRequest(),
+			url: new URL('https://sciledger.online/register')
+		} as any);
+		const body = await response.json();
+
+		expect(response.status).toBe(503);
+		expect(body).toEqual({
+			error:
+				'Conta criada, mas não foi possível enviar o email de verificação. Tente reenviar o email após corrigir a configuração SMTP.',
+			code: 'email_delivery_failed'
+		});
+		expect(mocks.instances[0].save).toHaveBeenCalled();
+	});
 });

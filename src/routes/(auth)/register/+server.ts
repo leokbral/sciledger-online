@@ -129,11 +129,23 @@ export const POST: RequestHandler = async ({ request, url }) => {
 		// Salva o usuário no banco de dados
 		await newUser.save();
 		if (shouldSendEmailVerification) {
-			await sendEmailVerification({
-				to: newUser.email,
-				firstName: newUser.firstName,
-				verificationUrl: getEmailVerificationUrl(url.origin, emailVerificationToken)
-			});
+			try {
+				await sendEmailVerification({
+					to: newUser.email,
+					firstName: newUser.firstName,
+					verificationUrl: getEmailVerificationUrl(url.origin, emailVerificationToken)
+				});
+			} catch (error) {
+				console.error('Falha ao enviar email de verificação:', error);
+				return json(
+					{
+						error:
+							'Conta criada, mas não foi possível enviar o email de verificação. Tente reenviar o email após corrigir a configuração SMTP.',
+						code: 'email_delivery_failed'
+					},
+					{ status: 503 }
+				);
+			}
 		}
 
 		// Resposta de sucesso

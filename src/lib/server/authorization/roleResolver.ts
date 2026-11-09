@@ -28,7 +28,7 @@ export type ResolvedRoleAssignment = {
 	roleKey: string;
 	scopeType: RoleScopeType;
 	scopeId?: string | null;
-	source: 'assignment';
+	source: 'assignment' | 'legacy-user-role';
 };
 
 type QueryOptions = {
@@ -160,6 +160,32 @@ export async function resolveRoleAssignments(
 		scopeId: assignment.scopeId ?? null,
 		source: 'assignment'
 	}));
+
+	// Users created before RBAC was introduced only have the legacy `roles`
+	// flags. Keep those accounts usable until the migration script is run.
+	const legacyRoles = [
+		['author', 'Author'],
+		['admin', 'Admin'],
+		['reviewer', 'Reviewer']
+	] as const;
+	for (const [legacyRole, roleKey] of legacyRoles) {
+		if (
+			user?.roles?.[legacyRole] === true &&
+			!assignments.some(
+				(assignment) =>
+					assignment.roleKey === roleKey &&
+					assignment.scopeType === 'global' &&
+					assignment.scopeId == null
+			)
+		) {
+			assignments.push({
+				roleKey,
+				scopeType: 'global',
+				scopeId: null,
+				source: 'legacy-user-role'
+			});
+		}
+	}
 
 	return assignments;
 }
