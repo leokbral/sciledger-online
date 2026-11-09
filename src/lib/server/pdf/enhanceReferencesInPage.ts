@@ -85,7 +85,7 @@ export function enhanceReferencesInPage(): ReferenceLinkReport {
 			}
 			const parent = node.parentElement;
 			if (!parent) return NodeFilter.FILTER_REJECT;
-			if (parent.closest('[id^="ref-"]') || parent.closest('a')) return NodeFilter.FILTER_REJECT;
+			if (parent.closest('[id^="ref-"]') || parent.closest('a, math')) return NodeFilter.FILTER_REJECT;
 			if (SKIP.has(parent.tagName)) return NodeFilter.FILTER_REJECT;
 			return NodeFilter.FILTER_ACCEPT;
 		}

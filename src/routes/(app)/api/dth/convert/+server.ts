@@ -120,8 +120,9 @@ export const POST: RequestHandler = async ({ request, url }) => {
                 originalFilename: file.name || 'document.docx'
             });
             const localHtmlHasScriptFormatting = /<(?:sup|sub)\b/i.test(localConversion.html);
+            const dthHtmlHasEquations = /<(?:[\w-]+:)?math\b/i.test(result);
 
-            if (localHtmlHasScriptFormatting && localConversion.html.trim()) {
+            if (!dthHtmlHasEquations && localHtmlHasScriptFormatting && localConversion.html.trim()) {
                 result = localConversion.html;
                 imageStats = {
                     htmlImageCount: localConversion.imageSources.length,
@@ -153,6 +154,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
             JSON.stringify({
                 result,
                 html: result,
+                equationCount: (result.match(/<(?:[\w-]+:)?math\b/gi) || []).length,
                 imageProcessingWarning,
                 ...imageStats
                 // src: `https://aulazero.xyz/${fileName}`

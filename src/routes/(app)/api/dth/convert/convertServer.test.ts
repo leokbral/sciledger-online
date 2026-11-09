@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { normalizeArticleHtml } from '$lib/server/pdf/normalizeArticleHtml';
 
 const mocks = vi.hoisted(() => ({
 	env: {
@@ -105,6 +106,36 @@ describe('POST /api/dth/convert image preview handling', () => {
 		expect(body.html).not.toContain('H2O');
 		expect(body.html).not.toContain('SO42-');
 		expect(mocks.rewriteHtmlImageSources).not.toHaveBeenCalled();
+	});
+
+	it('preserves DTH equations when local Mammoth HTML contains superscripts', async () => {
+		const math = '<math xmlns="http://www.w3.org/1998/Math/MathML"><mfrac><mn>1</mn><mi>x</mi></mfrac></math>';
+		const html = `<p>H<sub>2</sub>O ${math}</p><img src="https://example.com/image">`;
+		mocks.convertDocxToHtmlWithLocalImages.mockResolvedValue({
+			html: '<p>H<sub>2</sub>O</p>',
+			imageSources: ['/api/images/local-image']
+		});
+		mocks.rewriteHtmlImageSources.mockImplementation((value: string) => ({
+			html: value.replace('https://example.com/image', '/api/images/local-image'),
+			htmlImageCount: 1,
+			extractedImageCount: 1,
+			replacedImageCount: 1,
+			warnings: []
+		}));
+		vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ html }))));
+		const { POST } = await import('./+server');
+		const response = await POST({
+			request: createRequest(),
+			url: new URL('http://localhost:5173/api/dth/convert')
+		} as any);
+		const body = await response.json();
+		expect(response.status).toBe(200);
+		expect(body.html).toContain(math);
+		expect(body.html).toContain('H<sub>2</sub>O');
+		expect(body.html).toContain('/api/images/local-image');
+		expect(body.equationCount).toBe(1);
+		expect(normalizeArticleHtml(body.html).body).toContain(math);
+		expect(mocks.rewriteHtmlImageSources).toHaveBeenCalledWith(html, ['/api/images/local-image']);
 	});
 
 	it('returns a service-unavailable response when the conversion service cannot be reached', async () => {
