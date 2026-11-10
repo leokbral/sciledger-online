@@ -18,7 +18,6 @@ const TERMS_VERSION = 'terms-v1';
 const PRIVACY_VERSION = 'privacy-v1';
 
 export const POST: RequestHandler = async ({ request, url }) => {
-
 	await start_mongo(); // Não necessário mais
 
 	try {
@@ -38,15 +37,21 @@ export const POST: RequestHandler = async ({ request, url }) => {
 		} = await request.json();
 
 		// Verifica se todas as informações necessárias foram enviadas
-		if (!firstName || !lastName || !username || !country || !dob || !email || !password || !confirmPassword) {
+		if (
+			!firstName ||
+			!lastName ||
+			!username ||
+			!country ||
+			!dob ||
+			!email ||
+			!password ||
+			!confirmPassword
+		) {
 			return json({ error: 'Todos os campos são obrigatórios.' }, { status: 400 });
 		}
 
 		if (termsAccepted !== true || privacyAccepted !== true) {
-			return json(
-				{ error: 'Terms and Privacy Policy acceptance is required.' },
-				{ status: 400 }
-			);
+			return json({ error: 'Terms and Privacy Policy acceptance is required.' }, { status: 400 });
 		}
 
 		// Verifica se as senhas coincidem
@@ -63,10 +68,10 @@ export const POST: RequestHandler = async ({ request, url }) => {
 		}
 
 		// Validação do handle: deve ser único, sem espaços e começar com "@"
-        const usernamePattern = /^@[A-Za-z0-9_]{3,}$/;
-        if (!usernamePattern.test(username)) {
-            return json({ error: 'Username inválido. Não conter espaços.' }, { status: 400 });
-        }
+		const usernamePattern = /^@[A-Za-z0-9_]{3,}$/;
+		if (!usernamePattern.test(username)) {
+			return json({ error: 'Username inválido. Não conter espaços.' }, { status: 400 });
+		}
 
 		// Verifica se o usuário já existe
 		const existingUsername = await Users.findOne({ username });
@@ -74,20 +79,20 @@ export const POST: RequestHandler = async ({ request, url }) => {
 			return json({ error: 'Username já cadastrado.' }, { status: 409 });
 		}
 
-
-
 		// Cria um hash para a senha usando o crypto
-		const salt = AUTH_CONFIG_SECRET //crypto.randomBytes(32).toString('hex');
+		const salt = AUTH_CONFIG_SECRET; //crypto.randomBytes(32).toString('hex');
 		const hashedPassword = crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
 
-		const id = crypto.randomUUID()
+		const id = crypto.randomUUID();
 
 		// A invitation only counts when it is validated server-side against the
 		// database (pending, unexpired, and issued for this exact email). The
 		// Referer header is attacker-controlled and must never drive this decision.
 		const invitation = await findValidEmailReviewerInvitation(inviteToken, normalizedEmail);
 		const shouldSendEmailVerification = !invitation;
-		const emailVerificationToken = shouldSendEmailVerification ? generateEmailVerificationToken() : '';
+		const emailVerificationToken = shouldSendEmailVerification
+			? generateEmailVerificationToken()
+			: '';
 		const emailVerificationTokenHash = shouldSendEmailVerification
 			? hashEmailVerificationToken(emailVerificationToken)
 			: undefined;
@@ -137,11 +142,16 @@ export const POST: RequestHandler = async ({ request, url }) => {
 				});
 			} catch (error) {
 				console.error('Falha ao enviar email de verificação:', error);
+				newUser.emailVerificationLastSentAt = undefined;
+				await newUser.save();
 				return json(
 					{
 						error:
-							'Conta criada, mas não foi possível enviar o email de verificação. Tente reenviar o email após corrigir a configuração SMTP.',
-						code: 'email_delivery_failed'
+							'Your account was created, but we could not send the verification email. Please try resending it later.',
+						code: 'email_delivery_failed',
+						accountCreated: true,
+						email: newUser.email,
+						redirectTo: `/verify-email/pending?${new URLSearchParams({ email: newUser.email, delivery: 'failed' })}`
 					},
 					{ status: 503 }
 				);
@@ -149,7 +159,18 @@ export const POST: RequestHandler = async ({ request, url }) => {
 		}
 
 		// Resposta de sucesso
-		return json({ user: { id: newUser.id, email: newUser.email } }, { status: 201 });
+		return json(
+			{
+				user: { id: newUser.id, email: newUser.email },
+				...(shouldSendEmailVerification
+					? {
+							emailVerificationRequired: true,
+							redirectTo: `/verify-email/pending?${new URLSearchParams({ email: newUser.email })}`
+						}
+					: {})
+			},
+			{ status: 201 }
+		);
 	} catch (error) {
 		console.error('Erro ao registrar usuário:', error);
 		return json({ error: 'Erro interno do servidor.' }, { status: 500 });
