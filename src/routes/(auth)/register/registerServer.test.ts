@@ -96,6 +96,10 @@ describe('traditional registration email verification', () => {
 		} as any);
 
 		expect(response.status).toBe(201);
+		expect(await response.json()).toMatchObject({
+			emailVerificationRequired: true,
+			redirectTo: '/verify-email/pending?email=ada%40example.com'
+		});
 		const user = mocks.instances[0];
 		expect(user.emailVerified).toBe(false);
 		expect(user.emailVerificationTokenHash).toBe(hashEmailVerificationToken('plain-token'));
@@ -191,7 +195,10 @@ describe('traditional registration email verification', () => {
 		const user = mocks.instances[0];
 		expect(user.email).toBe('ada@example.com');
 		expect(user.handle).toBe('ada@example.com');
-		expect(mocks.findValidEmailReviewerInvitation).toHaveBeenCalledWith(undefined, 'ada@example.com');
+		expect(mocks.findValidEmailReviewerInvitation).toHaveBeenCalledWith(
+			undefined,
+			'ada@example.com'
+		);
 	});
 
 	it('requires Terms and Privacy Policy acceptance', async () => {
@@ -220,11 +227,13 @@ describe('traditional registration email verification', () => {
 		const body = await response.json();
 
 		expect(response.status).toBe(503);
-		expect(body).toEqual({
-			error:
-				'Conta criada, mas não foi possível enviar o email de verificação. Tente reenviar o email após corrigir a configuração SMTP.',
-			code: 'email_delivery_failed'
+		expect(body).toMatchObject({
+			code: 'email_delivery_failed',
+			accountCreated: true,
+			email: 'ada@example.com',
+			redirectTo: '/verify-email/pending?email=ada%40example.com&delivery=failed'
 		});
+		expect(mocks.instances[0].emailVerificationLastSentAt).toBeUndefined();
 		expect(mocks.instances[0].save).toHaveBeenCalled();
 	});
 });

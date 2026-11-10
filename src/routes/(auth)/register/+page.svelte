@@ -104,7 +104,9 @@
 				inviteToken: inviteToken || undefined
 			});
 
-			if (response.user) {
+			if ((response.emailVerificationRequired || response.accountCreated) && response.redirectTo) {
+				goto(response.redirectTo);
+			} else if (response.user) {
 				// Se for um registro através de convite, criar um convite de hub
 				if (isInvite && inviteToken && inviteHubId) {
 					try {

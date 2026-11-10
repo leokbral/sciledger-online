@@ -96,9 +96,9 @@
 	<div class="grid gap-4 md:grid-cols-2">
 		{#each hubs as hub}
 			<div
-				class="group grid min-h-48 overflow-hidden rounded-lg border border-surface-200 bg-white shadow-sm transition hover:border-primary-300 hover:shadow-md"
+				class="group flex min-h-48 min-w-0 flex-col overflow-hidden rounded-lg border border-surface-200 bg-white shadow-sm transition hover:border-primary-300 hover:shadow-md"
 			>
-				<a href={hubHref(hub)} class="grid" data-sveltekit-preload-data="hover">
+				<a href={hubHref(hub)} class="block min-w-0 flex-1" data-sveltekit-preload-data="hover">
 					<div class="relative h-28 overflow-hidden bg-surface-100">
 						{#if hub.cardUrl}
 							<img
@@ -116,7 +116,7 @@
 					</div>
 					<div class="space-y-3 p-4">
 						<div class="flex items-start justify-between gap-3">
-							<div class="min-w-0">
+							<div class="min-w-0 flex-1">
 								<p class="text-xs font-semibold uppercase text-primary-700">{hub.type ?? 'Hub'}</p>
 								<h3 class="mt-1 truncate text-base font-semibold text-surface-950">
 									{hub.title ?? 'Untitled hub'}
@@ -126,7 +126,7 @@
 								<img
 									src={hubImageUrl(hub.logoUrl)}
 									alt={`${hub.title ?? 'Hub'} logo`}
-									class="h-10 w-10 rounded-full border border-surface-200 object-cover"
+									class="h-10 w-10 shrink-0 rounded-full border border-surface-200 object-cover"
 								/>
 							{/if}
 						</div>
@@ -136,7 +136,7 @@
 					</div>
 				</a>
 				{#if showSubmit}
-					<div class="flex justify-end border-t border-surface-100 px-4 py-3">
+					<div class="flex shrink-0 justify-end border-t border-surface-100 px-4 py-3">
 						<a
 							href={loggedIn
 								? hubSubmissionHref(hubId(hub))

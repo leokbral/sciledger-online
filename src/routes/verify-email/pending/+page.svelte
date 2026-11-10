@@ -41,8 +41,11 @@
 			class="mx-auto mb-6 h-auto w-40"
 		/>
 		<h1 class="text-2xl font-bold text-surface-900">Verify your email</h1>
-		<p class="mt-5 text-surface-700">We've sent a verification email to:</p>
+		<p class="mt-5 text-surface-700">Verify the email address for your account:</p>
 		<p class="mt-2 break-all font-semibold text-surface-950">{email}</p>
+		{#if page.url.searchParams.get('delivery') === 'failed' && !message}
+			<p class="mt-5 rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-800">Your account was created, but the verification email could not be sent. You can request a new email below.</p>
+		{/if}
 		<p class="mt-5 text-surface-700">Please verify your email before signing in.</p>
 		<p class="mt-4 text-sm text-surface-600">Remember to check your Spam folder.</p>
 

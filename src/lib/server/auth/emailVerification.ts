@@ -56,6 +56,9 @@ function getTransporter(): nodemailer.Transporter | null {
 		host: env.SMTP_HOST || 'smtp.gmail.com',
 		port: smtpPort,
 		secure: env.SMTP_SECURE === 'true' || smtpPort === 465,
+		connectionTimeout: 10000,
+		greetingTimeout: 10000,
+		socketTimeout: 20000,
 		auth: {
 			user: smtpUser,
 			pass: smtpPass

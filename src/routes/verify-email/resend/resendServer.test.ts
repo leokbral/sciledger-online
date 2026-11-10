@@ -4,6 +4,7 @@ import { hashEmailVerificationToken } from '$lib/server/auth/emailVerification';
 const mocks = vi.hoisted(() => ({
 	startMongo: vi.fn(),
 	findOne: vi.fn(),
+	updateOne: vi.fn(),
 	save: vi.fn(),
 	sendEmailVerification: vi.fn(),
 	generateEmailVerificationToken: vi.fn(),
@@ -16,7 +17,8 @@ vi.mock('$lib/db/mongooseConnection', () => ({
 
 vi.mock('$lib/db/models/User', () => ({
 	default: {
-		findOne: mocks.findOne
+		findOne: mocks.findOne,
+		updateOne: mocks.updateOne
 	}
 }));
 
@@ -49,6 +51,7 @@ describe('email verification resend endpoint', () => {
 		vi.useRealTimers();
 		mocks.startMongo.mockResolvedValue(undefined);
 		mocks.save.mockResolvedValue(undefined);
+		mocks.updateOne.mockResolvedValue({ modifiedCount: 1 });
 		mocks.sendEmailVerification.mockResolvedValue(undefined);
 		mocks.generateEmailVerificationToken.mockReturnValue('new-token');
 		mocks.getEmailVerificationExpiresAt.mockReturnValue(new Date('2026-07-11T12:00:00.000Z'));
@@ -161,5 +164,87 @@ describe('email verification resend endpoint', () => {
 			firstName: 'Ada',
 			verificationUrl: 'https://sciledger.online/verify-email?token=new-token'
 		});
+	});
+
+	it('returns a recoverable delivery error and restores the previous token on SMTP failure', async () => {
+		const previous = {
+			emailVerificationTokenHash: hashEmailVerificationToken('old-token'),
+			emailVerificationExpiresAt: new Date('2026-12-01T12:00:00Z'),
+			emailVerificationLastSentAt: new Date('2026-01-01T12:00:00Z')
+		};
+		mocks.findOne.mockResolvedValue({
+			email: 'user@example.com',
+			firstName: 'Ada',
+			emailVerified: false,
+			verificationSource: 'register',
+			...previous,
+			save: mocks.save
+		});
+		mocks.sendEmailVerification.mockRejectedValue(
+			Object.assign(new Error('SMTP authentication failed'), { code: 'EAUTH', responseCode: 535 })
+		);
+		const { POST } = await import('./+server');
+		const response = await POST({
+			request: createRequest('user@example.com'),
+			url: new URL('https://sciledger.online/verify-email/resend')
+		} as any);
+		expect(response.status).toBe(503);
+		expect(await response.json()).toMatchObject({ code: 'email_delivery_failed' });
+		expect(mocks.updateOne).toHaveBeenCalledWith(
+			{
+				email: 'user@example.com',
+				emailVerified: false,
+				emailVerificationTokenHash: hashEmailVerificationToken('new-token')
+			},
+			{ $set: previous }
+		);
+	});
+
+	it('removes the failed resend cooldown when there was no previous token', async () => {
+		mocks.findOne.mockResolvedValue({
+			email: 'user@example.com',
+			firstName: 'Ada',
+			emailVerified: false,
+			verificationSource: 'register',
+			save: mocks.save
+		});
+		mocks.sendEmailVerification.mockRejectedValue(new Error('Email service is not configured'));
+		const { POST } = await import('./+server');
+		const response = await POST({
+			request: createRequest('user@example.com'),
+			url: new URL('https://sciledger.online/verify-email/resend')
+		} as any);
+		expect(response.status).toBe(503);
+		expect(mocks.updateOne).toHaveBeenCalledWith(expect.anything(), {
+			$unset: {
+				emailVerificationTokenHash: '',
+				emailVerificationExpiresAt: '',
+				emailVerificationLastSentAt: ''
+			}
+		});
+	});
+
+	it('returns JSON when the database is unavailable', async () => {
+		mocks.startMongo.mockRejectedValue(new Error('Database unavailable'));
+		const { POST } = await import('./+server');
+		const response = await POST({
+			request: createRequest('user@example.com'),
+			url: new URL('https://sciledger.online/verify-email/resend')
+		} as any);
+		expect(response.status).toBe(500);
+		expect(await response.json()).toMatchObject({ code: 'verification_unavailable' });
+	});
+
+	it('rejects malformed requests before touching the database', async () => {
+		const { POST } = await import('./+server');
+		const response = await POST({
+			request: new Request('https://sciledger.online/verify-email/resend', {
+				method: 'POST',
+				body: '{'
+			}),
+			url: new URL('https://sciledger.online/verify-email/resend')
+		} as any);
+		expect(response.status).toBe(400);
+		expect(mocks.startMongo).not.toHaveBeenCalled();
 	});
 });
