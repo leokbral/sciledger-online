@@ -117,5 +117,7 @@
 		"width",
 		"zIndex"
 	],
-	"python.terminal.useEnvFile": true
+	"python.terminal.useEnvFile": true,
+	"files.autoSave": "afterDelay",
+	"files.autoSaveDelay": 1000
 }

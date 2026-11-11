@@ -8,7 +8,6 @@
 	import type { User } from '$lib/types/User';
 	import type { PageData } from './$types';
 	import type { PaperPublishStoreData } from '$lib/types/PaperPublishStoreData';
-	import { Avatar } from '@skeletonlabs/skeleton-svelte';
 	import CorrectionProgressBar from '$lib/components/CorrectionProgressBar/CorrectionProgressBar.svelte';
 	import RichTextEditor from '$lib/components/Text/RichTextEditor.svelte';
 	import { onMount } from 'svelte';
@@ -91,17 +90,6 @@
 		return recommendations[recommendation] || recommendation;
 	}
 
-	function getEthicsText(value: string): string {
-		const ethics: Record<string, string> = {
-			yes: 'Yes',
-			no: 'No',
-			adequate: 'Adequate',
-			justified: 'Justified',
-			absent: 'Absent'
-		};
-
-		return ethics[value] || value || 'Not provided';
-	}
 
 	// Function to clean title from <p> tags
 	function cleanTitle(title: string): string {
@@ -141,19 +129,6 @@
 		return `/api/reviews/attachments/${encodeURIComponent(attachment.fileId || attachment.id)}`;
 	}
 
-	const detailedReviewFields = [
-		{ key: 'originality', label: 'Originality' },
-		{ key: 'clarity', label: 'Clarity' },
-		{ key: 'literatureReview', label: 'Literature Review' },
-		{ key: 'theoreticalFoundation', label: 'Theoretical Foundation' },
-		{ key: 'methodology', label: 'Methodology' },
-		{ key: 'reproducibility', label: 'Reproducibility' },
-		{ key: 'results', label: 'Results' },
-		{ key: 'figures', label: 'Figures' },
-		{ key: 'limitations', label: 'Limitations' },
-		{ key: 'language', label: 'Language' },
-		{ key: 'impact', label: 'Impact' }
-	];
 
 	// Save status tracking
 	let isSaving = $state(false);
@@ -374,7 +349,7 @@
 			}
 			paper = { ...paper, status: result.status || paper.status } as Paper;
 			// If published immediately (no hub), go to published view; otherwise go back to dashboard
-			if ((paper as any).status === 'published') {
+			if (paper.status === 'published') {
 				await goto(`/publish/published/${paper.id}`);
 			} else {
 				await goto(`/publish/`);
@@ -452,17 +427,6 @@
 	}
 
 	// Function to toggle correction completion
-	function toggleCorrection(
-		reviewIndex: number,
-		type: 'weaknesses' | 'criterion',
-		identifier: string
-	) {
-		const key = `${reviewIndex}-${type}-${identifier}`;
-		correctionProgress[key] = !correctionProgress[key];
-
-		// Force immediate save for testing
-		saveCorrectionProgress();
-	}
 
 	// Function to calculate completion percentage
 	function getCompletionPercentage(): number {
@@ -528,25 +492,8 @@
 		return summary;
 	}
 
-	async function handleSavePaper(event: { detail: { store: Paper } }) {
-		const updatedPaper = event.detail.store;
-
-		try {
-			const response = await post(`/publish/edit/${updatedPaper.id}`, updatedPaper);
-
-			if (response.paper) {
-				goto(`/publish/`);
-			} else {
-				alert(`Issue! ${JSON.stringify(response)}`);
-			}
-		} catch (error) {
-			console.error(error);
-			alert('An error occurred. Please try again.');
-		}
-	}
-
 	// Nova função para salvar via PaperPublishPage
-	async function savePaper(store: any) {
+	async function savePaper(store: PaperPublishStoreData) {
 		try {
 			const response = await post(`/publish/edit/${store.id}`, store);
 			if (response.paper) {
@@ -574,36 +521,12 @@
 		if (isEditMode) {
 			// Atualizar o valor inicial quando entrar no modo de edição
 			inicialValue = {
-				...(data.paper as any),
+				...(data.paper as Paper),
 				mainAuthor: (data.paper as Paper)?.mainAuthor
 			} as PaperPublishStoreData;
 		}
 	}
 
-	async function hdlSubmitPublish(event: CustomEvent) {
-		let { newMessage } = event.detail;
-		newMessage = { ...newMessage, sender: newMessage.sender.id, _id: newMessage.id };
-
-		try {
-			const response = await fetch(`/publish/corrections/${data.id}`, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify({
-					newMessage,
-					id: (messageFeed as any)?.id
-				})
-			});
-			if (!response.ok) {
-				const errorData = await response.json();
-				console.error('Erro ao enviar mensagem:', errorData);
-				alert(`Erro: ${errorData.error}`);
-			}
-		} catch (error) {
-			console.error('Erro na requisição:', error);
-		}
-	}
 </script>
 
 <!-- Main Container -->
@@ -623,7 +546,7 @@
 		<div class="mt-6 rounded-2xl border border-surface-200 bg-surface-50 p-5 dark:border-surface-700 dark:bg-surface-900/60 sm:p-6">
 			<h3 class="mb-4 text-sm font-semibold uppercase tracking-wide text-surface-500 dark:text-surface-400">Article Information</h3>
 			<div class="grid gap-4 text-sm sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
-				<div class="min-w-0"><span class="block text-surface-500 dark:text-surface-400">Title</span><span class="mt-1 block font-medium text-surface-900 dark:text-surface-100">{@html cleanTitle((paper as Paper).title)}</span></div>
+				<div class="min-w-0"><span class="block text-surface-500 dark:text-surface-400">Title</span><span class="mt-1 block font-medium text-surface-900 dark:text-surface-100">{cleanTitle((paper as Paper).title)}</span></div>
 				<div><span class="block text-surface-500 dark:text-surface-400">Status</span><span class="mt-1 block font-medium capitalize text-surface-900 dark:text-surface-100">{(paper as Paper).status}</span></div>
 				<div><span class="block text-surface-500 dark:text-surface-400">Submitted</span><span class="mt-1 block font-medium text-surface-900 dark:text-surface-100">{new Date((paper as Paper).createdAt).toLocaleDateString()}</span></div>
 			</div>
@@ -638,7 +561,7 @@
 				<li>Make the necessary changes to address reviewer concerns</li>
 				<li>Save your changes - they will be automatically applied to your article</li>
 				<li>
-					{#if (paper as any)?.reviewRound === 2}
+					{#if 'reviewRound' in paper && paper.reviewRound === 2}
 						When ready, submit for publication or withdraw from publication
 					{:else}
 						When ready, submit for the second review round
@@ -647,7 +570,7 @@
 			</ol>
 
 			{#if paper && ((paper as Paper).status === 'needing corrections' || (paper as Paper).status === 'under correction')}
-				{#if (paper as any)?.reviewRound === 2}
+				{#if paper?.reviewRound === 2}
 					<div class="mt-4 flex flex-col md:flex-row md:items-center gap-3">
 						<button
 							class="btn preset-filled-primary-500"
@@ -1294,7 +1217,7 @@
 		</div>
 	</div>
 
-	{#if paper && ((paper as Paper).status === 'needing corrections' || (paper as Paper).status === 'under correction') && (paper as any)?.reviewRound !== 2}
+	{#if paper && ((paper as Paper).status === 'needing corrections' || (paper as Paper).status === 'under correction') && (paper as Paper & { reviewRound?: number })?.reviewRound !== 2}
 		<div class="flex flex-col items-start gap-3 rounded-2xl border border-surface-200 bg-surface-50 p-5 shadow-sm dark:border-surface-700 dark:bg-surface-900/60 sm:flex-row sm:items-center sm:justify-end sm:p-7">
 			{#if submitFinalError}
 				<span class="text-sm text-red-600">{submitFinalError}</span>
