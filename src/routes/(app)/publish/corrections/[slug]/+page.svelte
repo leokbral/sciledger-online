@@ -678,23 +678,6 @@
 							<span class="text-red-600 text-sm">{withdrawPublicationError}</span>
 						{/if}
 					</div>
-				{:else}
-					<div class="mt-4 flex items-center gap-3">
-						<button
-							class="btn preset-filled-primary-500"
-							disabled={isSubmittingFinal || isSavingResponse}
-							onclick={() => (showFinalReviewConfirm = true)}
-						>
-							{#if isSubmittingFinal}
-								Submitting...
-							{:else}
-								Submit for Final Review
-							{/if}
-						</button>
-						{#if submitFinalError}
-							<span class="text-red-600 text-sm">{submitFinalError}</span>
-						{/if}
-					</div>
 				{/if}
 			{/if}
 		</div>
@@ -1310,4 +1293,23 @@
 			{/if}
 		</div>
 	</div>
+
+	{#if paper && ((paper as Paper).status === 'needing corrections' || (paper as Paper).status === 'under correction') && (paper as any)?.reviewRound !== 2}
+		<div class="flex flex-col items-start gap-3 rounded-2xl border border-surface-200 bg-surface-50 p-5 shadow-sm dark:border-surface-700 dark:bg-surface-900/60 sm:flex-row sm:items-center sm:justify-end sm:p-7">
+			{#if submitFinalError}
+				<span class="text-sm text-red-600">{submitFinalError}</span>
+			{/if}
+			<button
+				class="btn preset-filled-primary-500"
+				disabled={isSubmittingFinal || isSavingResponse}
+				onclick={() => (showFinalReviewConfirm = true)}
+			>
+				{#if isSubmittingFinal}
+					Submitting...
+				{:else}
+					Submit for Final Review
+				{/if}
+			</button>
+		</div>
+	{/if}
 </div>
